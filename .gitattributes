@@ -1,0 +1,12 @@
+# 仓库统一 LF（与 .prettierrc.json 的 endOfLine: lf 对齐），避免 Windows/Unix 混用导致 format 检查误报。
+* text=auto eol=lf
+
+# 二进制资产不做行尾转换
+*.png binary
+*.jpg binary
+*.webp binary
+*.mp3 binary
+*.m4a binary
+*.wav binary
+*.webm binary
+*.mp4 binary

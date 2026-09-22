@@ -1,0 +1,14 @@
+node_modules/
+dist/
+coverage/
+pnpm-lock.yaml
+.agent-teams/
+.dsh/
+.tmp-scratch/
+
+# 设计契约与 Figma 基线由各自 owner 维护格式，prettier 不参与改写
+DESIGN.md
+docs/figma/
+
+# 用户/队长冻结的产品规格与设计契约，不由工具链改写
+CONTEXT.md
