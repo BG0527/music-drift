@@ -1,0 +1,7 @@
+/**
+ * 设计系统入口样式。页面/组件统一 `import '@music-drift/web/design-system/index.css'` 级别引入。
+ * 顺序：字体自托管 → 主题 token → 动效层。
+ */
+@import './fonts.css';
+@import './theme.css';
+@import './motion.css';

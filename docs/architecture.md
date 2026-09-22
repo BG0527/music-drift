@@ -78,7 +78,11 @@ packages/shared/src/domain ──► 无任何 IO 依赖（时钟/ID/随机源�
 | typescript                                                                      | 5.9.3                                               | 全部         | 类型检查             |
 | eslint / @eslint/js / typescript-eslint / globals / react-hooks / react-refresh | 10.11.0 / 10.0.1 / 8.70.1 / 17.12.0 / 7.1.1 / 0.5.7 | 全部         | 静态检查             |
 | prettier / eslint-config-prettier                                               | 3.9.8 / 10.1.8                                      | 全部         | 格式化               |
-| @types/node                                                                     | 26.6.2                                              | api          | Node 类型            |
+| @types/node                                                                     | 26.6.2                                              | api / shared | Node 类型            |
+| drizzle-orm                                                                     | 0.45.3                                              | api          | ORM / 查询层（D-04） |
+| pg                                                                              | 8.23.0                                              | api          | Postgres 驱动（node-postgres） |
+| drizzle-kit                                                                     | 0.31.11                                             | api          | 迁移生成与执行（devDep） |
+| @types/pg                                                                       | 8.23.1                                              | api          | `pg` 类型（devDep） |
 
 - **预批准但尚未安装**（由对应任务 owner 在落地时加入 catalog，**不得**提前安装）：
 
@@ -90,10 +94,25 @@ packages/shared/src/domain ──► 无任何 IO 依赖（时钟/ID/随机源�
 | lxgw-wenkai-webfont、@fontsource/quattrocento | T3.1     | 自托管字体（**禁 CDN**，jsDelivr 不通） |
 | @playwright/test                              | T4.1     | E2E 与并发抢占验证                      |
 | 口令哈希库（argon2id / bcrypt 实现）          | T1.3     | 需先按 D-03 裁决                        |
-| 数据库驱动 / ORM / 迁移工具                   | T1.2     | 需先按 D-01 / D-04 裁决                 |
+| ~~数据库驱动 / ORM / 迁移工具~~               | T1.2     | **已落地**：D-01/D-04 裁决为单一 Postgres + drizzle，见上表 |
 | 音频存储 SDK（仅当选择对象存储时）            | T2.1     | 需先按 D-02 裁决                        |
 
 - pnpm 11 安装脚本策略：`pnpm-workspace.yaml` → `allowBuilds: { esbuild: true }`（esbuild 是 vite/vitest 的原生二进制，必须放行）；其余依赖默认不允许执行安装脚本，新增放行需在汇报里说明理由。
+
+**t5（T1.2）依赖引入记录**（D-01 方案 A：自建 Fastify + 单一 Postgres、音频存 `bytea`；D-04：drizzle）：
+
+| 依赖 | 版本 | 归属 | 用途 |
+| --- | --- | --- | --- |
+| `drizzle-orm` | 0.45.3 | api（运行时） | schema 声明与查询层（D-04） |
+| `pg` | 8.23.0 | api（运行时） | Postgres 驱动；**并发抢占用原生 SQL**（`INSERT … ON CONFLICT DO NOTHING RETURNING`），不经过 ORM 抽象 |
+| `drizzle-kit` | 0.31.11 | api（devDep） | 生成/执行迁移（`drizzle-kit generate` / `migrate`） |
+| `@types/pg` | 8.23.1 | api（devDep） | `pg` 的类型 |
+
+**不引入的替代方案及理由**：
+- **Prisma**：重型 codegen + 自有 engine 二进制；且并发抢占处按 D-04 明确要求写原生 SQL，用 Prisma 会同时承担抽象成本与绕开抽象的成本，双重开销。
+- **原生 `pg` + 手写迁移 SQL**：放弃 D-04 已裁决的 drizzle-kit，迁移幂等/回滚要靠人肉保证，与「迁移可重复执行」的验收直接冲突。
+- **Supabase / 对象存储 / Redis / 队列**：D-01、D-02 已明确禁止（零 BaaS、零对象存储、音频进库）。
+- **`postgres`（postgres.js）**：与 `pg` 能力重叠，`pg` 是 drizzle 的 node-postgres 驱动主线且类型更成熟；不引入第二个驱动。
 
 ## 5. ADR-004 契约策略：zod schema 是唯一真相
 
@@ -535,3 +554,599 @@ captain 自行重跑 M2 → **rc=1，`× 16.2（防御）：事件流带入越�
   （不要依赖内核兜底来掩盖脏数据）。
 - `total_segments` 必须作为列存储，**不得硬编码 4**（CONTEXT §4.3：正式版为第 3–5 段中的最后一段）。
 - 理由：内核的兜底是为了「不可信输入不导致公海撒谎」，不是为了让写入侧可以放任脏数据。
+
+
+## 18. 曲库素材授权约束（用户 2026-09-23 提供赛事官方歌单，captain 实测整理）
+
+用户提供的链接 `https://c6.y.qq.com/y.qq.com/...?__=UFgdsOYo9Glo` 解析结果为 **QQ 音乐歌单 ID 9778975366**，
+标题「**腾讯音乐高校AI Hackathon参考歌单**」，**共 156 首**（captain 已取到前 30 首元数据）。
+**这是赛事主办方提供的官方参考歌单，不是普通分享歌单。**
+
+### 18.1 授权条款（歌单描述原文，逐字引用，不得改写）
+
+> 仅用于腾讯音乐高校AI Hackathon赛事
+> 如果在作品 Demo 中使用音乐素材的，本次比赛周期内，非商用、不对外公开上线，只用于赛事评审演示。赛事结束后，不可以再对外发布、上线使用该素材。也可以考虑使用公版免费歌曲。
+> 如果涉及到使用专辑封面等素材，仅极少量引用用于评论、介绍原作，才有可能适用合理使用，但依然存在不确定性，不建议依赖使用。
+
+### 18.2 由原文导出的硬约束
+
+1. **非商用**。
+2. **不对外公开上线** —— ⚠️ 与用户「部署上线到公网链接」的原始要求**直接冲突**，部署形态必须单独裁决（见 18.4）。
+3. **仅用于赛事评审演示**；**赛事结束后不得再对外发布/上线使用**。
+4. **专辑封面等素材不要依赖**（原文"不建议依赖使用"）。→ 选歌列表若涉及视觉，使用自绘/内联 SVG，不使用官方封面图。
+5. 原文明确许可的退路：**「也可以考虑使用公版免费歌曲」** —— 这是主办方自己给出的合规替代方案。
+
+### 18.3 两项技术障碍（captain 实测）
+
+1. **歌单里没有伴奏。** captain 程序化检索「伴奏 / 无人声 / instrumental / off vocal / 纯音乐」关键词 → **零命中**；
+   前 30 首（全 156 首）**全部是含原唱的正式发行曲**。
+   → 而接力唱**必须**是伴奏或器乐：拿原曲做底会让原唱人声与用户人声重叠，直接毁掉核心体验
+     （"我的声音会和谁的声音拼在一起"变成"三个人在唱"）。
+2. **付费下载解决不了。** QQ 音乐付费下载产出的是加密格式（`.mflac` / `.mgg`），**不能直接作为 Web Audio 素材**。
+   → 花钱也拿不到可用文件；且**任何绕过付费墙/DRM 的抓取行为一律禁止**（版权 + 违反平台协议 +
+     本项目是 TME 赛题，用盗取 TME 曲库的方式参赛会直接毁掉作品可信度）。
+3. **歌词同样受版权保护。** `CONTEXT.md` §3.2 要求"看到剩余歌词/段落提示"，但**官方歌单曲目的歌词属受版权保护文本**，
+   赛事授权是否覆盖歌词并不明确。
+   → 结论：显示歌词时**只对公版曲目使用其公有领域歌词**；对赛事歌单曲目**只显示结构性提示**（第 N 段 / 时长 / 节拍），
+     不复制歌词正文。
+
+### 18.4 部署形态必须与素材授权一致（待用户裁决）
+
+| 选项 | 说明 |
+| --- | --- |
+| (i) 受控访问的评审链接 | 不公开索引、带访问口令/令牌、页面显著位置挂素材授权声明、赛后立即下线。最贴合"只用于赛事评审演示" |
+| (ii) 公网部署但不打包任何赛事素材 | 素材仅在本地/评审时使用；线上只跑公版素材或纯人声 |
+| (iii) 只本地验收 | 用户此前已表示"验收也在本地" |
+
+### 18.5 素材选型优先级（captain 建议，待用户确认）
+
+1. **公版 / CC0 器乐（首选）** —— 主办方明文许可，且**同时解决"伴奏"与"不公开上线"两个冲突**。
+2. 用户自有或已获授权的原创作品。
+3. 赛事官方歌单 —— 仅在取得**伴奏版本**且**部署形态按 18.4(i)** 的前提下使用；**只用于赛事评审演示，赛后必须下线**。
+
+无论选哪条，`t13` 都必须交付「授权来源记录」（文件来源 + 授权条款原文 + 适用限制）。
+
+
+## 19. 曲库分段规范（captain 定义，t13/t8 必须遵守）
+
+用户 2026-09-23 裁决：**素材来源 = 公版 / CC0 器乐**（原文许可的退路），**部署形态 = 受控访问的评审链接**。
+
+**一个重要的放宽**：本项目的用途是**非商用 + 受控访问 + 赛后下线**，
+因此**不必死守「CC0 / 零署名」** —— **CC-BY（要求署名）等宽松许可同样可用**，
+只要在「设置 / 关于」页与交付文档中给出署名与许可原文。这把可选曲池显著扩大。
+
+### 19.1 选曲硬约束
+
+| 约束 | 值 | 理由 |
+| --- | --- | --- |
+| 必须无人声 | **器乐 / 伴奏** | 否则原唱与用户人声重叠，毁掉核心体验（"我的声音会和谁的声音拼在一起"变成"几个人在唱"） |
+| BPM 稳定且已知 | **70 ≤ BPM ≤ 120** | 见 §19.2，此区间可让分段自动满足 CONTEXT §14.1 |
+| 不得变速 / 自由拍 | 无 rit./accel.、无自由散板 | 分段点须可计算 |
+| 时长 | **≥ 32 小节** | 供 4 段 × 8 小节 |
+| 授权 | 公版 / CC0 / CC-BY 等允许使用的宽松许可；**记录许可原文** | 可审计 |
+
+### 19.2 分段规范（通用形式；§19 初版只给了充分条件，此处更正）
+
+**唯一约束**：每段时长 ∈ [15, 30] 秒。总时长 = 4 × 段长，故自动落在 [60, 120] 秒 —— **总长不需要单独约束**。
+
+```
+一小节时长 barSec = (拍号分子 × 60) / BPM        # 4/4 → 240/BPM；3/4 → 180/BPM
+段长 = barsPerSegment × barSec  必须 ∈ [15, 30]
+可用小节数只需满足 barsPerSegment ∈ [15×(拍号分子×60/BPM)⁻¹ …, 30×…]，
+该区间宽度 = 15×拍号分子/BPM，对任何 BPM < 拍号分子×15 都至少含一个整数。
+```
+
+**🚩 稳健做法（captain 实测后修正，优先于上面的拍号公式）**
+
+captain 用 ffmpeg + numpy 自相关检测过三首的节拍与拍号，**结果不可信、不予采信**：
+实测 BPM 相对官方值偏差 4.7% / 13.1% / 16.8%，且拍号判定与元数据描述互相矛盾
+（把 `On the Shore` 判成 3/4，而官方描述里唯一的圆舞曲是 `Rains Will Fall`）。
+**Incompetech 详情页只公布 Length 与 Tempo，不公布拍号**，无从校准检测器。
+
+因此**不要用「拍号 × 小节数」反推分段点**（在拍号未知时，该做法会产生系统性偏移，
+且误差跨 4 段累积）。改用**与拍号无关的稳健做法**：
+
+1. 目标段长取 `T ≈ 22.5s`（区间 [15,30] 的中值），总长 `4T ≈ 90s`（自动落在 [60,120]）。
+2. 目标边界 `0, T, 2T, 3T, 4T`，每个边界在 **±1.5s** 窗口内**吸附到最强起音（onset peak）**。
+3. 记录每个边界处的**起音强度分位数**作为证据；若某边界窗口内没有显著起音，标记为待人工复核。
+4. 这样分段点落在音乐的自然重音/分句处，**接缝听感正常**，且不需要知道拍号。
+5. 段长仍须落在 [15,30]；吸附后若越界，收紧窗口重算。
+
+（原「BPM ∈ [70,120] + 每段 8 小节自动满足区间」的说法只是**充分条件**，且依赖拍号已知，已降级为参考。）
+
+**最终分段表由 `t13` 产出并经用户听感确认后定稿**；captain 的检测结果不作为定稿依据。
+
+**⚠️ 必须按曲目实际拍号计算，不能一律假设 4/4。** 例如圆舞曲是 3/4：
+若按 4/4 算会得到系统性偏长的段，且分割点会逐步滑离小节线（跨 4 段后误差累积可见）。
+
+**已核验的候选（Incompetech / Kevin MacLeod，许可 = CC BY 4.0，需署名）**：
+
+| 曲名 | BPM | 实测时长 | 拍号 | 每段小节 | 段长 | 总长 | 每段起拍(ms) |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| Immersed | 64 | 04:09 (249s) | 4/4（待下载后复核） | 6 | 22.50s | 90.00s | 0 / 22500 / 45000 / 67500 |
+| Rains Will Fall | 85 | 03:42 (222s) | **3/4（圆舞曲，待复核）** | 10 | 21.18s | 84.71s | 0 / 21176 / 42353 / 63529 |
+| On the Shore | 82 | 01:41 (101s) | 4/4（待下载后复核） | 6 | 17.56s | 70.24s | 0 / 17561 / 35122 / 52683 |
+
+- 下载地址模式：`https://incompetech.com/music/royalty-free/mp3-royaltyfree/<filename>`（三首都已实测 HTTP 200 / 206 可下载）。
+- 许可原文（站点 FAQ）：`Licensed under Creative Commons: By Attribution 4.0` + `https://creativecommons.org/licenses/by/4.0/`。
+- **署名义务**：CC BY 4.0 要求在「设置 / 关于」页与交付文档中标注 Kevin MacLeod 及许可链接。
+- **拍号与精确 BPM 必须在下载后实测复核**（本节数字来自官方 pieces.json 元数据，尚未经音频分析验证）。
+
+### 19.3 每段必须落库的元数据（t8 阶段二的时间槽锚点）
+
+```
+segmentIndex      1..4   —— 歌里的固定位置
+startMs / endMs         —— 相对曲目起点
+startBar / barCount     —— 8
+bpm                     —— 曲目 BPM
+```
+
+- **段号永不压缩**（ADR-015 §16.1）。缺口保留为空槽，不是把后面的段前移。
+- 混音按 `segmentIndex` 映射到伴奏的固定时间槽；有缺口时输出 `missingSegmentIndexes`，**严禁静默拼出缺段/错位的成品**。
+- 录音页面播放的伴奏必须**只播当前段的那 8 小节**（或从该段起拍开始播），以保证用户听到的与最终时间槽一致。
+
+### 19.4 交付纪律
+
+候选清单（≥3 首，含来源链接 + 许可原文 + 下载方式 + BPM + 分段表）**必须先经用户确认**，
+用户确认前**不得下载入库、不得写代码**。入库后统一转码、响度归一，并把许可原文落进仓库。
+
+
+## 20. t10 收口：设计系统落地验证、DESIGN.md 修订追认、遗留缺口
+
+`t10` 完成。设计系统落 `apps/web/src/design-system/`（样式层 theme/fonts/motion/index.css、JS token 镜像 tokens.ts、10 类组件、水波装饰、Lucide 唯一入口 Icon、开发展示页、5 个测试文件）。
+全量：**shared 117 + api 1 + web 67 = 185 测试全绿**。
+
+### 20.1 captain 独立验证
+
+| 核验项 | 方法 | 结果 |
+| --- | --- | --- |
+| 全量测试 | 自己跑 | 185 全绿，分布与声称一致 |
+| **「测试绿但页面全白」是否真修好** | 自己构建 + 查产物 | 构建 CSS 中 `.flex{display:flex}` 等 utility **真实存在**；关键 utility 逐个命中 |
+| 防回归守卫 | 查测试 | `contract-guard.test.ts` 有 `describe('Tailwind v4 接入契约（防止 utility 静默不生成）')` |
+| 外链/CDN | 抓产物中的 URL | 唯一命中 `https://tailwindcss.com */`，是 Tailwind 输出的**注释**，非外部请求 → **0 真实外链** |
+| 自托管字体 | 计数 | 198 处 `.woff2` + 198 处 `font-display:swap` |
+| reduced-motion | 查产物 | 存在，含 `animation:none!important` |
+| 动效数值 | 查产物 | `--motion-entry-duration:.48s`（480ms 归一化） |
+| **DESIGN.md 改动范围** | `git diff ba5c295 -- DESIGN.md` | 13 插入 / 4 删除；**被删除的 token 行 = 0，新增 = 8** → **无任何既有 token 数值被动过** |
+| 核心纪律回归 | 独立复跑 37 条 | **缺失 0 条**；colors token 22 → 30 |
+
+### 20.2 DESIGN.md 越权改动：**内容追认，流程纠正**
+
+`frontend-ds` 主动披露：除授权范围（Use Case 首行 + 8 个 tint/border token）外，另改了 3 处。
+captain 裁决：**内容全部追认**。理由：这 3 处都是**用户 2026-09-23 终裁（桌面为主要场景 + 移动端可用性适配）的直接落地**；
+若不改，`DESIGN.md` 会**自相矛盾**（Layout 仍写「375px 起手」、Use Case 末段仍写「不新增桌面专属布局模式」），
+而 T3.2 照它实现必然出现"移动优先"与"桌面为主"两套读法。用户裁决本身已授权这一方向。
+
+**但流程必须纠正**：`DESIGN.md` 是**唯一风格契约**，且**存在并发消费者**（`t11` 即将按它实现 11 个页面）。
+对契约文档的改动必须**先报后改**，不能先斩后奏 —— 本案例恰好只有 t10 自己是消费者所以无损，
+但若发生在 t11 进行中，会让已完成的页面实现失效。**今后对 `DESIGN.md` 的任何改动：先发 captain，等回复再改。**
+（成员主动披露 + 给出 1 步回滚方案，这个做法本身是正确的。）
+
+### 20.3 遗留缺口 1：等宽字体未落地（**captain 裁决：暂缓，已登记**）
+
+`DESIGN.md` 的 Monospace 指定 `JetBrains Mono`，但**未引入任何 npm 字体来源**，仅声明 `--font-mono: "JetBrains Mono", <系统兜底>`。
+
+**裁决：暂缓引入，但登记为已批准的待办。**
+- 理由：目前**没有任何页面真正消费 mono**（T3.2 未开工，审核台在 T3.3）。引入字体包会带进一整套 woff2（自托管、不能走 CDN），
+  属投机性工作（YAGNI）。`--font-mono` 已声明且能优雅降级到系统等宽字体，视觉可接受。
+- 登记：**预批准依赖 `@fontsource/jetbrains-mono`**（自托管，无外部请求）。
+  第一个真正需要等宽的页面（预期为 `t12` 审核台，或 T3.2 的代号/时间戳展示）负责：
+  ① 在本文「依赖基线」登记用途；② 在 `pnpm-workspace.yaml` catalog 登记版本；③ 接入并用构建产物验证。
+
+### 20.4 遗留缺口 2：缺少根级 `build` 脚本（**已并入 t16**）
+
+- 现状：根 `package.json` 只有 `dev/test/typecheck/lint/format`，**没有 `build`**；`apps/api/package.json` 也只有 `dev/start/test/test:watch/typecheck`，**没有 `build`**。
+  `apps/web` 可独立 `vite build`（已验证可用）。
+- 影响：部署（`t16`）无法用一条根命令产出全部构建物；CI 与 Render 的构建命令无标准入口。
+- 处置：**并入 `t16`**（部署任务负责定义并验证构建管线），不额外开任务。
+
+### 20.5 给 t11 的交接要点（`frontend-ds` 已提供，captain 确认）
+
+- 样式接入点已就位：`main.tsx` 已 `import './design-system/index.css'`；组件从 `design-system` barrel 引入。
+- **图标必须走 `design-system` 的 `Icon` 并先在 `icon.tsx` 注册表登记**；页面**禁止**直接 `import` lucide
+  （否则 `import * as lucide` 会让 JS 从 227KB 涨到 978KB —— 这是 t10 实测修掉的真实缺陷）。
+- 桌面：`SidebarNav` + 主内容 `max-w-[var(--container-max-width)]`；移动：`BottomNav`（z-sticky + safe-area）；外壳用 `min-h-[100dvh]`，**禁用被禁的视口高度类名**。
+- **状态缺口按 `DESIGN.md` 自建**：Figma 12 帧里**没有任何状态帧**（空态/错误/加载/骨架/权限被拒/hover/focus/disabled 全无）——
+  组件与 token 均已备好。**不得以"Figma 里没有"为由跳过状态设计。**
+- 视觉两条新裁决：选歌页**不使用官方专辑封面**（内联 SVG）；**不复制受版权歌词正文**，只显示结构性提示。
+
+
+## 21. t17 派发单文本过期 + t18 采集主路径改判 + 一处 captain 更正
+
+### 21.1 t17 派发单文本已过期（**不是行为缺陷**）
+
+`architect` 独立发现：`t17` 的任务描述写「缺口为第 1 段时回到发起者 DRAFT」，
+而 §16.5 用户的终裁（= `DAMAGED{ANCHOR_SEGMENT_CUT}`，无补位入口）与代码、测试完全自洽。
+
+**确认：派发单文本过期，实现正确，无需返工。** 成因：`t17` 的描述在该任务**已 started 后无法编辑**
+（running team 只允许改 pending never-started 任务），
+而用户「GAP_1 = 作品判定为已损坏」的裁决是在 t17 开工后才下的 —— captain 只能通过消息通知执行者，无法回写任务文本。
+
+**处置**：以本文 §16.5 与 §17 为准；`t17` 的任务描述仅作历史记录，**不得据其判断行为**。
+`architect` 的处理正确（文档 > 过期派发摘要；terminal 任务不回写）。
+
+### 21.2 t18 采集主路径改判：**改用 files 桶 + nodeIds 批量拉取**
+
+`t18` 因 Figma API **token/IP 级 429 持续 23 分钟**置 failed（纪律执行到位：间隔 65s/62s、退避 60/180/300、每端点 ≤3 次、零跳过零外推）。
+
+**captain 裁决：采纳 `architect` 的发现，主路径改为 `figma_get_file{ nodeIds, depth }`。** 理由：
+
+1. **配额桶独立**：`files` 桶与 `nodes` 桶分开。`nodes`（`figma_get_design_context`）被打满时 `files` 仍可能可用。
+2. **信息量恰好匹配需求**：用户已裁决「Figma 仅作 IA / 文案参考，视觉一律以 DESIGN.md 为准」。
+   因此 **`radius` / `effects[]` / `stops[]` / `opacity` 本来就不需要**；
+   而 `files` 桶**含 `TEXT` 文案**，正是我们要的 IA + 文案。截图降为可选（已有 3 张）。
+3. **可批量**：`nodeIds` 支持逗号分隔 → **一次调用可拉多帧**，把原计划 9 次调用压缩到 2–3 次。
+   `depth` 建议 ≈9（实测 `4:675` 在 depth 6 仍会截断卡片内部文案）。
+
+**新的调用计划**（按优先级）：
+- 第 1 次：`nodeIds=4:966,4:1312`（T3.2 黄金路径仍缺的 2 帧），depth ≈9。
+- 第 2 次：`nodeIds=4:1204,4:1426,4:1530,63:32`（T3.3 的 4 帧），depth ≈9。
+- 第 3 次（如可行）：子节点 `4:525,4:532,4:539`。
+
+**探测优先纪律（取代原来的退避阶梯）**：先发**1 次探测调用**；成功则按 ≥65s 间隔继续；
+**若 429 则立即停止并回报，不在本轮继续重试**（避免用退避阶梯把本就稀缺的额度烧掉）。
+
+### 21.3 captain 更正 `architect` 的一条转述
+
+`architect` 报告称「`CONFLICTS §1` 仍带旧结论，建议 frontend-ds 一并更正」。**此说法不正确**：
+`docs/figma/CONFLICTS.md` 第 23–25 行**已经**自更正（明确写"该断言是错的"并给出正确键名与源码行号），
+`README.md` §5 亦已更正。`frontend-ds` 在 t3 收尾时已完成两处改写，captain 已复核。
+
+→ 结论：**两文件均已正确，无需再改。** 这条提醒记录在此，是为了避免下游误信"文档里还留着错误断言"而重复劳动。
+
+
+## 22. 一次静默停滞事故与 captain 的调度教训（2026-09-23）
+
+### 22.1 事实
+
+`t5`（数据模型、契约与并发控制）是通往第一个可演示切片（T3.2）的**关键路径长杆**，却**静默停滞约 1.5 小时**：
+
+- 任务清单状态：始终 `pending` / **attempt 0**（**从未被 claim**）；
+- 成员状态：长期显示 `idle/running`；
+- 工作区**零产物**：无 `docker-compose.yml`、无 `apps/api/drizzle.config.ts`、无 `apps/api/src/db/**`、无 schema、无 `docs/api.md`；
+  `apps/api/src/` 下除 S0 脚手架外没有任何新文件。
+
+### 22.2 处置
+
+- captain 用**产物而非状态标签**判定卡死，将 `t5` 改派给 `backend-core`（空闲 + 是 DB 不变量交接要求的作者，交接损耗最低）。
+- 向原 owner 发出**四点诊断请求**（是否执行过 / 卡在哪 / 是否有未落盘的成果 / 现在能否干活），
+  并明确要求**停手、不要补 t5、不要做未分派的活**。
+- `t6`（账号体系）与 `t9`（业务 API）是否一并改派，**取决于原 owner 的诊断回报**。
+
+### 22.3 教训（写进 captain 的工作方式）
+
+1. **状态标签会撒谎，产物不会。** `idle/running` 既可能表示"正在长回合执行"，也可能表示"会话空转"。
+   → **captain 判断成员是否真在推进，必须查工作区产物**（文件是否存在、mtime、`git status`），不能只看状态标签。
+2. **`pending` / attempt 0 是红旗。** 若成员状态显示在跑，而对应任务仍是 `pending` 且从未 claim，
+   基本可断定调度没有落到该成员身上 —— 此时**等待无用，应主动 `reassign_task`**（该工具的作用正是"分配并唤醒"）。
+3. **关键路径上的任务需要主动巡检**。本次事故无人报警：成员不喊、调度器不报、状态标签还显示在跑。
+   → 今后**每个切片的关键路径任务**都要由 captain 在合理间隔内做一次**产物级巡检**。
+4. **静默比失败更贵**。环境坏、工具缺失、拿不到任务 —— 任何一条说出来都能立即被处理；
+   沉默 1.5 小时则同时浪费了关键路径时间与 captain 的调度决策依据。
+   → 已在给该成员的指令中重申："不知道就说不知道，拿不到就说拿不到"。
+
+### 22.4 待观察
+
+`frontend-flow`（t11/t12）与 `audio-engineer`（t7/t8/t13）目前仍为 `unspawned`。
+它们首次被派发后，captain 需按 22.3 第 3 条**做产物级巡检**，确认同一停滞模式没有在这两个成员上重演。
+
+
+## 23. t18 降级裁决：Figma 剩余帧改为「可选、机会性」交付（captain 2026-09-23）
+
+### 23.1 事实
+
+Figma API 对**本 token** 在 nodes 与 files **两个桶同时 429**，持续未恢复：
+
+| 时间 | 调用 | 结果 |
+| --- | --- | --- |
+| 01:07 | `figma_get_design_context{4:675}`（nodes 桶） | 429 |
+| 01:08 | `figma_get_file{4:966, depth 9}`（files 桶） | 429 |
+| 01:2x | **captain 亲自探测** `figma_get_file{depth 1}`（最省额度） | **429** |
+
+`architect` 两轮共 **11 次调用零产出**。它执行了「探测优先」纪律（探测失败即停手、0 次重试），行为正确。
+
+### 23.2 裁决
+
+**t18-F1（blocker）—— 采纳 `architect` 的提议「captain 先探测验活，再唤醒成员」。**
+- 不再按固定时间连派 `t18`（每轮都会固定烧掉探测额度）。
+- **由 captain 在需要时做 1 次最低成本探测**（如 `figma_get_file{depth:1}`）；**仅当探测成功**才唤醒成员执行采集。
+- 设**尝试上限**：若持续不可用，则永久按缺失处理（见 23.3），不再尝试。
+
+**t18-F2（medium）—— 降级为「可选、机会性」交付，且它本来就不阻塞关键路径。**
+- 依据：用户已裁决「Figma 仅作 IA/文案参考，视觉一律以 `DESIGN.md` 为准」；现有交付（5 帧完整 + `4:675` 含 4 项导航、4 档公海分区、10 条文案）**已覆盖黄金路径所需 IA**。
+- 依赖核查：**`t11` 依赖 `t10/t7/t9`，不依赖 `t18`；`t12` 依赖 `t11`** → `t18` 不阻塞任何关键路径任务。剩余帧只精修 T3.3（P1/P2 页面）的 IA。
+- 因此：**不为它等待、不为它重复唤醒**；后续仅在配额恢复且有空闲成员时机会性补齐。
+- `t18` 任务本身保持 `failed` 状态作为记录（running team 不允许移除/编辑已启动任务），**不作为交付阻塞项**。
+
+### 23.3 若配额持续不可用：按「已知缺口」处理，不阻塞交付
+
+剩余未采帧清单（**无一跳过、无外推、无伪造**，台账见 `docs/figma/frames/00-t18-ledger.md` §4.5）：
+`4:966` public-sea-detail / `4:1312` profile-center / `4:1204` tracking-reveal / `4:1426` report-modal /
+`4:1530` admin-dashboard / `63:32` certificate-panel / 子节点 `4:525`、`4:532`、`4:539`。
+
+这些页面的 IA 由 `frontend-flow` 依据 `DESIGN.md` + 已提取的 5 帧模式自建，
+**并在交付说明中标注「该页 IA 无 Figma 稿，依据 DESIGN.md 与既有模式推导」**（诚实标注，不假装有稿）。
+
+### 23.4 附：`architect` 的一次自我更正（captain 记录）
+
+它主动认错并落盘台账 §4.6：其「`CONFLICTS §1` 仍带旧结论，建议 frontend-ds 更正」属**未核原文的下游影响建议**。
+captain 已在 §21.3 更正。**它自己把这条记进台账并写明"涉及他人的影响建议，先核原文再发"——这个自省质量很高。**
+
+
+## 24. 成员可用性处置：`backend-api` 移出关键路径（captain 2026-09-23）
+
+### 24.1 事实与判定
+
+| 证据 | 内容 |
+| --- | --- |
+| 产物 | 全程**零产物**（`t5` 无 `docker-compose`/drizzle 配置/schema/`docs/api.md`） |
+| 任务状态 | `t5` 长期 `pending` / **attempt 0**（从未 claim） |
+| 通信 | 对 captain 的直接诊断请求（**累计 5 条消息**）**无任何回复** |
+| 成员状态 | 长期 `idle/running` —— 状态标签与事实不符 |
+
+**判定：该成员会话不可用（静默停滞），移出关键路径。**
+
+### 24.2 处置
+
+- `t5` → 已改派 `backend-core`（**已在推进**：`docker-compose.yml`、`apps/api/drizzle.config.ts`、`apps/api/src/db/{client,global-setup,migrate,schema,holdings.integration.test}.ts`、`vitest.integration.config.ts`、`.env.example` 均已落盘，依赖已在 §依赖基线与 `pnpm-workspace.yaml` catalog 登记）。
+- `t6`（账号体系）→ **改派 `architect`（零损失）**：`t6` 依赖 `t5`，后者未完成 ⇒ `t6` 必然尚未开工，改派不会丢失任何工作。`architect` 是最合适人选（它写了 Fastify 脚手架、ADR-004 的 zod 契约策略与 409/422 错误码语义）。
+- `t9`（业务 API）→ **暂留 `backend-api` 作为观察样本**：若调度把它派下去而该成员仍无产出，captain 再改派（预计候选：`backend-core`，它是领域内核作者；或 `architect`，视 `t6` 进度）。**captain 需主动巡检，不得依赖成员报警。**
+
+### 24.3 教训补充（与 §22.3 合并执行）
+
+1. **`idle/running` 是不可信状态标签** —— 本次同一个标签在同一个成员上持续约 1.5 小时以上而无任何产物。
+   判据只能是**产物级巡检**（文件存在性 + mtime + `git status`）。
+2. **巡检要趁早**：`t5` 停滞被发现的唯一原因是 captain 主动查了文件；
+   若按"等成员回报"的方式运行，会一直等到切片验收才暴露。
+3. **改派前必须先判断"零损失"**：`t6` 之所以能安全改派，是因为其依赖未完成 ⇒ 不可能有半成品。
+   对**依赖已满足、可能已有半成品**的任务改派前，必须先确认产物状态（避免丢掉成员上下文里未落盘的成果）。
+4. **本次 §22.3 的规则立即产生了正收益**：改派后 captain 用产物巡检**当场确认** `t5` 真在推进（新增 10 个文件、5 分钟内多个 mtime），
+   不需要再问成员 —— 这是"看产物不看标签"的直接价值。
+
+### 24.4 待观察
+
+- `t9`（`backend-api`）是否响应调度。
+- `frontend-flow`（t11/t12）与 `audio-engineer`（t7/t8/t13）首次派发后的**产物级巡检**（§22.4）。
+
+
+## 25. t5 收口：数据层落地验证、接口边界裁决、一处基线缺陷
+
+`t5` 完成（attempt 8817b960）。Postgres 单库 + drizzle（声明式 schema + drizzle-kit 迁移）+ 原生 SQL 抢占。未 commit（captain 统一提交）。
+
+### 25.1 captain 独立验证
+
+| 核验项 | 结果 |
+| --- | --- |
+| 迁移产物 | `apps/api/drizzle/0000_old_zeigeist.sql`（drizzle `out: './drizzle'`，**不在** `src/db/migrations`） |
+| **`events` 首条约束** | `events_first_event_check CHECK (seq > 1 or type = 'BOTTLE_CREATED')` —— **确实在迁移 SQL 第 60 行**，与声称逐字一致 |
+| **`holdings` 抢占约束** | `holdings_active_bottle_uniq ON holdings (bottle_id) WHERE released_at is null`（L194） |
+| **`bottle_segments` 补位约束** | `bottle_segments_active_index_uniq ON bottle_segments (bottle_id, index) WHERE deleted_at is null`（L186） |
+| `total_segments` | 是**列**（L28/L135），带 CHECK；迁移共 17 条 CHECK，**未硬编码 4** |
+| 集成测试 | `test:integration` → 4 文件 / 17 测试全过 |
+| eslint 时间守卫 | `eslint.config.mjs:60,80` 真实存在，报错指向 `createSystemClock()`（ADR-005 不变式 4） |
+| 依赖登记 | §4 两张表（已安装基线 + t5 引入记录 + **不引入的替代方案**：Prisma / 原生 pg+手写迁移 / Supabase / postgres.js） |
+
+### 25.2 🚩 发现并派回的基线缺陷：`pnpm -r test` 退出码 1
+
+- **现象**：`pnpm -r test` → exit=1；`apps/api` 的 4 个集成测试文件被判 failed（测试显示 skipped，但退出码非 0）。
+- **根因**：`apps/api/vitest.config.ts` 的 `include: ['src/**/*.test.ts']` **把 `*.integration.test.ts` 一并收集**；
+  无 `DATABASE_URL` 时这些文件在**收集期**抛错。另有次生错误 `TypeError: Cannot read properties of undefined (reading 'close')`（客户端未创建仍 close）。
+- **为何是真缺陷**：**AGENTS.md §2 把 `pnpm -r test` 定为命令基线**，而它现在依赖"会话里恰好 export 了 DATABASE_URL"才绿；
+  `.env` 是 gitignored 的 ⇒ 全新克隆 / CI / 任何其他成员跑都红。**"切片必须全绿"这道闸门会因环境变量而结构性失效。**
+- **要求**：默认配置排除 `**/*.integration.test.ts`（`pnpm -r test` 在无 `.env`、无数据库时返回 0）；修掉次生 teardown 错误；加一条守卫防止 include 被放宽。
+
+### 25.3 ⚠️ 报告口径纠正
+
+成员报"单测 213"。captain 实测：**单测 196**（shared 128 + api 1 + web 67）+ **集成 17**；`213 = 196 + 17`。
+→ **集测与单测性质不同（需 Docker + DATABASE_URL），不得合并计入"单测"**。今后报告须分开，且**必须附基线条命令的真实退出码**（退出码比测试数更有信息量）。
+
+### 25.4 接口边界裁决：包根 = 契约层，`/domain` = 内核（**批准**）
+
+成员改了 `packages/shared/src/domain/publicApi.test.ts`：包根不再 `export *` 领域内核。现 `exports` 为：
+
+```json
+{ ".": "./src/index.ts", "./contracts": "./src/contracts/index.ts", "./domain": "./src/domain/index.ts" }
+```
+
+**captain 裁决：批准。** 理由：① `export *` 双导出会产生 5 个同名类型歧义（Segment / Resolution / SeaZone / VoteValue / RuleViolation），改名更丑；
+② §17.3 本就写明"唯一消费点 = `packages/shared/src/domain/index.ts`"；③ 契约层是前后端共享面、领域内核是后端纯逻辑，**分离正确**。
+
+**下游必须遵守的 import 规则**：
+- `@music-drift/shared`（包根）→ **只能拿契约层**（zod schema 与推导类型）；
+- `@music-drift/shared/domain` → 领域内核（守卫、状态机、派生查询、`nextRecordIndex` 等）。
+- **禁止**把两者合并回包根（已有边界测试钉住）。
+
+### 25.5 成员自抓的 4 个真问题（captain 记录，含一条自证式守卫）
+
+① seed 的段落 id 曾用 songId 前缀派生 → 三首歌段落 id 撞车 → 改 ordinal 派生；
+② `insert ... values ($3,...,$3::text)` 跨 uuid/text 列复用参数 → `inconsistent types deduced` → 拆成两个参数；
+③ **成员自己写的 eslint 守卫抓到了成员自己写的 `releasedAt ?? new Date()` 默认值** → 改为时间必须由调用方注入。
+   → **这是"守卫价值"的最佳证明**：规则若只写在文档里，该默认值会活到线上并表现为"时间不可注入、结果不稳定"的假失败；
+④ 集成测试原跑在开发库上、跨轮次累积脏数据 → 改为**可抛弃测试库**（global-setup 建库 + 清表 + 迁移）。
+
+
+## 26. ADR-016 认证实现裁决（t6）：scrypt 参数、会话令牌、双错误词表
+
+### 26.1 scrypt 参数（captain **实测验证**，`architect` 的论断正确）
+
+- 参数：`node:crypto` 的 `scryptSync` / `randomBytes` / `timingSafeEqual`；**N=2^15, r=8, p=1, salt 32B, keylen 64B**。
+- **`maxmem` 必须显式传入**（建议 64 MiB）。这个结论经 captain 在 Node 24 上**实测**：
+
+| 事实 | 值 |
+| --- | --- |
+| `128 × N × r` | 33,554,432 B = **恰好 32.0 MiB** |
+| Node 默认 `maxmem` | **32 MiB**（33,554,432 B）——**两者相等** |
+| 按 Node 文档字面判据 `128*N*r > maxmem` | **False（应当不触发）** |
+| **实测（不传 maxmem）** | **抛 `ERR_CRYPTO_INVALID_SCRYPT_PARAMS`** |
+| **实测（`maxmem: 64*1024*1024`）** | **成功** |
+
+→ **反直觉但确凿：相等仍会抛。** 显式 `maxmem` 是**真必需**，不是"加保险"。
+→ **要求**：把上述实测结论（含错误码与"相等却仍抛"这一点）写进代码注释；
+   否则后人看到"32MiB 刚好等于默认值"会顺手删掉该参数，然后同一个坑再踩一次。
+
+### 26.2 口令存储格式（**采纳**，属正确做法）
+
+```
+scrypt$32768$8$1$<saltB64url>$<keyB64url>
+```
+
+- **参数入库** → 将来可在线升级算法强度（旧行按旧参数校验，新行用新参数）；
+- verify **按行内参数解析**；**畸形串返回 `false` 而非抛异常**（避免把存储损坏变成 500）。
+
+### 26.3 会话令牌（**采纳**）
+
+- 32B 随机 → base64url **明文 token 只出现在 `Set-Cookie`**；**库内只存 `SHA-256(hex)`**（`sessions.token_hash` 唯一索引）。
+- 校验：hash → 查表 → `expires_at > clock.now()`；登出 = 删行（**幂等**，无 cookie 也返回 204）。
+- cookie 名 `mdb_session`，`Path=/; HttpOnly; SameSite=Lax; Max-Age=TTL`；`Secure` **仅 `NODE_ENV=production`**。
+- **手写 cookie 序列化/解析**，不引 `@fastify/cookie`（符合 §7「能 stdlib 就不引依赖」）。
+- 时间一律注入 `createSystemClock()`。
+
+**captain 追加要求**：
+1. **TTL 必须是可注入的策略常量**，不得散落魔数；并测试**过期边界**（`now === expires_at` 视为过期）。
+2. 手写 cookie **必须测**：属性齐全；`Secure` 只在 production 出现；**畸形 / 重复 cookie 不抛异常，按未登录处理**。
+3. `INVALID_CREDENTIALS` **不区分**"账号不存在"与"密码错误" —— 正确（防用户枚举）。
+   但 `EMAIL_TAKEN` / `HANDLE_TAKEN` 在注册接口上**必然可枚举**，这是注册 UX 的固有取舍，**作为已知取舍记录，不要求改**。
+4. **登录无速率限制**：demo 阶段**接受**（不引中间件），但须在 `docs/api.md` 标注为已知未做项。
+
+### 26.4 错误码词表：选 (A) 双词表（**captain 裁决**）
+
+`architect` 提出二选一：
+- **(A)** 在 `packages/shared/src/contracts/auth.ts` 内新增独立的 `AUTH_ERROR_CODES / AUTH_ERROR_MESSAGES / AUTH_ERROR_HTTP_STATUS / authHttpStatusOf`，
+  envelope 与 `ErrorResponseSchema` **同形**（`{error:{message,violations[]}}`），仅 code 取自 auth 词表；
+- **(B)** 把 contracts 的 code 枚举改为 `RULE_CODES ∪ AUTH_ERROR_CODES` 统一词表。
+
+**裁决：(A)。** 理由：
+1. **不动终态内核**（t4/t17）→ **零回归风险**；
+2. auth 错误（凭证/会话/注册）与领域规则违反（游戏规则）是**不同类别**；合并成一个枚举会让所有领域错误码消费方无谓携带 6 个 auth 码；
+3. 不进一步加深 `contracts → domain` 的耦合。
+
+**代价与处置**：`docs/api.md` §1「`violations[].code` 与 `RULE_CODES` 完全一致」对 auth 路由不再字面成立。
+→ **captain 明确授权 `architect` 自行补那一行**：`violations[].code ∈ RULE_CODES ∪ AUTH_ERROR_CODES`（auth 路由取后者），
+   避免为一句话再多一轮往返。（其原话"文档是你的/t5 的，我不动" —— 边界意识正确，但此处已获授权。）
+
+### 26.5 注入
+
+`buildApp` 增加 `{ db?, clock? }` 注入；**不动** `packages/shared/src/domain/`；**不动** `apps/api/vitest.config.ts`（属 t5 收口）。
+
+
+## 27. 并行 TDD 工作区下的「基线红」判据 + t7/t11 目录边界
+
+### 27.1 `pnpm -r test` 返回非 0 的三种原因，必须区分（captain 2026-09-23）
+
+`pnpm -r test` 是**仓库全量**命令；在多人并行的 TDD 工作区里它天然会在队友的红灯期间返回非 0。**这不是缺陷。**判据必须看**失败的是谁的文件、失败原因是什么**：
+
+| 原因 | 是否缺陷 | 处置 |
+| --- | --- | --- |
+| 基线依赖环境变量（如缺 `DATABASE_URL`） | **是缺陷** | 修配置（t5 已修：默认 vitest 配置排除 `**/*.integration.test.ts`） |
+| 队友在途的 tests-first 红灯（如 `Cannot find module './constants'`） | **不是缺陷** | 正常瞬时状态；等其实现落地即回绿 |
+| 真实的实现/断言失败 | **是缺陷** | 派修复 |
+
+**captain 实例记录**：同一次修复后，captain 先跑 `apps/api` 得 exit=1，一分钟后复跑即 7 文件 / 49 测试全绿 —— 与成员报告一致地印证了「瞬时红」的存在。
+→ **t15（对抗式评审）与其他评审者不得把"队友在途红灯"当作交付缺陷**；须先确认该文件是否属于在途任务。
+
+### 27.2 t7 / t11 目录边界（captain 裁决，防止两个会话互相踩）
+
+captain 曾对 `audio-engineer` 下达「不碰 `apps/web/`」—— **该指令过窄**：`t7` 的交付明确包含「录制组件、上传 API 客户端、播放器组件」，按那句执行会砍掉一半交付。现按**目录硬切**更正：
+
+| 归 `audio-engineer`（t7 / t8 / t13） | 归 `frontend-flow`（t11 / t12） |
+| --- | --- |
+| `packages/shared/src/audio/**`（纯逻辑，可脱离浏览器测） | `apps/web/src/pages/**` |
+| **`apps/web/src/features/audio/**`**（录音/播放的 React 组件与 hooks，自包含） | `apps/web/src/features/{river,bottle,sea,profile}/**` |
+| 后端上传与 **Range 播放端点**所在路由文件 | 页面组装、路由、导航 |
+| 上述端点对应的 `packages/shared/src/contracts/` 文件 | — |
+
+- `t11` 的页面 **import** `features/audio`，**不得修改**它；需要改经 captain 转达。
+- 反之 `audio-engineer` **不得**动 `pages/**` 与其他 feature 目录。
+- 双方**都必须复用** `apps/web/src/design-system/`（组件 + token + `Icon` 注册表）；缺 token 报 captain，**禁止内联硬编码**（AGENTS.md §4）。
+- 图标**禁止**直接 `import` lucide（实测 JS 227KB → 978KB）。
+- **Figma 12 帧没有任何状态帧** → 权限被拒 / 录音中 / 上传失败 / 加载等状态由实现者按 `DESIGN.md` 自建，**不得以"Figma 里没有"为由跳过**。
+
+
+### 27.3 守卫设计规范（由 t9 的两道守卫评审导出，captain 裁决）
+
+**规范 1：守卫必须同时断言正反两个方向。**
+纯负向守卫（"不许出现 4xx 字面量"）可被**遗漏**满足：新路由一个错误码都不写也算"通过"，但它其实**无法正确报错**。
+→ 必须补**正向不变式**（例："每个声明了错误路径的路由模块必须 import `problem.ts`"）。
+> 本条由 `backend-core` 提出并被 captain 采纳，是整份方案里最有价值的设计。
+
+**规范 2：守卫的作用域不得误伤合法用法。**
+两道守卫在评审中各有一处作用域缺陷，均已收窄：
+
+| 缺陷 | 误伤对象 | 收窄后 |
+| --- | --- | --- |
+| 禁掉路由里**所有** `reply.code(...)` / `.status(...)` | **t6 合法的 `204`（登出）**、将来合理的 `201`（创建瓶子） | 只在**参数为 4xx/5xx** 时禁止：`CallExpression[callee.property.name=/^(code\|status)$/][arguments.0.value=/^[45]/]`。守卫的目的是"**错误**映射必须走 `problem.ts`"，不是"路由不许设状态码" |
+| 正向不变式要求**每个**路由模块 import `problem.ts` | `routes/health.ts`（S0 起即有、**无错误路径**）→ 会逼出一个无意义的 import | 建立**显式例外清单**并在守卫内注释例外理由；无错误路径的路由可例外，但须说明 |
+
+> 坏守卫的典型症状：**它让人为了让检查通过而写废代码。**
+
+**规范 3：把安全属性做成可执行的测试，而不是文档条款。**
+例（t9 交付）：`problem.ts` 是**唯一**构造 `ErrorResponseSchema` 的地方 → 用"`apps/api/src` 内除 `problem.ts` 外不得出现 `409`/`422` 字面量"来**可执行地**保证；
+并**故意制造 DB 故障**（外键违规 / 唯一约束冲突 / 连接失败）断言响应为 5xx + 固定中文文案，且**不含** `pg_` / `SELECT` / `insert into` / `constraint` / `duplicate key` / `at Object.`（堆栈）/ `ECONNREFUSED` / 白名单外表名。
+
+
+## 28. 共享装配点并发覆盖事故（captain 计划缺陷）+ 串行编辑区规则
+
+### 28.1 事故经过
+
+`apps/api/src/app.ts` 是**多任务共享装配点**。`architect`（t6）写入账号路由后，被 `audio-engineer` 一侧的版本（只挂 `segmentAudio`）**整文件覆盖**
+→ `architect` 的 **19 个路由集成用例全部 404**。
+
+> **最要紧的一点（architect 指出）**：**若非它跑了集成用例，这个冲突会带病通过。**
+> 静默 404 **连"红"都不是** —— 进程正常、单测正常、看起来一切正常。
+
+**定性：这是 captain 的 DAG 计划缺陷**，不是任何成员的 bug：我让多个任务编辑同一个装配文件，却没有定义编辑纪律。
+
+### 28.2 串行编辑区规则（立即生效）
+
+`apps/api/src/app.ts` / `server.ts` / `env.ts` 定义为**串行编辑区**：
+
+1. **只允许增量合并，绝对禁止整文件覆盖。**
+2. 新增路由时必须**保留**已有路由族：`/healthz`、`/api/auth/*`、segmentAudio 系列，以及既有注入（时钟/选项/`secureCookies`）。
+3. 编辑前先确认该文件**近期是否被改**；发现并发编辑，**先报 captain**。
+
+### 28.3 永久守卫：路由注册守卫测试（t9 必须交付）
+
+**不能靠"人记得要合并"。** 要求 t9 交付一条测试，断言**所有已知路由族同时挂载且可达**
+（逐个请求断言 ≠404，或断言已注册路由集合包含全部族）。
+→ 今后任何人整文件覆盖都会**立刻炸测试**，而不是静默 404 带病通过。
+
+### 28.4 基线状态的第四类：**静默丢失（不红但坏）**
+
+§27.1 的判据只有三类（环境依赖缺陷 / 在途红灯 / 真实失败）。
+本事故补上**第四类**，也是最危险的一类：
+
+| 状态 | 表现 | 可发现性 |
+| --- | --- | --- |
+| 静默丢失 | **不红**，进程与单测全绿，只是某个功能不可达（404 / 未挂载 / 未注册） | **只有覆盖性集成测试能发现** |
+
+→ **推论**：「跑集成用例」不是可选项。单测通过**不能**证明装配正确；装配正确性只能由**覆盖全路由族/全注册点的集成测试**证明。
+→ 这也是 §27.1 那条"基线红要区分原因"的**反向补丁**：**不红**同样需要区分原因。
+
+### 28.5 `env.ts` 语义裁决
+
+`architect` 将 `DATABASE_URL` 由必填改为**可空**，使 `server.ts` 的「无库也能启动 + 告警」分支可达 —— **裁决：保留**。
+理由：本地必须能在**无数据库**时跑单测与 `/healthz`（与"修 vitest 基线"同一个理由）；必填写死会让该分支成为**死代码**。
+
+**追加一条**：`NODE_ENV === 'production'` 且缺失 `DATABASE_URL` → **启动即 fail fast**。
+理由：开发环境"降级 + 告警"是便利；**生产环境静默无库运行比起不来更糟**（会表现为大面积 5xx，而不是立刻暴露配置错误）。
+
+**最终组合**：dev = 可空 + 告警覆盖 `/api/auth/*`；prod = 缺失即 fail fast。
+
+
+### 28.6 诊断补充：用 **mtime** 区分「在途快照」与「真实语法/类型错误」
+
+captain 实操中遇到一次极易误判的情形：
+
+`pnpm -r typecheck` 报 `apps/api/src/store/bottles.integration.test.ts(81,1): error TS1005: '}' expected` ——
+看起来是**语法错误**（比"缺模块"严重得多）。但该文件 **mtime 距检查时刻仅 6 秒**，且尾部完整闭合 ⇒
+这是 `backend-core` 正在写 t9 的 `store/` 层时的**半截快照**，**不是缺陷**。
+
+**操作规则**：判断基线红是否为在途状态，**最快且最可靠的证据是失败文件的 mtime**：
+
+| 现象 | 判据 | 结论 |
+| --- | --- | --- |
+| 失败文件 mtime 距今 **数秒** | 正在写 | **在途快照**，不是缺陷（`TS1005` 这类"语法错误"尤易误判） |
+| 失败文件 mtime 距今 **数分钟以上** | 已停笔 | 需按 §27.1 三类归因（环境依赖 / 在途红灯 / 真实失败） |
+| 失败文件属于**已完成任务** | — | 真实缺陷，派修复 |
+
+> 结论：**mtime 是"在途 vs 缺陷"的第一手证据**；在指责或派单之前先看它。

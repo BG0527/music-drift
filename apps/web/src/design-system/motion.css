@@ -1,0 +1,133 @@
+/**
+ * 动效层 —— 物理参数与 `theme.css` 的 `--motion-*` 契约一一对应。
+ * `__tests__/tokens.test.ts` 有 drift guard：两处同名值必须完全一致。
+ *
+ * 纪律：只允许动画 transform 与 opacity；必须支持 prefers-reduced-motion。
+ */
+:root {
+  --entry-shift: 16px;
+  --entry-duration: 480ms;
+  --entry-easing: ease-out;
+  --stagger-step: 100ms;
+  --hover-scale: 1.03;
+  --hover-duration: 200ms;
+  --page-duration: 300ms;
+  --reduced-duration: 150ms;
+}
+
+@keyframes ocean-rise {
+  from {
+    opacity: 0;
+    transform: translateY(var(--entry-shift));
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes ocean-fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes ocean-shimmer {
+  from {
+    background-position: -140% 0;
+  }
+  to {
+    background-position: 140% 0;
+  }
+}
+
+@keyframes ocean-ripple {
+  from {
+    opacity: 0.55;
+    transform: scale(0.92);
+  }
+  to {
+    opacity: 0;
+    transform: scale(1.08);
+  }
+}
+
+@layer components {
+  /* 入场：fade + translateY(16px → 0) / 480ms ease-out */
+  .enter-rise {
+    animation: ocean-rise var(--entry-duration) var(--entry-easing) both;
+  }
+
+  .enter-fade {
+    animation: ocean-fade var(--page-duration) var(--entry-easing) both;
+  }
+
+  /* 列表交错：每项 +100ms */
+  .stagger-1 {
+    animation-delay: calc(var(--stagger-step) * 1);
+  }
+  .stagger-2 {
+    animation-delay: calc(var(--stagger-step) * 2);
+  }
+  .stagger-3 {
+    animation-delay: calc(var(--stagger-step) * 3);
+  }
+  .stagger-4 {
+    animation-delay: calc(var(--stagger-step) * 4);
+  }
+
+  /* hover：只做 scale(1.03) + 阴影抬升，200ms，不触发重排 */
+  .hover-lift {
+    transition:
+      transform var(--hover-duration) var(--entry-easing),
+      box-shadow var(--hover-duration) var(--entry-easing);
+  }
+
+  .hover-lift:hover {
+    transform: scale(var(--hover-scale));
+    box-shadow: var(--shadow-lift);
+  }
+
+  /* 骨架屏 shimmer（禁 spinner） */
+  .skeleton-shimmer {
+    background-image: linear-gradient(
+      90deg,
+      color-mix(in srgb, var(--color-lagoon) 0%, transparent) 0%,
+      color-mix(in srgb, var(--color-lagoon) 22%, transparent) 45%,
+      color-mix(in srgb, var(--color-lagoon) 0%, transparent) 100%
+    );
+    background-size: 220% 100%;
+    animation: ocean-shimmer 1.4s linear infinite;
+  }
+
+  /* 涟漪：标记状态变化与落点（装饰层，aria-hidden） */
+  .ripple-ring {
+    animation: ocean-ripple 2.4s var(--entry-easing) infinite;
+  }
+}
+
+/* ── 无障碍降级：reduced-motion 时关掉动画与过渡，只留 150ms opacity 淡入 ── */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation: none !important;
+    transition: none !important;
+    scroll-behavior: auto !important;
+  }
+
+  .enter-rise,
+  .enter-fade {
+    animation: none;
+    opacity: 1;
+    transform: none;
+  }
+
+  .motion-fade-in {
+    opacity: 0;
+    animation: ocean-fade var(--reduced-duration) ease-out both;
+  }
+}

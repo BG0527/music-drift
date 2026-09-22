@@ -1,0 +1,37 @@
+# 本地开发数据库（D-01 方案 A：自建 Fastify + 单一 Postgres；零 BaaS / 零对象存储）。
+#
+# 用法：
+#   docker compose up -d --wait      # 起库并等 healthcheck 通过
+#   docker compose down              # 停库（保留数据卷）
+#   docker compose down -v           # 停库并清空数据（重跑迁移与种子）
+#
+# 说明：
+# - 宿主端口固定 5433，避免与本机既有 Postgres（5432）冲突；容器内仍是 5432。
+# - 数据放命名卷 `music-drift-pgdata`，`down` 不会丢；`down -v` 才会。
+# - 口令只来自环境变量（默认值仅用于本地开发，不写入任何生产配置）。
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: music-drift-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-music_drift}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-music_drift_dev}
+      POSTGRES_DB: ${POSTGRES_DB:-music_drift}
+      # 中文内容与大小写排序都按 C 排序规则最省心；时间一律 UTC。
+      TZ: UTC
+      PGTZ: UTC
+    ports:
+      - '${POSTGRES_PORT:-5433}:5432'
+    volumes:
+      - music-drift-pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U ${POSTGRES_USER:-music_drift} -d ${POSTGRES_DB:-music_drift}']
+      interval: 3s
+      timeout: 3s
+      retries: 20
+      start_period: 5s
+
+volumes:
+  music-drift-pgdata:
+    name: music-drift-pgdata

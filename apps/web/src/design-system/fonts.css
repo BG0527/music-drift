@@ -1,0 +1,35 @@
+/**
+ * 字体自托管层 —— **禁止任何 CDN**（本机对 CDN 域名不可达；离线 demo 不得依赖外网）。
+ *
+ * 来源：npm 包 → 本地 woff2 → @font-face。
+ *  - 中文主字体：`lxgw-wenkai-webfont`（霞鹜文楷，含 unicode-range 分片 + font-display: swap）
+ *  - 拉丁 / 数字：`@fontsource/quattrocento`
+ * 构建产物里不会出现 http(s) 外链；守卫测试：`__tests__/fonts-and-motion.test.ts`。
+ */
+@import 'lxgw-wenkai-webfont/lxgwwenkai-regular.css';
+@import 'lxgw-wenkai-webfont/lxgwwenkai-bold.css';
+@import '@fontsource/quattrocento/400.css';
+@import '@fontsource/quattrocento/700.css';
+
+:root {
+  /* 中文正文（含中英混排）：楷体 + 可用衬线兜底 */
+  --font-cjk:
+    'LXGW WenKai', 'LXGW WenKai Screen', Quattrocento, 'Songti SC', 'Noto Serif SC',
+    'Source Han Serif SC', serif;
+  /* 拉丁 / 数字 / UI 标签 */
+  --font-latin: Quattrocento, 'LXGW WenKai', ui-serif, system-ui, serif;
+  /* 等宽：技术值、时长、码率（JetBrains Mono 由系统兜底；本任务未引入该 npm 包，见汇报） */
+  --font-mono: 'JetBrains Mono', ui-monospace, 'SFMono-Regular', monospace;
+}
+
+@layer base {
+  /* 中文正文默认走楷体；拉丁字符由 Quattrocento 在栈内接管前端的西文段落 */
+  body {
+    font-family: var(--font-cjk);
+  }
+
+  :lang(en),
+  .font-latin {
+    font-family: var(--font-latin);
+  }
+}

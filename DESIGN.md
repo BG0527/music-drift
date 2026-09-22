@@ -1,7 +1,7 @@
 ---
 version: "ocean-v1"
 name: "Ocean Drift"
-description: "移动优先 H5 应用的海洋主题设计 token：水波 / 河道 / 浪线 / 漂流瓶。用于『音乐漂流瓶』匿名接力音乐共创社区。Tokens only — no component code."
+description: "桌面为主要场景的 Web 应用（移动端可用性适配）的海洋主题设计 token：水波 / 河道 / 浪线 / 漂流瓶。用于『音乐漂流瓶』匿名接力音乐共创社区。Tokens only — no component code."
 colors:
   # —— 水面（浅色基线，原文 Ivory/Cream 的语义位）——
   wave-white: "#F3F9FA"
@@ -30,6 +30,15 @@ colors:
   warning: "#875C12"
   info: "#0F6D80"
   danger: "#9D4125"
+  # —— 语义 tint / border（机器可读；与正文「Semantic & Status Colors」一致）——
+  success-tint: "#E7F2EE"
+  success-border: "#BFDCCF"
+  warning-tint: "#FAF1E0"
+  warning-border: "#E8D3A6"
+  danger-tint: "#FAEDE9"
+  danger-border: "#EBC3B6"
+  info-tint: "#E6F1F4"
+  info-border: "#BFDCE3"
 typography:
   hero:
     fontFamily: Quattrocento
@@ -241,7 +250,7 @@ Scale:
 
 移动优先落地（不改任何数值，只补齐 H5 语境）:
 
-- 设计顺序：375px 起手 → 768px（折叠阈值）→ 1440px 上限；1280px 容器 + 1.5rem 侧边距在窄屏退化为 100% 宽 + 1.5rem 侧边距。
+- 设计顺序：桌面主场景（1440px 评审稿、1280px 容器居中 + 1.5rem 侧边距）→ 768px（折叠阈值）→ 375px（可用性适配验证）；窄屏下容器退化为 100% 宽 + 1.5rem 侧边距。
 - 间距只取 8px 派生档：4 / 8 / 12 / 16 / 24 / 32 / 48 / 64。
 - 触控目标 ≥44px 见方（含 12px 内边距的按钮与列表行），相邻可点目标间距 ≥8px。
 - 安全区：底部固定导航 / 播放条预留 `env(safe-area-inset-bottom)`，纵向高度用 `min-h-[100dvh]`。
@@ -436,6 +445,6 @@ Token 绑定（不改下列规范，只把抽象词落到海洋语义色）:
 
 ## Use Case
 
-移动优先 H5 应用（375px 起手，768px 折叠多列，上限 1440px 内容区 1280px 居中）。场景：匿名接力音乐共创社区「音乐漂流瓶」——登录/注册 → 选歌 → 录制 15–30 秒片段 → 投瓶入海 → 他人取瓶接力 → 成品试听 → 漂流日志。核心页面：首页（今日海面 / 我的瓶子）、录制页、接力页、成品页、漂流日志、审核后台。
+桌面为主要场景的 Web 应用（1440px 为主场景，1280px 容器居中 + 1.5rem 侧边距；768px 折叠多列；移动端做可用性适配，H5 可用）。场景：匿名接力音乐共创社区「音乐漂流瓶」——登录/注册 → 选歌 → 录制 15–30 秒片段 → 投瓶入海 → 他人取瓶接力 → 成品试听 → 漂流日志。核心页面：首页（今日海面 / 我的瓶子）、录制页、接力页、成品页、漂流日志、审核后台。
 
-模板元数据里原文的 "Landing pages, SaaS" 已作废：本系统的全部 token 按移动端单手操作、触控目标 ≥44px、单列纵向接力流约束；桌面端只做"居中加宽"，不新增桌面专属布局模式。
+模板元数据里原文的 "Landing pages, SaaS" 已作废：本系统的全部 token 按桌面主场景（侧栏四入口 IA、1440px 评审）约束，**同时**保证移动端可用性四条硬底线——无横向溢出、触控目标 ≥44px、录音可用（含权限被拒降级）、关键闭环在 375px 可完成；桌面与移动共用同一套 token，不引入第二套主题。

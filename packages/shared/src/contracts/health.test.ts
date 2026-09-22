@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { CONTRACT_VERSION, HealthResponseSchema } from './health';
+import { CONTRACT_VERSION } from './common';
+import { HealthResponseSchema } from './health';
 
 describe('HealthResponseSchema', () => {
   it('accepts a well-formed health payload', () => {

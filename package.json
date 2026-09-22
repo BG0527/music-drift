@@ -17,7 +17,13 @@
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "format": "prettier --write .",
-    "format:check": "prettier --check ."
+    "format:check": "prettier --check .",
+    "db:up": "docker compose up -d --wait",
+    "db:down": "docker compose down",
+    "db:migrate": "pnpm --filter @music-drift/api db:migrate",
+    "db:seed": "pnpm --filter @music-drift/api db:seed",
+    "db:reset": "docker compose down -v && docker compose up -d --wait && pnpm --filter @music-drift/api db:migrate && pnpm --filter @music-drift/api db:seed",
+    "test:integration": "pnpm --filter @music-drift/api test:integration"
   },
   "devDependencies": {
     "@eslint/js": "catalog:",

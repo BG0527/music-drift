@@ -1,0 +1,192 @@
+/**
+ * Ocean Drift 主题层 —— `DESIGN.md` front matter 的唯一代码映射。
+ *
+ * 纪律（AGENTS.md §4）：
+ *  - 这里的每一个颜色/圆角/间距/层级/动效值都来自 `DESIGN.md`，不得在此发明新值。
+ *  - 组件只允许使用本文件生成的 utilities（`bg-peacock` / `rounded-base` / `z-sticky` …），
+ *    禁止内联 hex 或任意像素值。守卫测试：`__tests__/tokens.test.ts`。
+ *  - 禁止 CDN：字体与所有资源自托管（见 `fonts.css`）。
+ */
+@import 'tailwindcss';
+
+/* 测试文件里会写出被禁用的视口高度类名（用于守卫断言）；
+   不能让它们被内容扫描当成真类名而生成 utility，故排除测试目录。 */
+@source not './__tests__';
+
+/* `static` = 即使用户代码暂时没用到某个 token，也要产出该 CSS 变量：
+   色板是契约（Canvas 水波、图表、音频时间轴都会读 var(--color-*)），不允许被 tree-shake 掉。 */
+@theme static {
+  /* ── 水面（浅色基线）────────────────────────────── */
+  --color-wave-white: #f3f9fa;
+  --color-foam: #e4f0f2;
+  --color-tide-pool: #d7e8ec;
+  --color-mist: #c2d9df;
+  --color-driftline: #648c99;
+
+  /* ── 深水（仅沉浸式区块，非深色模式）────────────── */
+  --color-deep-current: #0b3a4a;
+  --color-trench: #123e52;
+  --color-night-ink: #061a22;
+
+  /* ── 品牌主色 ───────────────────────────────────── */
+  --color-peacock: #0f6d80;
+  --color-peacock-deep: #0b4e5b;
+  --color-peacock-active: #093e49;
+  --color-lagoon: #2a9db1;
+  --color-sea-glass: #7fd1d9;
+
+  /* ── 文字 ───────────────────────────────────────── */
+  --color-abyss: #07202b;
+  --color-slate-current: #44646f;
+  --color-on-dark-muted: #a9c7cf;
+
+  /* ── 点缀与语义 ─────────────────────────────────── */
+  --color-coral: #c7452c;
+  --color-coral-deep: #9d4125;
+  --color-success: #1f6b51;
+  --color-warning: #875c12;
+  --color-info: #0f6d80;
+  --color-danger: #9d4125;
+
+  /* ── 语义 tint / border（机器可读，与正文表格一致）── */
+  --color-success-tint: #e7f2ee;
+  --color-success-border: #bfdccf;
+  --color-warning-tint: #faf1e0;
+  --color-warning-border: #e8d3a6;
+  --color-danger-tint: #faede9;
+  --color-danger-border: #ebc3b6;
+  --color-info-tint: #e6f1f4;
+  --color-info-border: #bfdce3;
+
+  /* ── 字体（自托管，见 fonts.css）─────────────────── */
+  --font-cjk:
+    'LXGW WenKai', 'LXGW WenKai Screen', Quattrocento, 'Songti SC', 'Noto Serif SC',
+    'Source Han Serif SC', serif;
+  --font-latin: Quattrocento, 'LXGW WenKai', ui-serif, system-ui, serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, 'SFMono-Regular', monospace;
+
+  /* ── 8px 节奏基准（p-1 = 8px，p-0.5 = 4px）────────── */
+  --spacing: 0.5rem;
+
+  /* ── 圆角（基准 12px）───────────────────────────── */
+  --radius-none: 0;
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-base: 12px;
+  --radius-lg: 16px;
+  --radius-xl: 20px;
+  --radius-2xl: 24px;
+  --radius-pill: 999px;
+  --radius-full: 50%;
+
+  /* ── 阴影（卡片/播放条/遮罩）────────────────────── */
+  --shadow-card: 0 2px 12px rgba(0, 0, 0, 0.06);
+  --shadow-lift: 0 4px 14px rgba(11, 58, 74, 0.18);
+  --shadow-floating: 0 8px 24px rgba(11, 58, 74, 0.12);
+}
+
+:root {
+  /* ── 允许的间距档位（8px 派生，只允许这 8 档）────── */
+  --space-0: 0;
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+  --space-7: 48px;
+  --space-8: 64px;
+
+  /* ── 布局契约 ───────────────────────────────────── */
+  --container-max-width: 1280px;
+  --container-padding-inline: 1.5rem;
+  --section-gap: clamp(4rem, 8vw, 8rem);
+  --touch-target-min: 44px;
+
+  /* ── z-index 契约 ───────────────────────────────── */
+  --z-base: 0;
+  --z-sticky: 100;
+  --z-overlay: 200;
+  --z-modal: 300;
+  --z-toast: 500;
+
+  /* ── 动效物理参数（唯一契约；motion.css 里的同名工作变量必须与此一致，
+        一致性由 __tests__/tokens.test.ts 的 drift guard 校验）────────── */
+  --motion-spring-stiffness: 120;
+  --motion-spring-damping: 20;
+  --motion-entry-shift: 16px;
+  --motion-entry-duration: 480ms;
+  --motion-entry-easing: ease-out;
+  --motion-stagger: 100ms;
+  --motion-hover-scale: 1.03;
+  --motion-hover-duration: 200ms;
+  --motion-page-duration: 300ms;
+  --motion-animated-properties: transform, opacity;
+  --motion-reduced-duration: 150ms;
+}
+
+/* ── z-index 契约落成 utilities（Tailwind v4 无 z-index 命名空间）── */
+@utility z-base {
+  z-index: var(--z-base);
+}
+@utility z-sticky {
+  z-index: var(--z-sticky);
+}
+@utility z-overlay {
+  z-index: var(--z-overlay);
+}
+@utility z-modal {
+  z-index: var(--z-modal);
+}
+@utility z-toast {
+  z-index: var(--z-toast);
+}
+
+/* ── 安全区（底部固定导航/播放条）────────────── */
+@utility pb-safe {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+@utility mb-safe {
+  margin-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+@layer base {
+  html {
+    /* 页面底色恒为 wave-white；本设计不提供主题切换与 dark variant */
+    background-color: var(--color-wave-white);
+    color-scheme: light;
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    margin: 0;
+    min-height: 100dvh; /* 禁止把视口高度写死；纵向高度一律 100dvh */
+    background-color: var(--color-wave-white);
+    color: var(--color-abyss);
+    font-family: var(--font-cjk);
+    font-size: 1rem;
+    line-height: 1.6;
+  }
+
+  /* 中文不使用负字距 */
+  :lang(zh) {
+    letter-spacing: normal;
+  }
+
+  /* 键盘焦点永远可见（2px peacock + offset 2px） */
+  :focus-visible {
+    outline: 2px solid var(--color-peacock);
+    outline-offset: 2px;
+  }
+
+  /* 正文行长硬上限：<80ch（目标 72ch） */
+  p,
+  li {
+    max-width: 72ch;
+  }
+
+  ::selection {
+    background-color: var(--color-sea-glass);
+    color: var(--color-abyss);
+  }
+}
