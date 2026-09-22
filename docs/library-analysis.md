@@ -124,3 +124,32 @@ python tools/library-analysis.py
 | 入库 CLI | `apps/api/src/audio/library-cli.ts`（`--check` / `--allow-unreviewed`） |
 | 分段听感确认表（交用户拍板，**未定稿**） | `docs/library-segments-confirmation.md` |
 | 本文件（预注册） | `docs/library-analysis.md` |
+
+## 7. 验收证据（t13，本机实测）
+
+| 项 | 命令 | 结果 |
+| --- | --- | --- |
+| 规则自测（含变异） | `python tools/tempo-selftest.py` | exit 0：S-1 100.02 / S-2 100.03（含 2× 成分仍恢复 100）/ S-3 反转约定带 → 得 200 → **断言失败即"有牙齿"** |
+| 元数据校验 | `tsx src/audio/library-cli.ts --check` | exit 0：3 首、每首 4 段、起音证据齐全、等响目标 −24.73 LUFS |
+| 真实入库 | `tsx src/audio/library-cli.ts`（DATABASE_URL 指向本地 5433） | exit 0：`入库完成：3 首 / 12 段 · licensed_source=incompetech-cc-by-4.0` |
+| 入库幂等 | 同命令再跑一次 | 行数不变（songs/segments 未增加），按 songId 覆盖写 |
+| DB 抽查 | `select title, total_segments, licensed_source from songs` | `Immersed` / `Rains Will Fall` / `On the Shore`，各 `total_segments=4`，`licensed_source=incompetech-cc-by-4.0` |
+| 段落抽查 | `select s.title, g.index, g.start_ms, g.duration_ms, g.accompaniment_ref from song_segments g join songs s on s.id=g.song_id` | 每首 `index` = 1,2,3,4（**不压缩**）；start_ms/duration_ms 与 `library.json` 一致；`accompaniment_ref` = `/library/*.mp3` |
+| 单元/集成 | `pnpm -r typecheck` / `shared test` / `api test` / `vitest run src/features/audio` | typecheck 0 error；shared **231**、api **149**、features/audio **159** 全绿 |
+
+## 8. 尚未完成（诚实边界）
+
+1. **分段边界未经用户听感确认** → 见 `docs/library-segments-confirmation.md`（提案状态，未定稿）。
+2. **署名「已上线」未达成**：署名组件（`features/audio/library-attribution.tsx`，4 条测试）已交付，
+   但**「设置 / 关于」页的挂载归 `frontend-flow`**（t11/t12），挂载说明已发给对方。
+3. **无浏览器实测**：会话内没有浏览器 —— 伴奏播放与成品混音只到**组件/纯函数 + jsdom 假 Audio 元素**层；
+   真机（含移动端）听感验证归 t14 与用户。
+4. ~~`tempoDecision` 未进 shared 的 zod 契约~~ → **已裁决（captain，2026-09-23）：不扩展 schema。**
+
+   | 项 | 内容 |
+   | --- | --- |
+   | 裁决 | **不**在 `packages/shared/src/audio/library.ts` 增加 `tempoDecision` |
+   | 依据 | 准入规则「新增字段的理由必须是**有消费者要据此做不同的事**，而不是"这个数据有意思"」。当前**没有任何 UI 读它**：选歌/分段/伴奏播放/署名只需 曲目·段号·起止秒·伴奏引用。一旦进契约即为对外承诺（改它要升版本 + 通知前后端 + 维护 schema），为无消费者的数据付这个代价是纯负担 |
+   | 审计价值如何满足 | 证据留在**本文件**（预注册规则 + mtime 时序 + 边际）+ `library.json` 产物 + `library-cli --check` 输出 —— **来源凭据在仓库里**，可审计 |
+   | 字段现状 | 只存在于 `library.json`（脚本产物）；`LibraryMetadataSchema` 会 **strip 未声明键**，故 Web 端 parse 后拿不到它。CLI 打印"BPM 依据"时**直接读原始 JSON**（`apps/api/src/audio/library-cli.ts` 的 `evidenceByFile`），不依赖契约 |
+   | 复审触发条件 | 若将来**某处 UI 要展示"这首曲子的节拍判定依据"**（例如给评审看分析透明度）→ 那是出现了消费者，届时再扩展 schema |

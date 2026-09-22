@@ -87,7 +87,18 @@
 | POST | `/api/bottles/:id/resolution` | `ChooseResolutionRequestSchema`（`RIVER`/`RETURN`/`SEA`） | `BottleDetailSchema`          | 去向三选一；不是可选值即 `422 RESOLUTION_NOT_AVAILABLE`       |
 | POST | `/api/bottles/:id/put-back`   | —                                                         | `PutBackResponseSchema`       | 未接唱直接放回；返回冷却次数（N=10）                          |
 | GET  | `/api/bottles/:id`            | —                                                         | `BottleDetailSchema`          | 含 `availableResolutions` / `isHolder` / `replacementContext` |
-| GET  | `/api/bottles/:id/events`     | `BottleEventsQuerySchema`                                 | `BottleEventSchema[]`         | 漂流日志（按 `seq` 升序，客户端不要本地推算时间线）           |
+| GET  | `/api/bottles/:id/events`     | `BottleEventsQuerySchema`                                 | `BottleEventSchema[]`         | 事件流（按 `seq` 升序，客户端不要本地推算时间线）             |
+| GET  | `/api/me/bottles`             | `limit`（1–100，默认 20）                                 | `MyBottleListSchema`          | **我的漂流日志**（CONTEXT §11.1）：我参与过的瓶子，按最近活跃倒序 |
+
+**「我的漂流日志」（`GET /api/me/bottles`，CONTEXT §11.1）**
+
+- 「参与过」= **我发起的** 或 **我在该瓶唱过**（判据取 `events` 的 `SEGMENT_RECORDED` 主动方，事件是单一事实来源）。
+- **参与过 ≠ 现在还有效**：我的那一段被斩浪（ADR-015 §16.7 软删）之后**仍然在列表里**，`role` 不变，
+  只是 `mySegmentIndexes` 里不再有它（缺口由 `missingSegmentIndexes` 表达）。
+- `role: 'INITIATOR' | 'SINGER'` 只有两种取值：发起者不可能再接唱自己的瓶子（内核 `hasEverSung` 拦着），
+  因此**没有第三种状态**，前端不必为不存在的状态写分支。
+- 未登录 `401`；只返回自己的；每行含 状态 / 段数 / `missingSegmentIndexes` / `updatedAt`（最近活跃）/ 曲名。
+- 集成测试用 `MyBottleListSchema.parse` 校验**真响应**（`apps/api/src/routes/myBottles.integration.test.ts`）。
 
 **捞取（河道只能随机，不提供搜索/指定）**
 
@@ -257,6 +268,7 @@ pnpm --filter @music-drift/api test:integration
 
 | 版本       | 变更                                                                                                                                                                                                                                                                                                                                                          |
 | ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `0.2.0-s1` | **t19 可复现性修复**：新增 **`GET /api/me/bottles`**（`MyBottleSchema` / `MyBottleListSchema`，漂流日志 P0，替换 t11 的 localStorage 书签；契约只**新增**类型，既有字段形状零改动）；`apps/api` 的 `start` / `dev` 补上 `--env-file-if-exists=../../.env`（此前照 README 复制 .env 后起服务会走「未配置 DATABASE_URL」降级、`/api/songs` 404）；`golden-path-live-check.mjs` 改为**自建可抛弃库 + 自起 API**（hermetic），旧的"对着 dev 服务跑"只能靠 `API_BASE` 显式开启 |
 | `0.2.0-s1` | **t9 业务 API 落地**：§2.5 补齐 `POST /api/sea/:id/targeted-segment` 并改正 `/api/sea` 查询字段（`zone`/`limit`）与详情形状（`BottleSummarySchema`，非公海 → `404`）；§2.6 补齐 `notifications/:id/read`、`/api/me/badges`、`/api/me/collections`、`/api/admin/*`（决策端点显式 `501`）；新增 §2.8 错误码总表（规则码 → 409/422、传输码 → 400/401/403/404/501）+ §2.9 复现命令；§2.4 的录制端点由 `multipart` 改为**原始二进制**（ADR-018）。**未改任何 zod 字段形状**（`durationMs` 必填系 t7 已登记项；契约版本常量在代码里已是 `0.2.0-s1`，与本文件头部对齐）。**修复**：`toBottleSummary` 的 `songTitle` 曾写死空串，`GET /api/sea*` 返回违反契约（`min(1)`）的响应 —— 现由调用方必传曲名，并在集成测试里用 `BottleSummarySchema.parse` 校验真响应 |
 | `0.1.0-s1` | **t7 音频链路**：新增 §2.7（`GET /api/segments/:id/audio` 的 Range 语义、上传校验五步表、`AUDIO_RULE_CODES` 5 个码）；`RuleCodeSchema` 并入音频码（理由见 §2.7 引注，**待 captain 追认**）；`RecordSegmentRequest.durationMs` 服务端默认要求（契约字段仍为可选，**是否改为必填待裁决**）。既有字段形状零改动（契约版本号未提升）                              |
 | `0.1.0-s1` | **t6 落地账号体系**：`/api/auth/{register,login,logout,me}` + `/api/me/anonymous-codes`；新增 `AUTH_ERROR_CODES`（6 个稳定码，`AuthErrorResponseSchema` 与 `ErrorResponseSchema` 同形）；§1 错误码口径改为 `RULE_CODES ∪ AUTH_ERROR_CODES`（captain 裁决 A 方案，`docs/architecture.md` §26.4）；登记「登录无限流」「注册可枚举」「会话有状态」三条已知未做项 |

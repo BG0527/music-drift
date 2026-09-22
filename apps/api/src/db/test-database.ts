@@ -18,6 +18,16 @@ const SWEEP_PATTERN = BASE_DATABASE + '_%'; // LIKE 模式：前缀匹配（下�
 /** 只有"嵌入时间戳早于该阈值"的旧库才会被回收；并发的活库不可能被误清。 */
 const STALE_AFTER_SECONDS = 30 * 60;
 
+/**
+ * 派生测试库名的**唯一判据**（删库前必过）：必须是 `music_drift_test_<...>`。
+ *
+ * 为什么是纯函数并单独测：删库是不可逆操作，「绝不误删开发库 / 共享库」不能靠"记得"，
+ * 只能靠一个可以被证伪的判据（`music_drift_test`、`music_drift`、`postgres` 全部不认）。
+ */
+export function isDerivedTestDatabaseName(databaseName: string): boolean {
+  return /^music_drift_test_\d+_[0-9]+_[a-z0-9]+$/.test(databaseName);
+}
+
 function withDatabaseName(url: string, databaseName: string): string {
   const parsed = new URL(url);
   parsed.pathname = '/' + databaseName;

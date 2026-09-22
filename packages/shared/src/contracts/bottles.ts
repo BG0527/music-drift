@@ -7,7 +7,7 @@
  * 3. 有缺口也可以入海 → 公海分「已完成区 / 未完成区」（`seaZone`），前端不得把不完整作品当完整。
  */
 import { z } from 'zod';
-import { ErrorResponseSchema, EpochMsSchema, IsoDateTimeSchema, UuidSchema } from './common';
+import { ErrorResponseSchema, EpochMsSchema, IsoDateTimeSchema, PageSchema, UuidSchema } from './common';
 
 export const BottleStatusSchema = z.enum(['DRAFT', 'IN_RIVER', 'HELD', 'SEA', 'DAMAGED']);
 export const ResolutionSchema = z.enum(['RIVER', 'RETURN', 'SEA']);
@@ -60,6 +60,23 @@ export const BottleSummarySchema = z.object({
   createdAt: IsoDateTimeSchema,
   updatedAt: IsoDateTimeSchema,
 });
+
+/**
+ * 漂流日志用的一行（CONTEXT §11.1「我参与过的所有漂流瓶」）。
+ *
+ * 语义要点（**参与过 ≠ 现在还有效**）：
+ * - `role` 取自「我是发起者还是接唱者」；发起者不可能再接唱自己的瓶子（内核 `hasEverSung` 拦着），
+ *   因此**没有第三种取值**，不要为不存在的状态设计 UI 分支；
+ * - 判定基于事件（`SEGMENT_RECORDED` 的主动方），所以我的那一段被斩浪（ADR-015 §16.7 软删）之后
+ *   **仍然算参与过**：`role` 不变，只是 `mySegmentIndexes` 里不再有它。
+ */
+export const MyBottleSchema = BottleSummarySchema.extend({
+  role: z.enum(['INITIATOR', 'SINGER']),
+  /** 我在这个瓶子里**当前有效**的段号（升序）；被斩的段不出现（缺口由 `missingSegmentIndexes` 表达）。 */
+  mySegmentIndexes: z.array(z.number().int().min(1)),
+});
+
+export const MyBottleListSchema = PageSchema(MyBottleSchema);
 
 export const BottleDetailSchema = BottleSummarySchema.extend({
   initiatorCode: z.string().min(1),
@@ -150,6 +167,8 @@ export type SeaZone = z.infer<typeof SeaZoneSchema>;
 export type Segment = z.infer<typeof SegmentSchema>;
 export type ReplacementContext = z.infer<typeof ReplacementContextSchema>;
 export type BottleSummary = z.infer<typeof BottleSummarySchema>;
+export type MyBottle = z.infer<typeof MyBottleSchema>;
+export type MyBottleList = z.infer<typeof MyBottleListSchema>;
 export type BottleDetail = z.infer<typeof BottleDetailSchema>;
 export type DrawResponse = z.infer<typeof DrawResponseSchema>;
 export type RecordSegmentRequest = z.infer<typeof RecordSegmentRequestSchema>;

@@ -26,7 +26,7 @@ import { createActorResolver, type ActorResolver } from '../http/session.js';
 import type { Db } from '../db/client.js';
 import type { BottleStore } from '../store/bottles.js';
 import { createRequestContext } from '../store/context.js';
-import { toBottleDetail } from '../store/dto.js';
+import { toBottleDetail, toBottleSummary } from '../store/dto.js';
 
 export interface BottleRoutesOptions {
   db: Db;
@@ -36,6 +36,13 @@ export interface BottleRoutesOptions {
 
 const BottleIdParamsSchema = z.object({ id: UuidSchema });
 const CreateBottleRequestSchema = z.object({ songId: UuidSchema });
+/**
+ * 「我的漂流瓶」列表参数：与其它列表端点同口径（默认 20、上限 100）。
+ * **不做游标**：Demo 规模下个人参与量远小于一页，`nextCursor` 恒为 null（与 `/api/sea`、`/api/notifications` 一致）。
+ */
+const MyBottlesQuerySchema = z.object({
+  limit: z.coerce.number().int().min(1).max(100).default(20),
+});
 
 export function registerBottleRoutes(app: FastifyInstance, options: BottleRoutesOptions): void {
   const { db, store, clock } = options;
@@ -136,6 +143,55 @@ export function registerBottleRoutes(app: FastifyInstance, options: BottleRoutes
     return detail === null
       ? sendProblem(reply, transportProblem('NOT_FOUND'))
       : reply.code(201).send(detail);
+  });
+
+  /**
+   * 漂流日志（CONTEXT §11.1）：我参与过（发起或接唱）的漂流瓶。
+   * 「参与过」的判据在 store 里（基于事件流），因此**被斩浪的段仍算参与过**（ADR-015 §16.7）。
+   */
+  app.get('/api/me/bottles', async (request, reply) => {
+    const actor = await requireActor(request, reply);
+    if (actor === null) {
+      return reply;
+    }
+    const query = MyBottlesQuerySchema.safeParse(request.query ?? {});
+    if (!query.success) {
+      return sendProblem(reply, transportProblem('INVALID_BODY'));
+    }
+    const rows = await store.listParticipatedBottles({ userId: actor.user.id, limit: query.data.limit });
+    if (rows.length === 0) {
+      return reply.send({ items: [], nextCursor: null });
+    }
+
+    // 曲名一次性查（契约 `songTitle` 是 min(1)，不能写死空串 —— t9 修过的坑）
+    const songIds = [...new Set(rows.map((row) => row.songId))];
+    const titles = new Map<string, string>();
+    const songRows = await db.query<{ id: string; title: string }>(
+      `select id, title from songs where id = any($1::uuid[])`,
+      [songIds],
+    );
+    for (const song of songRows) {
+      titles.set(song.id, song.title);
+    }
+
+    const items = [];
+    for (const row of rows) {
+      const state = await store.loadState(row.id);
+      if (state === null) {
+        continue;
+      }
+      items.push({
+        ...toBottleSummary(row, state, titles.get(row.songId) ?? ''),
+        // 发起者不可能再接唱自己的瓶子（内核 hasEverSung 拦着）→ 只有两种角色
+        role: row.initiatorId === actor.user.id ? 'INITIATOR' : 'SINGER',
+        // 我从内核状态里取「当前有效的段号」：被斩的段不在其中（缺口另有 missingSegmentIndexes 表达）
+        mySegmentIndexes: state.segments
+          .filter((segment) => segment.deletedAt === null && segment.ownerId === actor.user.id)
+          .map((segment) => segment.index)
+          .sort((left, right) => left - right),
+      });
+    }
+    return reply.send({ items, nextCursor: null });
   });
 
   app.get('/api/bottles/:id', async (request, reply) => {

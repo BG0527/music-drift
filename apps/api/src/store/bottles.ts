@@ -102,6 +102,13 @@ export interface BottleStore {
   releaseHolding(bottleId: string, holderId: string, at: Date): Promise<number>;
   listSongs(): Promise<SongRow[]>;
   listSeaBottles(input: { zone?: 'COMPLETED' | 'INCOMPLETE'; limit: number }): Promise<BottleRow[]>;
+  /**
+   * 我参与过的瓶子（CONTEXT §11.1 漂流日志）：**发起** 或 **在该瓶唱过**（`SEGMENT_RECORDED` 的主动方）。
+   *
+   * 判据取 `events` 而不是 `bottle_segments` 投影：事件是单一事实来源，且**被斩的段仍算参与过**
+   *（ADR-015 §16.7 软删；"你参与过"不该因为被别人点踩斩浪就消失）。排序按最近活跃倒序。
+   */
+  listParticipatedBottles(input: { userId: string; limit: number }): Promise<BottleRow[]>;
   listBottleSegments(bottleId: string): Promise<BottleSegmentRow[]>;
   liveSegmentIndexes(bottleId: string): Promise<number[]>;
   activeHolding(bottleId: string): Promise<{ holderId: string; parentId: string | null; origin: string } | null>;
@@ -385,6 +392,26 @@ export function createBottleStore(db: Db): BottleStore {
          order by b.updated_at desc
          limit $2`,
         [input.zone ?? null, input.limit],
+      );
+      return rows.map(toBottleRow);
+    },
+
+    async listParticipatedBottles(input): Promise<BottleRow[]> {
+      const rows = await db.query<BottleDbRow>(
+        `select b.id, b.song_id, b.initiator_id, b.status, b.total_segments, b.revision,
+                b.current_holder_id, b.current_caster_id, b.created_at, b.updated_at
+         from bottles b
+         -- 同一个参数同时比 uuid 列（initiator_id）与 text 列（events.actor_id，允许 'SYSTEM' 哨兵）：
+         -- 不显式转型 Postgres 会报 "inconsistent types deduced for parameter $1"（t5 踩过一次）
+         where b.initiator_id = $1::uuid
+            or exists (
+              select 1 from events e
+              where e.bottle_id = b.id and e.type = 'SEGMENT_RECORDED' and e.actor_id = $1::text
+            )
+         -- 时间相同的行按 id 定序：分页/断言都要确定性（否则"最近活跃在前"会飘）
+         order by b.updated_at desc, b.id desc
+         limit $2`,
+        [input.userId, input.limit],
       );
       return rows.map(toBottleRow);
     },

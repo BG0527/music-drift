@@ -19,6 +19,11 @@ import {
   type SessionResponse,
   type Song,
 } from '@music-drift/shared';
+import {
+  LIBRARY_METADATA_URL,
+  LibraryMetadataSchema,
+  type LibraryMetadata,
+} from '@music-drift/shared/audio';
 import { ApiError, apiGet } from './client';
 import { QUERY_KEYS } from './query-client';
 import { arrayOf, pageOf, type Page } from './schema';
@@ -87,6 +92,21 @@ export function useSeaList(zone: 'COMPLETED' | 'INCOMPLETE'): UseQueryResult<Pag
   return useQuery({
     queryKey: QUERY_KEYS.seaList(zone),
     queryFn: () => apiGet(`/api/sea?zone=${zone}&limit=30`, pageOf(BottleSummarySchema)),
+  });
+}
+
+/**
+ * 曲库元数据（伴奏署名用）。
+ *
+ * 它是 `/library/library.json` 这个**静态资产**，不是 API：所以① 不走 `/api` 代理；
+ * ② 用 `LibraryMetadataSchema` 校验（文件损坏时立刻报错，而不是让署名静默变空）；
+ * ③ 缓存久一点（构建产物不会在运行中变化）。
+ */
+export function useLibraryMetadata(): UseQueryResult<LibraryMetadata> {
+  return useQuery({
+    queryKey: QUERY_KEYS.libraryMetadata,
+    queryFn: () => apiGet(LIBRARY_METADATA_URL, LibraryMetadataSchema),
+    staleTime: 5 * 60_000,
   });
 }
 

@@ -7,7 +7,13 @@
  */
 import { Client } from 'pg';
 import { runMigrations } from './migrate.js';
-import { adminUrlFor, databaseNameOf, resolveTestDatabaseUrl, sweepStaleTestDatabases } from './test-database.js';
+import {
+  adminUrlFor,
+  databaseNameOf,
+  isDerivedTestDatabaseName,
+  resolveTestDatabaseUrl,
+  sweepStaleTestDatabases,
+} from './test-database.js';
 
 export const TABLES = [
   'events',
@@ -41,7 +47,14 @@ export async function truncateAll(databaseUrl: string): Promise<void> {
  * Vitest 的 globalSetup 契约：**具名导出 `setup` / `teardown`** 才会两个都被采纳；
  * 用默认导出时 `teardown` 会被静默忽略（实测踩过：并发两次运行的库都留在 PG 里没回收）。
  */
-export async function setup(): Promise<void> {
+/**
+ * 建库（唯一名）+ 回收陈旧库 + 迁移 + 清表，返回本次运行应该用的连接串。
+ *
+ * 抽出来是因为**不止集成测试需要"一次性的干净库"**：`src/db/live-check.ts`（黄金路径 live-check 的
+ * 数据库预备/回收）必须复用同一套派生与回收机制 —— 否则两份实现会各自漂移，而"验证路径不可靠"
+ * 正是 t19 要修的病根。`setup()` 只是在它之上再写回 `process.env`。
+ */
+export async function provisionTestDatabase(): Promise<string> {
   const testUrl = resolveTestDatabaseUrl();
   const databaseName = databaseNameOf(testUrl);
 
@@ -59,26 +72,42 @@ export async function setup(): Promise<void> {
   await sweepStaleTestDatabases(testUrl);
   await runMigrations(testUrl);
   await truncateAll(testUrl);
-  process.env['DATABASE_URL'] = testUrl;
+  return testUrl;
+}
+
+export async function setup(): Promise<void> {
+  process.env['DATABASE_URL'] = await provisionTestDatabase();
 }
 
 /** 运行结束删掉本次的库（`WITH (FORCE)` 断掉残留连接）。供 global-teardown.ts 调用。 */
-export async function dropCurrentTestDatabase(): Promise<void> {
-  const testUrl = process.env['DATABASE_URL'];
-  if (testUrl === undefined || testUrl.length === 0) {
-    return;
+/**
+ * 删掉一个**派生测试库**。名字不符合 `music_drift_test_` 前缀的一律**拒删**（返回 false）——
+ * 这是"绝不误删开发库/别人的库"的结构性保证，而不是操作纪律。
+ */
+export async function dropTestDatabase(testUrl: string): Promise<boolean> {
+  if (testUrl.length === 0) {
+    return false;
   }
   const databaseName = databaseNameOf(testUrl);
-  if (!databaseName.startsWith('music_drift_test_')) {
-    return; // 显式 DATABASE_URL_TEST（共享库）：不删别人的东西
+  if (!isDerivedTestDatabaseName(databaseName)) {
+    return false; // 显式 DATABASE_URL_TEST（共享库）或开发库：不删别人的东西
   }
   const admin = new Client({ connectionString: adminUrlFor(testUrl) });
   await admin.connect();
   try {
     await admin.query(`drop database if exists "${databaseName}" with (force)`);
+    return true;
   } finally {
     await admin.end();
   }
+}
+
+export async function dropCurrentTestDatabase(): Promise<void> {
+  const testUrl = process.env['DATABASE_URL'];
+  if (testUrl === undefined) {
+    return;
+  }
+  await dropTestDatabase(testUrl);
 }
 
 /** 运行结束删掉本次的库。 */

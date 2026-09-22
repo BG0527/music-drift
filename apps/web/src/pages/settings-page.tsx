@@ -4,7 +4,9 @@
  * 只做三件事：匿名说明 / 登出 / 关于（契约版本 + 运行环境）。不追求设计稿。
  */
 import { CONTRACT_VERSION } from '@music-drift/shared';
+import { useLibraryMetadata } from '../features/api/queries';
 import { useLogout } from '../features/api/mutations';
+import { LibraryAttribution } from '../features/audio';
 import { useSession } from '../features/session/session-context';
 import { Button, Card, Icon, WaveDivider } from '../design-system';
 import { useNavigate } from './shell/router-context';
@@ -13,6 +15,14 @@ export function SettingsPage() {
   const session = useSession();
   const logout = useLogout();
   const navigate = useNavigate();
+  /**
+   * 伴奏署名（CC BY 4.0）—— t13 的授权义务，挂在本页履行。
+   *
+   * 关键取舍：**署名不依赖这个查询**。作者 / 来源 / 许可名 / 许可链接是编译期常量，
+   * 只有"逐首曲名"来自 `library.json`；元数据读不到时**照样渲染署名块**
+   * （组件会自己说明"曲目列表暂时读不到"），绝不因为接口挂掉而不显示署名。
+   */
+  const library = useLibraryMetadata();
 
   return (
     <div className="flex flex-col gap-6">
@@ -60,6 +70,19 @@ export function SettingsPage() {
           </span>
         </div>
       </Card>
+
+      <WaveDivider />
+
+      <section className="flex flex-col gap-2" aria-labelledby="attribution-heading">
+        <h2 id="attribution-heading" className="text-[1.0625rem] font-semibold text-abyss">
+          伴奏与授权
+        </h2>
+        <p className="text-[0.875rem] leading-[1.6] text-slate-current">
+          曲库里的伴奏都是 CC BY 4.0 授权的器乐作品：可以再分发、也可以改编，
+          唯一义务是署名。成品在伴奏之上叠加了用户人声，属于改编（remix），署名与许可条款照旧保留。
+        </p>
+        <LibraryAttribution tracks={library.data?.tracks ?? []} />
+      </section>
 
       <WaveDivider />
 

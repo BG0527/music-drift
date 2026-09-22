@@ -1,24 +1,52 @@
 /**
- * 黄金路径 **真实链路** 检查（需要 api + Postgres 在跑）。
+ * 黄金路径 **真实链路** 检查（真 HTTP + 真 Postgres + 真音频字节，不需要浏览器）。
  *
  * 为什么要有这个脚本：前端页面在浏览器里跑，但"页面发的每个请求能不能成功、字段是不是这些字段、
  * 并发冲突是不是 409"这些事实不需要浏览器就能钉住 —— 用真库 + 真 HTTP + 真音频字节走一遍，
  * 比"读代码推测"可靠得多。
  *
- * 用法（在仓库根目录）：
- *   pnpm db:up && pnpm db:migrate && pnpm db:seed
- *   pnpm --filter @music-drift/api start &     # http://localhost:8787
+ * ## 默认 = hermetic：自己的可抛弃库 + 自己起的 API
  *   node apps/web/tools/golden-path-live-check.mjs
+ * 脚本会（复用 `apps/api/src/db/test-database.ts` 的派生机制）建 `music_drift_test_<epoch>_<pid>_<rand>`、
+ * 迁移 + 灌种子、在**空闲端口**上起自己的 API、跑完 26 步后删库并回收超龄残留库。
+ *
+ * **为什么要这样**：旧版本直接用 8787 上的 dev 服务 → 库里漂着别人的瓶子 → 随机捞取会捞到别人的
+ * 瓶子 → 第 15 步断链、其后 11 项失败同源；通过与否取决于环境运气（同一份代码，captain 复现失败、
+ * 本地复现成功）。**端到端检查必须自己掌控输入**，否则它的"通过"不构成证据。
+ *
+ * ## 外部模式（显式开启，非 hermetic）
+ *   API_BASE=http://localhost:8787 node apps/web/tools/golden-path-live-check.mjs
+ * 对着一个已经起好的服务跑（调试用）。此时结果**取决于那个库里的数据**，不能当验收证据。
  *
  * 覆盖：注册/登录 → 选歌 → 发起 → 录第 1 段 → 投河 → 第二人捞取 → 接唱 → 投河 → … → 末段 →
- * 回传 → 入海 → 公海（完整区）→ 漂流日志 → 匿名代号 → 放回冷却 → 401/409 语义。
+ * 回传 → 入海 → 公海（完整区）→ 漂流日志 → 匿名代号 → 放回冷却 → 没有可捞的瓶子(409) → 401/409 语义。
  * 每一步都打印「步骤 / HTTP 状态 / 关键字段」，失败即 `process.exit(1)`。
  *
  * 说明：这是一个**命令行核查脚本**，输出就是它的产物，因此允许直接 console.log。
  */
 /* eslint-disable no-console */
+import { spawn, spawnSync } from 'node:child_process';
+import { createRequire } from 'node:module';
+import { createServer } from 'node:net';
+import { fileURLToPath } from 'node:url';
 
-const API = process.env.API_BASE ?? 'http://localhost:8787';
+const API_DIR = fileURLToPath(new URL('../../api/', import.meta.url));
+/**
+ * 用 `node <tsx cli>` 而不是 `pnpm --filter … start`：Windows 上 spawn 一个 `.cmd`
+ * 必须 `shell: true`，而那只会在输出里塞 DEP0190 弃用警告、并把参数拼接交给 cmd.exe。
+ * 这里直接定位 apps/api 自己的 tsx（同一份依赖），命令与 `package.json` 里的脚本**等价**：
+ *   node tsx --env-file-if-exists=../../.env src/server.ts
+ * （`pnpm --filter @music-drift/api start` 这份文档命令本身由 scripts.test.ts + 手工冒烟单独守着。）
+ */
+const TSX_CLI = createRequire(fileURLToPath(new URL('../../api/package.json', import.meta.url))).resolve(
+  'tsx/cli',
+);
+const IS_WINDOWS = process.platform === 'win32';
+
+/** 外部模式：只有**显式**给 API_BASE 才用别人的服务（默认自建，见文件头）。 */
+let API = process.env.API_BASE ?? null;
+/** hermetic 环境的句柄（外部模式下为 null）。 */
+let hermetic = null;
 const stamp = Date.now().toString(36);
 
 let failures = 0;
@@ -102,8 +130,8 @@ async function recordSegment(session, bottleId, durationMs, note) {
 /**
  * 反复打捞直到拿到目标瓶子。
  *
- * 为什么不能只捞一次：真库里河道可能还漂着别人的瓶子（随机打捞），
- * 捞到不是目标的那支就「放回海中」继续 —— 这同时也验证了放回冷却的具体行为。
+ * hermetic 模式下河道里只有本次运行造的瓶子，一次就能捞到；
+ * 外部模式下别人的瓶子也在河道里（随机打捞），因此保留"捞到不是目标就放回再捞"的容错路径。
  */
 async function drawUntil(session, targetId, maxAttempts = 15) {
   for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
@@ -115,15 +143,156 @@ async function drawUntil(session, targetId, maxAttempts = 15) {
   return { drawn: { status: 0, body: null }, attempts: maxAttempts };
 }
 
-const main = async () => {
-  log('健康检查', API);
+/** 跑 `live-check:db` 子命令（等价于 `pnpm --filter @music-drift/api live-check:db <args>`）。 */
+function runDbTool(args) {
+  const result = spawnSync(
+    process.execPath,
+    [TSX_CLI, '--env-file-if-exists=../../.env', 'src/db/live-check.ts', ...args],
+    { cwd: API_DIR, encoding: 'utf8', env: process.env },
+  );
+  return { status: result.status, stdout: result.stdout ?? '', stderr: result.stderr ?? '' };
+}
+
+/** 取输出里**最后一行**合法 JSON（pnpm/tsx 可能在其前面打别的行）。 */
+function lastJsonLine(text) {
+  const lines = text.trim().split(/\r?\n/);
+  for (let index = lines.length - 1; index >= 0; index -= 1) {
+    try {
+      return JSON.parse(lines[index]);
+    } catch {
+      // 不是 JSON 就继续往上找
+    }
+  }
+  return null;
+}
+
+async function freePort() {
+  return await new Promise((resolve, reject) => {
+    const probe = createServer();
+    probe.unref();
+    probe.on('error', reject);
+    probe.listen(0, '127.0.0.1', () => {
+      const address = probe.address();
+      const port = typeof address === 'object' && address !== null ? address.port : 0;
+      probe.close(() => resolve(port));
+    });
+  });
+}
+
+async function waitForHealth(baseUrl, timeoutMs = 60_000) {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    try {
+      const response = await fetch(`${baseUrl}/healthz`);
+      if (response.status === 200) return true;
+    } catch {
+      // 还没起来，继续等
+    }
+    await new Promise((resolve) => setTimeout(resolve, 300));
+  }
+  return false;
+}
+
+/** 杀掉整棵进程树：`pnpm start` 会派生 tsx/node 子进程，只杀 pnpm 会留下占端口的孤儿。 */
+function killTree(child) {
+  if (child === null || child.exitCode !== null) return;
+  if (IS_WINDOWS) {
+    spawnSync('taskkill', ['/pid', String(child.pid), '/T', '/F'], { stdio: 'ignore' });
+    return;
+  }
+  try {
+    process.kill(-child.pid, 'SIGTERM');
+  } catch {
+    child.kill('SIGTERM');
+  }
+}
+
+async function startHermetic() {
+  console.log('[setup] 建一次性数据库（复用 apps/api 的派生 / 迁移 / 种子机制）…');
+  const created = runDbTool(['create']);
+  if (created.status !== 0) {
+    console.error(created.stdout);
+    console.error(created.stderr);
+    process.exit(1);
+  }
+  const info = lastJsonLine(created.stdout);
+  if (info === null || typeof info.databaseUrl !== 'string') {
+    console.error('无法解析 live-check:db create 的输出：', created.stdout);
+    process.exit(1);
+  }
+
+  const port = await freePort();
+  API = `http://127.0.0.1:${port}`;
+  console.log(
+    `[setup] 库 ${info.databaseName}（种子 ${info.seededSongs} 首 / ${info.seededSegments} 段）· API ${API}`,
+  );
+
+  const child = spawn(process.execPath, [TSX_CLI, '--env-file-if-exists=../../.env', 'src/server.ts'], {
+    cwd: API_DIR,
+    stdio: ['ignore', 'pipe', 'pipe'],
+    // DATABASE_URL / PORT 由这里显式给：node 的 --env-file-if-exists **不覆盖**已存在的环境变量，
+    // 所以即便 start 脚本加载了根 .env（dev 库），本次运行仍然只碰自建库。
+    env: { ...process.env, DATABASE_URL: info.databaseUrl, PORT: String(port), LOG_LEVEL: 'error' },
+  });
+  let serverLog = '';
+  child.stdout.on('data', (chunk) => {
+    serverLog += String(chunk);
+  });
+  child.stderr.on('data', (chunk) => {
+    serverLog += String(chunk);
+  });
+  hermetic = { databaseUrl: info.databaseUrl, databaseName: info.databaseName, child };
+
+  if (!(await waitForHealth(API))) {
+    console.error(`API 未在 60s 内就绪（${API}）：\n${serverLog}`);
+    await stopHermetic();
+    process.exit(1);
+  }
+  must(
+    !serverLog.includes('未配置 DATABASE_URL'),
+    '自起的 API 必须拿到自建库的连接串（不得走"无 DATABASE_URL"降级）',
+  );
+}
+
+async function stopHermetic() {
+  if (hermetic === null) return;
+  const { child, databaseName } = hermetic;
+  hermetic = null; // 先置空：teardown 自身出错也不会重复删
+  killTree(child);
+  const dropped = runDbTool(['drop', databaseName]);
+  const info = lastJsonLine(dropped.stdout);
+  console.log(
+    `[teardown] 删库 ${databaseName} → ${info?.dropped === true ? '已删除' : '未删除（见输出）'}`,
+  );
+  runDbTool(['sweep']); // 顺手回收超龄残留库（上一次跑崩掉留下的）
+}
+
+const runChecks = async () => {
   const health = await call(newSession('anon'), 'GET', '/healthz');
   must(health.status === 200, `healthz 应为 200，实际 ${health.status}`);
+
+  /**
+   * 自建库 → 公海必须是空的。这不只是"顺手看一眼"：它同时证明**这次跑的不是别人污染的库**
+   *（旧版本正是栽在这里 —— 第 15 步捞到别人的瓶子，其后 11 项失败同源）。
+   * 外部模式下库里有别人的数据是正常的，因此只在 hermetic 模式下断言。
+   */
+  const preflightSea = await call(newSession('anon'), 'GET', '/api/sea?zone=COMPLETED&limit=100');
+  if (hermetic !== null) {
+    must(
+      preflightSea.status === 200 && preflightSea.body?.items?.length === 0,
+      `全新库的公海应为空，实际 ${preflightSea.status} / ${preflightSea.body?.items?.length} 件`,
+    );
+  }
 
   // ── 401：未登录发起的语义（前端据此显示「需要先登录」）──────────────
   const anon = newSession('anon');
   const songs = await call(anon, 'GET', '/api/songs');
   must(songs.status === 200 && Array.isArray(songs.body), '未登录也应能读曲库（首屏选歌）');
+  // 让"这份通过是在哪个环境上取得的"留在输出里，而不是靠回忆。
+  log(
+    '健康检查',
+    `${API}｜${hermetic === null ? '外部模式（数据不受控，非验收证据）' : `自建库 ${hermetic.databaseName} · 公海 ${preflightSea.body?.items?.length ?? '?'} 件（全新）`}`,
+  );
   log('曲库（未登录可读）', `${songs.body.length} 首`);
   must(
     songs.body.some((song) => song.segments.length === song.totalSegments),
@@ -132,8 +301,9 @@ const main = async () => {
 
   /**
    * 选歌口径：只挑**带分段元数据**的歌（页面要显示"每段约 N 秒"）。
-   * 注意：这条 dev 库里混进了 18 首 `song-xxxxxxxx` 测试残留（integration 夹具写进了主库），
-   * 那是数据卫生问题，与本任务无关，已在回报里登记；这里显式避开它们。
+   * hermetic 模式下库里只有 `runSeed` 灌的 3 首占位歌（每首 4 段元数据齐全）；
+   * 外部模式下 dev 库里还混着集成测试残留的 `song-xxxxxxxx`（无分段元数据），因此这里**显式过滤**，
+   * 不假设库是干净的。
    */
   const playable = songs.body.filter((song) => song.segments.length === song.totalSegments);
   must(playable.length > 0, '曲库里应有带分段元数据的歌（否则页面无法显示段位信息）');
@@ -377,25 +547,24 @@ const main = async () => {
 
   // ── 「没有可捞的瓶子」：409 + 稳定码（前端据此渲染空态，而不是红色报错）──
   //
-  // 注意：这条 dev 库里河道还漂着别人留下的瓶子，所以"真的捞不到"不一定能在有限次数内造出来；
-  // 造不出来时**只记录事实**（不伪装成通过）—— 该空态的界面行为由前端测试
-  // （river-page.test.tsx 用 409 桩）与 API 集成测试分别覆盖。
+  // 造法：**捞到就持有、不放回** —— 河道只会越来越空，下一次打捞必然空手而归。
+  //（旧写法是"捞到就放回"再重复：放回会刷新自己的冷却计数，于是 80 次全是 200，从来复现不出来。
+  // 这就是"检查自己不可靠"的另一种形态：分支永远走不到，却一直显示为通过。）
   const E = await register('ee');
   let emptyDraw = null;
-  let attemptCount = 0;
-  for (let attempt = 0; attempt < 80; attempt += 1) {
-    attemptCount = attempt + 1;
+  let drained = 0;
+  for (let attempt = 0; attempt < 5; attempt += 1) {
     const drawn = await call(E.session, 'POST', '/api/river/draw');
     if (drawn.status !== 200) {
       emptyDraw = drawn;
       break;
     }
-    await call(E.session, 'POST', `/api/bottles/${drawn.body.bottle.id}/put-back`);
+    drained += 1; // 捞到即持有（不选去向）→ 这支瓶子离开河道
   }
   if (emptyDraw === null) {
     log(
       '没有可捞的瓶子',
-      `本机 dev 库河道始终有其他瓶子（尝试 ${attemptCount} 次），按"未复现"记录；界面空态由前端测试覆盖`,
+      `河道里始终有瓶子可捞（持有 ${String(drained)} 支），按"未复现"记录；界面空态由前端测试覆盖`,
     );
   } else {
     must(emptyDraw.status === 409, `没有可捞时应为 409，实际 ${emptyDraw.status}`);
@@ -420,10 +589,30 @@ const main = async () => {
     console.log(
       `✅ 黄金路径真实链路检查通过（${String(stepNo)} 步，4 个账号，真库 + 真 HTTP + 真音频字节）`,
     );
-    process.exit(0);
+    return 0;
   }
   console.error(`❌ 有 ${String(failures)} 项不符合预期`);
-  process.exit(1);
+  return 1;
+};
+
+const main = async () => {
+  if (API === null) {
+    await startHermetic();
+  } else {
+    console.log(
+      `[setup] 外部模式：使用 API_BASE=${API}（非 hermetic —— 结果取决于那个库里的数据，不能当验收证据）`,
+    );
+  }
+
+  // 抛异常时本来就不会走到下面（node 自己给非零退出码），因此不需要"初始值"占位
+  let code;
+  try {
+    code = await runChecks();
+  } finally {
+    // 失败路径也要删库：残留库会污染下一次"干净环境"的假设（这正是本次要修的病根）。
+    await stopHermetic();
+  }
+  process.exit(code ?? 1);
 };
 
 await main();

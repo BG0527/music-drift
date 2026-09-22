@@ -22,6 +22,7 @@ export { QUERY_KEYS, createQueryClient, queryRetry } from './query-client';
 export { arrayOf, pageOf, segmentAudioUrl, type Page } from './queries';
 export {
   useAnonymousCodes,
+  useLibraryMetadata,
   useBottle,
   useBottleEvents,
   useMeQuery,

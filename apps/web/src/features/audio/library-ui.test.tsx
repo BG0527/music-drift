@@ -214,6 +214,19 @@ describe('LibraryAttribution（CC BY 4.0 署名）', () => {
     }
   });
 
+  it('未取到曲目列表时，署名义务仍然完整（作者/来源/许可/链接/改编），不依赖接口可用', () => {
+    // library.json 只是"逐首曲名"的来源；作者、许可与链接是 shared 里的编译期常量，
+    // 因此 fetch 失败也**不能**导致署名消失（CC BY 的唯一义务就是署名）。
+    render(<LibraryAttribution />);
+
+    expect(screen.getAllByText(/Kevin MacLeod/).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/incompetech\.com/).length).toBeGreaterThan(0);
+    expect(screen.getByText(/改编/)).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /CC BY 4\.0|创用 CC|查看许可/ })).toBeInTheDocument();
+    // 曲目列表整体缺失时应显示可读说明，而不是空白
+    expect(screen.getByText(/曲目列表暂时读不到|暂未加载/)).toBeInTheDocument();
+  });
+
   it("没有任何 emoji（DESIGN.md Do&Don't）", () => {
     render(<LibraryAttribution tracks={metadata.tracks} />);
 
