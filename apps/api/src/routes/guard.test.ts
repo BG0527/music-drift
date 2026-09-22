@@ -38,7 +38,12 @@ function readSources(dir: string): Source[] {
 
 /** 反例：直写 4xx/5xx（`reply.code(409)` / `.status(422)`）与裸的 4xx/5xx 数字字面量。 */
 const DIRECT_STATUS = /\.(code|status)\(\s*[45]\d{2}\s*\)/;
-const BARE_STATUS = /\b[45]\d{2}\b/;
+/*
+ * 裸的 4xx/5xx 只算「赋给状态类标识符」的那种（`const status = 409` / `statusCode: 500`）。
+ * 不能写成"任何 4xx/5xx 数字"：`z.string().max(500)` 这类**非状态**数字会被误判
+ * （本守卫第一版就这么误伤过交互路由，已收紧）。
+ */
+const BARE_STATUS = /\b(?:status|statusCode|code)\s*[:=]\s*[45]\d{2}\b/;
 
 /**
  * 例外表：文件 → { 理由, 类型 }。**例外是有条件的**，守卫会逐条验证条件成立：
@@ -82,11 +87,24 @@ describe('零规则守卫（反例）：错误码字面量只允许出现在 pro
     expect(offenders).toEqual([]);
   });
 
+  it('唯一构造点确实存在：problem.ts 里就是那张状态码表', () => {
+    const problem = httpSources.find((source) => source.file === 'problem.ts');
+
+    expect(problem?.text).toContain('TRANSPORT_STATUS');
+    for (const status of ['400', '401', '403', '404', '501', '500']) {
+      expect(problem?.text, 'problem.ts 应包含状态码 ' + status).toContain(status);
+    }
+  });
+
   it('守卫有牙齿：negative control —— 把禁止的写法临时注入，检测必须命中', () => {
     // 不写文件，只验证正则确实能抓到：证明上面的空数组不是"规则写错了所以永远通过"。
     expect(DIRECT_STATUS.test('return reply.code(409).send({})')).toBe(true);
     expect(DIRECT_STATUS.test('return reply.status(422).send({})')).toBe(true);
     expect(BARE_STATUS.test('const status = 500;')).toBe(true);
+    expect(BARE_STATUS.test('statusCode: 409,')).toBe(true);
+    // 非状态数字必须放行（这是收紧后的关键：否则 schema 的长度上限会被误判）
+    expect(BARE_STATUS.test('z.string().min(1).max(500)')).toBe(false);
+    expect(BARE_STATUS.test('limit: z.coerce.number().max(100)')).toBe(false);
     // 合法用法必须放行：成功码（200/201/204）与变量状态码
     expect(DIRECT_STATUS.test('return reply.code(201).send(body)')).toBe(false);
     expect(DIRECT_STATUS.test('return reply.code(problem.status).send(problem.body)')).toBe(false);

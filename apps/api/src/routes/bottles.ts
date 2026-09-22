@@ -13,11 +13,12 @@ import {
   recordSegment,
   type Clock,
 } from '@music-drift/shared/domain';
-import { ChooseResolutionRequestSchema, RecordSegmentRequestSchema, UuidSchema } from '@music-drift/shared';
+import { ChooseResolutionRequestSchema, UuidSchema } from '@music-drift/shared';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { z } from 'zod';
 import { createAnonCodeService } from '../auth/anonCodeService.js';
 import { createAuthRepository } from '../auth/repository.js';
+import { validateSegmentAudioUpload } from '../audio/ingest.js';
 import { readDomainEvents } from '../db/events.js';
 import { problemFromOutcome, problemFromViolations, sendProblem, transportProblem } from '../http/problem.js';
 
@@ -168,22 +169,51 @@ export function registerBottleRoutes(app: FastifyInstance, options: BottleRoutes
     );
   });
 
+  /**
+   * 录音上传（原始二进制协议）：`Content-Type` = 音频 MIME，body = 字节流，
+   * 时长走 `x-audio-duration-ms` 请求头，附言走 `?note=`。守门人是 t7 的 `validateSegmentAudioUpload`。
+   * 落库：**真实字节** + 归一化 MIME + 时长（不再写 `audio: null`）。
+   */
   app.post('/api/bottles/:id/segments', async (request, reply) => {
     const actor = await requireActor(request, reply);
     if (actor === null) {
       return reply;
     }
     const params = BottleIdParamsSchema.safeParse(request.params);
-    const body = RecordSegmentRequestSchema.safeParse(request.body ?? {});
-    if (!params.success || !body.success) {
-      return sendProblem(reply, transportProblem('INVALID_BODY'));
+    if (!params.success) {
+      return sendProblem(reply, transportProblem('NOT_FOUND'));
     }
+    const rawDuration = request.headers['x-audio-duration-ms'];
+    const durationMs = typeof rawDuration === 'string' && /^[0-9]+$/.test(rawDuration) ? Number(rawDuration) : null;
+    const rawNote = request.headers['x-segment-note'];
+    const noteQuery = (request.query as { note?: string } | undefined)?.note;
+    const noteSource = typeof rawNote === 'string' && rawNote.length > 0 ? rawNote : noteQuery;
+    let note: string | null = null;
+    if (typeof noteSource === 'string' && noteSource.length > 0) {
+      try {
+        note = decodeURIComponent(noteSource).slice(0, 200);
+      } catch {
+        note = noteSource.slice(0, 200);
+      }
+    }
+    const bytes = Buffer.isBuffer(request.body) ? request.body : null;
+
+    const validation = validateSegmentAudioUpload({
+      mime: request.headers['content-type'] ?? null,
+      bytes: bytes ?? new Uint8Array(0),
+      durationMs,
+    });
+    if (!validation.ok) {
+      const problem = problemFromViolations(validation.violations);
+      return problem === null ? reply : sendProblem(reply, problem);
+    }
+
     const state = await store.loadState(params.data.id);
     if (state === null) {
       return sendProblem(reply, transportProblem('NOT_FOUND'));
     }
     const ctx = createRequestContext(clock);
-    const outcome = recordSegment(state, { userId: actor.user.id, note: body.data.note ?? null }, ctx);
+    const outcome = recordSegment(state, { userId: actor.user.id, note }, ctx);
     const problem = problemFromOutcome(outcome);
     if (problem !== null) {
       return sendProblem(reply, problem);
@@ -192,7 +222,7 @@ export function registerBottleRoutes(app: FastifyInstance, options: BottleRoutes
     const segmentId = recorded !== undefined && 'segmentId' in recorded ? String(recorded.segmentId) : '';
     const index = recorded !== undefined && 'index' in recorded ? Number(recorded.index) : 0;
     await store.applyOutcome(params.data.id, outcome, {
-      segment: { durationMs: body.data.durationMs ?? null, audioMime: null, audio: null },
+      segment: { audio: bytes, audioMime: validation.value.mime, durationMs: validation.value.durationMs },
     });
     await codesFor(params.data.id, [actor.user.id]);
     const detail = await loadDetail(params.data.id, actor.user.id);

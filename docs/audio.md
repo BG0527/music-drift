@@ -138,6 +138,32 @@ getUserMedia({audio:true})
 
 ---
 
+## 5.1 阶段一混音与成品导出（t8）
+
+把各段人声拼成可试听、可下载的成品，**纯人声无伴奏**（用户裁决），实现说明与**对齐误差实测报告**见
+**`docs/mix-report.md`**。接线一句话：
+
+```tsx
+import { MixExportPanel } from '../features/audio';
+import { planMonoSequentialMix } from '@music-drift/shared/audio';
+
+const plan = planMonoSequentialMix({
+  segments: bottle.segments.map((s) => ({
+    index: s.index,
+    durationMs: s.durationMs ?? 0,
+    audioUrl: `/api/segments/${s.id}/audio`,
+    ownerCode: s.ownerCode,
+  })),
+  totalSegments: bottle.totalSegments, // 来自数据，不硬编码 4
+  nominalDurationByIndex, // 可选：来自 /api/songs 的 songSegments.durationMs
+});
+
+<MixExportPanel plan={plan} />;
+```
+
+要点：缺口保留为**静音占位**并显式标注（段号永不压缩）；对齐误差阈值 120ms（D-05）；
+阶段二叠加伴奏时只换 `MixPlanner`，调用方不改。
+
 ## 6. 接线指南（给 t11 / frontend-flow）
 
 ```tsx
@@ -209,9 +235,28 @@ import {
 1. **服务端无法核实音频真实时长**：只校验客户端上报值 + 容器魔数 + 体积。
    真正堵住"伪报时长"需要服务端解码（如 `music-metadata`/ffmpeg，属新依赖，须先按 AGENTS §7 登记）。
    影响面：段长可能被注水到 30 秒以上而不被拒；不影响 80% 门槛与斩杀阈值的语义（它们只认比例）。
-2. **段创建端点（`POST /api/bottles/:id/segments`）归 t9**：t7 交付的是音频侧守门人
-   （`validateSegmentAudioUpload`）、bytea 写入入口（复用 t5）与 Range 播放端点。
-   该端点若用 multipart，需要登记 `@fastify/multipart`（新依赖，t9 走 AGENTS §7 流程）。
+2. **⚠️ 跨任务缺口（高，已实测）：t7 的 multipart 上传客户端与 t9 当前的段创建端点协议不一致**。
+   - t7 交付：multipart 上传客户端（`apps/web/src/features/audio/upload.ts`）+ 音频侧守门人
+     `validateSegmentAudioUpload`（`AUDIO_*` 五个码）+ Range 播放端点。
+   - t9 当前实现（`apps/api/src/routes/bottles.ts:171`，观察于 2026-09-23 01:38）：
+     `POST /api/bottles/:id/segments` 只解析 **JSON** `request.body`，没有任何 multipart 解析器
+     （全仓无 `@fastify/multipart`）；落库时写的是 `{ durationMs, audioMime: null, audio: null }`。
+   - **实测（临时探针，跑完已删除）**：用真实 Fastify 实例 + 真实 Postgres + 真实会话 cookie，
+     以 multipart（`audio` 文件 + `durationMs`）POST 该端点：
+     ```text
+     [PROBE] status= 400  body= {"error":{"message":"请求内容不合法，请检查后重试。","violations":[]}}
+     [PROBE] db row= []        # 没有插入任何行
+     ```
+     → 结论：**不是静默丢数据，而是硬 400**（我原先按代码推测"会 201 且丢掉音频"，实测推翻了该推测，以此为准）。
+     即使改用 JSON 请求体，该路由也会落一条 `audio = null` 的段，而 Range 端点对"有段无音频"返回 `404`
+     （该行为有集成测试覆盖）。
+   - 需要 t9 二选一（并各自同步 `docs/api.md`）：
+     ① **multipart**（与文档现状一致）：登记 `@fastify/multipart`（AGENTS §7 流程）+ 调用
+     `validateSegmentAudioUpload()` 校验 + 把 `audio/audioMime/durationMs` 一起落库（`insertBottleSegment` 已支持）；
+     ② **改用原始二进制**（`Content-Type: audio/webm`，`durationMs`/`note` 走 query 或头）：零新依赖，
+     但要改契约与文档，`upload.ts` 的 `buildSegmentUploadForm` 也随之换掉（改动量很小）。
+   - t7 侧两条路都能低成本对接（守门人 / bytea 读写 / 错误码都已就绪），但**换协议属契约变更，不由 t7 单方面拍**。
+
 3. **播放端点匿名可读**（理由见 §4）；账号级/持有者级权限待 t9/t12 收紧。
 4. **`RecordSegmentRequest.durationMs` 在契约里是可选字段**，而服务端校验需要它。
    t7 用 `validateSegmentAudioUpload(..., { requireDuration: true })` 默认要求它（缺失即 422），

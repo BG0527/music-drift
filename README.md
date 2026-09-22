@@ -68,6 +68,10 @@ pnpm db:up && pnpm --filter @music-drift/api test:integration   # bytea 入库 �
   拖动进度条只取需要的字节；Safari 探测 moov 用的后缀请求（`bytes=-N`）也支持。
 - 点踩门槛：**覆盖率**（听过的区间并集）≥ 80% 才可点踩；拖动进度条与循环重播都不算听。
   阈值来自内核 `DEFAULT_POLICY.dislikeListenRatioThreshold`，服务端会再校验一次。
+- 曲库（3 首 CC BY 4.0 器乐，Kevin MacLeod / Incompetech）：BPM/拍号依据、分段表、响度归一与署名 →
+  `docs/library.md`；入库 `pnpm --filter @music-drift/api exec tsx src/audio/library-cli.ts`（默认拒绝未复核边界）。
+- 成品导出（阶段一：**纯人声、无伴奏**，按固定段号拼接、缺口留静音并标注）：见 `docs/mix-report.md`
+  （含对齐误差实测报告：样本级 0ms，120ms 阈值由音频源前导静音决定余量）。
 
 ## 重要约束
 

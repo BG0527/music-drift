@@ -15,14 +15,13 @@
  *
  * 本文件是**唯一**允许出现 4xx/5xx 数字字面量的地方（`TRANSPORT_STATUS`），守卫测试会强制这一点。
  */
-import { ErrorResponseSchema, type ErrorResponse } from '@music-drift/shared';
+import { API_RULE_CODES, ErrorResponseSchema, type ErrorResponse } from '@music-drift/shared';
 import {
   RULE_CODES,
   RULE_MESSAGES,
   httpStatusOf,
   type CommandOutcome,
   type RuleCode,
-  type RuleViolation,
 } from '@music-drift/shared/domain';
 import type { FastifyReply } from 'fastify';
 
@@ -57,23 +56,48 @@ const TRANSPORT_STATUS: Record<TransportErrorCode, number> = {
   INTERNAL: 500,
 };
 
-/** 全部错误码（内核 + 传输层）：`docs/api.md` 的错误码表由它派生，测试断言其完整性。 */
-export const ALL_API_ERROR_CODES: readonly ApiErrorCode[] = [...RULE_CODES, ...TRANSPORT_ERROR_CODES];
+/** `violations[].code` 的**完整**词表（内核 ∪ API 层功能规则 ∪ 传输层）：docs/api.md 的错误码表据此派生。 */
+export const ALL_API_ERROR_CODES: readonly string[] = [
+  ...RULE_CODES,
+  ...API_RULE_CODES,
+  ...TRANSPORT_ERROR_CODES,
+];
 
 export interface HttpProblem {
   status: number;
   body: ErrorResponse;
 }
 
+/**
+ * 违规条目：内核码走内核状态表，**同端点上出现的其它词表**（音频码 `AUDIO_RULE_CODES`，
+ * 见 `contracts/common.ts` 的 `RuleCodeSchema`）按规则违反处理 → 422。
+ * 判别原则（captain 裁决 ADR-018）：**决定因素是「是否与领域码出现在同一端点」**，不是「是不是领域规则」。
+ */
+export interface ApiViolation {
+  code: string;
+  message: string;
+}
+
+const KERNEL_CODES = new Set<string>(RULE_CODES);
+
+function statusOfViolationCode(code: string): number {
+  return KERNEL_CODES.has(code) ? httpStatusOf(code as RuleCode) : 422;
+}
+
 /** 内核违规 → 错误响应；没有违规时返回 `null`（成功路径不需要映射）。 */
-export function problemFromViolations(violations: readonly RuleViolation[]): HttpProblem | null {
+export function problemFromViolations(violations: readonly ApiViolation[]): HttpProblem | null {
   const first = violations[0];
   if (first === undefined) {
     return null;
   }
-  const message = first.message.trim().length > 0 ? first.message : RULE_MESSAGES[first.code];
+  const message =
+    first.message.trim().length > 0
+      ? first.message
+      : KERNEL_CODES.has(first.code)
+        ? RULE_MESSAGES[first.code as RuleCode]
+        : '请求内容不合法，请检查后重试。';
   return {
-    status: httpStatusOf(first.code),
+    status: statusOfViolationCode(first.code),
     body: ErrorResponseSchema.parse({
       error: { message, violations: violations.map((violation) => ({ ...violation })) },
     }),

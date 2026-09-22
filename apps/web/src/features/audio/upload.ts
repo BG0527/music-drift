@@ -1,5 +1,5 @@
 /**
- * 上传客户端：`POST /api/bottles/:id/segments`（multipart，带进度与失败重试）。
+ * 上传客户端：`POST /api/bottles/:id/segments`（原始二进制，带进度与失败重试）。
  *
  * 为什么用 XHR 而不是 `fetch`：上传进度只能从 `XMLHttpRequest.upload.onprogress` 拿到，
  * `fetch` 至今没有可靠的上传进度（`ReadableStream` 上传在各浏览器不一致）。
@@ -22,7 +22,10 @@ import type { RecordSegmentResponse } from '@music-drift/shared/contracts';
 
 export interface UploadTransportRequest {
   url: string;
-  form: FormData;
+  /** 原始音频字节（ADR-018：body 就是音频本体，段号由服务端定）。 */
+  body: Blob;
+  /** 请求头：`Content-Type` = 音频 MIME，`x-audio-duration-ms` = 时长，可选 `x-segment-note`。 */
+  headers: Record<string, string>;
   /** 上传进度回调（`loaded` 字节 / `total` 可能为 null）。 */
   onProgress: (loaded: number, total: number | null) => void;
   signal?: AbortSignal | undefined;
@@ -126,18 +129,27 @@ export function fileNameForMime(mime: string | null | undefined): string {
   }
 }
 
-/** 组装 multipart 表单：**没有 `index` 字段**（段号由服务端决定）。 */
-export function buildSegmentUploadForm(input: {
+/**
+ * 组装上传请求（**原始二进制**，ADR-018）：**没有 `index`**（段号由服务端决定）。
+ *
+ * 形态：body = 音频本体；`Content-Type` = 归一化后的音频 MIME；时长走请求头（必填，fail-closed）；
+ * 附言走可选请求头（`encodeURIComponent` 后放入，避免非 ASCII 头问题）。
+ */
+export function buildSegmentUploadRequest(input: {
   audio: Blob;
   durationMs: number;
   note?: string | null;
-}): FormData {
-  const form = new FormData();
-  form.append('audio', input.audio, fileNameForMime(input.audio.type));
-  form.append('durationMs', String(Math.round(input.durationMs)));
+}): { body: Blob; headers: Record<string, string> } {
+  const mime = normalizeMimeType(input.audio.type) ?? 'audio/webm';
+  const headers: Record<string, string> = {
+    'Content-Type': mime,
+    'x-audio-duration-ms': String(Math.round(input.durationMs)),
+  };
   const note = input.note?.trim() ?? '';
-  if (note !== '') form.append('note', note);
-  return form;
+  if (note !== '') {
+    headers['x-segment-note'] = encodeURIComponent(note);
+  }
+  return { body: input.audio, headers };
 }
 
 /**
@@ -220,7 +232,7 @@ export async function uploadSegmentAudio(
     if (isAborted(options.signal)) {
       return aborted();
     }
-    const form = buildSegmentUploadForm({
+    const upload = buildSegmentUploadRequest({
       audio: input.audio,
       durationMs: input.durationMs,
       note: input.note ?? null,
@@ -237,7 +249,8 @@ export async function uploadSegmentAudio(
     try {
       response = await transport({
         url,
-        form,
+        body: upload.body,
+        headers: upload.headers,
         signal: options.signal,
         onProgress: (loaded, total) => {
           emit({
@@ -324,12 +337,15 @@ function aborted(): UploadFailure {
 }
 
 /** 生产传输层：`XMLHttpRequest`（唯一能拿到上传进度的浏览器 API）。 */
-export const xhrTransport: UploadTransport = ({ url, form, onProgress, signal }) =>
+export const xhrTransport: UploadTransport = ({ url, body, headers, onProgress, signal }) =>
   new Promise<UploadTransportResponse>((resolve, reject) => {
     const xhr = new XMLHttpRequest();
     xhr.open('POST', url, true);
     xhr.withCredentials = true; // httpOnly 会话 cookie（ADR-008）
     xhr.responseType = 'text';
+    for (const [name, value] of Object.entries(headers)) {
+      xhr.setRequestHeader(name, value);
+    }
 
     xhr.upload.addEventListener('progress', (event) => {
       onProgress(event.loaded, event.lengthComputable ? event.total : null);
@@ -348,7 +364,7 @@ export const xhrTransport: UploadTransport = ({ url, form, onProgress, signal })
     });
     signal?.addEventListener('abort', () => xhr.abort(), { once: true });
 
-    xhr.send(form);
+    xhr.send(body);
   });
 
 function safeJson(text: string): unknown {

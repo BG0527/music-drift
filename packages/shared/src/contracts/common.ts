@@ -6,10 +6,11 @@
  */
 import { z } from 'zod';
 import { AUDIO_RULE_CODES, type AudioRuleCode } from '../audio/errors';
+import { API_RULE_CODES, type ApiRuleCode } from './error-codes';
 import { RULE_CODES, type RuleCode } from '../domain/errors';
 
 /** 契约版本：不兼容变更必须提升此值，并在 `docs/api.md` 留变更记录。 */
-export const CONTRACT_VERSION = '0.1.0-s1';
+export const CONTRACT_VERSION = '0.2.0-s1';
 
 export const UuidSchema = z.uuid();
 export const IsoDateTimeSchema = z.iso.datetime();
@@ -31,6 +32,7 @@ export const ContractVersionSchema = z.literal(CONTRACT_VERSION);
 export const RuleCodeSchema = z.enum([
   ...(RULE_CODES as unknown as [RuleCode, ...RuleCode[]]),
   ...(AUDIO_RULE_CODES as unknown as [AudioRuleCode, ...AudioRuleCode[]]),
+  ...(API_RULE_CODES as unknown as [ApiRuleCode, ...ApiRuleCode[]]),
 ]);
 
 export const RuleViolationSchema = z.object({

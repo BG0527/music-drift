@@ -11,7 +11,7 @@
  */
 import { describe, expect, it, vi } from 'vitest';
 import {
-  buildSegmentUploadForm,
+  buildSegmentUploadRequest,
   fileNameForMime,
   isRetryableStatus,
   retryDelayMs,
@@ -87,24 +87,31 @@ const BASE_OPTIONS = {
   jitter: () => 0,
 };
 
-describe('buildSegmentUploadForm / fileNameForMime', () => {
-  it('表单里只有音频 + 时长 + 可选附言，**没有 index**（段号由服务端决定）', () => {
-    const form = buildSegmentUploadForm({
-      audio: makeAudio(),
+describe('buildSegmentUploadRequest / fileNameForMime（原始二进制协议，ADR-018）', () => {
+  it('body 就是音频本体，**没有 index**（段号由服务端决定），时长与附言走请求头', () => {
+    const audio = makeAudio();
+    const request = buildSegmentUploadRequest({
+      audio,
       durationMs: 20_000,
       note: '这句给我自己',
     });
 
-    expect(form.get('durationMs')).toBe('20000');
-    expect(form.get('note')).toBe('这句给我自己');
-    expect(form.get('audio')).toBeInstanceOf(File);
-    expect(form.has('index')).toBe(false);
+    expect(request.body).toBe(audio);
+    expect(request.headers['x-audio-duration-ms']).toBe('20000');
+    expect(request.headers['x-segment-note']).toBe(encodeURIComponent('这句给我自己'));
+    expect(request.headers['Content-Type']).toBe('audio/webm');
+    expect(Object.keys(request.headers)).not.toContain('index');
   });
 
-  it('附言为空时不带 note 字段（而不是发一个空字符串）', () => {
-    const form = buildSegmentUploadForm({ audio: makeAudio(), durationMs: 20_000, note: null });
+  it('附言为空时不带附言请求头（而不是发一个空字符串）', () => {
+    const request = buildSegmentUploadRequest({
+      audio: makeAudio(),
+      durationMs: 20_000,
+      note: null,
+    });
 
-    expect(form.has('note')).toBe(false);
+    expect(request.headers['x-segment-note']).toBeUndefined();
+    expect(request.headers['x-audio-duration-ms']).toBe('20000');
   });
 
   it('文件名按容器给出（Safari 的 mp4 与 Chrome 的 webm 都能被服务端/浏览器识别）', () => {

@@ -1,8 +1,13 @@
 import Fastify, { type FastifyInstance } from 'fastify';
 import { createSystemClock, type Clock } from '@music-drift/shared/domain';
+import { internalProblem, transportProblem } from './http/problem';
 import { registerHealthRoutes } from './routes/health';
 import { registerAuthRoutes } from './routes/auth';
+import { registerAdminRoutes } from './routes/admin';
 import { registerBottleRoutes } from './routes/bottles';
+import { registerCollectionRoutes } from './routes/collections';
+import { registerInteractionRoutes } from './routes/interactions';
+import { registerSeaRoutes } from './routes/sea';
 import { registerRiverRoutes } from './routes/river';
 import { registerSongRoutes } from './routes/songs';
 import type { ScryptParams } from './auth/password';
@@ -42,6 +47,32 @@ export type BuildAppOptions = {
 export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
   const app = Fastify({ logger: options.logger ?? false });
 
+  /**
+   * 录音上传走**原始二进制**（captain 裁决 ADR-018）：`Content-Type` 即音频 MIME，body 是字节流。
+   * 用 Fastify **内置** `addContentTypeParser`，零新依赖（对比 multipart 需引 @fastify/multipart + busboy）。
+   */
+  for (const audioMime of ['audio/webm', 'audio/mp4']) {
+    app.addContentTypeParser(audioMime, { parseAs: 'buffer' }, (_request, body, done) => {
+      done(null, body);
+    });
+  }
+
+  /**
+   * 全局错误出口（t9）：**兜底**把所有未处理错误收敛成 `problem.ts` 的固定形态。
+   *
+   * 为什么必须有：Fastify 默认处理器会把 `error.message` 原样回显 —— 一个 pg 报错
+   * （`insert or update on table "votes" violates foreign key constraint ...`）就会泄漏表名/约束名/SQL 片段。
+   * 这里 4xx（框架层：非法 JSON、缺 content-type 等）统一成中文 `INVALID_BODY`，
+   * 5xx 统一成 `INTERNAL`（不接受任何错误对象），原始错误只进服务端日志。
+   */
+  app.setErrorHandler((error: unknown, request, reply) => {
+    request.log.error({ err: error }, 'unhandled request error');
+    const rawStatus = (error as { statusCode?: unknown }).statusCode;
+    const status = typeof rawStatus === 'number' ? rawStatus : 500;
+    const problem = status >= 400 && status < 500 ? transportProblem('INVALID_BODY') : internalProblem();
+    reply.code(problem.status).send(problem.body);
+  });
+
   registerHealthRoutes(app);
 
   if (options.db !== undefined) {
@@ -67,6 +98,10 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
     const store = createBottleStore(options.db);
     registerSongRoutes(app, { db: options.db, store, clock });
     registerBottleRoutes(app, { db: options.db, store, clock });
+    registerSeaRoutes(app, { db: options.db, store, clock });
+    registerInteractionRoutes(app, { db: options.db, store, clock });
+    registerCollectionRoutes(app, { db: options.db, store, clock });
+    registerAdminRoutes(app, { db: options.db, clock });
     registerRiverRoutes(app, {
       db: options.db,
       store,

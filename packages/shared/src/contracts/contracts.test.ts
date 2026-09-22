@@ -30,7 +30,7 @@ function summaryPayload(overrides: Record<string, unknown> = {}) {
 
 describe('契约：基本校验', () => {
   it('契约版本是常量且随不兼容变更提升', () => {
-    expect(CONTRACT_VERSION).toBe('0.1.0-s1');
+    expect(CONTRACT_VERSION).toBe('0.2.0-s1');
   });
 
   it('错误码枚举与领域内核一致：未知码被拒', () => {
@@ -57,9 +57,11 @@ describe('契约：基本校验', () => {
 
 describe('契约：ADR-015 三条硬语义', () => {
   it('录制请求体**没有** index 字段：段号必须由服务端决定，前端不得猜', () => {
-    expect(RecordSegmentRequestSchema.safeParse({ note: null }).success).toBe(true);
+    // durationMs 必填（ADR-018）：缺失即拒绝，否则无法核对 15–30 秒
+    expect(RecordSegmentRequestSchema.safeParse({ note: null }).success).toBe(false);
+    expect(RecordSegmentRequestSchema.safeParse({ note: null, durationMs: 20_000 }).success).toBe(true);
     // 非法字段不会被静默忽略为「合法」——契约显式声明形状，前端写了 index 说明理解错了协议
-    const parsed = RecordSegmentRequestSchema.safeParse({ note: null, index: 3 });
+    const parsed = RecordSegmentRequestSchema.safeParse({ note: null, durationMs: 20_000, index: 3 });
     expect(parsed.success && 'index' in parsed.data).toBe(false);
   });
 

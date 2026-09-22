@@ -6,20 +6,22 @@
  * - `DATABASE_URL` 缺失时用本地 compose 的默认值（仅测试/开发路径），生产无默认值。
  */
 import { defineConfig } from 'vitest/config';
+import { resolveTestDatabaseUrl } from './src/db/test-database';
 
-// 集成测试跑在**可抛弃的测试库**上（global-setup 负责建库/清表/迁移），不碰开发库。
-// 注意：`process.env` 是 index signature，`noPropertyAccessFromIndexSignature` 下必须用下标访问。
-process.env['DATABASE_URL'] ??=
-  process.env['DATABASE_URL_TEST'] ??
-  'postgres://music_drift:music_drift_dev@localhost:5433/music_drift_test';
+// 集成测试跑在**本次运行专属**的可抛弃库上（globalSetup 建库/迁移/清表，teardown 删库）。
+// 唯一名由 `resolveTestDatabaseUrl()` 派生：跨进程不再互相清表（captain 裁决 ②）。
+// 显式设置 `DATABASE_URL_TEST` 时原样使用（CI / 共享基础设施的覆盖口）。
+process.env['DATABASE_URL'] = resolveTestDatabaseUrl();
 
 export default defineConfig({
   test: {
     environment: 'node',
     include: ['src/**/*.integration.test.ts'],
+    // 该文件具名导出 `setup` + `teardown`（默认导出会让 teardown 被静默忽略）。
     globalSetup: ['./src/db/global-setup.ts'],
-    // 文件之间完全隔离：每个文件前清表（per-file-setup） + 串行执行文件。
-    setupFiles: ['./src/db/per-file-setup.ts'],
+    // 文件**串行**执行（并行的随机捞取会捞到别的文件建的瓶子）。
+    // 注意：不要再加"每个文件前清表"——那会清掉某些文件在 beforeAll 里建的夹具，
+    // 表现为"该文件 7 个用例 404、2 个期望 404 的用例反而通过"（本仓真实踩过）。
     fileParallelism: false,
     testTimeout: 30_000,
     hookTimeout: 30_000,

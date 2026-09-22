@@ -10,6 +10,7 @@
  */
 import { z } from 'zod';
 import { IsoDateTimeSchema, UuidSchema } from './common';
+export { API_RULE_CODES, type ApiRuleCode } from './error-codes';
 
 export const VoteValueSchema = z.enum(['LIKE', 'DISLIKE']);
 

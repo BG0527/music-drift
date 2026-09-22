@@ -44,6 +44,25 @@ const KNOWN_FAMILIES: readonly Family[] = [
   { family: 'bottles-put-back', method: 'POST', path: '/api/bottles/00000000-0000-4000-8000-000000000000/put-back' },
   { family: 'bottles-events', method: 'GET', path: '/api/bottles/00000000-0000-4000-8000-000000000000/events' },
   { family: 'river', method: 'POST', path: '/api/river/draw' },
+  { family: 'sea', method: 'GET', path: '/api/sea' },
+  { family: 'sea-detail', method: 'GET', path: '/api/sea/00000000-0000-4000-8000-000000000000' },
+  {
+    family: 'sea-targeted',
+    method: 'POST',
+    path: '/api/sea/00000000-0000-4000-8000-000000000000/targeted-segment',
+  },
+  { family: 'votes', method: 'POST', path: '/api/segments/00000000-0000-4000-8000-000000000000/votes' },
+  { family: 'messages', method: 'GET', path: '/api/bottles/00000000-0000-4000-8000-000000000000/messages' },
+  { family: 'reports', method: 'POST', path: '/api/reports' },
+  { family: 'notifications', method: 'GET', path: '/api/notifications' },
+  { family: 'badges', method: 'GET', path: '/api/me/badges' },
+  { family: 'collections', method: 'GET', path: '/api/me/collections' },
+  {
+    family: 'collections-create',
+    method: 'POST',
+    path: '/api/collections/00000000-0000-4000-8000-000000000000',
+  },
+  { family: 'admin', method: 'GET', path: '/api/admin/reports' },
 ];
 
 const UNMATCHED_MARKER = '/__unmatched__';

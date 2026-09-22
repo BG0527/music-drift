@@ -97,11 +97,16 @@ export const CreateBottleRequestSchema = z.object({
   songId: UuidSchema,
 });
 
-/** 录一段接唱：**请求体没有 index** —— 段号由服务端 `nextRecordIndex` 决定（ADR-015 §16.8）。 */
+/**
+ * 录一段接唱：**请求体没有 index** —— 段号由服务端 `nextRecordIndex` 决定（ADR-015 §16.8）。
+ *
+ * 传输形态（ADR-018 裁决）：音频走**原始二进制** body（`Content-Type` = 音频 MIME），
+ * `durationMs` 走请求头 `x-audio-duration-ms`，附言走 `?note=`。
+ * 本 schema 描述**逻辑请求**：`durationMs` **必填**（否则无法核对「每段 15–30 秒」→ fail-closed）。
+ */
 export const RecordSegmentRequestSchema = z.object({
   note: z.string().max(200).nullable().optional(),
-  /** 音频以 multipart 上传（T2.1）；此处只声明时长用于校验 15–30s。 */
-  durationMs: z.number().int().min(15_000).max(30_000).optional(),
+  durationMs: z.number().int().min(15_000).max(30_000),
 });
 
 export const RecordSegmentResponseSchema = z.object({

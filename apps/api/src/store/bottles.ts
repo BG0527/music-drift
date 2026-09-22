@@ -105,6 +105,14 @@ export interface BottleStore {
   listBottleSegments(bottleId: string): Promise<BottleSegmentRow[]>;
   liveSegmentIndexes(bottleId: string): Promise<number[]>;
   activeHolding(bottleId: string): Promise<{ holderId: string; parentId: string | null; origin: string } | null>;
+  /**
+   * 指定接唱未完成作品（CONTEXT §6.2）：把公海未完成作品交给指定的人接下一段。
+   *
+   * 内核冻结，没有对应命令 —— 这里用**内核已有事件词汇**表达同一状态转移：
+   * 追加一条 `BOTTLE_DRAWN`（父节点 = 该作品**最后一段的接唱者**，正是 §6.2 原文规定），
+   * 并原子抢占持有者锁。状态仍由事件流重放得到，规则不在路由里。
+   */
+  takeTargetedSegment(input: { bottleId: string; userId: string; ctx: DomainContext }): Promise<CommandOutcome | null>;
 }
 
 /** 事件 → 段/票/留言投影（这些表是「查询与媒体」视图，不参与规则判定）。 */
@@ -412,6 +420,49 @@ export function createBottleStore(db: Db): BottleStore {
         [bottleId],
       );
       return rows.map((row) => row.index);
+    },
+
+    async takeTargetedSegment(input): Promise<CommandOutcome | null> {
+      const state = await loadState(input.bottleId);
+      if (state === null) {
+        return null;
+      }
+      const live = state.segments.filter((segment) => segment.deletedAt === null);
+      const last = live.length === 0 ? undefined : live[live.length - 1];
+      const parentId = last === undefined ? state.initiatorId : last.ownerId;
+      const claimed = await db.withTransaction(async (tx) =>
+        claimHolding(tx, {
+          bottleId: input.bottleId,
+          holderId: input.userId,
+          parentId,
+          origin: 'DRAW',
+          acquiredAt: new Date(input.ctx.clock.now()),
+        }),
+      );
+      if (!claimed.ok) {
+        return {
+          ok: false,
+          state,
+          events: [],
+          violations: [{ code: 'HOLDING_ALREADY_TAKEN', message: '这个漂流瓶已经被别人拿走了，换一个吧。' }],
+        };
+      }
+      const outcome: CommandOutcome = {
+        ok: true,
+        state,
+        events: [
+          {
+            type: 'BOTTLE_DRAWN',
+            bottleId: input.bottleId,
+            at: input.ctx.clock.now(),
+            actorId: input.userId,
+            parentId,
+          },
+        ],
+        violations: [],
+      };
+      await applyOutcome(input.bottleId, outcome);
+      return outcome;
     },
 
     async activeHolding(bottleId: string) {

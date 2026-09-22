@@ -7,6 +7,7 @@
 import { RULE_CODES, type RuleCode, type RuleViolation } from '@music-drift/shared/domain';
 import { ErrorResponseSchema } from '@music-drift/shared';
 import { describe, expect, it } from 'vitest';
+import { API_RULE_CODES } from '@music-drift/shared';
 import {
   ALL_API_ERROR_CODES,
   TRANSPORT_ERROR_CODES,
@@ -88,6 +89,24 @@ describe('problem.ts：内核违规 → 409/422', () => {
     expect(problem?.body.error.message).toBe('瓶子被抢走了');
   });
 
+  it('同端点上的其它词表（音频码）也走同一出口 → 422，不会因不在内核表里而崩', () => {
+    const problem = problemFromViolations([{ code: 'AUDIO_DURATION_OUT_OF_RANGE', message: '这一段太短了。' }]);
+
+    expect(problem?.status).toBe(422);
+    expect(problem?.body.error.violations[0]?.code).toBe('AUDIO_DURATION_OUT_OF_RANGE');
+    expect(ErrorResponseSchema.safeParse(problem?.body).success).toBe(true);
+  });
+
+  it('API 层功能码（收藏仅限已完成作品）也走同一出口 → 422 且被契约接受', () => {
+    const problem = problemFromViolations([
+      { code: 'COLLECTION_REQUIRES_FINISHED_WORK', message: '收藏只对已完成并进入公海的作品开放。' },
+    ]);
+
+    expect(API_RULE_CODES).toContain('COLLECTION_REQUIRES_FINISHED_WORK');
+    expect(problem?.status).toBe(422);
+    expect(ErrorResponseSchema.safeParse(problem?.body).success).toBe(true);
+  });
+
   it('没有违规就没有错误响应（成功路径不需要映射）', () => {
     expect(problemFromViolations([])).toBe(null);
   });
@@ -120,8 +139,10 @@ describe('problem.ts：传输层码 → 401/403/404/500（内核不参与）', (
     }
   });
 
-  it('错误码表完整：内核码 + 传输层码都能查到状态码与文案', () => {
-    expect(ALL_API_ERROR_CODES.length).toBe(RULE_CODES.length + TRANSPORT_ERROR_CODES.length);
+  it('错误码表完整：内核码 + API 层功能码 + 传输层码都能查到状态码与文案', () => {
+    expect(ALL_API_ERROR_CODES.length).toBe(
+      RULE_CODES.length + API_RULE_CODES.length + TRANSPORT_ERROR_CODES.length,
+    );
     expect(new Set(ALL_API_ERROR_CODES).size).toBe(ALL_API_ERROR_CODES.length);
   });
 });

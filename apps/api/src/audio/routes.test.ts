@@ -5,6 +5,8 @@
  * 200 / 206 / 416 / 404、`Content-Range`、`Content-Length`、`Accept-Ranges`、HEAD。
  * 真实数据库上的字节级一致性另见 `audio.integration.test.ts`。
  */
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import Fastify from 'fastify';
 import { describe, expect, it } from 'vitest';
 import { registerSegmentAudioRoutes } from './routes';
@@ -181,6 +183,39 @@ describe('GET /api/segments/:segmentId/audio', () => {
     });
 
     expect(response.statusCode).toBe(404);
+    await app.close();
+  });
+});
+
+/**
+ * 装配守卫（回归测试，保护**共享装配点** `app.ts`）。
+ *
+ * 背景（真实事故）：`apps/api/src/app.ts` 被两个人同时改过，其中一方**整文件覆盖**，
+ * 结果另一方注册的路由全部变成 404 —— 而单元测试如果只测自己的模块，**根本不会报警**
+ * （静默 404 连"红"都不是）。
+ *
+ * 因此这里对 `app.ts` 做两层守卫：
+ * 1. **文本层**：三个 `register*Routes` 调用必须同时存在（谁整文件覆盖，这里立刻红）；
+ * 2. **行为层**：给了仓储时，真实 Fastify 实例上一定能路由到音频端点。
+ */
+describe('app.ts 装配守卫（防整文件覆盖导致路由静默消失）', () => {
+  const appSource = readFileSync(resolve(process.cwd(), 'src/app.ts'), 'utf8');
+
+  it('健康检查 / 账号 / 分段音频三条注册调用同时存在（增量合并，禁止整文件覆盖）', () => {
+    expect(appSource).toMatch(/registerHealthRoutes\(app\)/);
+    expect(appSource).toMatch(/registerAuthRoutes\(app,/);
+    expect(appSource).toMatch(/registerSegmentAudioRoutes\(app,/);
+  });
+
+  it('注入了仓储时，真实 app 上音频端点可路由（不是 404）', async () => {
+    const { app } = buildTestApp();
+
+    const response = await app.inject({
+      method: 'HEAD',
+      url: `/api/segments/${SEGMENT_ID}/audio`,
+    });
+
+    expect(response.statusCode).toBe(200);
     await app.close();
   });
 });

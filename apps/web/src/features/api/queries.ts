@@ -1,0 +1,100 @@
+/**
+ * 读侧查询（TanStack Query）。
+ *
+ * 契约纪律：所有响应都用 `packages/shared` 的 zod schema 过一遍（ADR-004），
+ * 页面拿到的是**契约类型**，不是 `any`。段号 / 缺口 / 完成度一律来自服务端字段
+ * （ADR-015：前端不得自己推算段号或完成度）。
+ */
+import { useQuery, type UseQueryResult } from '@tanstack/react-query';
+import {
+  AnonymousCodeSchema,
+  BottleDetailSchema,
+  BottleEventSchema,
+  BottleSummarySchema,
+  SessionResponseSchema,
+  SongSchema,
+  type BottleDetail,
+  type BottleEvent,
+  type BottleSummary,
+  type SessionResponse,
+  type Song,
+} from '@music-drift/shared';
+import { ApiError, apiGet } from './client';
+import { QUERY_KEYS } from './query-client';
+import { arrayOf, pageOf, type Page } from './schema';
+
+export { arrayOf, pageOf, type Page } from './schema';
+
+/** 分段音频播放地址（Range 端点；`<audio src>` 直接吃它）。 */
+/** 匿名代号类型同样从 schema 派生（`AnonymousCode` 未在契约里导出别名）。 */
+type AnonymousCode = ReturnType<typeof AnonymousCodeSchema.parse>;
+
+export function segmentAudioUrl(segmentId: string): string {
+  return `/api/segments/${segmentId}/audio`;
+}
+
+export function useSongs(): UseQueryResult<Song[]> {
+  return useQuery({
+    queryKey: QUERY_KEYS.songs,
+    queryFn: () => apiGet('/api/songs', arrayOf(SongSchema)),
+  });
+}
+
+/**
+ * 当前会话。**未登录不是错误**：401 收敛成 `null`（匿名也能浏览公海、选歌）。
+ * 只有真正的故障（5xx / 网络）才会把状态变成 error。
+ */
+export function useMeQuery(): UseQueryResult<SessionResponse | null> {
+  return useQuery({
+    queryKey: QUERY_KEYS.me,
+    queryFn: async () => {
+      try {
+        return await apiGet('/api/auth/me', SessionResponseSchema);
+      } catch (error) {
+        if (error instanceof ApiError && error.status === 401) return null;
+        throw error;
+      }
+    },
+  });
+}
+
+export function useAnonymousCodes(enabled = true): UseQueryResult<AnonymousCode[]> {
+  return useQuery({
+    queryKey: QUERY_KEYS.anonymousCodes,
+    queryFn: () => apiGet('/api/me/anonymous-codes', arrayOf(AnonymousCodeSchema)),
+    enabled,
+  });
+}
+
+export function useBottle(id: string | undefined): UseQueryResult<BottleDetail> {
+  return useQuery({
+    queryKey: QUERY_KEYS.bottle(id ?? ''),
+    queryFn: () => apiGet(`/api/bottles/${String(id)}`, BottleDetailSchema),
+    enabled: typeof id === 'string' && id.length > 0,
+  });
+}
+
+export function useBottleEvents(id: string | undefined): UseQueryResult<BottleEvent[]> {
+  return useQuery({
+    queryKey: QUERY_KEYS.bottleEvents(id ?? ''),
+    queryFn: () => apiGet(`/api/bottles/${String(id)}/events`, arrayOf(BottleEventSchema)),
+    enabled: typeof id === 'string' && id.length > 0,
+  });
+}
+
+/** 公海分区：`COMPLETED` = 完整作品，`INCOMPLETE` = 等待接力（`docs/api.md` §2.5）。 */
+export function useSeaList(zone: 'COMPLETED' | 'INCOMPLETE'): UseQueryResult<Page<BottleSummary>> {
+  return useQuery({
+    queryKey: QUERY_KEYS.seaList(zone),
+    queryFn: () => apiGet(`/api/sea?zone=${zone}&limit=30`, pageOf(BottleSummarySchema)),
+  });
+}
+
+/** 公海详情：不在公海的瓶子 → 404（服务端口径，避免探测）。 */
+export function useSeaBottle(id: string | undefined): UseQueryResult<BottleSummary> {
+  return useQuery({
+    queryKey: QUERY_KEYS.seaBottle(id ?? ''),
+    queryFn: () => apiGet(`/api/sea/${String(id)}`, BottleSummarySchema),
+    enabled: typeof id === 'string' && id.length > 0,
+  });
+}

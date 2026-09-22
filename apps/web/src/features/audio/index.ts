@@ -12,6 +12,13 @@
  * <RecorderPanel segmentIndex={nextRecordIndex} totalSegments={song.totalSegments}
  *                onRecorded={async (rec) => { const r = await uploadSegmentAudio({bottleId, ...rec}); ... }} />
  *
+ * // 伴奏（曲库）：只播当前段 + 响度归一；署名块挂到「设置 / 关于」页
+ * <AccompanimentPlayer track={track} segmentIndex={nextRecordIndex} />
+ * <LibraryAttribution tracks={library.tracks} />
+ *
+ * // 成品导出（阶段一：纯人声拼接 → WAV 试听/下载 + 对齐误差报告）
+ * <MixExportPanel plan={planMonoSequentialMix({ segments, totalSegments })} />
+ *
  * // 试听某一段（src 指向 Range 端点），<80% 时点踩按钮自动禁用并说明原因
  * <SegmentPlayer src={`/api/segments/${segment.id}/audio`} segmentIndex={segment.index}
  *                durationMs={segment.durationMs} isOwnSegment={segment.ownerId === me}
@@ -43,7 +50,7 @@ export {
 
 export {
   uploadSegmentAudio,
-  buildSegmentUploadForm,
+  buildSegmentUploadRequest,
   fileNameForMime,
   isRetryableStatus,
   retryDelayMs,
@@ -55,6 +62,41 @@ export {
   type UploadSuccess,
   type UploadTransport,
 } from './upload';
+
+export { MixExportPanel, type MixExportPanelProps } from './mix-export-panel';
+export {
+  useMixExport,
+  buildMixFileName,
+  type MixExportEnvironment,
+  type MixExportPhase,
+  type MixExportProgress,
+  type UseMixExportResult,
+  type MixRenderResult,
+} from './use-mix-export';
+export {
+  PROBE_ALIGNMENT_THRESHOLD,
+  PROBE_FORWARD_SEARCH_MS,
+  encodeWavPcm16,
+  fetchClipPcm,
+  findNonSilentGaps,
+  measureClipOnsets,
+  mixPcm,
+  renderOfflineMix,
+  wavBlob,
+  type AudioBufferLike,
+  type MixedPcm,
+  type MixPcmOptions,
+  type OfflineAudioContextLike,
+  type PcmClipInput,
+} from './mix-render';
+
+export { AccompanimentPlayer, type AccompanimentPlayerProps } from './accompaniment-player';
+export { LibraryAttribution, type LibraryAttributionProps } from './library-attribution';
+export {
+  useAccompaniment,
+  type AccompanimentEnvironment,
+  type UseAccompanimentResult,
+} from './use-accompaniment';
 
 export { formatClock, formatSeconds } from './format';
 export { downsampleLevels, normalizeLevels, peakLevel } from './waveform';

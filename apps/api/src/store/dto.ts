@@ -21,11 +21,17 @@ function iso(date: Date | null): string | null {
   return date === null ? null : date.toISOString();
 }
 
-export function toBottleSummary(row: BottleRow, state: BottleState): BottleSummary {
+/**
+ * 列表/详情的公共部分。
+ *
+ * ⚠️ `songTitle` **必须**由调用方查出来传进来：它不在 `bottles` 行里，早先这里写死空串，
+ * 于是 `GET /api/sea` 返回的 `songTitle: ''` 直接违反契约 `BottleSummarySchema.songTitle.min(1)`
+ * —— 公海列表会没有曲名。改成必填参数，让漏传在类型检查期就红。 */
+export function toBottleSummary(row: BottleRow, state: BottleState, songTitle: string): BottleSummary {
   return {
     id: row.id,
     songId: row.songId,
-    songTitle: '',
+    songTitle,
     status: state.status,
     totalSegments: state.totalSegments,
     recordedCount: state.segments.filter((segment) => segment.deletedAt === null).length,
@@ -71,8 +77,7 @@ export function toBottleDetail(input: DetailInput): BottleDetail {
     dislikeCount: input.voteCounts.get(segment.id)?.dislikeCount ?? 0,
   }));
   return {
-    ...toBottleSummary(row, state),
-    songTitle: input.songTitle,
+    ...toBottleSummary(row, state, input.songTitle),
     initiatorCode: input.codes.get(state.initiatorId) ?? '匿名歌手',
     holderId: currentHolderId(state),
     currentCasterId: state.currentCasterId,

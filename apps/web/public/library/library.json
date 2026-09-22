@@ -1,0 +1,769 @@
+{
+  "generatedBy": "tools/library-analysis.py",
+  "headroomPolicy": {
+    "peakCeilingDbfs": -1.0,
+    "nominalTargetLufs": -16.0,
+    "maxSafeEqualLoudnessLufs": -24.73,
+    "processing": "仅增益，无限幅/压缩"
+  },
+  "note": "**候选表**：分段边界需用户听感确认后才定稿（t13 第 3 条）。onset 证据见 segmentEvidence。",
+  "targetLufs": -16.0,
+  "tracks": [
+    {
+      "file": "Immersed.mp3",
+      "title": "Immersed",
+      "songId": "00000000-0000-4000-8000-000000000001",
+      "ordinal": 1,
+      "accompanimentRef": "/library/Immersed.mp3",
+      "durationS": 248.973,
+      "officialBpm": 64,
+      "officialNote": "Piano+Strings（官方 Tempo 64）",
+      "measuredBpm": 64.0,
+      "bpmDeviationPercent": -0.0,
+      "beatPhaseMs": 429.7,
+      "tempoDecision": {
+        "bpm": 63.9999999999994,
+        "phaseS": 0.42968750000000405,
+        "sn": 0.35462873606654954,
+        "decision": "R-4b 约定：argmax 结论为僵持/并列，改取落在预注册打拍带 [60,120) 的层级（数据本身未定夺）",
+        "ambiguous": false,
+        "conventionApplied": true,
+        "preConventionBpm": 63.99,
+        "preConventionSn": 0.3812,
+        "conventionSnRatio": 0.9302,
+        "tactusBand": [
+          60.0,
+          120.0
+        ],
+        "interleavedRatio": 0.3598,
+        "coarserRatio": 1.0,
+        "ratioBands": {
+          "keepAt": 0.55,
+          "upAt": 0.75
+        },
+        "ratioDistance": {
+          "toKeepBand": -0.1902,
+          "toUpBand": -0.3902
+        },
+        "alternative": {
+          "bpm": 127.99,
+          "sn": 0.2574,
+          "snRatio": 0.726
+        },
+        "runnerUp": {
+          "bpm": 63.99,
+          "sn": 0.3812,
+          "marginPercent": -7.5
+        },
+        "top": [
+          {
+            "bpm": 63.99,
+            "sn": 0.3812
+          },
+          {
+            "bpm": 63.99,
+            "sn": 0.3812
+          },
+          {
+            "bpm": 47.99,
+            "sn": 0.3796
+          },
+          {
+            "bpm": 47.99,
+            "sn": 0.376
+          },
+          {
+            "bpm": 64.0,
+            "sn": 0.3546
+          },
+          {
+            "bpm": 64.0,
+            "sn": 0.3546
+          }
+        ]
+      },
+      "tempoCandidates": [
+        {
+          "bpm": 128.0,
+          "score": 201.6
+        },
+        {
+          "bpm": 127.95,
+          "score": 194.3
+        },
+        {
+          "bpm": 128.05,
+          "score": 172.0
+        },
+        {
+          "bpm": 127.9,
+          "score": 169.4
+        },
+        {
+          "bpm": 64.0,
+          "score": 154.8
+        },
+        {
+          "bpm": 63.95,
+          "score": 146.0
+        },
+        {
+          "bpm": 192.0,
+          "score": 142.2
+        },
+        {
+          "bpm": 191.95,
+          "score": 141.7
+        }
+      ],
+      "meter": 4,
+      "meterRawBest": 4,
+      "meterConfidence": "HIGH",
+      "meterMargin": 0.491,
+      "meterHarmonicAliases": {
+        "2": 0.544
+      },
+      "meterScores": {
+        "2": {
+          "fullContrast": 1.2927,
+          "lowContrast": 0.5461,
+          "lowDownbeatStability": 0.496,
+          "lowScore": 0.544
+        },
+        "3": {
+          "fullContrast": 0.395,
+          "lowContrast": 0.3736,
+          "lowDownbeatStability": 0.42,
+          "lowScore": 0.3439
+        },
+        "4": {
+          "fullContrast": 2.5401,
+          "lowContrast": 1.529,
+          "lowDownbeatStability": 0.697,
+          "lowScore": 1.8302
+        },
+        "6": {
+          "fullContrast": 1.8142,
+          "lowContrast": 0.9315,
+          "lowDownbeatStability": 0.5,
+          "lowScore": 0.9315
+        }
+      },
+      "loudnessLufs": -27.69,
+      "samplePeakDbfs": -8.04,
+      "segments": [
+        {
+          "index": 1,
+          "startMs": 0,
+          "endMs": 23870,
+          "durationMs": 23870,
+          "startBeat": 0,
+          "startBar": 0.0,
+          "barCount": 6.5
+        },
+        {
+          "index": 2,
+          "startMs": 23870,
+          "endMs": 44489,
+          "durationMs": 20619,
+          "startBeat": 26,
+          "startBar": 6.5,
+          "barCount": 5.25
+        },
+        {
+          "index": 3,
+          "startMs": 44489,
+          "endMs": 66990,
+          "durationMs": 22501,
+          "startBeat": 47,
+          "startBar": 11.75,
+          "barCount": 6.0
+        },
+        {
+          "index": 4,
+          "startMs": 66990,
+          "endMs": 90000,
+          "durationMs": 23010,
+          "startBeat": 71,
+          "startBar": 17.75,
+          "barCount": 6.25
+        }
+      ],
+      "segmentEvidence": {
+        "windowS": 1.5,
+        "significanceGate": 0.02829,
+        "boundaries": [
+          {
+            "targetS": 0.0,
+            "snappedS": 0.0,
+            "onsetStrength": null,
+            "windowMedian": null,
+            "percentile": null,
+            "significant": true,
+            "note": "曲目起点（不吸附）"
+          },
+          {
+            "targetS": 22.5,
+            "snappedS": 23.87,
+            "onsetStrength": 5.28837,
+            "windowMedian": 0.0,
+            "windowP90": 0.19859,
+            "percentile": 100.0,
+            "significant": true,
+            "note": "吸附到窗口内最强起音"
+          },
+          {
+            "targetS": 45.0,
+            "snappedS": 44.489,
+            "onsetStrength": 2.09416,
+            "windowMedian": 0.0,
+            "windowP90": 0.22719,
+            "percentile": 99.8,
+            "significant": true,
+            "note": "吸附到窗口内最强起音"
+          },
+          {
+            "targetS": 67.5,
+            "snappedS": 66.99,
+            "onsetStrength": 1.37785,
+            "windowMedian": 0.00148,
+            "windowP90": 0.24579,
+            "percentile": 99.4,
+            "significant": true,
+            "note": "吸附到窗口内最强起音"
+          },
+          {
+            "targetS": 90.0,
+            "snappedS": 90.0,
+            "onsetStrength": null,
+            "windowMedian": null,
+            "percentile": null,
+            "significant": true,
+            "note": "曲目终点（不吸附）"
+          }
+        ],
+        "segmentLengthsS": [
+          23.87,
+          20.619,
+          22.501,
+          23.01
+        ],
+        "totalS": 90.0
+      },
+      "normalization": {
+        "targetLufs": -24.73,
+        "nominalTargetLufs": -16.0,
+        "maxSafeTargetLufs": -24.73,
+        "policy": "标称目标会使峰值越界 → 取等响上限",
+        "gainDb": 2.96,
+        "gainLimitedByPeak": false,
+        "resultingPeakDbfs": -5.08,
+        "resultingLufs": -24.73
+      }
+    },
+    {
+      "file": "On the Shore.mp3",
+      "title": "On the Shore",
+      "songId": "00000000-0000-4000-8000-000000000003",
+      "ordinal": 3,
+      "accompanimentRef": "/library/On%20the%20Shore.mp3",
+      "durationS": 100.78,
+      "officialBpm": 82,
+      "officialNote": "Strings+Glock+Tympani+Flute",
+      "measuredBpm": 84.41,
+      "bpmDeviationPercent": 2.94,
+      "beatPhaseMs": 651.6,
+      "tempoDecision": {
+        "bpm": 84.41000000000153,
+        "phaseS": 0.6515815661651345,
+        "sn": 0.20397802372563814,
+        "decision": "R-4b 约定：argmax 结论为僵持/并列，改取落在预注册打拍带 [60,120) 的层级（数据本身未定夺）",
+        "ambiguous": false,
+        "conventionApplied": true,
+        "preConventionBpm": 42.2,
+        "preConventionSn": 0.2529,
+        "conventionSnRatio": 0.8065,
+        "tactusBand": [
+          60.0,
+          120.0
+        ],
+        "interleavedRatio": 0.4193,
+        "coarserRatio": 0.6157,
+        "ratioBands": {
+          "keepAt": 0.55,
+          "upAt": 0.75
+        },
+        "ratioDistance": {
+          "toKeepBand": -0.1307,
+          "toUpBand": -0.3307
+        },
+        "alternative": {
+          "bpm": 168.86,
+          "sn": 0.1465,
+          "snRatio": 0.7182
+        },
+        "runnerUp": {
+          "bpm": 42.2,
+          "sn": 0.2529,
+          "marginPercent": -24.0
+        },
+        "top": [
+          {
+            "bpm": 42.2,
+            "sn": 0.2529
+          },
+          {
+            "bpm": 42.2,
+            "sn": 0.2529
+          },
+          {
+            "bpm": 42.2,
+            "sn": 0.2529
+          },
+          {
+            "bpm": 47.47,
+            "sn": 0.2449
+          },
+          {
+            "bpm": 47.47,
+            "sn": 0.2449
+          },
+          {
+            "bpm": 47.47,
+            "sn": 0.2449
+          }
+        ]
+      },
+      "tempoCandidates": [
+        {
+          "bpm": 84.15,
+          "score": 46.6
+        },
+        {
+          "bpm": 84.1,
+          "score": 44.7
+        },
+        {
+          "bpm": 83.9,
+          "score": 43.4
+        },
+        {
+          "bpm": 94.85,
+          "score": 42.9
+        },
+        {
+          "bpm": 83.95,
+          "score": 42.0
+        },
+        {
+          "bpm": 84.0,
+          "score": 42.0
+        },
+        {
+          "bpm": 84.05,
+          "score": 42.0
+        },
+        {
+          "bpm": 94.9,
+          "score": 41.6
+        }
+      ],
+      "meter": 4,
+      "meterRawBest": 4,
+      "meterConfidence": "HIGH",
+      "meterMargin": 0.3368,
+      "meterHarmonicAliases": {
+        "2": 0.896
+      },
+      "meterScores": {
+        "2": {
+          "fullContrast": 0.4624,
+          "lowContrast": 0.9086,
+          "lowDownbeatStability": 0.486,
+          "lowScore": 0.8956
+        },
+        "3": {
+          "fullContrast": 0.4877,
+          "lowContrast": 0.1927,
+          "lowDownbeatStability": 0.426,
+          "lowScore": 0.1784
+        },
+        "4": {
+          "fullContrast": 1.5644,
+          "lowContrast": 1.5684,
+          "lowDownbeatStability": 0.543,
+          "lowScore": 1.6356
+        },
+        "6": {
+          "fullContrast": 1.0858,
+          "lowContrast": 1.1088,
+          "lowDownbeatStability": 0.478,
+          "lowScore": 1.0847
+        }
+      },
+      "loudnessLufs": -22.82,
+      "samplePeakDbfs": -4.92,
+      "segments": [
+        {
+          "index": 1,
+          "startMs": 0,
+          "endMs": 22709,
+          "durationMs": 22709,
+          "startBeat": 0,
+          "startBar": 0.0,
+          "barCount": 8.0
+        },
+        {
+          "index": 2,
+          "startMs": 22709,
+          "endMs": 44164,
+          "durationMs": 21455,
+          "startBeat": 32,
+          "startBar": 8.0,
+          "barCount": 7.5
+        },
+        {
+          "index": 3,
+          "startMs": 44164,
+          "endMs": 67988,
+          "durationMs": 23824,
+          "startBeat": 62,
+          "startBar": 15.5,
+          "barCount": 8.25
+        },
+        {
+          "index": 4,
+          "startMs": 67988,
+          "endMs": 90000,
+          "durationMs": 22012,
+          "startBeat": 95,
+          "startBar": 23.75,
+          "barCount": 7.75
+        }
+      ],
+      "segmentEvidence": {
+        "windowS": 1.5,
+        "significanceGate": 0.01887,
+        "boundaries": [
+          {
+            "targetS": 0.0,
+            "snappedS": 0.0,
+            "onsetStrength": null,
+            "windowMedian": null,
+            "percentile": null,
+            "significant": true,
+            "note": "曲目起点（不吸附）"
+          },
+          {
+            "targetS": 22.5,
+            "snappedS": 22.709,
+            "onsetStrength": 3.55547,
+            "windowMedian": 0.0,
+            "windowP90": 0.11328,
+            "percentile": 100.0,
+            "significant": true,
+            "note": "吸附到窗口内最强起音"
+          },
+          {
+            "targetS": 45.0,
+            "snappedS": 44.164,
+            "onsetStrength": 1.0764,
+            "windowMedian": 0.0,
+            "windowP90": 0.15478,
+            "percentile": 99.1,
+            "significant": true,
+            "note": "吸附到窗口内最强起音"
+          },
+          {
+            "targetS": 67.5,
+            "snappedS": 67.988,
+            "onsetStrength": 0.33828,
+            "windowMedian": 0.0,
+            "windowP90": 0.20374,
+            "percentile": 94.8,
+            "significant": true,
+            "note": "吸附到窗口内最强起音"
+          },
+          {
+            "targetS": 90.0,
+            "snappedS": 90.0,
+            "onsetStrength": null,
+            "windowMedian": null,
+            "percentile": null,
+            "significant": true,
+            "note": "曲目终点（不吸附）"
+          }
+        ],
+        "segmentLengthsS": [
+          22.709,
+          21.455,
+          23.824,
+          22.012
+        ],
+        "totalS": 90.0
+      },
+      "normalization": {
+        "targetLufs": -24.73,
+        "nominalTargetLufs": -16.0,
+        "maxSafeTargetLufs": -24.73,
+        "policy": "标称目标会使峰值越界 → 取等响上限",
+        "gainDb": -1.91,
+        "gainLimitedByPeak": false,
+        "resultingPeakDbfs": -6.83,
+        "resultingLufs": -24.73
+      }
+    },
+    {
+      "file": "Rains Will Fall.mp3",
+      "title": "Rains Will Fall",
+      "songId": "00000000-0000-4000-8000-000000000002",
+      "ordinal": 2,
+      "accompanimentRef": "/library/Rains%20Will%20Fall.mp3",
+      "durationS": 222.408,
+      "officialBpm": 85,
+      "officialNote": "Piano+Kit+Strings（官方描述里唯一的圆舞曲）",
+      "measuredBpm": 84.99,
+      "bpmDeviationPercent": -0.01,
+      "beatPhaseMs": 647.1,
+      "tempoDecision": {
+        "bpm": 84.99000000000153,
+        "phaseS": 0.6471349570537595,
+        "sn": 0.5801419210655567,
+        "decision": "R-4b 约定：argmax 结论为僵持/并列，改取落在预注册打拍带 [60,120) 的层级（数据本身未定夺）",
+        "ambiguous": false,
+        "conventionApplied": true,
+        "preConventionBpm": 42.49,
+        "preConventionSn": 0.5863,
+        "conventionSnRatio": 0.9894,
+        "tactusBand": [
+          60.0,
+          120.0
+        ],
+        "interleavedRatio": 0.27,
+        "coarserRatio": 0.9788,
+        "ratioBands": {
+          "keepAt": 0.55,
+          "upAt": 0.75
+        },
+        "ratioDistance": {
+          "toKeepBand": -0.28,
+          "toUpBand": -0.48
+        },
+        "alternative": {
+          "bpm": 170.0,
+          "sn": 0.406,
+          "snRatio": 0.6998
+        },
+        "runnerUp": {
+          "bpm": 42.49,
+          "sn": 0.5863,
+          "marginPercent": -1.07
+        },
+        "top": [
+          {
+            "bpm": 42.49,
+            "sn": 0.5863
+          },
+          {
+            "bpm": 42.49,
+            "sn": 0.5863
+          },
+          {
+            "bpm": 84.99,
+            "sn": 0.5801
+          },
+          {
+            "bpm": 84.99,
+            "sn": 0.5801
+          },
+          {
+            "bpm": 84.99,
+            "sn": 0.5801
+          },
+          {
+            "bpm": 84.99,
+            "sn": 0.5801
+          }
+        ]
+      },
+      "tempoCandidates": [
+        {
+          "bpm": 170.0,
+          "score": 381.5
+        },
+        {
+          "bpm": 170.05,
+          "score": 381.5
+        },
+        {
+          "bpm": 169.95,
+          "score": 353.6
+        },
+        {
+          "bpm": 85.0,
+          "score": 303.3
+        },
+        {
+          "bpm": 169.9,
+          "score": 294.7
+        },
+        {
+          "bpm": 85.05,
+          "score": 275.1
+        },
+        {
+          "bpm": 170.1,
+          "score": 269.4
+        },
+        {
+          "bpm": 84.95,
+          "score": 268.2
+        }
+      ],
+      "meter": 3,
+      "meterRawBest": 6,
+      "meterConfidence": "HIGH",
+      "meterMargin": 0.8662,
+      "meterHarmonicAliases": {
+        "6": 2.534
+      },
+      "meterScores": {
+        "2": {
+          "fullContrast": 0.0214,
+          "lowContrast": 0.1114,
+          "lowDownbeatStability": 0.522,
+          "lowScore": 0.1138
+        },
+        "3": {
+          "fullContrast": 0.7055,
+          "lowContrast": 1.6703,
+          "lowDownbeatStability": 0.885,
+          "lowScore": 2.3127
+        },
+        "4": {
+          "fullContrast": 0.3008,
+          "lowContrast": 0.3095,
+          "lowDownbeatStability": 0.5,
+          "lowScore": 0.3095
+        },
+        "6": {
+          "fullContrast": 0.8008,
+          "lowContrast": 1.9097,
+          "lowDownbeatStability": 0.827,
+          "lowScore": 2.534
+        }
+      },
+      "loudnessLufs": -26.66,
+      "samplePeakDbfs": -2.93,
+      "segments": [
+        {
+          "index": 1,
+          "startMs": 0,
+          "endMs": 21850,
+          "durationMs": 21850,
+          "startBeat": 0,
+          "startBar": 0.0,
+          "barCount": 10.33
+        },
+        {
+          "index": 2,
+          "startMs": 21850,
+          "endMs": 44420,
+          "durationMs": 22570,
+          "startBeat": 31,
+          "startBar": 10.33,
+          "barCount": 10.67
+        },
+        {
+          "index": 3,
+          "startMs": 44420,
+          "endMs": 67733,
+          "durationMs": 23313,
+          "startBeat": 63,
+          "startBar": 21.0,
+          "barCount": 11.0
+        },
+        {
+          "index": 4,
+          "startMs": 67733,
+          "endMs": 90000,
+          "durationMs": 22267,
+          "startBeat": 96,
+          "startBar": 32.0,
+          "barCount": 10.33
+        }
+      ],
+      "segmentEvidence": {
+        "windowS": 1.5,
+        "significanceGate": 0.0,
+        "boundaries": [
+          {
+            "targetS": 0.0,
+            "snappedS": 0.0,
+            "onsetStrength": null,
+            "windowMedian": null,
+            "percentile": null,
+            "significant": true,
+            "note": "曲目起点（不吸附）"
+          },
+          {
+            "targetS": 22.5,
+            "snappedS": 21.85,
+            "onsetStrength": 1.31967,
+            "windowMedian": 0.0,
+            "windowP90": 0.22509,
+            "percentile": 99.7,
+            "significant": true,
+            "note": "吸附到窗口内最强起音"
+          },
+          {
+            "targetS": 45.0,
+            "snappedS": 44.42,
+            "onsetStrength": 0.87007,
+            "windowMedian": 0.0,
+            "windowP90": 0.06574,
+            "percentile": 98.5,
+            "significant": true,
+            "note": "吸附到窗口内最强起音"
+          },
+          {
+            "targetS": 67.5,
+            "snappedS": 67.733,
+            "onsetStrength": 1.25434,
+            "windowMedian": 0.0,
+            "windowP90": 0.09253,
+            "percentile": 99.7,
+            "significant": true,
+            "note": "吸附到窗口内最强起音"
+          },
+          {
+            "targetS": 90.0,
+            "snappedS": 90.0,
+            "onsetStrength": null,
+            "windowMedian": null,
+            "percentile": null,
+            "significant": true,
+            "note": "曲目终点（不吸附）"
+          }
+        ],
+        "segmentLengthsS": [
+          21.85,
+          22.57,
+          23.313,
+          22.267
+        ],
+        "totalS": 90.0
+      },
+      "normalization": {
+        "targetLufs": -24.73,
+        "nominalTargetLufs": -16.0,
+        "maxSafeTargetLufs": -24.73,
+        "policy": "标称目标会使峰值越界 → 取等响上限",
+        "gainDb": 1.93,
+        "gainLimitedByPeak": false,
+        "resultingPeakDbfs": -1.0,
+        "resultingLufs": -24.73
+      }
+    }
+  ]
+}

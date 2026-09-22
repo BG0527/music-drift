@@ -11,6 +11,8 @@
  * 一律通过参数（端口）注入，因此可以在 node 环境下直接单测。
  */
 export * from './constants';
+export * from './library';
+export * from './mix';
 export * from './errors';
 export * from './listening';
 export * from './recording';

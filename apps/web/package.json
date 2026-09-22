@@ -13,6 +13,7 @@
   },
   "dependencies": {
     "@fontsource/quattrocento": "catalog:",
+    "@tanstack/react-query": "catalog:",
     "@music-drift/shared": "workspace:*",
     "lucide-react": "catalog:",
     "lxgw-wenkai-webfont": "catalog:",
