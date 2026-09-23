@@ -33,3 +33,7 @@ Thumbs.db
 # test artifacts
 test-results/
 playwright-report/
+
+# 成员的一次性批量修改脚本（临时产物，不入库）
+.t*-*.py
+.t*-tests.py
