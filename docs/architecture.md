@@ -3581,3 +3581,34 @@ architect 主动报告「**会话上下文已接近上限**（累计约 40 次�
 `pnpm --filter @music-drift/web test` **exit 0**（64 文件 / 554 通过 + 1 跳过）· `pnpm -r typecheck` **exit 0** · eslint/prettier exit 0 · `features/audio` 19 文件 / **250 例**（新增 19 例）。
 ⚠️ 首次 `typecheck` exit 2，红点在 **apps/api 在途写入**（20 秒内红点从 `routes/interactions.ts(200,7)` 变成 `store/notifications.ts(92,7) TS1359`，45 秒后复测 exit 0）⇒ **backend-core 的 t42 在途**，它按 **mtime 归因**、未动别人文件 ✓
 ⚠️ 越界声明：仓库外新仪器 `mic-probe.mjs` + 两个 WAV **不在工作区**、不入 changedPaths；配方与生成命令已落进 `docs/audio.md` §11.7 ✓
+
+---
+
+## 91. t42 复核（实现已落盘、三条 verify 全绿）+ 一处**它自己标注**的遗漏（必须补）
+
+### 91.1 captain 独立复核（不采信自述）
+- `pnpm --filter @music-drift/shared test` **exit 0**（**22 文件 / 242 例**；t42 前 21/231 ⇒ **+11 例**）；
+- `pnpm --filter @music-drift/api test` **exit 0**（19/180）；
+- `pnpm --filter @music-drift/api test:integration` **exit 0**（**23 文件 / 189 例**；此前 22/181 ⇒ **+1 文件 / +8 例**）；
+- **规则本体已反转**：`domain/messages.ts` 里原「硬编码 `toUserId: state.initiatorId`」已改为 `toUserId: target.ownerId`，且代码注释**明确标出**「（旧实现这里硬编码 `state.initiatorId`）」⇒ 符合「**反转而非追加**」；
+- **契约**：`contracts/interactions.ts:81/91` = `targetSegmentIndex: z.number().int().min(1)`；
+- **可见性**：判定改为 `message.toUserId === viewerId`（DELIVERED 后可见）/ `=== holderId`（PENDING 且**持有者就是目标** ⇒ 送达）；
+- **集成测试**新增整组「私密留言：目标由发送者按**段号**指定，只有目标能看到」，含：
+  - 「目标不能是自己 → 422（**旧规则"发起者不能写"已按用户裁决反转**）」；
+  - 「目标 = 第 1 段（发起者）：**客户端全程没传过 userId**」（落实"不信任前端身份"）；
+  - 「**回传到目标手上即 DELIVERED、无需等到入海**」（**正是 captain 补充的第 1 条**）；
+  - 「中途入海 ⇒ 发送者看到 UNDELIVERED、发起者始终看不到」；
+- **`CONTEXT.md` §5 措辞已同步**（第 138 行：「目标**由自己指定**」）。
+
+### 91.2 ⚠️ 一处**它自己标注**的遗漏 —— 而那正是用户第④条的硬要求
+`apps/api/src/routes/interactions.integration.test.ts:523`：
+> 「⚠️ §5.2 的「C 会收到通知：你的留言未送达」需要写入 notifications —— **当前全仓无任何写入口**」
+
+⇒ 用户第④条原话：「**如果传递留言失败则给发起留言的人通知**」 ⇒ **未完成，必须补**：
+- `UNDELIVERED` 时**给留言者写一条通知**；
+- **三条失败路径都要能触发**：① 目标被斩浪 ② 父链断裂 / `DAMAGED` ③ **整首接唱完成入海却未送达**（用户补充的第三条，**最容易漏** —— 它在"入海即终结"那一刻结算）；
+- 补完把 523 行那条 ⚠️ 注释**改成"已实现"**（过期警示比没有更误导）。
+
+### 91.3 一条方法论（认可）
+它把"需要写 notifications 但当前无写入口"**就地在测试文件里标注** —— 比事后在报告里提一句有效得多：**下一个看到这段代码的人会立刻知道这里缺什么**，而不会以为"测试绿了就没问题"。这与"把未做项放在它该在的位置"一致。
+顺便：它**同时暴露了我们的一个系统性缺口** —— `notifications` 表**此前没有任何写入口**（所以第④条的"失败通知"无处落地）。这与早期修过的"`BOTTLE_DAMAGED` 从不终结 PENDING 留言"是同族问题：**状态存了，但没人写它**。
