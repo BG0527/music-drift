@@ -3097,3 +3097,24 @@ captain 初裁：**不入库**（AGENTS.md §7 规定 E2E 工具属待裁决项�
 - 处置：`docker start music-drift-postgres`，并**明确声明"这是本地开发数据库，不是部署动作"** ⇒ 符合 AGENTS.md §9。
 - 恢复后数据完好：`songs=4`、`bottles=44`、`backup_t12` 五张备份表均在。
 ⇒ 环境纪律：**容器可能因宿主资源回收而退出**，长任务前先 `docker ps` 确认；这类"环境消失"造成的红**不是代码缺陷**。
+
+---
+
+## 75. t31 闭合（用权威基线）+ captain 的 inScope 记账（第三次）
+
+### 75.1 t31 闭合
+依据：captain 在**全员 idle 窗口（18:34）**实测 `typecheck` **0 error** / `test` **98 文件 903 例** / 集成 22/177 / lint 0 ⇒ 重开并闭合（**未消耗成员一轮**）。
+交付内容见任务回执（`ingest.ts` 必填化 + `db/segments.ts` 抛错 + `routes/bottles.ts` 422 + 迁移 0006 + `ingest.test.ts` 重写 + `requireDuration` 交代）。
+
+### 75.2 ⚠️ captain 的 inScope 记账（第三次路径问题）
+| # | 任务 | 事实 | 后果/教训 |
+| 1 | **t22** | inScope 写了**不存在**的 `apps/api/src/routes/myBottles.ts` | 未阻塞，但说明**不能"拿测试文件名反推源文件名"** |
+| 2 | **t26** | **漏写** `apps/api/drizzle/` | 归档僵局（`update_task` 以 undeclared path 拒绝）⇒ 才有 §47.6 的约定 |
+| 3 | **t31** | **这个任务本身没写错**（`apps/api/drizzle/` 是对的）—— 但**工具首次报的路径是 `apps/api/src/drizzle/…`，与实际不符** | 首次闭合被拒；captain 实测（`ls apps/api/{,src/}drizzle/*.sql`）后才确认**是路径报告不一致，不是越界** |
+
+⇒ 合并教训：**inScope 的每条路径都应先用 `ls`/`glob` 确认；而当工具说 "undeclared" 时，第一步也是去实测真实路径** —— 本次若先实测，就不会先怀疑自己写错。
+⇒ 更重要的一条：**工具报的路径也要核**。错误信息本身可能不准，"undeclared"这个结论要自测后才采信。
+
+### 75.3 另一处 captain 自己引入的失败（第二次尝试时）
+第二次 `update_task` 我把 `apps/api/src/routes/listenProgress.integration.test.ts` 写进了 `changedPaths` —— 而它**是 architect 如实披露过的越界文件**，按 t20 先例应**只披露、不入 changedPaths** ⇒ 被工具判 undeclared（这次拒绝是**对的**）。
+⇒ 教训：**"披露越界"与"声明路径"是两件事** —— 披露是诚实，声明是权限；把披露项写进 `changedPaths` 等于**事后扩大自己的声明**，工具挡下来是正确的。
