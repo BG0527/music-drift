@@ -49,6 +49,15 @@ export interface SegmentPlayerProps {
    */
   onProgress?: (snapshot: SegmentListenSnapshot) => void;
   castingDislike?: boolean;
+  /**
+   * 是否渲染**内置的踩按钮**，默认 `true`。
+   *
+   * 页面若要自己渲染「赞 / 踩」一对控件（t12 的 `VoteControls`，用户裁决：按钮改小、补上点赞），
+   * 就传 `false` 关掉内置踩，避免同一段出现两个踩（其中一个还点不动）。
+   * 关掉之后契约不变：仍是 `onProgress` 上报覆盖 + `onCastDislike`（或 `listen.castDislike()`）投票 ——
+   * 踩只有这一条路径，内置按钮只是它的一个默认外观。
+   */
+  showDislike?: boolean;
   /** 测试/特殊环境注入音频元素工厂。 */
   createElement?: (src: string) => AudioElementLike;
   className?: string;
@@ -62,6 +71,7 @@ export function SegmentPlayer({
   isOwnSegment = false,
   onCastDislike,
   castingDislike = false,
+  showDislike = true,
   onProgress,
   createElement,
   className,
@@ -129,11 +139,13 @@ export function SegmentPlayer({
         />
       </div>
 
-      <DislikeButton
-        availability={player.dislike}
-        casting={castingDislike}
-        onCast={() => onCastDislike?.(segmentIndex)}
-      />
+      {showDislike ? (
+        <DislikeButton
+          availability={player.dislike}
+          casting={castingDislike}
+          onCast={() => onCastDislike?.(segmentIndex)}
+        />
+      ) : null}
     </Card>
   );
 }

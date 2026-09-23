@@ -157,7 +157,10 @@ export function createListenReporter(options: ListenReporterOptions): ListenRepo
       const durationMs = readNumber(response.body, 'durationMs');
       if (response.status < 200 || response.status >= 300) {
         const { message } = readError(response.body);
-        emit({ reporting: false, lastError: message ?? `上报失败（HTTP ${String(response.status)}）` });
+        emit({
+          reporting: false,
+          lastError: message ?? `上报失败（HTTP ${String(response.status)}）`,
+        });
         return {
           ok: false,
           status: response.status,
@@ -250,14 +253,16 @@ export function createListenReporter(options: ListenReporterOptions): ListenRepo
         emit({ thresholdNotReached: notReached, lastError: message });
         return { ok: false, status: response.status, code, message, segmentCut: false };
       } catch (thrown) {
-        const message = `点踩失败（网络错误）：${thrown instanceof Error ? thrown.message : ''}`.trim();
+        const message =
+          `点踩失败（网络错误）：${thrown instanceof Error ? thrown.message : ''}`.trim();
         emit({ lastError: message });
         return { ok: false, status: 0, code: null, message, segmentCut: false };
       }
     },
 
     locallyUnlocked: () =>
-      state.serverDurationMs !== null && state.reportedCoveredMs / state.serverDurationMs >= threshold,
+      state.serverDurationMs !== null &&
+      state.reportedCoveredMs / state.serverDurationMs >= threshold,
 
     state: () => state,
 

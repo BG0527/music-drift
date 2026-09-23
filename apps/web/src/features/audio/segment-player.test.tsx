@@ -172,6 +172,59 @@ describe('SegmentPlayer：点踩门槛', () => {
   });
 });
 
+describe('SegmentPlayer：showDislike（页面自建赞/踩控件时关掉内置踩按钮）', () => {
+  /*
+   * 背景（用户裁决 + t12）：页面上是「赞 / 踩」一对小按钮，由 `features/bottle/VoteControls` 渲染。
+   * 如果播放条再自带一个踩，同一段会出现两个踩（一个还点不动）。
+   * 契约上踩只有一条路径：`onProgress` 上报覆盖 + `onCastDislike`/`listen.castDislike()` 投票，
+   * 因此这里只需要一个**可选**总开关：默认 true（保持既有行为与既有测试全绿）。
+   */
+  it('默认（不传）保留内置踩按钮：既有行为不变', () => {
+    setup();
+
+    expect(screen.getByRole('button', { name: /点踩/ })).toBeInTheDocument();
+  });
+
+  it('showDislike={false}：播放条里不再出现踩按钮，但播放与进度照常', () => {
+    const { element } = setup({ showDislike: false });
+
+    expect(screen.queryByRole('button', { name: /点踩/ })).toBeNull();
+    // 播放控件与已听文字不受影响（页面把踩换成自己的 VoteControls，不是把功能砍掉）
+    expect(screen.getByRole('button', { name: '播放' })).toBeInTheDocument();
+    act(() => {
+      element.playThroughTo(8);
+    });
+    expect(screen.getByText(/已听 8\.0 秒/)).toBeInTheDocument();
+    expect(screen.getByRole('progressbar').getAttribute('aria-valuenow')).toBe('40');
+  });
+
+  it('showDislike={false} 时仍会发进度回调（页面的 VoteControls 靠它决定能不能踩）', () => {
+    const onProgress = vi.fn();
+    const { element } = setup({ showDislike: false, onProgress });
+
+    act(() => {
+      element.playThroughTo(16);
+    });
+
+    const last = onProgress.mock.calls.at(-1)?.[0] as { ratio: number; dislikeUnlocked: boolean };
+    expect(last.ratio).toBeCloseTo(0.8, 5);
+    expect(last.dislikeUnlocked).toBe(true);
+  });
+
+  it('showDislike={true}（显式传）与默认一致：踩按钮在且可点', () => {
+    const onCastDislike = vi.fn();
+    const { element } = setup({ showDislike: true, onCastDislike });
+
+    act(() => {
+      element.playThroughTo(16);
+    });
+    const button = screen.getByRole('button', { name: /点踩/ });
+    expect(button).toBeEnabled();
+    fireEvent.click(button);
+    expect(onCastDislike).toHaveBeenCalledWith(2);
+  });
+});
+
 describe('SegmentPlayer：把真实已听比例透给消费者（t12 点踩门槛依赖它）', () => {
   const lastSnapshot = (onProgress: ReturnType<typeof vi.fn>): SegmentListenSnapshot => {
     const call = onProgress.mock.calls.at(-1);

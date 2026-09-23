@@ -23,7 +23,12 @@ function fakeTransport(overrides: Partial<ListenReportTransport> = {}): {
   transport: ListenReportTransport;
   calls: Array<{ kind: 'listen' | 'vote'; segmentId: string; coveredMs?: number; body?: unknown }>;
 } {
-  const calls: Array<{ kind: 'listen' | 'vote'; segmentId: string; coveredMs?: number; body?: unknown }> = [];
+  const calls: Array<{
+    kind: 'listen' | 'vote';
+    segmentId: string;
+    coveredMs?: number;
+    body?: unknown;
+  }> = [];
   const transport: ListenReportTransport = {
     reportListen: async (segmentId, coveredMs) => {
       calls.push({ kind: 'listen', segmentId, coveredMs });
