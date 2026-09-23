@@ -119,3 +119,28 @@
 **⚠️ 两个必须记住的边界**
 - **`/settings` 在 375 下余量 ≈1px**（实测 811/812）⇒ 任何再往该页加高度都会顶破硬门；要加内容必须先压缩既有间距。
 - 写守卫别用带反斜杠的正则（python heredoc 会把 `` 吃成退格、`\s` 报 warning）：本批两次假红都源于此，已改用 `includes` 断言。
+
+---
+
+# t47（收尾）状态 —— 深底水面也流动
+
+任务 `t47`（attempt 2, attempt_id `2d046d54-4dfd-46bf-bd6f-ee28893632fa`）。证据：`docs/ui-review/theme-pass-4.md`。
+
+**为何做**：浅底在流、深底是死图 ⇒ 同一页两种水，细看像"浅底那张是活的、深底那张是贴图"。
+
+| 步 | 内容 | 结果 |
+| --- | --- | --- |
+| E1 | **先写守卫**：每个 `bg-deep-current` 深底容器（河道 2 个 + 详情页头 1 个）内的水层必须带 `drift`；另断言"降级通道唯一"（`water.css` 不得有 `.animate(` / `requestAnimationFrame`）；再加一条"深浅底共用同一对 token"（`driftDuration`/`driftShift` 在 motion 块各只出现一次） | **红：`2 failed \| 39 passed (41)`**（两条断言都报 `expected 'partial' to be 'all'`） |
+| E2 | **最小实现**：`river-page.tsx` 两个面板的 `<WaterTexture />` → `<WaterTexture drift />`；`sea-detail-page.tsx` **深底页头**那个 → 同理（内容区那个 t46 已是 drift） | **绿：`41 passed (41)`** |
+| E3 | 契约措辞：`DESIGN.md` ③ 补一句"浅底整面水层与深底面板/深底页头的水层**共用同一对参数**，不设深底专用值"（仍是**一条**规则，不是第二套） | ✅ |
+| E4 | 守卫合并 | `2 files / **58 passed**`（water-motif 41 + motion-contract 17） |
+| E5 | 三条门 | `TEST_EXIT=0`（shared 242 / api 180 / web **598 passed | 1 skipped**）、`TC_EXIT=0`、`LINT_EXIT=0` |
+| E6 | 一屏 1440/375 | 见 theme-pass-4.md（截图 `after-theme4-1440/`、`after-theme4-375/`） |
+
+**判断留痕（为什么不是"新增深底专用 token"）**：深底与浅底上，±10px 的 1px 细线位移**感知量级相同**（位移是绝对像素，不随底色缩放）；
+分开设值只会制造"同一件事两套规则"（ADR-019 明令禁止），故**共用** `driftDuration`/`driftShift`。守卫已把这点写成断言（参数只能在 motion 块出现一次）。
+**`motion-web` §1 decoration 第②条（不争夺注意力）的自评**：24s 一个来回、±10px、1px 细线，幅度远小于 hero 主 CTA 的静态对比；且深底面板的 `<WaterTexture>` 在 `z-underlay`（内容之下）。⇒ 判定**不构成注意力竞争**；若 captain 认为构成，撤掉只需去掉一个 `drift` 属性（一处一行）。
+
+## ⚠️ 保留的地雷（t46 登记，t47 继续有效）
+- **`/settings` 在 375×812 下余量 ≈1px**（实测 `settings-attribution=811 ≤ 812`）：**任何**再往该页加高度（padding/文案/新元素）都会顶破一屏硬门；要加内容必须先压缩既有间距。
+- 本任务**没有碰 `settings-page.tsx` 与 `admin-page.tsx`**（两者在 out of scope 内）。

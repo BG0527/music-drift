@@ -128,7 +128,7 @@ export function SeaDetailPage({ id }: { id: string }) {
       <header className="relative isolate flex flex-col gap-3 overflow-hidden rounded-2xl bg-deep-current p-6 text-wave-white">
         {/* 水域母题层：零布局高度（绝对定位 + z-underlay），落在深底之上、正文之下 */}
         <WaterSheen />
-        <WaterTexture />
+        <WaterTexture drift />
         <TideLine className="inset-x-6 bottom-0" />
         <h1 className="text-[2rem] font-bold leading-tight">{summary.songTitle}</h1>
         <p className="flex flex-wrap items-center gap-x-[16px] gap-y-[4px] text-[0.9375rem] leading-[1.6] text-on-dark-muted">

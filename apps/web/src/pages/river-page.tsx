@@ -53,7 +53,7 @@ export function RiverPage() {
         >
           {/* 水域母题层：零布局高度（绝对定位 + z-underlay），不影响一屏；见 DESIGN.md 的 motif 契约 */}
           <WaterSheen />
-          <WaterTexture />
+          <WaterTexture drift />
 
           <h2 id="draw-heading" className="sr-only">
             从河道捞一个漂流瓶
@@ -122,7 +122,7 @@ export function RiverPage() {
         >
           {/* 水域母题层：零布局高度（绝对定位 + z-underlay），不影响一屏；见 DESIGN.md 的 motif 契约 */}
           <WaterSheen />
-          <WaterTexture />
+          <WaterTexture drift />
 
           <h2 id="cast-heading" className="sr-only">
             投下一支漂流瓶

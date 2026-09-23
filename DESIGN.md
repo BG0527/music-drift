@@ -322,7 +322,7 @@ Water contours, tide lines, river-channel guides, ripples, drift-bottle silhouet
   2. **水位线肌理（water texture）**：横向细线平铺（周期 `textureTile`，强度 `textureAlpha`），让大块暗底不再像空白模板（`frontend-design` L59：把质量地板做到不喧哗）。
   3. **潮线（tide line）**：`sea-glass → 透明` 的渐隐细线，替代区块之间的硬分隔线（母题见 Overview 的 tide lines）。
   - **产品理由**：这本就是一个关于"水面之上与深海之下"的产品；这三层让页面有**地点感**，而不是"任何 App 都能用的背景"。
-  - **不许喧宾夺主（硬约束，三条同时成立）**：① 一律 `aria-hidden="true"` + `pointer-events-none` + **绝对定位**（零布局高度，因此不会破坏"一屏装下"）；② 只出现在**深水暗底与区块边缘**，不进入内容区、不压在正文之下 —— 浅底上若要用，强度必须降到 `sheenAlphaLight` 并实测文字对比度不退化；③ **含一条低幅度常驻漂移**（water drift，t46 起生效）：水面缓缓横向流动，参数取 `driftDuration`（24s）/ `driftShift`（±10px），**只动 `transform`**、由 CSS 动画实现（因此被全局 `reduced-motion` 重置冻结为静止）。`motion-web` §1 的 decoration 三条件逐条成立：① 产品理由＝「静止的水面像贴图」，已写在本条；② 低幅度低速度、不争夺注意力；③ `reduced-motion` 下静止。
+  - **不许喧宾夺主（硬约束，三条同时成立）**：① 一律 `aria-hidden="true"` + `pointer-events-none` + **绝对定位**（零布局高度，因此不会破坏"一屏装下"）；② 只出现在**深水暗底与区块边缘**，不进入内容区、不压在正文之下 —— 浅底上若要用，强度必须降到 `sheenAlphaLight` 并实测文字对比度不退化；③ **含一条低幅度常驻漂移**（water drift，t46 起生效；t47 起**浅底整面水层与深底面板/深底页头的水层共用同一对参数**，不设"深底专用"值）：水面缓缓横向流动，参数取 `driftDuration`（24s）/ `driftShift`（±10px），**只动 `transform`**、由 CSS 动画实现（因此被全局 `reduced-motion` 重置冻结为静止）。`motion-web` §1 的 decoration 三条件逐条成立：① 产品理由＝「静止的水面像贴图」，已写在本条；② 低幅度低速度、不争夺注意力；③ `reduced-motion` 下静止。
 - **漂流瓶母题（bottle motif，t44 补）**：用户点名的第三类母题。已有内联 SVG `BottleMark`（瓶身 + 瓶塞 + 一道水线 + 底部椭圆水影）本批**首次落到页面上**：公海大厅与漂流日志的页头右侧各一枚，骑在潮线上、与标题同高（绝对定位，零布局高度）。产品理由：**公海就是瓶子入海之后的去处**，页头出现"漂着的瓶子"是这个页面最该有的那一件事。
 - **航迹虚线（wake line，t44 补）**：漂流瓶划过水面留下的**断续**水痕（与潮线的"实线渐隐"区分）。落在页头与内容之间，1px 高、绝对定位。产品理由：接力是**一条路径**（河道），航迹把这个"经过"的语义画出来，而不是再加一层静态底纹。
 - **浅底装饰强度上限（t44 定，先定后用）**：浅底（wave-white）上**只允许** `textureAlphaLight`（**0.09**）级别的纹理/光带，且装饰一律在内容**之下**（`z-underlay`），不得压住正文。

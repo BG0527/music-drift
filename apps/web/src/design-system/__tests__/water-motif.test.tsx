@@ -329,3 +329,58 @@ describe('t46 水流漂移：走契约 + reduced-motion 可静止（能真的区
     expect(designMd, '新条文缺失').toContain('低幅度常驻漂移');
   });
 });
+
+/* ── t47 收尾：深底水面也要流动（浅底活、深底死图 = 同一页两种水，不一致）─────────
+   判据（全部 includes，无正则）：① 河道页两个深水面板的水层带 drift；
+   ② 作品详情深底页头的水层带 drift；③ 降级通道唯一 —— water.css 里不得有 JS 驱动动画
+   （`.animate(` / requestAnimationFrame），否则 reduced-motion 的 CSS 重置会被绕过。 */
+const countDriftTags = (src: string, tag: string): number => {
+  let n = 0;
+  let i = src.indexOf('<' + tag);
+  while (i !== -1) {
+    if (src.slice(i, i + 80).includes(' drift')) n += 1;
+    i = src.indexOf('<' + tag, i + 1);
+  }
+  return n;
+};
+
+/**
+ * 深底容器（`bg-deep-current`）里是否**有**带 drift 的水层。
+ * 判据放在"深底容器之后 700 字符"的窗口里 —— 因为装饰层是该容器的子节点，
+ * 而 className 在容器标签上、装饰在它之后。
+ */
+const darkSurfaceDrifts = (src: string): 'none' | 'all' | 'partial' => {
+  const hits: boolean[] = [];
+  let i = src.indexOf('bg-deep-current');
+  while (i !== -1) {
+    hits.push(src.slice(i, i + 700).includes(' drift'));
+    i = src.indexOf('bg-deep-current', i + 1);
+  }
+  if (hits.length === 0) return 'none';
+  return hits.every(Boolean) ? 'all' : 'partial';
+};
+
+describe('t47 深底水面也流动（消除"浅底活在流、深底是贴图"）', () => {
+  it('河道页的两个深水面板（bg-deep-current）里都有 drift 水层', () => {
+    const src = pageSource('river-page.tsx');
+    expect(src.split('bg-deep-current').length - 1, '河道页深底容器数量变了？').toBe(2);
+    expect(darkSurfaceDrifts(src), '河道页有深水面板没开漂移').toBe('all');
+    expect(countDriftTags(src, 'WaterTexture'), '河道页带 drift 的水层少于 2 处').toBeGreaterThanOrEqual(2);
+  });
+
+  it('作品详情深底页头（bg-deep-current）里也有 drift 水层', () => {
+    const src = pageSource('sea-detail-page.tsx');
+    expect(darkSurfaceDrifts(src), '详情页深底页头没开漂移').toBe('all');
+  });
+
+  it('降级通道唯一：water.css 里不得有 JS 驱动动画（否则 reduced-motion 会被绕过）', () => {
+    expect(waterCss, 'water.css 出现 JS 动画').not.toContain('.animate(');
+    expect(waterCss, 'water.css 出现 rAF 驱动').not.toContain('requestAnimationFrame');
+  });
+
+  it('深浅底共用同一对 token（不得出现"深底专用"的第二套规则）', () => {
+    // 只允许一套漂移参数：motion 块里 drift 参数只能各出现一次
+    expect(frontMatter.split('driftDuration:').length - 1, 'driftDuration 出现多次').toBe(1);
+    expect(frontMatter.split('driftShift:').length - 1, 'driftShift 出现多次').toBe(1);
+  });
+});
