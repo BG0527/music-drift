@@ -3216,3 +3216,41 @@ audio-engineer 按新装的 `motion-web` 重审动效，**§5「不要靠改 `ke
 1. **handover 过期信息**（`audio-engineer-t30-unfinished.md` §0/§5 称"F2 仍是 typecheck 红点"）⇒ 由 captain 加**历史标注**（成员按纪律未擅改非 inScope 文件 ✓ 处置正确）；
 2. **提交信息有误**（`1ef0647` 称 `measuredDurationMs` 仍是包级红）⇒ **提交信息不可改**，记入本节并在下个 checkpoint 的提交信息里更正；
 3. **越界披露**（新增 `docs/handover/audio-engineer-t30-unfinished.md`，不在 t30 inScope）⇒ 那是 **captain 13:54 停机令明确要求**的产物 ⇒ 接受 ✓。
+
+---
+
+## 79. t37 动效审计（1030 行）+ 四项裁决 + 抽查 skill 引文
+
+### 79.1 审计的核心答案（captain 的怀疑被证实）
+**「呆」在缺 feedback 与 continuity，不在缺装饰动效。** 装饰恰好克制（引 `frontend-design` L32：把"每张卡都 hover、每段都 fade-and-slide-up"判为 read as AI-generated）。
+**最该修三处（都是硬切，都能只用既有 token 修）**：
+1. **移动端底部导航零反馈** —— `design-system/nav.tsx` 的 BottomNav 中 `hover:|active:|transition|focus-visible` 命中 = **0**（实测）⇒ **最高频交互 × 零回应**；
+2. **Tab 切换硬切** —— `tabs.tsx` 选中 pill 瞬变 + `{active?.content}` 整块替换（`sea-page` / `admin-page` / `login-page` 三处在用）；
+3. **投票后计数硬换** —— `vote-controls.tsx:129` 是纯文本节点；`motion-web` §1 恰好点名「**投票后的确认**」是 feedback 的典型例。
+其后：Modal/Toast 无退场（§4「不能弹出来就没了」）→ 页面过渡只实现了 fade（**`DESIGN.md` L286 明文要求 Fade + slide**）且无退场 → 骨架→内容硬切 → 分页第 5 张起无入场 → 侧栏 hover 无 transition → **不可点的 `<li>` 挂了 hover-lift**。
+
+**两条硬违规**：
+1. `motion.css:84-86` 的 `.hover-lift` **同时过渡 `box-shadow` 的 blur/offset 与色值** ⇒ **不是灰区违规**（§3 只给"颜色过渡"留灰区，"尺寸与位置"明文禁止）。顺带：`fonts-and-motion.test.ts:73` 用例名写「hover 只做 scale(1.03)…」而断言体只查两项 ⇒ **名字比断言强**，正是 §8 警告的"看起来在验证、实际没验证"；
+2. `route-view.tsx:63` 的 `key={match.path}` ⇒ §5 明令禁止的 remount 抖动（会丢焦点/输入/滚动位置）；仓库**自己已有这条守卫**（`features/audio/motion-usage.test.ts:44`）但**只覆盖 `features/audio/` 两个文件**。
+
+**参数无据**：`motion.css:103` shimmer `1.4s`（motion token 块 10 项里没有）· `motion.css:108` ripple `2.4s`（**契约完全无据**）+ `infinite` 常驻。
+
+### 79.2 captain 四项裁决
+- **A2 涟漪**：**留常驻**，但契约须**区分两种涟漪** —— ① **事件涟漪**（标记状态变化/落点：短暂、事件驱动，保留 L449 原文语义）② **场景涟漪**（hero 背景母题：常驻，但须满足 `motion-web` §1 的 decoration 三条件 + 进 token 块 + 写出产品理由）。
+  ⇒ 定性：**不是"实现违反契约"，而是契约缺了第二种的定义**。
+- **A1/A3/A4**：**批准补 token**（shimmer 时长 / Toast 常驻+退场 / Modal 退场）。`motion-web` §2 要求"参数只能取自设计契约" ⇒ **契约缺项就必须补**，而不是让组件继续内联；Modal 退场按 §4 口径（**退场比入场快**）。
+- **P8+P9**：**等 t36 收口后一起做** —— 只补页面过渡 slide、却留着 `route-view.tsx:63` 的 key-remount，两者会**互相抵消**。
+- **A6**：`duration-200` **算"引用 token"**（条件：档位数值 = 契约 token 值），但**必须加守卫**断言"源码里的 duration 字面量都在契约 token 值集合内"（挡 `duration-375` 这类漂移）。
+  ⇒ 原则：**纪律不该以降低代码质量为代价**（强制 arbitrary value 会让代码更差），但必须有守卫防漂移。
+
+### 79.3 批准立即做：P1–P7（零 `DESIGN.md` 改动）+ 守卫扩容
+- **P1**（收缩 `.hover-lift` 的 `box-shadow` 过渡）与 **P7**（撤掉不可点 `<li>` 的 hover-lift）**优先**；**P7 定性为"动效承诺了不存在的交互"（静默欺骗）**；
+- **额外**：把 key-remount 守卫**从 `features/audio/` 扩到全仓**（含**反向控制**证明它会红）。
+
+### 79.4 ⭐ 审计的自我证伪（记为报告标准）
+执行者**主动撤回 6 条被证据推翻的草案断言**（mood chips 是"只作展示"非交互 / 加载更多已有 `loading` 态 / `sea-page` 已有骨架 / 加载语义全站统一 ⇒ **"本来就没问题"**）。
+⇒ 价值：**避免用噪音淹没真问题，也避免 captain 误判漏报**。这是审计该有的样子 —— 不是凑发现数。
+另：它**显式登记两处 skill 间冲突**（`afrexai` 的 `hover_lift` 含 shadow ↔ `motion-web` §3；`afrexai` Modal 200–300ms ↔ `DESIGN.md` 480ms），并按 AGENTS.md §4 取 `DESIGN.md` —— 处置正确（非 Figma 出入、不需 §5 上报，但**必须写下来**）。
+
+### 79.5 验证分层的口径（它自己声明）
+本审计结论**全在"源码结构层"（L1）**；**jsdom 与静态截图都不能证明动效**（`home-page.tsx:68` 已踩过这个坑）；§10 给了真实 Chromium 的 `getAnimations()` + `emulateMedia({ reducedMotion: 'reduce' })` 断言配方，并单列必须真机/录屏的项（触摸 active 反馈、60fps、低端设备）。
