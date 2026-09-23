@@ -197,6 +197,80 @@ describe('bottleStore：内核命令 ↔ 事件流 ↔ 投影 ↔ 重放', () =>
     expect(incomplete.some((candidate) => candidate.id === bottleId)).toBe(false);
   });
 
+  it('listParticipatedBottles：被斩段的作者（含发起者）不再算参与过，其余参与者不受影响（§46.1）', async () => {
+    const songId = await insertSong(db, 4);
+    const initiatorId = await insertUser(db);
+    const singerId = await insertUser(db);
+    const bottleId = crypto.randomUUID();
+    const ctx = ctxAt(6 * HOUR);
+    await store.createBottle({ bottleId, songId, initiatorId, ctx });
+
+    let state = (await store.loadState(bottleId))!;
+    await store.applyOutcome(bottleId, recordSegment(state, { userId: initiatorId, note: null }, ctx));
+    state = (await store.loadState(bottleId))!;
+    await store.applyOutcome(bottleId, chooseResolution(state, { userId: initiatorId, resolution: 'RIVER' }, ctx));
+    state = (await store.loadState(bottleId))!;
+    await store.drawFromRiver({ bottleId, userId: singerId, ctx });
+    state = (await store.loadState(bottleId))!;
+    await store.applyOutcome(bottleId, recordSegment(state, { userId: singerId, note: null }, ctx));
+
+    const singerSegmentId = (await store.loadState(bottleId))!.segments.find((segment) => segment.index === 2)!.id;
+    const idsFor = async (userId: string): Promise<string[]> =>
+      (await store.listParticipatedBottles({ userId, limit: 50 })).map((row) => row.id);
+
+    // 斩浪前：两人都算参与过（钉住"我们不是因为别的原因丢的"）
+    expect(await idsFor(initiatorId)).toContain(bottleId);
+    expect(await idsFor(singerId)).toContain(bottleId);
+
+    // 斩掉**接唱者**的段（非锚段）→ 只有他失去该瓶，发起者（段仍有效）不受影响
+    for (let round = 0; round < 10; round += 1) {
+      const voterId = await insertUser(db);
+      const outcome = castVote(
+        (await store.loadState(bottleId))!,
+        { userId: voterId, segmentId: singerSegmentId, value: 'DISLIKE', listenedRatio: 1 },
+        ctx,
+      );
+      expect(outcome.ok).toBe(true);
+      await store.applyOutcome(bottleId, outcome, { vote: { listenedRatio: 1 } });
+    }
+    expect(await idsFor(singerId)).not.toContain(bottleId);
+    expect(await idsFor(initiatorId)).toContain(bottleId);
+  });
+
+  it('listParticipatedBottles：**发起者**的锚段被斩 → 该瓶从发起者自己的列表里消失（§46.1「连发起者也一并剔除」）', async () => {
+    const songId = await insertSong(db, 4);
+    const initiatorId = await insertUser(db);
+    const bottleId = crypto.randomUUID();
+    const ctx = ctxAt(7 * HOUR);
+    await store.createBottle({ bottleId, songId, initiatorId, ctx });
+
+    let state = (await store.loadState(bottleId))!;
+    await store.applyOutcome(bottleId, recordSegment(state, { userId: initiatorId, note: null }, ctx));
+    state = (await store.loadState(bottleId))!;
+    await store.applyOutcome(bottleId, chooseResolution(state, { userId: initiatorId, resolution: 'RIVER' }, ctx));
+    const firstSegmentId = (await store.loadState(bottleId))!.segments[0]!.id;
+
+    expect((await store.listParticipatedBottles({ userId: initiatorId, limit: 50 })).map((row) => row.id)).toContain(
+      bottleId,
+    );
+
+    for (let round = 0; round < 10; round += 1) {
+      const voterId = await insertUser(db);
+      const outcome = castVote(
+        (await store.loadState(bottleId))!,
+        { userId: voterId, segmentId: firstSegmentId, value: 'DISLIKE', listenedRatio: 1 },
+        ctx,
+      );
+      expect(outcome.ok).toBe(true);
+      await store.applyOutcome(bottleId, outcome, { vote: { listenedRatio: 1 } });
+    }
+
+    expect((await store.loadState(bottleId))!.status).toBe('DAMAGED'); // 锚段被斩
+    expect((await store.listParticipatedBottles({ userId: initiatorId, limit: 50 })).map((row) => row.id)).not.toContain(
+      bottleId,
+    );
+  });
+
   it('斩浪：留下缺口 + 释放持有者锁 + 锚被斩时作品判定已损坏（用户终裁）', async () => {
     const songId = await insertSong(db, 2);
     const initiatorId = await insertUser(db);

@@ -222,7 +222,7 @@ describe('GET /api/me/bottles（CONTEXT §11.1 漂流日志）', () => {
     }
   });
 
-  it('段被斩浪后**仍然算参与过**（§16.7）：角色还在，只是"我唱的那一段"变成空', async () => {
+  it('被斩浪的段作者（含发起者）该瓶一律不算参与过：锚被斩 → DAMAGED 后从我自己的列表里消失', async () => {
     // 让 10 个路人点踩我的第 1 段（阈值 10）→ 锚被斩 → 整瓶 DAMAGED
     const segmentId = (
       await db.query<{ id: string }>(
@@ -246,18 +246,88 @@ describe('GET /api/me/bottles（CONTEXT §11.1 漂流日志）', () => {
       expect(vote.statusCode).toBe(200);
     }
 
+    // 先证明"斩浪真的发生了"（否则下面"不在列表里"可能只是因为没斩成 —— 假绿）
+    const cutRow = await db.query<{ status: string; deleted_at: string | null }>(
+      `select b.status, s.deleted_at from bottles b
+       join bottle_segments s on s.bottle_id = b.id
+       where b.id = $1 and s."index" = 1`,
+      [mine],
+    );
+    expect(cutRow[0]?.status).toBe('DAMAGED'); // 锚段被斩 → 整瓶 DAMAGED
+    expect(cutRow[0]?.deleted_at).not.toBeNull(); // 段确实被软删
+
     const items = await myBottles(me.cookie);
-    const cut = items.find((item) => item.id === mine) as MyBottle & {
-      status: string;
-      recordedCount: number;
-    };
-    expect(cut).toBeDefined(); // 被斩不等于"没参与过"
-    expect(cut.status).toBe('DAMAGED');
-    expect(cut.role).toBe('INITIATOR');
-    expect(cut.recordedCount).toBe(0); // 有效段为 0（段已软删）
-    expect(cut.mySegmentIndexes).toEqual([]); // 我唱的那一段不再有效
-    // 刚被斩 → 最近活跃在最前（列表按 updatedAt 倒序）
-    expect(items[0]?.id).toBe(mine);
-    expect(Date.parse(cut.updatedAt)).toBe(Date.parse(String(items[0]?.updatedAt)));
+    const ids = items.map((item) => item.id);
+    // §46.1（用户第九轮裁定「连发起者也一并剔除」）：旧断言「被斩浪后仍然算参与过」已**反转**
+    expect(ids).not.toContain(mine);
+    // 不误伤：我另一支（段仍有效）必须还在
+    expect(ids).toContain(joined);
+  });
+
+  it('非发起者的段被斩：只有那位作者失去该瓶，其余参与者不受影响', async () => {
+    const initiator = await register('ci');
+    const singer = await register('cs');
+    const songId = await insertSong(db, 4);
+    const created = await app.inject({
+      method: 'POST',
+      url: '/api/bottles',
+      payload: { songId },
+      headers: { cookie: initiator.cookie },
+    });
+    const bottleId = (created.json() as { id: string }).id;
+    await app.inject({
+      method: 'POST',
+      url: '/api/bottles/' + bottleId + '/segments',
+      payload: webmPayload(),
+      headers: { cookie: initiator.cookie, 'content-type': 'audio/webm', 'x-audio-duration-ms': '20000' },
+    });
+    // 用「指定接唱」按 id 精确交接：集成库是多文件共用的，河道随机捞取会捞到别人的瓶子
+    // （这种夹具的"通过"取决于环境运气 —— t19 的病根，本文件不该再引入一次）
+    const toSea = await app.inject({
+      method: 'POST',
+      url: '/api/bottles/' + bottleId + '/resolution',
+      payload: { resolution: 'SEA' },
+      headers: { cookie: initiator.cookie },
+    });
+    expect(toSea.statusCode).toBe(200);
+    const drawn = await app.inject({
+      method: 'POST',
+      url: '/api/sea/' + bottleId + '/targeted-segment',
+      headers: { cookie: singer.cookie },
+    });
+    expect(drawn.statusCode).toBe(200);
+    expect((drawn.json() as { id: string }).id).toBe(bottleId);
+    const second = await app.inject({
+      method: 'POST',
+      url: '/api/bottles/' + bottleId + '/segments',
+      payload: webmPayload(),
+      headers: { cookie: singer.cookie, 'content-type': 'audio/webm', 'x-audio-duration-ms': '20000' },
+    });
+    expect((second.json() as { index: number }).index).toBe(2);
+    const singerSegmentId = (second.json() as { segmentId: string }).segmentId;
+
+    // 10 个路人点踩**接唱者**的第 2 段（不是锚段）→ 该段被斩，瓶子仍活（留缺口）
+    const voters: string[] = [];
+    for (let index = 0; index < 10; index += 1) {
+      voters.push((await register('cv')).cookie);
+    }
+    await listenUntilThresholdBatch(app, voters, singerSegmentId, 20_000);
+    for (const cookie of voters) {
+      const vote = await app.inject({
+        method: 'POST',
+        url: '/api/segments/' + singerSegmentId + '/votes',
+        payload: { value: 'DISLIKE' },
+        headers: { cookie },
+      });
+      expect(vote.statusCode).toBe(200);
+    }
+    const cut = await db.query<{ deleted_at: string | null }>(
+      `select deleted_at from bottle_segments where id = $1`,
+      [singerSegmentId],
+    );
+    expect(cut[0]?.deleted_at).not.toBeNull(); // 斩浪确实发生
+
+    expect((await myBottles(singer.cookie)).map((item) => item.id)).not.toContain(bottleId);
+    expect((await myBottles(initiator.cookie)).map((item) => item.id)).toContain(bottleId);
   });
 });

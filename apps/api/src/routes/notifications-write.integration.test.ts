@@ -292,8 +292,8 @@ describe('通知写入 ②：私密留言**未送达** → 通知发送者（§5
   });
 });
 
-describe('通知写入 ③：被斩浪的参与者**仍算参与过**（ADR-015 §16.7 / §9.2）', () => {
-  it('某段被斩（作品随后被补齐并完整入海）：被斩者依然收到「作品已完成」通知', async () => {
+describe('通知写入 ③：被斩浪的参与者**不再算参与过**（用户裁决 §46.1；与 §16.7 防捣乱是两个维度）', () => {
+  it('某段被斩（作品随后被补齐并完整入海）：被斩者**不再**收到「作品已完成」通知，其余有效段作者照常收到', async () => {
     const initiator = await register('zd');
     const crowd: string[] = [];
     for (let index = 0; index < 10; index += 1) crowd.push((await register('zc')).cookie);
@@ -361,9 +361,10 @@ describe('通知写入 ③：被斩浪的参与者**仍算参与过**（ADR-015 
     expect((before.json() as { isComplete: boolean }).isComplete).toBe(true);
     await resolve(saver3.cookie, bottleId, 'SEA');
 
-    // ③ 被斩的那位**仍然算参与过** → 收到「作品已完成」
+    // ③ 被斩的那位**不再算参与过**（§46.1：连发起者也一并剔除）→ 不收「作品已完成」；
+    //    反假绿：上面已断言 `victimSegment` 确实被软删，所以"没收到"不是因为没斩成
     const victimNotifications = await notificationsOf(victimCookie);
-    expect(typesFor(victimNotifications, bottleId)).toContain('BOTTLE_COMPLETED');
+    expect(typesFor(victimNotifications, bottleId)).not.toContain('BOTTLE_COMPLETED');
     for (const who of [initiator, saver1, saver2, saver3]) {
       expect(typesFor(await notificationsOf(who.cookie), bottleId)).toContain('BOTTLE_COMPLETED');
     }

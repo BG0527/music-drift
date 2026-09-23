@@ -24,6 +24,7 @@
 import {
   isComplete,
   missingSegmentIndexes,
+  participants,
   replayBottle,
   type DomainEvent,
 } from '@music-drift/shared/domain';
@@ -104,19 +105,21 @@ async function pendingMessages(tx: Queryable, bottleId: string): Promise<Pending
 }
 
 /**
- * 参与者 = 发起者 + 每位录过段的人。
+ * 通知的收件人 = **有效段的作者**（发起者只要第 1 段还在，也在其中）。
  *
- * **从事件流取**而不是从有效段取：被斩浪的段虽然软删了，但"参与过"这件事在事件里，
- * 与 ADR-015 §16.7（斩浪不抹掉参与关系）一致。系统（`SYSTEM` 哨兵）不算人。
+ * 判定**收敛到内核 `participants(state)`**（`liveSegments`）——与 `/api/me/bottles` 用的是**同一条规则**
+ *（用户裁决 §46.1：被斩浪的段作者 —— 含发起者 —— 不算参与过）。此前这里自己写了一份"从事件流取参与者"的
+ * SQL，于是同一条规则有了两份实现，裁决一改就会出现两个口径。系统（`SYSTEM` 哨兵）不算人，内核的
+ * `participants` 只产出真实用户，因此也不需要再过滤。
+ *
+ * ⚠️ 与 §16.7「防捣乱」无关（那个维度是"今后不许再参与"，故意查含软删行的 `state.segments`）。
  */
 async function participantsOf(tx: Queryable, bottleId: string): Promise<string[]> {
-  const rows = await tx.query<{ actor_id: string }>(
-    `select distinct actor_id from events
-     where bottle_id = $1 and type in ('BOTTLE_CREATED', 'SEGMENT_RECORDED')
-       and actor_id <> 'SYSTEM'`,
-    [bottleId],
-  );
-  return rows.map((row) => row.actor_id);
+  const events = await readDomainEvents(tx, bottleId);
+  if (events.length === 0) {
+    return [];
+  }
+  return participants(replayBottle(events)).map((record) => record.userId);
 }
 
 /**
@@ -182,7 +185,7 @@ export async function projectNotifications(
       }
     }
 
-    // ② 作品**完整**入海 → 所有参与者（含被斩浪的人）
+    // ② 作品**完整**入海 → 通知**有效段的作者**（被斩浪者不算参与过，§46.1）
     //
     // 完整性由**内核**判定（`replayBottle` + `isComplete`），不在这里数段数重写规则。
     // 未完成的作品进公海（「等待接力」区）**不发**这条通知：那时说"已完成"是撒谎，

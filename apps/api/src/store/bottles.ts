@@ -10,6 +10,7 @@
 import {
   createBottle as createBottleCommand,
   drawBottle,
+  participants,
   replayBottle,
   resolveDrawParent,
   type BottleState,
@@ -21,6 +22,12 @@ import { appendDomainEvent, readDomainEvents } from '../db/events.js';
 import { activeHoldingOf, applyDomainEventToHoldings, claimHolding } from '../db/holdings.js';
 import { insertBottleSegment } from '../db/segments.js';
 import { projectNotifications } from './notifications.js';
+
+/**
+ * `listParticipatedBottles` 的候选超取倍数：候选里含"段被斩"的瓶子，会被内核判定筛掉；
+ * 不多取就会**静默少给**几行（契约说返回 limit 以内，但少给是静默损失）。
+ */
+const CANDIDATE_OVERFETCH = 3;
 
 export interface BottleRow {
   id: string;
@@ -113,10 +120,11 @@ export interface BottleStore {
   listSongs(): Promise<SongRow[]>;
   listSeaBottles(input: { zone?: 'COMPLETED' | 'INCOMPLETE'; limit: number }): Promise<BottleRow[]>;
   /**
-   * 我参与过的瓶子（CONTEXT §11.1 漂流日志）：**发起** 或 **在该瓶唱过**（`SEGMENT_RECORDED` 的主动方）。
+   * 我参与过的瓶子（CONTEXT §11.1 漂流日志）：判定 = **我在该瓶有有效段**（内核 `participatedIn`，§46.1）。
    *
-   * 判据取 `events` 而不是 `bottle_segments` 投影：事件是单一事实来源，且**被斩的段仍算参与过**
-   *（ADR-015 §16.7 软删；"你参与过"不该因为被别人点踩斩浪就消失）。排序按最近活跃倒序。
+   * 用户裁决第九轮推翻了"发起者豁免"：**被斩浪的段作者（含发起者）一律不算参与过**。
+   * 这里刻意只把 `events` 当**候选**（我录过段的瓶子），判定交给内核 —— 事件流会留下"录过但后来被斩"的痕迹，
+   * 那正是必须被筛掉的情形。排序按最近活跃倒序。
    */
   listParticipatedBottles(input: { userId: string; limit: number }): Promise<BottleRow[]>;
   listBottleSegments(bottleId: string): Promise<BottleSegmentRow[]>;
@@ -136,6 +144,21 @@ export interface BottleStore {
     userId: string;
     ctx: DomainContext;
   }): Promise<CommandOutcome | null>;
+}
+
+/**
+ * 「参与过」的**唯一判定**（用户裁决 §46.1：被斩浪的段作者 —— **含发起者** —— 一律不算参与过）。
+ *
+ * 规则不在本文件里重写，而是**直接用内核的 `participants(state)`**
+ *（`packages/shared/src/domain/queries.ts`）：它从 `liveSegments` 取，被斩段（软删）的作者自然不在其中。
+ *
+ * ⚠️ 与 §16.7「防捣乱」是**两个维度**，别混：
+ * - §16.7：被斩者**今后**不得再参与该瓶（`canRecordSegment` / `canDrawBottle` 故意查 `state.segments`，**含软删行**）；
+ * - §46.1（本函数）：那**一次**参与不算数（只看**有效段**）。
+ * 把 §16.7 改成只看有效段会让防捣乱静默失效（被斩者又能接唱/捞到同一支瓶），因此禁止。
+ */
+export function participatedIn(state: BottleState, userId: string): boolean {
+  return participants(state).some((record) => record.userId === userId);
 }
 
 /** 事件 → 段/票/留言投影（这些表是「查询与媒体」视图，不参与规则判定）。 */
@@ -453,23 +476,41 @@ export function createBottleStore(db: Db): BottleStore {
     },
 
     async listParticipatedBottles(input): Promise<BottleRow[]> {
-      const rows = await db.query<BottleDbRow>(
+      /**
+       * SQL 只做**候选超集**（"我录过段的瓶子"），真正的判定交给内核（`participatedIn`）。
+       *
+       * ⚠️ 刻意**不再**有 `b.initiator_id = $1` 这个 disjunct：那正是「发起者豁免」——
+       * 发起者的段被斩后照样会被列出（旧行为）。按 §46.1 整条删掉，不留特殊照顾分支。
+       * 发起者发起时必须录第一段（CONTEXT §3），所以他的有效段本来就会经由 `SEGMENT_RECORDED` 进候选。
+       *
+       * 多取一些候选再筛（`limit * CANDIDATE_OVERFETCH`）：被斩者会被筛掉，不这样会**静默少给**几行。
+       */
+      const candidates = await db.query<BottleDbRow>(
         `select b.id, b.song_id, b.initiator_id, b.status, b.total_segments, b.revision,
                 b.current_holder_id, b.current_caster_id, b.created_at, b.updated_at
          from bottles b
-         -- 同一个参数同时比 uuid 列（initiator_id）与 text 列（events.actor_id，允许 'SYSTEM' 哨兵）：
-         -- 不显式转型 Postgres 会报 "inconsistent types deduced for parameter $1"（t5 踩过一次）
-         where b.initiator_id = $1::uuid
-            or exists (
-              select 1 from events e
-              where e.bottle_id = b.id and e.type = 'SEGMENT_RECORDED' and e.actor_id = $1::text
-            )
+         where exists (
+                 select 1 from events e
+                 where e.bottle_id = b.id and e.type = 'SEGMENT_RECORDED' and e.actor_id = $1::text
+               )
          -- 时间相同的行按 id 定序：分页/断言都要确定性（否则"最近活跃在前"会飘）
          order by b.updated_at desc, b.id desc
          limit $2`,
-        [input.userId, input.limit],
+        [input.userId, input.limit * CANDIDATE_OVERFETCH],
       );
-      return rows.map(toBottleRow);
+
+      const rows: BottleRow[] = [];
+      for (const candidate of candidates) {
+        const state = await loadState(candidate.id);
+        if (state === null || !participatedIn(state, input.userId)) {
+          continue;
+        }
+        rows.push(toBottleRow(candidate));
+        if (rows.length >= input.limit) {
+          break;
+        }
+      }
+      return rows;
     },
 
     async listBottleSegments(bottleId: string): Promise<BottleSegmentRow[]> {
