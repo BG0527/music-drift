@@ -334,3 +334,88 @@ pnpm --filter @music-drift/web test
 | `api` 音频单测           | 3 文件 / 35 用例                                              |
 | `api` 音频集成（真实库） | 1 文件 / 9 用例（300 KB bytea，含跨 8 KB 页边界的字节级比对） |
 | `web` 音频能力层         | 9 文件 / 92 用例                                              |
+
+---
+
+## 9. F2：实测时长回填点踩门槛的**分母**（t28 前端 / t26 后端）
+
+### 9.1 缺陷（t20 门禁 finding F2，用户裁决 (c)）
+
+点踩门槛的**分母**是上传者自报的 `x-audio-duration-ms`（上传时只校验 15–30s 区间 + 4 字节容器嗅探）。
+于是**真实 2s 却声明 30s** 的段：诚实听众最多覆盖 2s ⇒ `ratio ≤ 6.7%` ⇒ **永久点不了踩**，
+上传者可单方面冻结自己那段的斩浪（CONTEXT §16 / §7.1）。用户裁决 **(c)**：播放时用浏览器**实测**真实时长回填分母。
+
+### 9.2 接口（**已与 t26/architect 冻结字段名与单位** —— 2026-09-23，协商记录见 §9.5）
+
+```text
+POST /api/segments/:segmentId/duration
+  auth    ：需登录会话（与 /listen 同一套）
+  body    ：{ measuredDurationMs: number,        // round(element.duration * 1000)，整数毫秒
+              coveredMsAtReportMs: number }      // **必填**（t26 改的）：上报那一刻的 coveredMs
+  200     ：{ declaredDurationMs: number | null,
+              measuredDurationMs: number,        // 本次上报原值（审计用）
+              effectiveDurationMs: number,        // 实际生效的分母
+              corrected: boolean,                 // effective !== declared
+              direction: 'LOWER' | 'NONE' | 'PENDING_AGREEMENT',
+              sampleCount: number }               // 该段累计独立测量数
+  422     ：{ error:{ message, violations:[{ code:'MEASURED_DURATION_REJECTED' }] } }
+  404     ：段不存在（与 /listen 一致）
+  幂等    ：**per (user, segment) 一次性**；重复上报返回已有记录（**不覆盖**）
+```
+
+**t26 对我提案改的三处（已按此实现前端）**：
+
+1. `coveredMsAtReportMs` 由"可选"改为**必填** —— 它是"我真的播过"与"我凭空报个数"之间唯一的证据链：
+   服务端已有 `listen_progress`，可校验它与库内 `coveredMs` 一致（容差 ±1s）；
+2. 新增 `direction`：**下调立即生效**（`LOWER`，F2 的诚实场景**一个诚实听众即可修好**）；
+   **上调只记录不生效**（`PENDING_AGREEMENT`，等 ≥2 个不同用户实测值互相接近 ±10%）——
+   因为"抬高别人段的分母"对作者有利，是另一条滥用路径；
+3. `effectiveDurationMs` 下限 = `max(500ms, 该段已记录的最大 coveredMs)`（避免 `ratio > 1` 与"追溯作废已听进度"）。
+
+**前端已实现的保证**（与提案一致，均有单测钉住）：
+
+| 保证                        | 实现                                                                                                                                      |
+| --------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
+| 值来自**真实播放**          | 读 `HTMLMediaElement.duration`（`loadedmetadata`/`durationchange`），且**必须 `playedMs > 0`**；不是请求体/元数据里的自报值               |
+| **fail-closed**             | `NaN`/`Infinity`/`≤0`/`<500ms`/`>5min`/`> max(声明×2, 60s)` 一律**不上报**（分母宁可不动，也不能被脏值污染）                              |
+| **一次性**                  | 同一页面会话内同一段最多报一次；**失败不重试**（值不会变好）                                                                              |
+| **与 t21 覆盖上报互不遮蔽** | 独立端点、独立状态（`state.durationReport`）；时长通道**不写**共享 `lastError`（覆盖率成功会清空它，否则会擦掉时长失败）                  |
+| 页面**零改动**              | 实测值与声明值随 `SegmentListenSnapshot`（`measuredDurationMs` / `declaredDurationMs`）一起透出，页面仍只用 `onProgress={listen.observe}` |
+
+### 9.3 ⚠️ 诚实边界：**这不是安全边界**
+
+实测值**同样来自客户端**，所以本方案**只修诚实路径**。就当前形状而言它**很容易被直接构造**：
+脚本登录后直接 `POST {measuredDurationMs: 2000}`，请求体**不携带"我真的播过"的证据**。
+前端能提供的"真实播放前置"仅两项：值来自解码器的 `duration`、且此刻 `playedMs > 0`。
+更强的保证必须由**服务端**做（已在提案里给 t26 列出候选）：
+① 要求该 `(user, segment)` 已有 `listen_progress` 行（先报过播放覆盖，才允许报时长）；
+② 一致性：只接受 `measuredDurationMs >= coveredMs`（覆盖不可能超过真实时长）；
+③ **只允许下调分母**（实测更短才是 F2 的诚实场景；升调是对抗方向，恶意者可用它抬高分母、永久冻结斩浪）；
+④ 跨用户聚合（中位数/最小值），单个说谎者搬不动分母。
+
+### 9.4 联调待办（**未伪造通过**）
+
+- t26（F2 后端：接收/校正/审计 + F4）**尚未实现**（architect 明示：t26 的路径正被 t24 占用，等 captain 重划范围后开工）⇒ 端点 `POST /api/segments/:id/duration` **服务端还不存在**。
+- 前端侧已按上述形状实现并有单测（含"时长上报失败不影响覆盖率上报"的互不遮蔽用例）；
+  **真实联通必须等 t26 落地后复核**（若届时改名/改单位，前端只需改 `fetchListenTransport` 一个函数）。
+- 本轮证据是**前端单测 + 请求形状断言（真 fetch mock）**，不是端到端联通 —— 不把它说成"F2 已修好"。
+
+### 9.5 接口协商记录（AGENTS.md §8：结论落文档，口头约定无效）
+
+- **2026-09-23 t28 → t26**：audio-engineer 发出提案（端点/字段/单位/幂等语义 + 前端能提供的"真实播放前置"证据 + 主动指出的弱点）。
+- **2026-09-23 t26 → t28 裁决：选 (B) 改名/定语义**（不推翻形状，改三处并把关键不变量写死）→ 见 §9.2 的三条。
+  architect 明确："**字段名/单位现在冻结**，你按这个形状做前端，我按同一形状做后端，联调不会返工"。
+- 我的 fail-closed band（`≥500ms`、`≤300_000ms`、`≤ max(declared×2, 60_000)`）**由服务端原样镜像**，不满足即 422；
+  前端照旧"不满足就完全不上报"。
+- t26 落地时会把该语义写进 `docs/api.md`，并把新码 `MEASURED_DURATION_REJECTED` 加进 contracts 错误码表。
+
+**architect 的威胁模型结论（原文转达 captain，未经我改写）**：
+
+> `measuredDurationMs` 与 `coveredMs` 一样来自客户端 ⇒ 它只修诚实路径，**不是安全边界**。
+>
+> - **谎报更小的 duration 能让门槛变低吗？能。** 影响面不是"攻击者自己"而是**被点踩的那个段**：
+>   分母变小 ⇒ 门槛(0.8×分母)变小 ⇒ 所有人都更容易踩它。所以"缩小别人段的分母"是一条真实滥用路径。
+> - **谎报更大的 duration** 对段作者有利（分母变大 ⇒ 更难被斩），是另一条自保滥用路径。
+> - 防护（分层，都不构成硬边界）：① 要求先有 `listen_progress` 行 + `coveredMsAtReportMs` 与库内值一致；
+>   ② 只允许**下调立即生效**，**上调需要多用户一致**；③ 落库**审计**（谁/何时/报多少/是否生效）；
+>   ④ 跨用户取**中位数**而非均值（抗单点离群）。

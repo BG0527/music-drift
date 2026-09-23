@@ -24,9 +24,10 @@ import {
 } from './listen-reporter';
 
 interface Call {
-  kind: 'listen' | 'vote';
+  kind: 'listen' | 'vote' | 'duration';
   segmentId: string;
   coveredMs?: number;
+  measuredDurationMs?: number;
   body?: unknown;
 }
 
@@ -52,6 +53,20 @@ function fakeTransport(options: { threshold?: number; durationMs?: number } = {}
       return {
         status: 200,
         body: { coveredMs: covered, durationMs, ratio: covered / durationMs, threshold },
+      };
+    },
+    reportMeasuredDuration: async (segmentId, measuredDurationMs, context) => {
+      calls.push({ kind: 'duration', segmentId, measuredDurationMs, body: context });
+      return {
+        status: 200,
+        body: {
+          declaredDurationMs: durationMs,
+          measuredDurationMs,
+          effectiveDurationMs: measuredDurationMs,
+          corrected: true,
+          direction: measuredDurationMs < durationMs ? 'LOWER' : 'NONE',
+          sampleCount: 1,
+        },
       };
     },
     castVote: async (segmentId, body) => {
@@ -193,6 +208,253 @@ describe('createListenReporter：服务端状态（threshold / ratio 只认服�
     expect(listenCalls.every((call) => call.coveredMs === 3_200)).toBe(true);
     // 真实播放下 3.2s 只覆盖 16%，服务端也就只记到这么多
     expect(reporter.state().serverRatio ?? 0).toBeLessThan(0.8);
+    reporter.dispose();
+    vi.useRealTimers();
+  });
+});
+
+describe('createListenReporter：实测时长上报（t28 / F2）', () => {
+  /*
+   * 目的：修"诚实用户路径"——上传者声明 30s、真实只有 2s 时，分母错了 ⇒ 诚实听众永远够不到 80%。
+   * 客户端在**真实播放后**读 `HTMLMediaElement.duration` 报一次，供后端校正分母。
+   * 边界（必须 fail-closed，绝不污染分母）：NaN / Infinity / 0 / 负数 / <500ms / >5min /
+   * 比声明值离谱地长 → **一个请求都不发**。
+   */
+  const play = { coveredMs: 2_000, playedMs: 2_000, declaredDurationMs: 20_000 };
+
+  it('真实播放后报一次实测时长（带 coveredMs 供服务端做一致性校验）', async () => {
+    vi.useFakeTimers();
+    const { reporter, fake } = setup({ periodMs: 60_000 });
+
+    reporter.observe({ ...play, measuredDurationMs: 2_000 });
+    await vi.advanceTimersByTimeAsync(0);
+
+    const durationCalls = fake.calls.filter((call) => call.kind === 'duration');
+    expect(durationCalls).toHaveLength(1);
+    expect(durationCalls[0]?.measuredDurationMs).toBe(2_000);
+    expect(durationCalls[0]?.body).toEqual({
+      declaredDurationMs: 20_000,
+      coveredMsAtReportMs: 2_000,
+    });
+    expect(reporter.state().durationReport?.status).toBe('reported');
+    expect(reporter.state().durationReport?.effectiveDurationMs).toBe(2_000);
+    // t26 冻结形状：direction 表示本次测量是否真的生效（下调立即生效；上调只记录待多用户一致）
+    expect(reporter.state().durationReport?.direction).toBe('LOWER');
+    reporter.dispose();
+    vi.useRealTimers();
+  });
+
+  it('t26 冻结枚举扩为 4 值：RAISED（多用户一致后上调真正生效）也必须如实透出', async () => {
+    vi.useFakeTimers();
+    const fake = fakeTransport();
+    const transport = {
+      ...fake.transport,
+      reportMeasuredDuration: async () => ({
+        status: 200,
+        body: {
+          declaredDurationMs: 20_000,
+          measuredDurationMs: 30_000,
+          effectiveDurationMs: 30_000,
+          corrected: true,
+          direction: 'RAISED',
+          sampleCount: 2,
+        },
+      }),
+    };
+    const reporter = createListenReporter({ segmentId: 'seg-1', transport, periodMs: 60_000 });
+
+    reporter.observe({
+      coveredMs: 2_000,
+      playedMs: 2_000,
+      measuredDurationMs: 30_000,
+      declaredDurationMs: 20_000,
+    });
+    await vi.advanceTimersByTimeAsync(0);
+
+    // 白名单漏了 'RAISED' 的话，这里会变成 undefined —— 信息被静默丢掉
+    expect(reporter.state().durationReport?.direction).toBe('RAISED');
+    expect(reporter.state().durationReport?.effectiveDurationMs).toBe(30_000);
+    expect(reporter.state().durationReport?.corrected).toBe(true);
+    reporter.dispose();
+    vi.useRealTimers();
+  });
+
+  it('未知 direction 值不透出（白名单之外一律 null，不把服务端的未来字段当成已知语义）', async () => {
+    vi.useFakeTimers();
+    const fake = fakeTransport();
+    const transport = {
+      ...fake.transport,
+      reportMeasuredDuration: async () => ({
+        status: 200,
+        body: { effectiveDurationMs: 20_000, corrected: false, direction: 'SOMETHING_NEW' },
+      }),
+    };
+    const reporter = createListenReporter({ segmentId: 'seg-1', transport, periodMs: 60_000 });
+
+    reporter.observe({ coveredMs: 2_000, playedMs: 2_000, measuredDurationMs: 20_000 });
+    await vi.advanceTimersByTimeAsync(0);
+
+    expect(reporter.state().durationReport?.status).toBe('reported');
+    expect(reporter.state().durationReport?.direction).toBeUndefined();
+    reporter.dispose();
+    vi.useRealTimers();
+  });
+
+  it('上调方向（实测比声明长）→ 服务端只记录不生效：direction=PENDING_AGREEMENT 如实透出', async () => {
+    vi.useFakeTimers();
+    const fake = fakeTransport();
+    const transport = {
+      ...fake.transport,
+      reportMeasuredDuration: async () => ({
+        status: 200,
+        body: {
+          declaredDurationMs: 20_000,
+          measuredDurationMs: 30_000,
+          effectiveDurationMs: 20_000,
+          corrected: false,
+          direction: 'PENDING_AGREEMENT',
+          sampleCount: 1,
+        },
+      }),
+    };
+    const reporter = createListenReporter({ segmentId: 'seg-1', transport, periodMs: 60_000 });
+
+    reporter.observe({
+      coveredMs: 2_000,
+      playedMs: 2_000,
+      measuredDurationMs: 30_000,
+      declaredDurationMs: 20_000,
+    });
+    await vi.advanceTimersByTimeAsync(0);
+
+    expect(reporter.state().durationReport?.direction).toBe('PENDING_AGREEMENT');
+    expect(reporter.state().durationReport?.corrected).toBe(false);
+    reporter.dispose();
+    vi.useRealTimers();
+  });
+
+  it('一次性：反复 observe（值相同或不同）也只报一次', async () => {
+    vi.useFakeTimers();
+    const { reporter, fake } = setup({ periodMs: 60_000 });
+
+    reporter.observe({ ...play, measuredDurationMs: 2_000 });
+    await vi.advanceTimersByTimeAsync(0);
+    reporter.observe({ ...play, measuredDurationMs: 2_100 });
+    reporter.observe({ ...play, measuredDurationMs: 1_900 });
+    await vi.advanceTimersByTimeAsync(5_000);
+
+    expect(fake.calls.filter((call) => call.kind === 'duration')).toHaveLength(1);
+    reporter.dispose();
+    vi.useRealTimers();
+  });
+
+  it.each([
+    ['NaN', Number.NaN],
+    ['Infinity', Number.POSITIVE_INFINITY],
+    ['0', 0],
+    ['负数', -1],
+    ['过短（499ms）', 499],
+    ['过长（超过 5 分钟）', 300_001],
+    ['比声明值离谱（20s 声明 → 200s）', 200_000],
+  ])('异常值 fail-closed：%s → 一个请求都不发', async (_label, measured) => {
+    vi.useFakeTimers();
+    const { reporter, fake } = setup({ periodMs: 60_000 });
+
+    reporter.observe({ ...play, measuredDurationMs: measured });
+    await vi.advanceTimersByTimeAsync(0);
+
+    expect(fake.calls.filter((call) => call.kind === 'duration')).toHaveLength(0);
+    expect(reporter.state().durationReport?.status).toBe('skipped');
+    // 且**不污染分母**：覆盖率那一路照常，duration 字段不参与任何判定
+    expect(reporter.state().serverRatio).toBeNull();
+    reporter.dispose();
+    vi.useRealTimers();
+  });
+
+  it('没有真实播放过（playedMs=0）就不报：实测值必须来自真实播放，不是元数据自报', async () => {
+    vi.useFakeTimers();
+    const { reporter, fake } = setup({ periodMs: 60_000 });
+
+    reporter.observe({ coveredMs: 0, playedMs: 0, measuredDurationMs: 2_000 });
+    await vi.advanceTimersByTimeAsync(0);
+
+    expect(fake.calls.filter((call) => call.kind === 'duration')).toHaveLength(0);
+    reporter.dispose();
+    vi.useRealTimers();
+  });
+
+  it('duration 缺失（还没 loadedmetadata）→ 不上报；随后有了再报（不是永久放弃）', async () => {
+    vi.useFakeTimers();
+    const { reporter, fake } = setup({ periodMs: 60_000 });
+
+    reporter.observe({ ...play, measuredDurationMs: null });
+    await vi.advanceTimersByTimeAsync(0);
+    expect(fake.calls.filter((call) => call.kind === 'duration')).toHaveLength(0);
+
+    reporter.observe({ ...play, measuredDurationMs: 2_000 });
+    await vi.advanceTimersByTimeAsync(0);
+    expect(fake.calls.filter((call) => call.kind === 'duration')).toHaveLength(1);
+    reporter.dispose();
+    vi.useRealTimers();
+  });
+
+  it('与服务端约定一致：15s 段实测 15s 也照报（没改正也照样是一次有效测量）', async () => {
+    vi.useFakeTimers();
+    const { reporter, fake } = setup({ periodMs: 60_000 });
+
+    reporter.observe({ ...play, measuredDurationMs: 20_000 });
+    await vi.advanceTimersByTimeAsync(0);
+
+    expect(fake.calls.filter((call) => call.kind === 'duration')).toHaveLength(1);
+    reporter.dispose();
+    vi.useRealTimers();
+  });
+
+  it('时长上报失败不影响覆盖上报（互不遮蔽）', async () => {
+    vi.useFakeTimers();
+    const fake = fakeTransport();
+    const calls = fake.calls;
+    const transport = {
+      ...fake.transport,
+      reportMeasuredDuration: async () => {
+        throw new Error('duration endpoint down');
+      },
+    };
+    const reporter = createListenReporter({ segmentId: 'seg-1', transport, periodMs: 1_000 });
+
+    reporter.observe({ coveredMs: 1_000, playedMs: 1_000, measuredDurationMs: 2_000 });
+    await vi.advanceTimersByTimeAsync(1_000);
+    reporter.observe({ coveredMs: 2_000, playedMs: 2_000, measuredDurationMs: 2_000 });
+    await vi.advanceTimersByTimeAsync(1_000);
+
+    // 覆盖上报照常继续（周期性的那两个请求在）
+    expect(calls.filter((call) => call.kind === 'listen').length).toBeGreaterThanOrEqual(2);
+    // 时长上报如实记为失败，且不再重试（一次性）
+    expect(reporter.state().durationReport?.status).toBe('failed');
+    expect(reporter.state().durationReport?.message).toContain('duration endpoint down');
+    // **互不遮蔽**：时长通道的失败不占用覆盖率通道的 lastError（覆盖率成功了就该是 null）
+    expect(reporter.state().lastError).toBeNull();
+    // 时长这一点只发过一次（失败也不重试）
+    expect(reporter.state().durationReport?.measuredDurationMs).toBe(2_000);
+    reporter.dispose();
+    vi.useRealTimers();
+  });
+
+  it('传输层没提供时长能力时（旧传输层）→ 状态为 unavailable，不影响其它功能', async () => {
+    vi.useFakeTimers();
+    const transport = {
+      reportListen: async () => ({
+        status: 200,
+        body: { coveredMs: 1_000, durationMs: 20_000, ratio: 0.05, threshold: 0.8 },
+      }),
+      castVote: async () => ({ status: 200, body: { segmentCut: false } }),
+    };
+    const reporter = createListenReporter({ segmentId: 'seg-1', transport, periodMs: 60_000 });
+
+    reporter.observe({ coveredMs: 1_000, playedMs: 1_000, measuredDurationMs: 2_000 });
+    await vi.advanceTimersByTimeAsync(0);
+
+    expect(reporter.state().durationReport?.status).toBe('unavailable');
     reporter.dispose();
     vi.useRealTimers();
   });

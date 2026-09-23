@@ -27,6 +27,8 @@ export interface AudioElementLike {
   src: string;
   currentTime: number;
   paused: boolean;
+  /** 解码后的真实时长（秒）；流式容器在 metadata 就绪前可能是 NaN/Infinity。 */
+  duration?: number;
   play: () => Promise<void> | void;
   pause: () => void;
   load?: () => void;
@@ -39,6 +41,13 @@ export interface PlayerProgressSnapshot {
   coveredMs: number;
   playedMs: number;
   dislikeUnlocked: boolean;
+  /**
+   * 浏览器**解码出来的真实时长**（ms）；不可信（NaN/Infinity/≤0）时为 null（fail-closed）。
+   *
+   * 用途（t28 / F2）：点踩门槛的分母是上传者自报的时长，真实 2s 却声明 30s 的段对诚实听众
+   * 永久够不到 80%。这个值就是"播放时实测"的分母来源，**不参与**覆盖率判定。
+   */
+  measuredDurationMs: number | null;
 }
 
 export interface UseSegmentPlayerOptions {
@@ -59,6 +68,8 @@ export interface UseSegmentPlayerResult {
   ratio: number;
   coveredMs: number;
   playedMs: number;
+  /** 真实解码时长（ms）；不可信时 null。 */
+  measuredDurationMs: number | null;
   dislike: DislikeAvailability;
   toggle: () => void;
   seekTo: (positionMs: number) => void;
@@ -72,6 +83,7 @@ interface ProgressView {
   playedMs: number;
   ratio: number;
   dislikeUnlocked: boolean;
+  measuredDurationMs: number | null;
 }
 
 const EMPTY_PROGRESS: ProgressView = {
@@ -81,11 +93,19 @@ const EMPTY_PROGRESS: ProgressView = {
   playedMs: 0,
   ratio: 0,
   dislikeUnlocked: false,
+  measuredDurationMs: null,
 };
 
 interface ProgressState extends ProgressView {
   /** 这份进度属于哪一段（src + 服务端时长）；不匹配即视为"还没开始听"。 */
   key: string;
+}
+
+/** 元素上报的时长（秒）→ 可用的毫秒数；不可信一律 null（fail-closed）。 */
+function readMeasuredDurationMs(seconds: number | undefined): number | null {
+  if (typeof seconds !== 'number' || !Number.isFinite(seconds) || seconds <= 0) return null;
+  const ms = Math.round(seconds * 1000);
+  return Number.isFinite(ms) && ms > 0 ? ms : null;
 }
 
 function createAudioElement(src: string): AudioElementLike {
@@ -130,6 +150,7 @@ export function useSegmentPlayer(options: UseSegmentPlayerOptions): UseSegmentPl
       playedMs: progress.playedMs,
       ratio: progress.ratio,
       dislikeUnlocked: progress.dislikeUnlocked,
+      measuredDurationMs: readMeasuredDurationMs(element?.duration),
       // 注意：不在这里展示 ratio=NaN 之类的中间态，ListenTracker 已保证 0..1
     });
     onProgressRef.current?.({
@@ -137,6 +158,7 @@ export function useSegmentPlayer(options: UseSegmentPlayerOptions): UseSegmentPl
       coveredMs: progress.coveredMs,
       playedMs: progress.playedMs,
       dislikeUnlocked: progress.dislikeUnlocked,
+      measuredDurationMs: readMeasuredDurationMs(element?.duration),
     });
   }, [key]);
 
@@ -162,11 +184,17 @@ export function useSegmentPlayer(options: UseSegmentPlayerOptions): UseSegmentPl
       publish();
     };
 
+    // 真实时长来自解码器：metadata 就绪 / 时长变化时都要重新读（t28）
+    const onDurationChange = (): void => {
+      publish();
+    };
     element.addEventListener('timeupdate', onTimeUpdate);
     element.addEventListener('seeking', onSeeking);
     element.addEventListener('ended', onEnded);
     element.addEventListener('play', onPlayStateChange);
     element.addEventListener('pause', onPlayStateChange);
+    element.addEventListener('loadedmetadata', onDurationChange);
+    element.addEventListener('durationchange', onDurationChange);
 
     return () => {
       element.removeEventListener('timeupdate', onTimeUpdate);
@@ -174,6 +202,8 @@ export function useSegmentPlayer(options: UseSegmentPlayerOptions): UseSegmentPl
       element.removeEventListener('ended', onEnded);
       element.removeEventListener('play', onPlayStateChange);
       element.removeEventListener('pause', onPlayStateChange);
+      element.removeEventListener('loadedmetadata', onDurationChange);
+      element.removeEventListener('durationchange', onDurationChange);
       element.pause();
       elementRef.current = null;
       trackerRef.current = null;
@@ -225,6 +255,7 @@ export function useSegmentPlayer(options: UseSegmentPlayerOptions): UseSegmentPl
     ratio: snapshot.ratio,
     coveredMs: snapshot.coveredMs,
     playedMs: snapshot.playedMs,
+    measuredDurationMs: snapshot.measuredDurationMs,
     dislike,
     toggle,
     seekTo,

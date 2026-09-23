@@ -2625,3 +2625,41 @@ Demo 前考虑**重建开发库**到干净基线（migrate + seed + 3 首真曲�
 
 ### 56.4 反向控制（必须跑，不可省）
 注入 2000px 高元素后：1440 的一屏断言**必须红**，375 的锚元素断言**也必须能红**。否则二者都属于"永远点头"的守卫 —— 与 `listenProgress` 那两条"绿距离失败只差一轮循环"的守卫同类。
+
+---
+
+## 57. t28（F2 前端）交付 + 「过期断言 vs 在途噪声」的实战判别
+
+### 57.1 t28 域内交付（播放实测时长采集与一次性上报）
+- `use-segment-player.ts`：`loadedmetadata` / `durationchange` 读 `HTMLMediaElement.duration` → ms（`NaN` / `Infinity` / `≤0` → `null`，**fail-closed**）；
+- `segment-player.tsx`：`SegmentListenSnapshot` 增 `measuredDurationMs` + `declaredDurationMs` ⇒ **页面零改动**即可上报（已确认域外无人引用该类型）；
+- `listen-reporter.ts`：`checkMeasuredDuration`（fail-closed band）+ **一次性**独立端点上报（必须 `playedMs > 0`；失败**不重试**）；独立状态 `state.durationReport`；
+- `use-segment-listen.ts`：`POST /api/segments/:id/duration`，body 仅 `{ measuredDurationMs, coveredMsAtReportMs }`；
+- `docs/audio.md` §9：契约 + 前端保证 + 诚实边界 + **联调待办** + §9.5 协商记录。
+- 退出码：`features/audio` **16 文件 / 211 例 exit 0**（t21 的 183 例无回归 + 新 28 例）；`pnpm -r typecheck` **exit 0**；域内 eslint / prettier **exit 0**。
+
+### 57.2 ⭐ 包级 verify 红的归属：**真过期断言**，不是"在途噪声"（判别方法）
+- 红点：`src/pages/__tests__/sea-detail-page.test.tsx > 公海作品页 > 展示作品信息、段位链与成品试听区`。
+- 根因：frontend-flow 在**未提交**的 `pages/sea-detail-page.tsx` 里把 `<MixExportPanel>` 移进 `<Modal open={mixOpen}>`，而**测试文件没有对应的未提交改动** ⇒ 测试停在旧交互。旁证：`git diff HEAD` 只见页面新增 `mixOpen` / `Modal`。
+- **判别方法（把 §52.3 / §54.4 的纪律操作化）**：同一命令三个时刻红点**游走**（12:37 → 3 文件/4 例；12:45 → `bottle-page`/3 例；12:49 → `sea-detail`/1 例）；关键是 **12:49 那次是在写者 mtime 静默 3.5 分钟之后测的** ⇒ 排除"拍到写一半"，判定为**真过期断言**。
+  ⇒ 成文判据：**静默窗口内红 → 先疑在途（复跑）；静默窗口后仍红 → 真问题（必须归因到代码）**。
+
+### 57.3 t28 状态处置
+- audio-engineer 按「verify 红 ⇒ 不得 completed」如实置 **failed**（不虚报），域内交付不受影响；
+- 唯一红是 frontend-flow 的**过期断言**（测试未随交互改动同步）⇒ finding 转 frontend-flow（修法：先点「混音导出计划」再断言 `findByText(/成品（阶段一 · 纯人声）/)`）；
+- 修完在写者静默窗口复跑 ⇒ 应 exit 0，届时 **t28 无需再改一行代码**即可转 completed。
+
+### 57.4 F2 接口冻结（t26 ↔ t28，已落 `docs/audio.md` §9.2 / §9.5）
+- `coveredMsAtReportMs` **必填**；新增 `direction: LOWER | NONE | PENDING_AGREEMENT`；
+- **下调立即生效** ⇒ F2 的诚实场景**一个听众即可修好**；**上调只记录、需 ≥2 用户一致**；
+- `effectiveDurationMs` 下限 = `max(500ms, 该段已记录最大 coveredMs)`；
+- 前端 fail-closed band 由**服务端镜像**。
+
+### 57.5 威胁模型（architect 定，audio-engineer 原样转达 —— 避免二层转述失真）
+- `measuredDurationMs` 与 `coveredMs` 一样**来自客户端** ⇒ **只修诚实路径，不是安全边界**；
+- ① 谎报**更小** duration ⇒ 分母 0.8× 变小 ⇒ **被踩那段**的门槛变低 ⇒ 所有人更容易踩它 —— **真实滥用路径，影响别人**；
+- ② 谎报**更大** duration ⇒ 对作者有利（更难被斩）—— 另一条自保路径；
+- 分层防护：先有 `listen_progress` 行 + `coveredMsAtReportMs` 与库内一致；下调立即生效 / 上调需多用户一致；落库**审计**（谁 / 何时 / 报多少 / 是否生效）；跨用户取**中位数**（非均值，抗单点离群）。
+
+### 57.6 后端现状（不粉饰）
+**t26 尚未实现** ⇒ 本轮证据止于前端单测 + 真 `fetch` mock 的**请求形状**断言，**不声称"F2 已修好"**；`docs/audio.md` §9.4 标题即「联调待办（未伪造通过）」。

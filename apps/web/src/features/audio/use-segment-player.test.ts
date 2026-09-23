@@ -231,6 +231,79 @@ describe('useSegmentPlayer：已播放时长与覆盖率', () => {
   });
 });
 
+describe('useSegmentPlayer：实测真实时长（t28 / F2 的分母来源）', () => {
+  /*
+   * 分母（段时长）是上传者自报的 ⇒ 诚实用户可能永久够不到 80%。
+   * 这里取的是**浏览器解码出来的真实时长**（`HTMLMediaElement.duration`），
+   * 只用于"播放时实测上报"，**不参与**覆盖率判定（覆盖率仍以服务端给的 durationMs 为分母）。
+   */
+  it('metadata 就绪后读出真实解码时长（秒 → 毫秒）', () => {
+    const { element, view } = setup();
+
+    act(() => {
+      element.duration = 2; // 真实只有 2 秒（上传者却声明 20s）
+      element.emit('loadedmetadata');
+    });
+
+    expect(view.result.current.measuredDurationMs).toBe(2_000);
+  });
+
+  it('durationchange（流式容器后到）也会更新实测值', () => {
+    const { element, view } = setup();
+
+    act(() => {
+      element.duration = 19.98;
+      element.emit('durationchange');
+    });
+
+    expect(view.result.current.measuredDurationMs).toBe(19_980);
+  });
+
+  it.each([
+    ['NaN', Number.NaN],
+    ['Infinity', Number.POSITIVE_INFINITY],
+    ['0', 0],
+    ['负数', -3],
+  ])('异常 duration（%s）→ 实测值为 null（fail-closed，绝不产生可疑分母）', (_label, value) => {
+    const { element, view } = setup();
+
+    act(() => {
+      element.duration = value as number;
+      element.emit('durationchange');
+    });
+
+    expect(view.result.current.measuredDurationMs).toBeNull();
+  });
+
+  it('实测时长随 onProgress 一起透出（消费者不需要自己读元素）', () => {
+    const onProgress = vi.fn();
+    const { element } = setup({ onProgress });
+
+    act(() => {
+      element.duration = 2;
+      element.emit('loadedmetadata');
+      element.playThrough(0, 1);
+    });
+
+    const last = onProgress.mock.calls.at(-1)?.[0] as { measuredDurationMs: number | null };
+    expect(last.measuredDurationMs).toBe(2_000);
+  });
+
+  it('实测时长**不参与**覆盖率判定：分母仍是服务端给的 durationMs', () => {
+    const { element, view } = setup({ durationMs: 20_000 });
+
+    act(() => {
+      element.duration = 2; // 真实 2s
+      element.emit('loadedmetadata');
+      element.playThrough(0, 2); // 把真实音频听完了
+    });
+
+    // 覆盖率按"已覆盖 / 服务端时长"算 ⇒ 2s/20s = 10%（这正是 F2 的症状本身）
+    expect(view.result.current.ratio).toBeCloseTo(0.1, 3);
+    expect(view.result.current.measuredDurationMs).toBe(2_000);
+  });
+});
+
 describe('useSegmentPlayer：点踩门槛（79.9% / 80%）', () => {
   it('听到 79.9% 不可点踩，并给"还差多少"的文案', () => {
     const { element, view } = setup({ durationMs: 10_000 });

@@ -24,6 +24,7 @@ import {
   type ListenReporter,
   type ListenReporterState,
   type ListenReportTransport,
+  type MeasuredDurationSnapshot,
   type ReportOutcome,
   type VoteOutcome,
 } from './listen-reporter';
@@ -42,8 +43,8 @@ export interface UseSegmentListenOptions {
 }
 
 export interface UseSegmentListenResult {
-  /** 直接接 `<SegmentPlayer onProgress={...}>`：把播放进度交给上报器（按周期上报）。 */
-  observe: (snapshot: { coveredMs: number }) => void;
+  /** 直接接 `<SegmentPlayer onProgress={...}>`：把播放进度交给上报器（按周期上报 + 一次性上报实测时长）。 */
+  observe: (snapshot: MeasuredDurationSnapshot) => void;
   /** 直接接 `<SegmentPlayer onCastDislike={...}>`：先 flush 最新覆盖，再投票。 */
   castDislike: () => void;
   /** 立刻上报一次（切换段、页面隐藏、或投票前手动调用）。 */
@@ -61,6 +62,7 @@ const EMPTY_STATE: ListenReporterState = {
   lastError: null,
   thresholdNotReached: false,
   reporting: false,
+  durationReport: null,
 };
 
 interface Session {
@@ -77,6 +79,26 @@ export function fetchListenTransport(): ListenReportTransport {
         credentials: 'same-origin',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ coveredMs }),
+      });
+      return {
+        status: response.status,
+        body: (await response.json().catch(() => null)) as unknown,
+      };
+    },
+    /**
+     * `POST /api/segments/:id/duration`（t28 / F2，**已与 architect 提案的形状**）：
+     * body 只带客户端才知道的两件事 —— 实测时长、上报时的已覆盖量；
+     * **声明时长由服务端自己从段行读**（不采信客户端转述）。
+     */
+    reportMeasuredDuration: async (segmentId, measuredDurationMs, context) => {
+      const response = await fetch(`/api/segments/${segmentId}/duration`, {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          measuredDurationMs,
+          coveredMsAtReportMs: context.coveredMsAtReportMs,
+        }),
       });
       return {
         status: response.status,
@@ -143,7 +165,7 @@ export function useSegmentListen(options: UseSegmentListenOptions): UseSegmentLi
     };
   }, [key, periodMs, segmentId]);
 
-  const observe = useCallback((input: { coveredMs: number }): void => {
+  const observe = useCallback((input: MeasuredDurationSnapshot): void => {
     sessionRef.current?.reporter.observe(input);
   }, []);
 

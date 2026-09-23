@@ -29,6 +29,13 @@ export interface SegmentListenSnapshot {
   playedMs: number;
   /** 是否已达点踩门槛（门槛取内核 `DEFAULT_POLICY.dislikeListenRatioThreshold`）。 */
   dislikeUnlocked: boolean;
+  /**
+   * 浏览器**解码出来的真实时长**（ms）；不可信时 null（t28 / F2）。
+   * 用途：上报给服务端校正点踩门槛的**分母**（上传者自报的时长可能远大于真实值）。
+   */
+  measuredDurationMs: number | null;
+  /** 段行**声明**时长（ms）——随快照一起给，便于服务端/客户端做宽窄带判断；缺失为 null。 */
+  declaredDurationMs: number | null;
 }
 
 export interface SegmentPlayerProps {
@@ -88,6 +95,8 @@ export function SegmentPlayer({
         coveredMs: progress.coveredMs,
         playedMs: progress.playedMs,
         dislikeUnlocked: progress.dislikeUnlocked,
+        measuredDurationMs: progress.measuredDurationMs,
+        declaredDurationMs: typeof durationMs === 'number' && durationMs > 0 ? durationMs : null,
       });
     },
     ...(createElement === undefined ? {} : { createElement }),
