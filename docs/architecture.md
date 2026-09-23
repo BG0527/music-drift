@@ -2832,3 +2832,35 @@ frontend-flow 把 `one-screen-check.mjs` 改为 hermetic 后**立刻**发现：*
 
 ### 63.4 当前绿基线（captain 亲测）
 `pnpm -r test` → **exit 0**：shared 21/231 · api 19/179 · web 54/479 = **94 文件 889 例**（含已转绿的 P0「发起者录第 1 段」）。这是本会话第一次达到"全仓全绿且含 P0 修复"的状态。
+
+---
+
+## 64. t31 的三个裁定 + 一次自报事故 + frontend-flow 会话中断的处置
+
+### 64.1 F1 裁定：**授权改写六条边界断言**（选 (1)）
+把 `audio/ingest.ts` 的 `presetDurationMs` 改必填，会改写 t7 `ingest.test.ts` 六条**区间边界**断言（`14_999/15_000/30_000/30_001` + `requireDuration`）：单一预设无法同时复现"下界 15000 + 上界 30000"（需 `P−2000=15000` **且** `P+2000=30000`，**无解**）⇒ 机械改不可能。
+⇒ **授权语义替换**，理由：那六条测的是**已被取代的旧规则**（15–30s 固定区间），规则变了检查必须跟上（§49.3 同一类）；矛盾证明说明它**不是机械改**。
+要求：① 保持覆盖（`P−2000−1` / `P−2000` / `P+2000` / `P+2000+1` 四种边界 + **无预设 → 拒绝**）；② 测试名能读出新规则；③ **不得只删断言**把红变绿。
+
+### 64.2 F2 裁定：**保持现状 + 文档化**（选 (c)）
+冲突：**seed 占位曲与库曲共用同一批固定 UUID**（`...0001/0002/0003` 同时在 `db/seed.ts::PLACEHOLDER_SONGS` 与 `library.json` 的 `songId`）⇒ 同一库里是同一批行（dev 那 3 行被库入库覆盖为真曲）。
+⇒ 裁定 **(c)**：现状**功能自洽**（dev = 真曲/CC BY/真预设；hermetic = 占位曲/20s），无功能性 bug；拆 id 空间会牵动 seed + 金路径 + 集成测试，属中等改动且引入新风险，与当前优先级不成比例。
+- architect 的迁移谓词**改用固定 UUID 是对的** ✓（原先按 `licensed_source='placeholder'` 命中 0 行，正是这个冲突导致的）；
+- **触发条件（必须回头拆 id 空间）**：当需要 seed 占位曲与库曲**在同一库共存**时（例如引入第 4 首真曲、或金路径改用真曲）。
+
+### 64.3 F3 事故（architect 自报，已修复）：根子在"为取证动了真实数据"
+- 事故经过：取证 0006 时在 **dev 库**删了那 3 首曲的 12 行 `song_segments` 模拟历史库；随后 `docker exec … psql -f /dev/stdin` **漏了 `-i`** ⇒ stdin 未接上、SQL **静默未执行**，12 行没补回（dev 库一度处于"无预设即拒绝录制"）；**已用 `library-cli` 完整恢复**并复查真实数字 ✓。
+- **captain 的定性**：根因**不是忘了 `-i`**，而是**为了取证去动真实数据**（场地选错）。
+- 新要求：**取证类操作一律先干跑 `SELECT` 或用临时库**；确需改动共享库时**先备份**（`pg_dump` 或 `create table … as select`）。
+- 认可：**主动自报事故**这件事对 —— 否则 dev 库会长期处于"无预设"而无人知。
+
+### 64.4 frontend-flow 会话中断（failed，无收尾信息）
+- 现象：其会话 `failed before it finished`、**无 closing message**；成员回到 idle/ready，而它手里的**视觉收尾无人推进**。
+- 其工作**全部落在工作区**（`design-system/*`、`features/api/*`、`pages/*`），**未丢**；但 **t12 状态没能回写**（任务 output 仍停在 08:42 的停机快照）。
+- 处置：captain 发**交接简报**（先读 `docs/handover/frontend-flow-vision-unfinished.md`）+ "已完成不要重做"清单 + 剩余优先级，并唤醒继续。
+⇒ 教训（本会话**第二次**成员会话中断）：**成员的未完成清单必须活在仓库里** —— 这次正是 `docs/handover/*` 救了场。
+
+### 64.5 t26 / t28 作废说明（终态不可改，故在此留痕）
+- **t26**（F2 后端 repair，failed）：用户第 4 条使 F2 整体作废 ⇒ 已按 §60.2 撤干净（−294 行、零残留、DB 表已 drop）⇒ **不需要 follow-up repair**。
+- **t28**（F2 前端，failed）：同上作废；其客户端时长校正代码由 **t30**（audio-engineer）删除（t30 的 inScope 含 `docs/audio.md`，覆盖系统提示的 "unaudited path"）。
+- 系统的 `Delivery: blocked` 会持续提示 "failed without a follow-up repair" —— 这是**语义不匹配**：它假设 failed 必然需要一个 repair，而这两条的"follow-up"是**作废与清理**，且已经发生。
