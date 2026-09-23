@@ -2385,3 +2385,29 @@ frontend-ds 原建议「等 frontend-flow 告一段落再动基准」；captain 
 ### 48.12 一处 captain 的指令缺陷（自我记录）
 frontend-ds 顺手把 `features/audio/recorder-panel.tsx` 的 `p-5`→`p-6` 收了口，但 `apps/web/src/features/audio/**` 是 **audio-engineer 在 t21 的 in-scope**（他正在该目录新建 `use-segment-listen.ts`）⇒ 存在并发写同一文件的可能。
 根因：**captain 批准"18 处收口"时只划了 `pages/**` 与 `features/bottle/**` 两块禁区，没有覆盖 `features/audio/`**。指令边界不全，不能算调用方违规。处置：告知 audio-engineer 保留该行；今后跨域一行改动**先报备再动**。
+
+---
+
+## 49. t21 完成（金路径恢复）+ 第二类判据问题：**规则变了、检查没跟**
+
+### 49.1 t21 结果（audio-engineer，captain 亲验路径）
+- `node apps/web/tools/golden-path-live-check.mjs` → **exit 0**，`28 步`（原 27 + 新增"点踩门槛证据"步）。关键行：`[27] 被斩段作者（含发起者）已从列表剔除（§46.1）· 主瓶不受影响 · 被斩瓶 status=DAMAGED`；`[28] 单次塞满→ratio 0.5 被拒 422(LISTEN_THRESHOLD_NOT_REACHED) · 10 个点踩者按 1× 实时周期上报各自听满（≈17s）→ 全部 200，第 10 票斩浪`。
+- 交付：`features/audio/listen-reporter.ts`（新）、`use-segment-listen.ts`（新）+ 各自测试、`features/audio/index.ts`（barrel 导出能力与用法）、`tools/golden-path-live-check.mjs`。
+- 实现要点：`onProgress` 内核覆盖率 → 每 1000ms 一次 `POST /listen`，上报值 = **本地真实观测**（单测钉住"绝不虚报"）；点踩前必先 `flush()`。与限速配合：首报封顶 `duration×0.5`，之后 `距上次真实耗时×1.25+3000ms`；1× 实时上报天然在夹子之下。**未加自动重试**（diff 里唯一"重试"字样是注释）；第 19 步历史间歇本次未复现。
+
+### 49.2 ⚠️ 交叉依赖警告（必须跟进的验证）
+t21 的第 27 步断言依据的是**工作区里 backend-core 正在写的 t22 实现**（`store/bottles.ts:477`「刻意不再有发起者豁免」、`store/bottles.integration.test.ts:200`）。
+⇒ **t21 的"绿"是建立在 t22 未完成的在飞代码上的。** t22 完成后**必须重跑金路径**确认仍然 exit 0；若 t22 调整了实现细节，"金路径绿"随时可能失效。这类"一个任务的验收引用了另一个未完成任务的在飞实现"是**验证污染**，不能当成稳定基线。
+
+### 49.3 第二类判据问题：**规则/契约变更后，检查与调用方没跟着改**（本会话第 3 例）
+统一命名：与 §48.8 的「**同源判据错误**」不同 —— 那类是*让错误在自己的判据体系里被认证为正确*；本类是**上游规则改了，下游检查/调用方没改**，于是检查变成了**过期的谎言**（它仍在认真守护一条已经不存在的规则）。
+1. 金路径脚本仍传 `listenedRatio`（t20 已把判定源改为持久化覆盖率）→ 第 27 步 10 个点踩者全 422；
+2. 金路径第 27 步的 4 条断言仍断言「斩浪后仍算参与过」（§46.1 已反转该规则）；
+3. `myBottles.integration.test.ts:225` 断言同样过期（backend-core 在 t22 反转）。
+**防御**：
+- 改规则的变更清单里，**「反转过期检查」是变更的一部分，不是额外工作** —— 不反转就等于仓库里同时存在两份矛盾规则（§42.3 的"第二份规则必然与第一份漂移"）；
+- 改规则时必须 grep 全仓旧语义的**调用方与断言**（不只改实现）；
+- **反转断言时加反向对照**：audio-engineer 在反转第 27 步时补了「同一用户其它参与作品必须仍在」，防止"列表变空"也能通过 —— 这是把"反转"做成**有判别力**的检查，而不是把断言反过来就完事。
+
+### 49.4 待办（路由给 frontend-flow）
+前端仍有 3 处传 `listenedRatio`：`features/api/mutations.ts:155`（**类型仍是必填 = 根因**）、`pages/bottle-page.tsx:185,191`、`pages/sea-detail-page.tsx:141`。服务端已忽略该字段（功能不受影响），但"前端路径干净"还差这几行：删字段 + 接 `useSegmentListen({segmentId})`（能力已从 `features/audio` barrel 导出，带用法注释）。

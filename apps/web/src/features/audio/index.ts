@@ -12,6 +12,10 @@
  * <RecorderPanel segmentIndex={nextRecordIndex} totalSegments={song.totalSegments}
  *                onRecorded={async (rec) => { const r = await uploadSegmentAudio({bottleId, ...rec}); ... }} />
  *
+ * // 收听覆盖上报 + 点踩（t21/t20：服务端按持久化覆盖率判门槛，**不要**再传 listenedRatio）
+ * const listen = useSegmentListen({ segmentId: segment.id, onVoteOutcome: (o) => { ... } });
+ * <SegmentPlayer onProgress={listen.observe} onCastDislike={listen.castDislike} ... />
+ *
  * // 伴奏（曲库）：只播当前段 + 响度归一；署名块挂到「设置 / 关于」页
  * <AccompanimentPlayer track={track} segmentIndex={nextRecordIndex} />
  * <LibraryAttribution tracks={library.tracks} />
@@ -97,6 +101,21 @@ export {
   type AccompanimentEnvironment,
   type UseAccompanimentResult,
 } from './use-accompaniment';
+
+export {
+  useSegmentListen,
+  fetchListenTransport,
+  type UseSegmentListenOptions,
+  type UseSegmentListenResult,
+} from './use-segment-listen';
+export {
+  createListenReporter,
+  type ListenReporter,
+  type ListenReporterState,
+  type ListenReportTransport,
+  type ReportOutcome,
+  type VoteOutcome,
+} from './listen-reporter';
 
 export { formatClock, formatSeconds } from './format';
 export { downsampleLevels, normalizeLevels, peakLevel } from './waveform';

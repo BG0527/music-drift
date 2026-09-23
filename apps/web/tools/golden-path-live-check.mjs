@@ -187,6 +187,53 @@ async function recordSegment(session, bottleId, durationMs, note) {
 }
 
 /**
+ * 按**真实播放节奏**周期性上报收听覆盖，直到服务端确认达到点踩门槛。
+ *
+ * 这条序列与浏览器端完全一致：`SegmentPlayer.onProgress`（内核 `ListenTracker` 的覆盖率）
+ * → `useSegmentListen` 每 `periodMs` 一次 `POST /api/segments/:id/listen {coveredMs}`。
+ *
+ * 为什么不能"投票前一次性塞满"（本检查的负向对照会实测这一点）：
+ * 服务端 `nextCoveredMs` 的规则是「首报最多给段长一半；之后每次最多增长
+ * `距上次真实耗时 × 1.25 + 3s`」，所以单次塞满最多拿到 50%（< 80% 门槛）。
+ * 想跨过门槛，客户端的覆盖率必须**随真实时间增长** —— 也就是真的在播。
+ *
+ * 实现纪律：
+ * - 上报值 = 已过去的真实时间（1× 速率，不虚报）；
+ * - **不重试**：任何一次上报不是 200 就立即失败并把原始响应体抛出来（重试会掩盖真 5xx）；
+ * - 超时（`maxMs`）仍未达门槛 → 直接失败并打印最后一次响应体，不做"再等一会"的模糊处理。
+ */
+async function listenUntilThreshold(session, segmentId, options = {}) {
+  const durationMs = options.durationMs ?? 20_000;
+  const threshold = options.threshold ?? 0.8;
+  const periodMs = options.periodMs ?? 1_000;
+  const maxMs = options.maxMs ?? 30_000;
+  const startedAt = Date.now();
+  let last = null;
+
+  for (;;) {
+    await new Promise((resolve) => setTimeout(resolve, periodMs));
+    const elapsedMs = Date.now() - startedAt;
+    const coveredMs = Math.min(elapsedMs, durationMs);
+    last = await call(session, 'POST', `/api/segments/${segmentId}/listen`, {
+      json: { coveredMs },
+    });
+    must(
+      last.status === 200,
+      `上报收听覆盖应为 200，实际 ${last.status}（响应 ${JSON.stringify(last.body)}）`,
+    );
+    const ratio = typeof last.body?.ratio === 'number' ? last.body.ratio : 0;
+    if (ratio >= threshold) {
+      return { ratio, coveredMs: last.body?.coveredMs ?? coveredMs, elapsedMs };
+    }
+    if (elapsedMs > maxMs) {
+      throw new Error(
+        `上报 ${String(maxMs)}ms 后仍未达门槛（最后一次响应 = ${JSON.stringify(last.body)}）`,
+      );
+    }
+  }
+}
+
+/**
  * 反复打捞直到拿到目标瓶子。
  *
  * hermetic 模式下河道里只有本次运行造的瓶子，一次就能捞到；
@@ -639,9 +686,11 @@ const runChecks = async () => {
 
   // ── 第 27 步：我的漂流日志 `GET /api/me/bottles`（CONTEXT §11.1，P0）──────
   //
-  // 这条端点最容易写错的两处，这里都钉住：
+  // 这条端点最容易写错的三处，这里都钉住：
   // ① 判据是"我参与过"（我发起 或 我唱过），而不是"我现在还持有/还唱得动"；
-  // ② 段被**斩浪**（软删）之后**仍然算参与过**，只是 `mySegmentIndexes` 变空 —— 所以本步真的造一次斩浪。
+  // ② **§46.1（用户裁决）**：被斩段作者 —— **含发起者** —— 不再算参与过（旧规则有"发起者豁免"，已整条删除）；
+  // ③ 剔除必须是**定向**的：同一用户的其它参与作品不受影响（否则"整个列表变空"也会假装通过）。
+  // 所以本步真的造一次斩浪，并同时断言"该瓶消失 + 主瓶还在"。
   const ownList = await call(A.session, 'GET', '/api/me/bottles');
   must(ownList.status === 200, `我的漂流日志应为 200，实际 ${ownList.status}`);
   const ownItem = ownList.body?.items?.find((item) => item.id === bottleId);
@@ -673,13 +722,46 @@ const runChecks = async () => {
   const doomedSegment = await recordSegment(A.session, doomedId, 20_000, '等着被斩的一段');
   const doomedSegmentId = doomedSegment.body?.segmentId;
   await call(A.session, 'POST', `/api/bottles/${doomedId}/resolution`, { json: { resolution: 'RIVER' } });
-  let cutTriggered = false;
+  // 负向对照（先做）：单次"塞满"拿不到门槛 —— 证明限速真的在起作用，而不是我们的客户端在放水
+  const cheater = await register('cz');
+  const oneShot = await call(cheater.session, 'POST', `/api/segments/${doomedSegmentId}/listen`, {
+    json: { coveredMs: 20_000 },
+  });
+  must(oneShot.status === 200, `上报本身应为 200，实际 ${oneShot.status}`);
+  must(
+    (oneShot.body?.ratio ?? 1) < 0.8,
+    `单次塞满不应达到门槛（首报只给一半），实际 ratio=${String(oneShot.body?.ratio)}`,
+  );
+  const cheated = await call(cheater.session, 'POST', `/api/segments/${doomedSegmentId}/votes`, {
+    json: { value: 'DISLIKE' },
+  });
+  must(cheated.status === 422, `没听满就点踩应为 422，实际 ${cheated.status}`);
+  must(
+    cheated.body?.error?.violations?.[0]?.code === 'LISTEN_THRESHOLD_NOT_REACHED',
+    `应按"未达门槛"拒绝，实际错误码 ${String(cheated.body?.error?.violations?.[0]?.code)}`,
+  );
+
+  // 10 个点踩者：各自**真的听满**（1× 实时速率周期上报）之后才投票 —— 并发进行，本步总耗时 ≈ 一个段长
+  const voters = [];
   for (let index = 0; index < 10; index += 1) {
-    const voter = await register('kv');
+    voters.push(await register('kv'));
+  }
+  const listened = await Promise.all(
+    voters.map((voter) =>
+      listenUntilThreshold(voter.session, doomedSegmentId, { durationMs: 20_000, threshold: 0.8 }),
+    ),
+  );
+  must(
+    listened.every((entry) => entry.ratio >= 0.8),
+    `每个点踩者都应在服务端确认达门槛（实际最小 ratio=${String(Math.min(...listened.map((e) => e.ratio)))}）`,
+  );
+
+  let cutTriggered = false;
+  for (const voter of voters) {
     const vote = await call(voter.session, 'POST', `/api/segments/${doomedSegmentId}/votes`, {
-      json: { value: 'DISLIKE', listenedRatio: 0.9 },
+      json: { value: 'DISLIKE' },
     });
-    must(vote.status === 200, `点踩应为 200，实际 ${vote.status}`);
+    must(vote.status === 200, `点踩应为 200，实际 ${vote.status}（响应 ${JSON.stringify(vote.body)}）`);
     cutTriggered = vote.body?.segmentCut === true;
   }
   must(cutTriggered, '第 10 个点踩应触发斩浪（阈值 10）');
@@ -687,18 +769,38 @@ const runChecks = async () => {
   const afterCut = await call(A.session, 'GET', '/api/me/bottles');
   const cutItem = afterCut.body?.items?.find((item) => item.id === doomedId);
   must(
-    cutItem !== undefined,
-    '段被斩浪之后**仍然**要算"参与过"（ADR-015 §16.7），不能从漂流日志里消失',
+    cutItem === undefined,
+    `被斩段作者（含发起者）不应再算参与过（§46.1），实际仍列出：${JSON.stringify(cutItem)}`,
   );
-  must(cutItem?.role === 'INITIATOR', `斩浪后角色应仍是 INITIATOR，实际 ${cutItem?.role}`);
+  // 反向对照：同一用户的**其它**参与作品必须还在 —— 没有这条，"列表整个变空"也会假装通过
+  const mainStillListed = afterCut.body?.items?.find((item) => item.id === bottleId);
   must(
-    JSON.stringify(cutItem?.mySegmentIndexes) === JSON.stringify([]),
-    `斩浪后 mySegmentIndexes 应为 []（段已软删），实际 ${JSON.stringify(cutItem?.mySegmentIndexes)}`,
+    mainStillListed !== undefined,
+    '同一用户的其它参与作品不应受影响（否则剔除就不是"定向"的）',
   );
-  must(cutItem?.status === 'DAMAGED', `锚被斩后瓶子应为 DAMAGED，实际 ${cutItem?.status}`);
+  must(
+    mainStillListed?.role === 'INITIATOR',
+    `主瓶子角色应仍是 INITIATOR，实际 ${mainStillListed?.role}`,
+  );
+  // 斩浪本身的效果换个端点观测（发起者仍可读详情）：状态与有效段
+  const doomedDetail = await call(A.session, 'GET', `/api/bottles/${doomedId}`);
+  must(doomedDetail.status === 200, `瓶子详情应为 200（发起者仍可读），实际 ${doomedDetail.status}`);
+  must(
+    doomedDetail.body?.status === 'DAMAGED',
+    `锚被斩后瓶子应为 DAMAGED，实际 ${doomedDetail.body?.status}`,
+  );
+  must(
+    (doomedDetail.body?.segments ?? []).length === 0,
+    `锚段被斩后应无有效段，实际 ${JSON.stringify((doomedDetail.body?.segments ?? []).map((s) => s.index))}`,
+  );
   log(
     '我的漂流日志（/api/me/bottles）',
-    `A=INITIATOR 段[1] · B=SINGER 段[2] · 无关者看不到 · 斩浪后仍列出且段号变空（status=${cutItem?.status}）`,
+    `A=INITIATOR 段[1] · B=SINGER 段[2] · 无关者看不到 · 被斩段作者（含发起者）已从列表剔除（§46.1）· 主瓶不受影响 · 被斩瓶 status=${doomedDetail.body?.status}`,
+  );
+  log(
+    '点踩门槛（服务端持久化覆盖率）',
+    `单次塞满→ratio ${String(oneShot.body?.ratio)} 被拒 422(${String(cheated.body?.error?.violations?.[0]?.code)}) · ` +
+      `10 个点踩者按 1× 实时周期上报并各自听满（≈${String(Math.round(Math.max(...listened.map((e) => e.elapsedMs)) / 1000))}s）→ 全部 200，第 10 票斩浪`,
   );
 
   // ── 会话隔离：登出后 /me 为 401 ───────────────────────────────
