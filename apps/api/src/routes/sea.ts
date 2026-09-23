@@ -7,7 +7,7 @@ import { hasEverSung, isComplete, seaZoneOf, violation } from '@music-drift/shar
 import { BottleListQuerySchema, UuidSchema } from '@music-drift/shared';
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
-import { problemFromViolations, sendProblem, transportProblem } from '../http/problem.js';
+import { problemFromOutcome, problemFromViolations, sendProblem, transportProblem } from '../http/problem.js';
 import { createActorResolver } from '../http/session.js';
 import type { Clock } from '@music-drift/shared/domain';
 import type { Db } from '../db/client.js';
@@ -128,6 +128,19 @@ export function registerSeaRoutes(app: FastifyInstance, options: SeaRoutesOption
     });
     if (outcome === null) {
       return sendProblem(reply, transportProblem('NOT_FOUND'));
+    }
+    /**
+     * ⚠️ **抢占失败必须被调用方看见**（t39 / qa-e2e F1）：store 已经把失败原因放在
+     * `outcome.violations`（`HOLDING_ALREADY_TAKEN` → 409），但此前这里**从不检查 `outcome.ok`**，
+     * 于是并发里输的那一方也拿到 `200 + 摘要`（`isHolder=false`），前端据此 `navigate()`
+     * 到瓶子页、只看到"这个瓶子现在不在你手上"——**无解释、无出口**。
+     * 写法对齐 `routes/river.ts`（那里写对了）：`problemFromOutcome` 把内核码映射成 409/422。
+     */
+    if (!outcome.ok) {
+      const problem = problemFromOutcome(outcome);
+      return problem === null
+        ? sendProblem(reply, transportProblem('INTERNAL'))
+        : sendProblem(reply, problem);
     }
     const row = await options.store.findBottle(params.data.id);
     const next = await options.store.loadState(params.data.id);

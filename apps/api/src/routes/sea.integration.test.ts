@@ -8,7 +8,7 @@
  * 2. **分区口径来自内核**（`isComplete` / `seaZoneOf`），路由不重算；默认只看已完成区（CONTEXT §6.1）。
  */
 import { createSystemClock } from '@music-drift/shared/domain';
-import { BottleSummarySchema } from '@music-drift/shared/contracts';
+import { BottleSummarySchema, ErrorResponseSchema } from '@music-drift/shared/contracts';
 import type { FastifyInstance } from 'fastify';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { buildApp } from '../app.js';
@@ -343,6 +343,127 @@ describe('公海列表真分页（§46.2）：cursor 真消费 + 真 nextCursor 
       const response = await app.inject({ method: 'GET', url: '/api/sea?limit=2&cursor=' + encodeURIComponent(bad) });
       expect(response.statusCode, `cursor=${bad} 应被拒绝`).toBe(400);
     }
+  });
+});
+
+describe('指定接唱：抢占必须先被看见（t39 / qa-e2e F1，409 而不是 200+摘要）', () => {
+  /**
+   * 为什么要单列这一组：**串行语义的集成测试天然测不到并发抢占** —— 之前所有用例都是
+   * "一个请求做完再发下一个"，而缺陷恰恰发生在两个请求的交错窗口里（读状态与抢持有权之间）。
+   * 所以这里两路夹击：
+   * ① 一个**确定性**用例（预先存在一条未释放的 holding，不依赖交错时序）；
+   * ② 一个**真并发**用例（两个请求同时发，抢同一支瓶子）。
+   */
+
+  it('瓶子已被别人持有（未释放）→ 409 HOLDING_ALREADY_TAKEN，而不是 200 + 摘要', async () => {
+    const author = await register('tl');
+    const bottleId = await seedIncompleteSeaBottle(author.cookie);
+    const rival = await register('tl');
+    // ⚠️ 抢的人必须是**没在该瓶唱过**的新用户：用作者自己会先撞 ALREADY_SANG_IN_BOTTLE（422），
+    // 根本走不到抢占那一步（第一版就这么踩了，红的现象是 422 而不是 200，白读一轮）
+    const claimant = await register('tl');
+
+    // 直接造出"公海里的瓶子却有一条未释放 holding"这一状态 —— 正是并发交错窗口里的中间态。
+    // 这样用例**不依赖线程/请求交错时序**也能稳定覆盖路由是否检查 outcome.ok。
+    await db.query(
+      `insert into holdings (bottle_id, holder_id, parent_id, origin, acquired_at)
+       values ($1, $2, null, 'DRAW', now())`,
+      [bottleId, rival.userId],
+    );
+
+    const response = await app.inject({
+      method: 'POST',
+      url: '/api/sea/' + bottleId + '/targeted-segment',
+      headers: { cookie: claimant.cookie },
+    });
+
+    expect(response.statusCode).toBe(409); // ← 修前是 200（摘要里 isHolder=false，调用方无从分辨）
+    const envelope = ErrorResponseSchema.parse(response.json());
+    expect(envelope.error.violations[0]?.code).toBe('HOLDING_ALREADY_TAKEN');
+  });
+
+  it('并发抢同一支瓶子 ⇒ 恰好一个 200；撞进窗口的落败者是 409 HOLDING_ALREADY_TAKEN', async () => {
+    const author = await register('tr');
+    const bottleId = await seedIncompleteSeaBottle(author.cookie);
+    // 6 路并发（不是 2 路）：请求交错窗口很窄，两路常常"一个做完另一个才读状态"，
+    // 落败者就走 404（瓶子已离开公海）而不是 409。多路并发才能稳定命中那个窗口 ——
+    // 这正是"串行语义的集成测试测不到并发缺陷"的具体形态。
+    const rivals: string[] = [];
+    for (let index = 0; index < 6; index += 1) {
+      rivals.push((await register('tr')).cookie);
+    }
+
+    const responses = await Promise.all(
+      rivals.map((cookie) =>
+        app.inject({
+          method: 'POST',
+          url: '/api/sea/' + bottleId + '/targeted-segment',
+          headers: { cookie },
+        }),
+      ),
+    );
+    const statuses = responses.map((response) => response.statusCode);
+    const winners = responses.filter((response) => response.statusCode === 200);
+    const conflicts = responses.filter((response) => response.statusCode === 409);
+
+    // 修前：窗口内的落败者也拿 200（两个窗口都被 navigate，输的一方只看到"不在你手上"）
+    expect(winners.length).toBe(1);
+    for (const status of statuses) {
+      // 409 = 撞进抢占窗口（有人先抢了）；404 = 读状态时瓶子已离开公海（既有防探测口径，不改）
+      expect([200, 404, 409]).toContain(status);
+    }
+    // 命中窗口的那次一定得 409 + 稳定码；**没命中也不假绿** —— 兜底由下面这条"确定性命中"的用例保证
+    //（预置一条未释放 holding，不依赖请求交错时序），以及 store 层的并发用例。
+
+    const winner = winners[0];
+    // ⚠️ 这个端点的响应是 **BottleSummary**（没有 `isHolder`/`availableResolutions` 那些 Detail 字段）；
+    // 谁持有要另外查详情 —— 第一版在这里把 Summary 当 Detail 断言，红的是用例自己。
+    expect(BottleSummarySchema.parse(winner?.json()).id).toBe(bottleId);
+    for (const conflict of conflicts) {
+      expect(ErrorResponseSchema.parse(conflict.json()).error.violations[0]?.code).toBe(
+        'HOLDING_ALREADY_TAKEN',
+      );
+    }
+
+    // 数据不变量：活跃持有者恰好 1 个（输的一方零副作用）
+    const holdings = await db.query<{ count: string }>(
+      `select count(*)::text as count from holdings where bottle_id = $1 and released_at is null`,
+      [bottleId],
+    );
+    expect(holdings[0]?.count).toBe('1');
+    // 且**只有**赢家持有：逐个复查每个会话的瓶子详情 isHolder
+    const winnerCookie = rivals[statuses.indexOf(200)]!;
+    const detail = await app.inject({
+      method: 'GET',
+      url: '/api/bottles/' + bottleId,
+      headers: { cookie: winnerCookie },
+    });
+    expect((detail.json() as { isHolder: boolean }).isHolder).toBe(true);
+  });
+
+  it('「有人先抢了」(409) 与「不在公海」(404) 必须可分辨（404 的防探测口径不改）', async () => {
+    const author = await register('td');
+    const bottleId = await seedIncompleteSeaBottle(author.cookie);
+    const winner = await register('td');
+
+    const won = await app.inject({
+      method: 'POST',
+      url: '/api/sea/' + bottleId + '/targeted-segment',
+      headers: { cookie: winner.cookie },
+    });
+    expect(won.statusCode).toBe(200);
+
+    // 顺序上的第二位：瓶子已经离开公海（HELD）→ 仍是 404（防探测，不改）
+    const late = await register('td');
+    const after = await app.inject({
+      method: 'POST',
+      url: '/api/sea/' + bottleId + '/targeted-segment',
+      headers: { cookie: late.cookie },
+    });
+    expect(after.statusCode).toBe(404);
+
+    // 两者可分辨：409 带**稳定领域码**，404 是传输层（violations 为空）
+    expect(after.body).not.toContain('HOLDING_ALREADY_TAKEN');
   });
 });
 

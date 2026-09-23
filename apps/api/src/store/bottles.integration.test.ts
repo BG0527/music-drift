@@ -203,6 +203,49 @@ describe('bottleStore：内核命令 ↔ 事件流 ↔ 投影 ↔ 重放', () =>
     expect(incomplete.rows.some((candidate) => candidate.id === bottleId)).toBe(false);
   });
 
+  it('并发指定接唱同一支瓶子：恰好一个拿到持有权，落败者得 HOLDING_ALREADY_TAKEN 且零副作用', async () => {
+    // 造一支"公海未完成"作品（作者录第 1 段 → 入海）
+    const songId = await insertSong(db, 4);
+    const initiatorId = await insertUser(db);
+    const bottleId = crypto.randomUUID();
+    const ctx = ctxAt(10 * HOUR);
+    await store.createBottle({ bottleId, songId, initiatorId, ctx });
+    const initial = (await store.loadState(bottleId))!;
+    await store.applyOutcome(bottleId, recordSegment(initial, { userId: initiatorId, note: null }, ctx));
+    const afterSegment = (await store.loadState(bottleId))!;
+    await store.applyOutcome(
+      bottleId,
+      chooseResolution(afterSegment, { userId: initiatorId, resolution: 'SEA' }, ctx),
+    );
+
+    // 两个没在该瓶唱过的人**同时**抢：store 先读状态（都看到 SEA）再原子抢占 ⇒ DB 层唯一索引决定胜负。
+    // 这一条是**确定性**的（不依赖 HTTP 交错窗口），它钉住"store 侧本来就拒绝得对"，
+    // 从而说明 t39 的缺陷纯粹是**路由把失败信号吞掉了**。
+    const first = await insertUser(db);
+    const second = await insertUser(db);
+    const results = await Promise.all([
+      store.takeTargetedSegment({ bottleId, userId: first, ctx }),
+      store.takeTargetedSegment({ bottleId, userId: second, ctx }),
+    ]);
+
+    expect(results.filter((result) => result?.ok === true).length).toBe(1);
+    const failed = results.filter((result) => result?.ok === false);
+    expect(failed.length).toBe(1);
+    expect(failed[0]?.violations[0]?.code).toBe('HOLDING_ALREADY_TAKEN');
+
+    // 活跃持有者恰好 1 个；且落败者没有写任何事件（bottle 的 revision 只由赢家那一条 BOTTLE_DRAWN 推进）
+    const active = await db.query<{ count: string }>(
+      `select count(*)::text as count from holdings where bottle_id = $1 and released_at is null`,
+      [bottleId],
+    );
+    expect(active[0]?.count).toBe('1');
+    const drawn = await db.query<{ count: string }>(
+      `select count(*)::text as count from events where bottle_id = $1 and type = 'BOTTLE_DRAWN'`,
+      [bottleId],
+    );
+    expect(drawn[0]?.count).toBe('1');
+  });
+
   it('listSeaBottles：真游标分页（逐页不重叠、末页 nextCursor 为 null、畸形游标解码为 null）', async () => {
     // 造两支**已完成**的公海作品（4 段各由不同用户录 —— 内核禁止同瓶二次接唱）
     const makeCompleteSeaLockedBottle = async (): Promise<string> => {
