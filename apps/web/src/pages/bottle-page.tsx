@@ -298,7 +298,8 @@ function BottleView({ bottle, seams }: { bottle: BottleDetail; seams?: BottlePag
               录第 {String(nextIndex)} 段
             </Button>
             <span className="text-[0.875rem] text-slate-current">
-              录 15–30 秒，录完再选去向 —— 不点开就不会占用你的麦克风。
+              录这一段（时长以该段的固定时长为准，页面里会写明），录完再选去向 ——
+              不点开就不会占用你的麦克风。
             </span>
           </div>
         ) : null}

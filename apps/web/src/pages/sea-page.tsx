@@ -114,7 +114,10 @@ function SeaZoneList({ zone }: { zone: Zone }) {
             {list.map((bottle, index) => (
               <li
                 key={bottle.id}
-                className={index < 4 ? `enter-rise stagger-${String(index + 1)}` : undefined}
+                // guidance（motion-web §1「新内容入场」）：原来只有首批 4 张有入场，
+                // 「加载更多」追加的第 5 张起是凭空出现。现在每一项都有，
+                // 交错取模 4 保持「等距且小」的延迟（§4：不要不等距随机延迟，也不要无限增长的长尾）。
+                className={`enter-rise stagger-${String((index % 4) + 1)}`}
               >
                 <SeaBottleCard bottle={bottle} />
               </li>
@@ -153,7 +156,10 @@ function SeaBottleCard({ bottle }: { bottle: BottleSummary }) {
       : `缺第 ${bottle.missingSegmentIndexes.join('、')} 段`;
 
   return (
-    <Card className="hover-lift flex h-full flex-col gap-3">
+    // 原语：这张卡片曾是 `hover-lift`。但整块**不可点**（可点的是卡内的「听这支作品」链接），
+    // 抬起动效会让人以为整卡可点 —— 撤销（t37 审计 M9 的补充：审计当时把这张误判为"可点卡片"，
+    // 复核源码后确认同样属"动效承诺了不存在的交互"）。
+    <Card className="flex h-full flex-col gap-3">
       <div className="flex items-start justify-between gap-3">
         <p className="text-[1.0625rem] font-semibold text-abyss">{bottle.songTitle}</p>
         <span className="rounded-pill bg-tide-pool px-3 py-1 text-[0.8125rem] text-abyss">

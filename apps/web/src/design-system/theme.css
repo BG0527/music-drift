@@ -126,6 +126,11 @@
   --motion-hover-scale: 1.03;
   --motion-hover-duration: 200ms;
   --motion-page-duration: 300ms;
+  /* 2026-09-24 amend（审计 A1/A2/A4）：原先 shimmer 1.4s 与 ripple 2.4s 是 motion.css 里的字面量、
+     退场时长根本没有 —— 违反「参数只能来自设计契约」。登记为 token，让组件只能引用、不能内联。 */
+  --motion-shimmer-duration: 1400ms;
+  --motion-ripple-duration: 2400ms;
+  --motion-exit-duration: 240ms;
   --motion-animated-properties: transform, opacity;
   --motion-reduced-duration: 150ms;
 }

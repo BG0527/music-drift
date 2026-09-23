@@ -68,6 +68,8 @@ export function Tabs({ items, value, defaultValue, onChange, className }: TabsPr
               className={cn(
                 'min-h-11 rounded-pill px-4 text-[0.875rem] font-medium',
                 'focus-visible:ring-2 focus-visible:ring-peacock focus-visible:ring-offset-2 focus-visible:ring-offset-wave-white',
+                // feedback（motion-web §1）：选中态原来是瞬变，颜色过渡让「切到哪一档」看得见
+                'transition-colors duration-200 ease-out',
                 selected
                   ? 'bg-peacock text-wave-white'
                   : 'border border-driftline bg-transparent text-peacock hover:bg-info-tint',

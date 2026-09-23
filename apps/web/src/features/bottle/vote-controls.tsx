@@ -13,7 +13,8 @@
  * 计数变化由 `aria-live="polite"` 播报（动效不是唯一反馈）；
  * **禁用必有可见文字原因**（DESIGN.md），原因不写在 `title` 里。
  */
-import { Button, Icon, cn } from '../../design-system';
+import { useEffect, useRef } from 'react';
+import { Button, Icon, cn, motion, prefersReducedMotion } from '../../design-system';
 
 export type MyVote = 'LIKE' | 'DISLIKE' | null;
 
@@ -106,6 +107,23 @@ function VoteButton({
   icon: 'ThumbsUp' | 'ThumbsDown';
   onClick: () => void;
 }) {
+  // 计数变化的一次性反馈（motion-web §1 把「投票后的确认」列为 feedback 的典型例）。
+  // 用 Web Animations API 而不是改 key 重播动画：§5 明令禁止靠改 key 造成子树重建，
+  // 而 CSS 动画只会在挂载时跑一次、内容变化不会重播。只动 opacity（§3），
+  // 时长取契约 token（§2），并且在 reduced-motion 下**根本不发**这个动画（§7）。
+  const countRef = useRef<HTMLSpanElement>(null);
+  const previousCount = useRef(count);
+  useEffect(() => {
+    const element = countRef.current;
+    const changed = previousCount.current !== count;
+    previousCount.current = count;
+    if (!changed || element === null || prefersReducedMotion()) return;
+    element.animate?.([{ opacity: 0.4 }, { opacity: 1 }], {
+      duration: motion.pageDuration,
+      easing: motion.entryEasing,
+    });
+  }, [count]);
+
   return (
     <span className="flex flex-col gap-[2px]">
       <Button
@@ -125,7 +143,11 @@ function VoteButton({
         onClick={onClick}
       >
         <span className="whitespace-nowrap">{label}</span>
-        <span className="whitespace-nowrap" style={{ fontFamily: 'var(--font-latin)' }}>
+        <span
+          ref={countRef}
+          className="whitespace-nowrap"
+          style={{ fontFamily: 'var(--font-latin)' }}
+        >
           {count}
         </span>
       </Button>

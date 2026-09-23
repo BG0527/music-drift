@@ -79,8 +79,13 @@ function MyBottleRow({ bottle }: { bottle: MyBottle }) {
 
   return (
     /* 两行结构（§46.3）：第一行"歌名 + 我的角色 + 出口"，第二行"进度 / 我唱的段 / 缺口"。
-       原来全塞一行，窄一点就折成三行，4 条就把 /me 顶出 900。 */
-    <li className="hover-lift flex flex-col gap-[6px] rounded-base border border-mist bg-foam px-4 py-[8px] shadow-card">
+       原来全塞一行，窄一点就折成三行，4 条就把 /me 顶出 900。
+
+       原语：这行曾是 `hover-lift`（hover 整行抬起）。但这一行**本身不可点**（可点的是行内的两个
+       `<Link>`），抬起的动效于是在承诺一个不存在的交互 —— `motion-web` §1 要求每个动效说清它
+       "替代或补充了什么"，这一条说不出。故撤销；可点性反馈留给行内的链接自己。
+       （纪律守卫：`design-system/__tests__/motion-contract.test.tsx` 的 hover-lift 宿主检查） */
+    <li className="flex flex-col gap-[6px] rounded-base border border-mist bg-foam px-4 py-[8px] shadow-card">
       <div className="flex flex-wrap items-center gap-x-[12px] gap-y-[2px]">
         <Icon name="Music" size={18} />
         <span className="text-[1rem] font-semibold text-abyss">{bottle.songTitle}</span>

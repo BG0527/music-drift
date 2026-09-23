@@ -71,7 +71,11 @@ const RULE_FALLBACK_MESSAGES: Record<string, string> = {
   AUDIO_TOO_LARGE: '录音文件超过体积上限，请重新录制。',
   AUDIO_FORMAT_UNSUPPORTED: '这个音频格式不被支持，请用浏览器直接录制。',
   AUDIO_CONTAINER_MISMATCH: '音频内容与声明的格式不一致，请重新录制。',
-  AUDIO_DURATION_OUT_OF_RANGE: '每段录音需在 15–30 秒之间，请重新录制。',
+  // 旧口径（固定区间 15–30 秒）已废：现在由服务端按**本段固定时长**判定并给出带数字的叙述（例如
+  // “这一段的固定时长是 22.5 秒，你录的是 15.0 秒”）。下面这句只是服务端 message 缺失时的中性兜底，
+  // **不得**写参数——否则就是第二份规则。
+  AUDIO_DURATION_OUT_OF_RANGE: '这一段录音的时长不符合要求，请按页面提示的时长重录。',
+  AUDIO_SEGMENT_PRESET_MISSING: '这一段的固定时长还没登记，现在没法录；换一首歌，或者稍后再来。',
   EMAIL_TAKEN: '这个邮箱已经注册过了，直接登录试试？',
   HANDLE_TAKEN: '这个名字已经有人用了，换一个吧。',
   INVALID_CREDENTIALS: '账号或口令不正确。',

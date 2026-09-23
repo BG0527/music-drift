@@ -81,7 +81,7 @@ export function LoginPage() {
             每一段旋律，都在寻找下一个声音
           </h1>
           <p className="text-[1rem] leading-[1.6] text-slate-current">
-            这是一个由歌声、回音和宿命组成的角落。你只录 15–30 秒，剩下的交给漂流。
+            这是一个由歌声、回音和宿命组成的角落。你只录一段，剩下的交给漂流。
           </p>
         </div>
 

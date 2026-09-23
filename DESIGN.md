@@ -99,6 +99,12 @@ motion:
   hoverScale: 1.03
   hoverDuration: 200ms
   pageTransition: 300ms
+  shimmerDuration: 1400ms   # 骨架 shimmer（= §Interaction States loading 行的 1.4s）
+  rippleDuration: 2400ms    # 涟漪扩散（事件涟漪与场景涟漪共用；两角色定义见 Elevation & Depth）
+  exitDuration: 240ms       # 一切退场（Modal / Toast / 页面）：入场 480ms 的一半 —— 退场比入场快
+  toastSuccessDuration: 3000ms
+  toastInfoDuration: 5000ms
+  toastErrorPersistent: true   # 错误不许自动消失，必须手动关闭（不许静默失败）
   animatedProperties: [transform, opacity]
 zIndex:
   base: 0
@@ -284,6 +290,12 @@ Water contours, tide lines, river-channel guides, ripples, drift-bottle silhouet
 - **Entry animations:** Fade + translate-Y (16px → 0) over 480ms ease-out. Staggered cascades for lists: 100ms between items.
 - **Hover states:** Scale(1.03) + shadow lift over 200ms.
 - **Page transitions:** Fade + slide (300ms).
+- **Exit animations:** 一切退场（Modal / Toast / 页面）用 `exitDuration`（240ms）——**更短**因为人已经知道结果了。**进出必须配对**：有入场就必须有退场，不能"弹出来就没了"。
+- **Ripples — 两个角色，不可混为一谈**（2026-09-24 amend，按 `motion-web` §1 的目的分类拆分）:
+  - **① 事件涟漪（event ripple）**：**标记状态变化与落点**（时间轴节点、投/捞的落点、接力交接）。**短暂、事件驱动、只播一次**。
+  - **② 场景涟漪（scene ripple）**：**hero 的常驻水面母题**（Figma `home-river` 的 240·180·130 同心圆）。**允许 `infinite` 常驻**，但只有在同时满足「**低幅度 + 低速度、不争夺注意力**」与「`reduced-motion` 下静止」时才成立；它**不进内容区**、不承载任何信息（`aria-hidden`）。
+  - **产品理由（写进契约，不让它游走在契约之外）**：涟漪是本系统的水主题母题（见 Overview 的母题清单），hero 同心圆是用户设计稿的既定形态；两者共用 `rippleDuration`（2400ms）。
+- **Toast 生命周期:** 成功 3000ms / 信息 5000ms 后自动退场（退场用 `exitDuration`）；**错误常驻到手动关闭**（`toastErrorPersistent`）——错误不许静默消失。
 - **Performance:** Only transform and opacity animated. No layout-triggering properties.
 
 深度层级（形态语言）:

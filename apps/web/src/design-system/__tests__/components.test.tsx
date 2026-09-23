@@ -52,7 +52,12 @@ describe('Button（主按钮 / 幽灵按钮）', () => {
 
   it('hover 只做 scale(1.03)（动效纪律：不改布局属性）', () => {
     render(<Button>继续</Button>);
-    expect(screen.getByRole('button', { name: '继续' }).className).toMatch(/hover:scale-\[1\.03\]/);
+    const className = screen.getByRole('button', { name: '继续' }).className;
+    // 抬升走 `.hover-lift`：transform + ::after 的 opacity 交叉（详见 motion-contract.test.tsx）
+    expect(className).toMatch(/hover-lift/);
+    // 不得直接过渡/设置 box-shadow：§3 只允许动 transform 与 opacity（box-shadow 的尺寸位置是明文禁止）
+    expect(className).not.toMatch(/hover:shadow-lift/);
+    expect(className).not.toMatch(/transition-\[[^\]]*box-shadow/);
   });
 
   it('disabled 时不可点、且不是靠透明度敷衍（用 tide-pool 底）', () => {

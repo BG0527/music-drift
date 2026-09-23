@@ -69,6 +69,8 @@ export function SidebarNav({ items, current, footer, className }: NavProps) {
                   // 212×44（Figma）：宽度由外层 ul 固定，这里只定高与内边距
                   'flex h-[44px] w-[212px] items-center gap-[16px] overflow-hidden rounded-base px-[16px] text-[1rem]',
                   'focus-visible:ring-2 focus-visible:ring-peacock focus-visible:ring-offset-2 focus-visible:ring-offset-foam',
+                  // 颜色过渡（motion-web §1 feedback）：原来 hover 是瞬变，与按钮的 200ms 手感不一致
+                  'transition-colors duration-200 ease-out',
                   active
                     ? 'bg-wave-white font-semibold text-peacock'
                     : 'text-slate-current font-normal hover:bg-wave-white/70',
@@ -113,6 +115,11 @@ export function BottomNav({ items, current, className }: NavProps) {
             aria-current={active ? 'page' : undefined}
             className={cn(
               'flex min-h-11 flex-1 flex-col items-center justify-center gap-1 px-2 py-2 text-[0.75rem]',
+              // feedback（motion-web §1「按下缩放」）：移动端没有 hover，`:active` 是唯一即时回应。
+              // 只动颜色与背景（DESIGN.md §Interaction States：颜色变化允许，不动布局属性）。
+              'transition-colors duration-200 ease-out hover:bg-wave-white/70 active:bg-tide-pool',
+              // 焦点环：与侧栏同款（两处导航的键盘手感必须一致）
+              'focus-visible:ring-2 focus-visible:ring-peacock focus-visible:ring-offset-2 focus-visible:ring-offset-foam',
               active ? 'font-medium text-peacock' : 'text-slate-current',
             )}
           >

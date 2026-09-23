@@ -3293,3 +3293,33 @@ PASS 31 条 / FAIL 0 条 · [result] ALL PASS
 
 ### 80.6 协作
 执行者明确表示：**不会主动去碰 qa-e2e 的任务**（t14），但若被要求提供假麦克风参数 / 游离元素挂钩 / 断言清单，会**把命令与原始输出一起回报 captain**（AGENTS.md §8）⇒ 边界与协作都正确。
+
+---
+
+## 81. 动效实施批次（P1–P7 + A1–A4）+ ⚠️ captain 的流程缺口（「批准立即做」也是一种派发）
+
+### 81.1 ⚠️ captain 的流程缺口（记账）
+captain 在裁决消息里批准「P1–P7 立即做」，**没有建任务** ⇒ 这批工作无 `attempt` 可回写、证据无处挂。
+- **执行者主动指出该缺口**并要求补建，同时声明"后续不再在没有任务记录的情况下开工" ⇒ **要求正确，责任在 captain**；
+- 处置：**事后补建 t38**（只为让证据有位置，不重做）；因 t36 正占着 `apps/web/src/pages/`、`features/bottle/`、`docs/ui-review/`，t38 的 inScope 只能取**主体域**（`DESIGN.md` + `design-system/`），其余**披露式归档**（output 逐条披露、不写 changedPaths）；
+- 另：captain 试图**代写回执被工具拒绝两次**（`acceptance` 必须逐条匹配原文，而 captain 读不到 acceptance 列表）⇒ 交回执行者自行回写（**不猜、不编造**，这是 §20 学到的同一课）。
+⇒ **新纪律：「批准立即做」也是一种派发 —— 必须先有任务记录。** 消息批准的豁免会直接造成"不可审计的工作"，与我们整天在做的"让每件事都能被核"直接冲突。
+
+### 81.2 ⭐ P1：执行者**推翻 captain 的字面指示**，captain 采纳
+captain 要求「收缩 `.hover-lift` 的 `box-shadow` 过渡」（隐含：删掉阴影）。执行者指出 `DESIGN.md` **L285/L382 明文要求「scale(1.03) + shadow lift」**，直删会**违反设计契约**。
+⇒ 它采用 **P1b**：阴影抬升移到**几何固定的独立图层**（`::after`），hover 只过渡该图层的 `opacity` ⇒ **`motion-web` §3（禁动画尺寸/位置）与 `DESIGN.md`（要求 shadow lift）同时成立**。
+⇒ **captain 采纳 P1b**，并记：**看似权威的指示若会导致契约违规，执行者应当指出而不是照做**；反过来，**captain 的指示不是豁免契约的理由**。
+
+### 81.3 交付
+- **契约先补**：`DESIGN.md` `motion:` **+6 项**（shimmerDuration 1400 / rippleDuration 2400 / exitDuration 240 / toastSuccessDuration 3000 / toastInfoDuration 5000 / toastErrorPersistent true）+ Elevation & Depth **+3 条**（Exit animations＝入场一半且进出配对 / **Ripples 两个角色**含产品理由 / Toast 生命周期）；**12 行新增 / 0 删除，结构仍 13 节**；token 三层同步（`theme.css` → `tokens.ts` → `motion.css`）+ **drift guard 扩项**（否则契约会漂）；
+- **代码**：P1b · P7（撤掉不可点行的 hover-lift＝消除"动效承诺不存在的交互"）· P2/P3（BottomNav 原 **`hover/active/transition/focus-visible` 命中 0** → 补齐 + `focus-visible` 环）· P5（公海列表去 `index < 4` 改 `(index % 4) + 1`）· P6（投票计数用 **WAAPI**，reduced-motion 不发，**未用 `key={count}`**）· V3/V4（shimmer/ripple 引用新 token，**`motion.css` 再无时间字面量**）；
+- **纪律变断言**：`motion-contract.test.tsx` **17 例**，首轮 **13 failed** → **17 passed**；含 **key-remount 守卫扩到全仓**（花括号/引号感知 JSX 扫描 + `.map()` 区间判定 ⇒ 列表项 `key={bottle.id}` + 入场动画**合法**、单例容器 `key={match.path}` **违规**）· **反向控制**（坏样本必中 / 合法列表 key 不误报 / **全仓结果精确等于单条 allowlist**）· **A6**（duration/scale/translate 字面量必须落在契约值集合内）；
+- `fonts-and-motion.test.ts` 的**「用例名比断言强」已修**（现在真的断言 hover-lift 不含 box-shadow）。
+
+### 81.4 回归与两处诚实边界
+- **1440 一屏 12/12 OK / EXIT=0**；两条反向控制成立；`pnpm -r test` **EXIT=0**（web **500 → 527**，零回归）；`typecheck` **0 error**；
+- **375 有 1 条红且已归因、非本批**：`FAIL /river river-drop=832 > 812` —— `river-page.tsx` 有 t36 在途文案（改两行，`leading-[1.6] × 0.875rem = 22.4px`，`832−22.4 = 809.6 ≤ 812` 恰好回到界内）；**两次独立 hermetic 运行均为 832** ⇒ 确定性、与数据无关。执行者**未改队友文件去反证**（§8），改为通知 owner ⇒ 处置正确。**375 是硬门，待 t36 复绿**；
+- **本批证明不了的**：hover 与动效的**屏幕表现**（静帧证明不了动效）⇒ 建议 t14 用真浏览器补 `document.getAnimations()` 断言。
+
+### 81.5 未做（明确登记，不是漏做）
+**P4**（`AsyncBoundary` 有 **15 个调用点**，加包裹元素可能改变 flex/grid 子元素语义 ⇒ 与 P8/P9 同批）· **P8/P9**（等 t36 让出 `pages/**`，守卫已 allowlist 登记 `route-view.tsx`）· **Tabs 面板 continuity 一半**（唯一顺手写法 `key={active.key}` 正是 §5 禁止的、**会被新守卫当场拦下** —— 这恰好证明守卫有效）· **Modal/Toast 退场实现**（本批只落契约）。

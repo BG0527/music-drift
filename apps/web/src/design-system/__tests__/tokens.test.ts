@@ -154,6 +154,11 @@ describe('布局 / 圆角 / 层级 token 与 DESIGN.md 一致', () => {
       '--motion-hover-scale: 1.03',
       '--motion-hover-duration: 200ms',
       '--motion-page-duration: 300ms',
+      // 2026-09-24 amend（审计 A1/A2/A4）：原先 shimmer 1.4s / ripple 2.4s 是 motion.css 的内联字面量、
+      // 退场时长则根本不存在 —— 违反「参数只能来自设计契约」。现登记为 token。
+      '--motion-shimmer-duration: 1400ms',
+      '--motion-ripple-duration: 2400ms',
+      '--motion-exit-duration: 240ms',
     ]) {
       expect(themeCss, `缺少动效契约 ${declaration}`).toContain(declaration);
     }
@@ -171,6 +176,9 @@ describe('布局 / 圆角 / 层级 token 与 DESIGN.md 一致', () => {
       ['100ms', '--stagger-step: 100ms'],
       ['200ms', '--hover-duration: 200ms'],
       ['300ms', '--page-duration: 300ms'],
+      ['1400ms', '--shimmer-duration: 1400ms'],
+      ['2400ms', '--ripple-duration: 2400ms'],
+      ['240ms', '--exit-duration: 240ms'],
     ];
     for (const [contract, working] of pairs) {
       expect(themeCss, `theme.css 缺少契约值 ${contract}`).toContain(contract);

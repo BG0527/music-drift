@@ -46,7 +46,7 @@ export function RiverPage() {
         <section
           aria-labelledby="draw-heading"
           data-anchor="river-draw"
-          className="flex min-h-[230px] flex-col items-center justify-center gap-[12px] rounded-2xl bg-deep-current px-[16px] py-[20px] text-wave-white md:min-h-[517px] md:gap-[24px] md:px-[48px] md:py-[40px]"
+          className="flex min-h-[230px] flex-col items-center justify-center gap-[12px] rounded-2xl bg-deep-current px-[16px] py-[16px] text-wave-white md:min-h-[517px] md:gap-[24px] md:px-[48px] md:py-[40px]"
         >
           <h2 id="draw-heading" className="sr-only">
             从河道捞一个漂流瓶
@@ -111,7 +111,7 @@ export function RiverPage() {
         <section
           aria-labelledby="cast-heading"
           data-anchor="river-drop"
-          className="flex min-h-[230px] flex-col items-center justify-center gap-[12px] rounded-2xl bg-deep-current px-[16px] py-[20px] text-wave-white md:min-h-[517px] md:gap-[24px] md:px-[48px] md:py-[40px]"
+          className="flex min-h-[230px] flex-col items-center justify-center gap-[12px] rounded-2xl bg-deep-current px-[16px] py-[16px] text-wave-white md:min-h-[517px] md:gap-[24px] md:px-[48px] md:py-[40px]"
         >
           <h2 id="cast-heading" className="sr-only">
             投下一支漂流瓶
@@ -148,7 +148,7 @@ export function RiverPage() {
               <span className="whitespace-nowrap">投下一支漂流瓶</span>
             </p>
             <p className="max-w-[38rem] text-[0.875rem] leading-[1.6] text-on-dark-muted">
-              选一首歌，录下第 1 段 15–30 秒，然后投进河道等一个陌生人接下一棒。
+              选一首歌，录下第 1 段（时长以该段为准），然后投进河道等一个陌生人接下一棒。
             </p>
             <p className="text-[0.8125rem] leading-[1.6] text-on-dark-muted">
               投河之后就交出去了；想找回来看，去「我参与过的漂流瓶」。

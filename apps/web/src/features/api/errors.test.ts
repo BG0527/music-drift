@@ -81,3 +81,43 @@ describe('错误 → 用户可读文案', () => {
     expect(view.detail.length).toBeGreaterThan(0);
   });
 });
+
+/**
+ * 音频规则文案与服务端收敛（t36）。
+ *
+ * 服务端现在会给**带数字**的叙述：“这一段的固定时长是 22.5 秒，你录的是 15.0 秒（相差 7.5 秒）”。
+ * 两个音频码都必须**优先展示服务端 message**；前端静态文案只能是中性兜底，
+ * 不得写参数（否则就是“规则换了、文案没换”的第二份规则）。
+ */
+describe('音频规则文案：服务端 message 优先', () => {
+  const serverMessage =
+    '这一段的固定时长是 22.5 秒，你录的是 15.0 秒（相差 7.5 秒，允许 ±2.0 秒）。';
+
+  it('AUDIO_DURATION_OUT_OF_RANGE：直接用服务端那句带数字的话', () => {
+    const view = describeApiError({
+      status: 422,
+      code: 'AUDIO_DURATION_OUT_OF_RANGE',
+      message: serverMessage,
+    });
+    expect(view.code).toBe('AUDIO_DURATION_OUT_OF_RANGE');
+    expect(view.detail).toBe(serverMessage);
+  });
+
+  it('AUDIO_SEGMENT_PRESET_MISSING：同样用服务端 message', () => {
+    const view = describeApiError({
+      status: 422,
+      code: 'AUDIO_SEGMENT_PRESET_MISSING',
+      message: serverMessage,
+    });
+    expect(view.detail).toBe(serverMessage);
+  });
+
+  it('服务端 message 缺失时的兜底不得写出旧口径参数（不成为第二份规则）', () => {
+    for (const code of ['AUDIO_DURATION_OUT_OF_RANGE', 'AUDIO_SEGMENT_PRESET_MISSING']) {
+      const view = describeApiError({ status: 422, code, message: null });
+      expect(view.detail).not.toMatch(/15\s*(–|-|~)\s*30/);
+      expect(view.detail).not.toContain('15–30');
+      expect(view.detail.length).toBeGreaterThan(0);
+    }
+  });
+});

@@ -1,0 +1,80 @@
+# t36 文案守卫证据（真实输出）
+
+## 1) 守卫红的现场（改动前的全量扫描）
+```
+$ pnpm --filter @music-drift/web exec vitest run src/pages/__tests__/copy-consistency.test.ts
+AssertionError: expected [ "pages/bottle-page.tsx:263", …(3) ] to deeply equal []
++   "pages/bottle-page.tsx:263"
++   "pages/login-page.tsx:77"
++   "pages/river-page.tsx:142"
++   "features/api/errors.ts:63"
+Tests  1 failed | 3 passed (4)
+```
+
+## 2) 反向控制（临时插一句含 15–30 的可见文案 → 必须红）
+```
+$ (临时把 river-page 的可见文案改回「录下第 1 段 15–30 秒」)
+$ pnpm --filter @music-drift/web exec vitest run src/pages/__tests__/copy-consistency.test.ts
+× 页面与文案层全量扫描：0 处命中
+AssertionError: expected [ "pages/river-page.tsx:142" ] to deeply equal []
+Tests  1 failed | 3 passed (4)
+$ (还原)
+Tests  4 passed (4)
+```
+
+## 3) 绿
+```
+$ pnpm --filter @music-drift/web exec vitest run src/pages/__tests__/copy-consistency.test.ts src/features/api/errors.test.ts
+Tests  16 passed (16)
+```
+
+## 4) 四个项目级前端 skill 的原文条款 → 解释了哪个选择
+（captain 可逐条去 `.dsh/skills/<name>/SKILL.md` 核对；引文一字未改）
+
+### frontend-design（`.dsh/skills/frontend-design/SKILL.md`）
+> "Treat failure and emptiness as moments for direction, not mood. Explain what went wrong and how to fix it,
+> in the interface's voice rather than a person's. Errors don't apologize, and they are never vague about what happened."
+
+→ 兜底文案从「每段录音需在 15–30 秒之间，请重新录制。」改成
+「这一段录音的时长不符合要求，请按页面提示的时长重录。」：**说清发生了什么 + 下一步做什么**，不写会过期的参数。
+
+> "A CTA says exactly what happens when it is used: "Save changes," not "Submit." An action keeps the same name
+> through the whole flow, so the button that says "Publish" produces a toast that says "Published.""
+
+→ 同一段语义全程同名：按钮「选这首，录第 1 段」→ 录制面板「本段 22.0 秒」→ 成功提示「已录下第 N 段」，
+三处说的都是"录这一段、时长以该段为准"，没有一处再说区间。
+
+### afrexai-ui-design-system（`.dsh/skills/afrexai-ui-design-system/SKILL.md`）
+> "**Error messages below the field** — specific ("Email must include @" ) not generic ("Invalid input")"
+
+→ 这就是"前端静态文案必须让位给服务端 message"的理由：服务端那句带具体数字
+（"这一段的固定时长是 22.5 秒，你录的是 15.0 秒（相差 7.5 秒，允许 ±2.0 秒）"）是 **specific**，
+前端那句「每段录音需在 15–30 秒之间」是 **generic**（而且是错的）。`describeApiError` 现在对两个音频码都优先用 `message`。
+
+> "**Never rely on color alone** — always pair with icons, labels, or patterns."
+
+→ 文案是除颜色/动效之外的**第二反馈通道**：录制按钮禁用时旁边必须有可见理由（`preset-missing`），
+这条与本轮的文案正确性是同一件事。
+
+### css-animation-creator（`.dsh/skills/css-animation-creator/SKILL.md`）
+> Workflow Step 5: "Constrain animated properties to `transform` and `opacity` for GPU acceleration."
+
+> Workflow Step 6: "Honor reduced-motion preferences for every animation."
+
+→ 本轮是**纯文案**改动，因此按这两条**没有引入任何新的动效或参数**：被改的三个页面原有的动效
+（涟漪、hover-lift、进度条 scaleX）一行未动，仍然是 transform/opacity + `motion.css` 的全局 reduced-motion 兜底。
+
+### motion-web（`.dsh/skills/motion-web/SKILL.md`）
+> §8：「**"看着挺顺"不是证据。** 每个动效都要有**可断言的契约**，并给出验证方式」
+> §8 表格：「属性 | 断言动画只改 `transform`/`opacity`（静态扫描 CSS/类名）」
+
+→ 本轮把"文案不得回退"也做成**可断言的契约**（一条会红的测试），并且照 §8 的要求说清**各层能证明什么**：
+静态扫描能证明"可见文案里没有旧口径"，**不能**证明"文案读起来对"（那要靠人读 / 截图）；
+所以另有 `docs/ui-review/after-t36-river-1440.png` 作为人眼证据。
+
+> §7：「**动效不得是唯一反馈**：状态变化要同时有**文字 / 结构变化 / `aria-live` 播报**。」
+> §2：「参数只能来自设计契约，禁止内联新值」
+
+→ ① 录制这类没有动效可依的状态，**文字就是唯一反馈通道** —— 文案错了等于没有反馈，这正是本轮的严重性所在；
+② 旧的「15–30 秒」本质上是一份**内联的、与契约冲突的参数**（真正的参数是曲库/服务端给的每段固定时长），
+删掉它 = 恢复"参数只有一个来源"。

@@ -12,6 +12,9 @@
   --hover-scale: 1.03;
   --hover-duration: 200ms;
   --page-duration: 300ms;
+  --shimmer-duration: 1400ms;
+  --ripple-duration: 2400ms;
+  --exit-duration: 240ms;
   --reduced-duration: 150ms;
 }
 
@@ -79,19 +82,36 @@
     animation-delay: calc(var(--stagger-step) * 4);
   }
 
-  /* hover：只做 scale(1.03) + 阴影抬升，200ms，不触发重排 */
+  /* hover：只动 transform（scale 1.03 / 200ms）；阴影抬升交给独立的 ::after 图层做 opacity 交叉。
+     §3 只允许动画 transform 与 opacity —— 原来直接过渡 box-shadow 等于动画它的尺寸与位置
+     （blur/offset 都在变），那是明文禁止的；颜色过渡才在灰区。 */
   .hover-lift {
-    transition:
-      transform var(--hover-duration) var(--entry-easing),
-      box-shadow var(--hover-duration) var(--entry-easing);
+    position: relative;
+    transition: transform var(--hover-duration) var(--entry-easing);
+  }
+
+  .hover-lift::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    border-radius: inherit;
+    background: inherit;
+    box-shadow: var(--shadow-lift);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity var(--hover-duration) var(--entry-easing);
   }
 
   .hover-lift:hover {
     transform: scale(var(--hover-scale));
-    box-shadow: var(--shadow-lift);
   }
 
-  /* 骨架屏 shimmer（禁 spinner） */
+  .hover-lift:hover::after {
+    opacity: 1;
+  }
+
+  /* 骨架屏 shimmer（禁 spinner）；时长取自契约 token，不再内联 1.4s */
   .skeleton-shimmer {
     background-image: linear-gradient(
       90deg,
@@ -100,12 +120,13 @@
       color-mix(in srgb, var(--color-lagoon) 0%, transparent) 100%
     );
     background-size: 220% 100%;
-    animation: ocean-shimmer 1.4s linear infinite;
+    animation: ocean-shimmer var(--shimmer-duration) linear infinite;
   }
 
-  /* 涟漪：标记状态变化与落点（装饰层，aria-hidden） */
+  /* 场景涟漪（hero 常驻母题）：时长与形态定义在 DESIGN.md「Ripples — 两个角色」；
+     reduced-motion 下由下方全局兜底冻结。事件涟漪用同一个类，但由使用方只播一次。 */
   .ripple-ring {
-    animation: ocean-ripple 2.4s var(--entry-easing) infinite;
+    animation: ocean-ripple var(--ripple-duration) var(--entry-easing) infinite;
   }
 }
 

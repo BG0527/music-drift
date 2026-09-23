@@ -70,8 +70,15 @@ describe('动效物理参数与 reduced-motion 降级', () => {
     expect(motionCss).toMatch(/--stagger-step:\s*100ms/);
   });
 
-  it('hover 只做 scale(1.03) + 200ms，且不位移触发重排', () => {
-    expect(motionCss).toMatch(/scale\(1\.03\)/);
+  it('hover 只动 transform（scale 走 token）+ 200ms，且不碰 box-shadow', () => {
+    // 2026-09-24 修正：本条原来叫「hover 只做 scale(1.03)…」却只断言了两个字面量，
+    // **没有**检查同期存在的 box-shadow 过渡 —— 即「用例名比断言强」。
+    // 现在断言的正是当年漏掉的那一点（motion-web §3：box-shadow 的尺寸/位置禁止动画）。
+    const block = /\.hover-lift\s*\{([\s\S]*?)\}/.exec(motionCss)?.[1] ?? '';
+    expect(block, 'missing .hover-lift block').not.toBe('');
+    expect(block).toMatch(/transition:\s*transform/);
+    expect(block).not.toMatch(/box-shadow/);
+    expect(motionCss).toMatch(/transform:\s*scale\(var\(--hover-scale\)\)/);
     expect(motionCss).toMatch(/--hover-duration:\s*200ms/);
   });
 

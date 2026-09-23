@@ -77,6 +77,9 @@ export const motion = {
   hoverScale: 1.03,
   hoverDuration: 200,
   pageDuration: 300,
+  shimmerDuration: 1400,
+  rippleDuration: 2400,
+  exitDuration: 240,
   reducedDuration: 150,
   animatedProperties: ['transform', 'opacity'],
 } as const;
