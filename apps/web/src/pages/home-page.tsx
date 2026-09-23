@@ -79,7 +79,7 @@ export function HomePage() {
           />
           <span
             aria-hidden="true"
-            className="absolute h-[100px] w-[100px] rounded-full border border-sea-glass/40 md:h-[130px] md:w-[130px]"
+            className="absolute h-[104px] w-[104px] rounded-full border border-sea-glass/40 md:h-[130px] md:w-[130px]"
           />
           <RippleRing className="h-[180px] w-[180px] md:h-[240px] md:w-[240px]" />
 
@@ -87,7 +87,7 @@ export function HomePage() {
             to={riverHref}
             aria-label="捞一个漂流瓶"
             data-anchor="home-pick"
-            className="relative z-10 flex h-[88px] w-[88px] items-center justify-center rounded-full bg-peacock md:h-[110px] md:w-[110px] text-wave-white transition-transform duration-200 ease-out hover:scale-[1.03] hover:bg-peacock-deep focus-visible:ring-2 focus-visible:ring-sea-glass focus-visible:ring-offset-2 focus-visible:ring-offset-deep-current active:translate-y-[-1px]"
+            className="relative z-10 flex h-[88px] w-[88px] items-center justify-center rounded-full bg-peacock ring-2 ring-foam md:h-[110px] md:w-[110px] text-wave-white transition-transform duration-200 ease-out hover:scale-[1.03] hover:bg-peacock-deep focus-visible:ring-[3px] focus-visible:ring-sea-glass focus-visible:ring-offset-2 focus-visible:ring-offset-deep-current active:translate-y-[-1px]"
           >
             <span className="flex flex-col items-center gap-[4px]">
               <Icon name="Waves" size={24} />

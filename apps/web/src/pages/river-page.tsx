@@ -64,7 +64,7 @@ export function RiverPage() {
             />
             <span
               aria-hidden="true"
-              className="absolute h-[80px] w-[80px] rounded-full border border-sea-glass/40 md:h-[130px] md:w-[130px]"
+              className="absolute h-[92px] w-[92px] rounded-full border border-sea-glass/40 md:h-[130px] md:w-[130px]"
             />
             <RippleRing className="h-[140px] w-[140px] md:h-[240px] md:w-[240px]" />
 
@@ -74,6 +74,8 @@ export function RiverPage() {
               aria-label="捞一个漂流瓶"
               className={cn(
                 'relative z-10 h-[76px] w-[76px] rounded-full px-0 md:h-[110px] md:w-[110px]',
+                // V1/C2：紧贴控件的 foam 环（≥3:1）+ 焦点三重区分；同时覆盖 Button 基类的 ring-peacock(2.05:1) 与 wave-white offset
+                'ring-2 ring-foam focus-visible:ring-[3px] focus-visible:ring-sea-glass focus-visible:ring-offset-2 focus-visible:ring-offset-deep-current',
               )}
               onClick={onDraw}
             >
@@ -126,13 +128,13 @@ export function RiverPage() {
             />
             <span
               aria-hidden="true"
-              className="absolute h-[80px] w-[80px] rounded-full border border-coral/55 md:h-[130px] md:w-[130px]"
+              className="absolute h-[92px] w-[92px] rounded-full border border-coral/55 md:h-[130px] md:w-[130px]"
             />
 
             <Link
               to={newHref}
               aria-label="投下一支漂流瓶"
-              className="relative z-10 flex h-[76px] w-[76px] items-center justify-center rounded-full bg-coral text-wave-white transition-transform duration-200 ease-out hover:scale-[1.03] hover:bg-coral-deep focus-visible:ring-2 focus-visible:ring-sea-glass focus-visible:ring-offset-2 focus-visible:ring-offset-deep-current active:translate-y-[-1px] md:h-[110px] md:w-[110px]"
+              className="relative z-10 flex h-[76px] w-[76px] items-center justify-center rounded-full bg-coral ring-2 ring-foam text-wave-white transition-transform duration-200 ease-out hover:scale-[1.03] hover:bg-coral-deep focus-visible:ring-[3px] focus-visible:ring-sea-glass focus-visible:ring-offset-2 focus-visible:ring-offset-deep-current active:translate-y-[-1px] md:h-[110px] md:w-[110px]"
             >
               <span className="flex flex-col items-center gap-[4px]">
                 <Icon name="Music" size={24} />
