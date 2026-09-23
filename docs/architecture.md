@@ -2663,3 +2663,35 @@ Demo 前考虑**重建开发库**到干净基线（migrate + seed + 3 首真曲�
 
 ### 57.6 后端现状（不粉饰）
 **t26 尚未实现** ⇒ 本轮证据止于前端单测 + 真 `fetch` mock 的**请求形状**断言，**不声称"F2 已修好"**；`docs/audio.md` §9.4 标题即「联调待办（未伪造通过）」。
+
+---
+
+## 58. t26 判定层交付 + 迁移审批（captain **批准**）+ FFmpeg 方向关闭
+
+### 58.1 四项归属复核（architect 逐条**读码**复核，不采信履历）
+- **F1** ✅ t25（他本人）：`slackMs = previous.coveredMs <= floor(D×0.5) ? RATE_SLACK_MS : 0`，零延时上限 `0.5D+3000 < 0.8D`；红→绿 `expected 24000 to be less than 24000`。
+- **F3** ✅ t25：标题改「原样+上限记账」+ 两条判别用例。
+- **F4** ✅ **t24（backend-core）**：`store/bottles.ts:254-261` 已删 `?? 1`，改为缺字段**直接抛错**（比"默认 0"更强），测试钉 `bottles.integration.test.ts:402`；architect **本轮未动该文件**。
+- **用户裁决** ✅ 已落档 `docs/api.md`「已知限制」；**F1 残余名按裁决未去修**（守住了"别顺手修"）。
+⇒ architect **没有重做**已完成项 —— captain 那条"只做 t26 剩余"的干预达成目的。
+
+### 58.2 本轮产出：F2 **判定层**（纯函数、与存储解耦）
+`store/listenProgress.ts` 新增 `DURATION_BAND` / `isMeasuredDurationAcceptable` / `medianDuration` / `resolveEffectiveDuration`：
+- 样本**过带才采纳**（有限、500ms–300s、`≤ max(声明×2, 60s)`）⇒ 防"2ms 时长"把门槛打到 0；
+- **中位数**抗离群（非均值）；
+- **下调立即生效 / 上调需 ≥2 用户 ±10% 接近**（否则 `PENDING_AGREEMENT` 不生效）；
+- 下限 `max(500ms, 该段已记录最大 coveredMs)`（不出 ratio > 1、不追溯作废已听进度）；
+- `direction` 扩为 **4 值**（新增 `RAISED` = 上调经多用户一致后真正生效），已同步 t28。
+- TDD：先写 10 条用例 → 亲见 **10 红** → 实现 → **21 passed / rc=0**。
+
+### 58.3 ⭐ 迁移审批：captain **批准**（含 6 条路径）
+**必要性论证（采纳）**：五层里的 **③落库审计**与 **④跨用户聚合必须有新表** —— `listen_progress` 是"覆盖进度"、`events` 是"领域重放日志"，语义都不匹配。architect **没有擅自建迁移**，而是带 DDL 回报（守纪律）。
+批准的 `segment_duration_reports`：`PRIMARY KEY (user_id, segment_id)` ⇒ **天然幂等 + 审计**；`accepted` / `reason` / `applied_direction` 保审计语义；`index (segment_id)` 服务跨用户聚合。**生效分母读时派生，不往 `bottle_segments` 加列** —— 避免与 t20 的"段行时长是权威"语义冲突。
+批准路径（6 条）：`apps/api/src/db/schema.ts`、`apps/api/drizzle/0005_*` + `meta/*`、`apps/api/src/store/segmentDuration.ts`（新）、`apps/api/src/routes/segments.ts`（新）、`packages/shared/src/contracts/interactions.ts`、`packages/shared/src/contracts/error-codes.ts`（`MEASURED_DURATION_REJECTED`）。
+
+### 58.4 FFmpeg 方向：**关闭**（用户裁决已排除）
+architect 问"唯一硬边界是服务端自行解析容器时长（FFmpeg，§7 待裁决）"。→ 用户在 F2 裁决时**已明确排除 (a) 服务端音频核对**、选择 (c) 播放实测回填。故**不引入 FFmpeg / 容器解析**；五层防护"**只抬高成本、无一条是硬边界**"的定位已如实写入 `docs/api.md`「已知限制」第 2 条，与用户裁决一致。
+
+### 58.5 阻塞链：**两个任务卡在同一个过期断言上**
+t26（F2 后端持久化）与 t28（F2 前端）的共同阻塞点 = frontend-flow 的一个**过期断言**：`apps/web/src/pages/__tests__/sea-detail-page.test.tsx`（页面已把 `<MixExportPanel>` 移进 `<Modal open={mixOpen}>`，测试未同步）⇒ 使 `pnpm -r test` 与 `pnpm --filter @music-drift/web test` 保持 exit 1。
+修法一行（先点「混音导出计划」再断言 `findByText(/成品（阶段一 · 纯人声）/)`）。**已提升优先级转达 frontend-flow**：它不是"别人的红"，它是这两个任务验收的直接前置。

@@ -200,3 +200,159 @@ export function listenThresholdOf(policy: { dislikeListenRatioThreshold: number 
 }
 
 export type { Clock };
+
+// ------------------------------------------------------------------ F2（t26）：实测时长校正
+//
+// 动机：声明时长（上传时的 `x-audio-duration-ms`，服务端只校验 15–30s 区间、**不核对音频本体**）
+// 可能远大于文件真实长度 ⇒ 诚实用户永远够不到 `0.8 × 声明值` 的门槛。用户裁决 (c)：
+// 播放时用浏览器实测 `HTMLMediaElement.duration` 回填分母。
+//
+// ⚠️ **安全定位（必须与原话一起读）**：`measuredDurationMs` 与 `coveredMs` 一样**来自客户端**，
+// 因此这套校正**只修诚实路径，不构成对恶意客户端的安全防护**。谎报更小的 duration 会让
+// **被踩的那一段**的门槛变低（受害者是段作者，不是谎报者自己）；谎报更大会让该段更难被斩。
+// 下面五条是**抬高成本**的分层防护，**没有一条是硬边界**：
+// ① 必须先有库内 `listen_progress` 行且 `coveredMsAtReportMs` 与库内值一致（挡"从没播过就改分母"）；
+// ② 下调立即生效 / 上调需 ≥2 个用户互相接近（±10%）；
+// ③ 落库审计（何时、从多少到多少、来源）—— 见 `segment_duration_reports` 表（待迁移）；
+// ④ 跨用户取中位数（抗单点离群）；
+// ⑤ 下限 = `max(500ms, 该段已记录的最大 coveredMs)`（避免 ratio > 1 与追溯作废已听进度）。
+// 物理上限：纯 Web 架构下服务端**无法**知道客户端是否真的出声（同 §「已知限制」第 2 条）。
+
+/** 实测时长的可接受带（与前端 t28 的 fail-closed band 镜像一致）。 */
+export const DURATION_BAND = {
+  MIN_MS: 500,
+  MAX_MS: 300_000,
+  /** 与声明值的最大偏离倍数：`measured <= max(declared × 2, ABSOLUTE_CAP_MS)`。 */
+  MAX_DECLARED_MULTIPLE: 2,
+  /** 声明值未知（旧数据）时的绝对上限。 */
+  ABSOLUTE_CAP_MS: 60_000,
+  /** 上调需要几个用户互相接近。 */
+  UPWARD_MIN_AGREEMENT: 2,
+  /** "接近"的相对容差（±10%）。 */
+  AGREEMENT_TOLERANCE: 0.1,
+} as const;
+
+export type DurationCorrectionDirection = 'LOWER' | 'RAISED' | 'NONE' | 'PENDING_AGREEMENT';
+
+export interface DurationSample {
+  measuredDurationMs: number;
+  /** 上报那一刻该用户在该段的已听覆盖（用于一致性校验与审计）。 */
+  coveredMsAtReportMs: number;
+}
+
+export interface EffectiveDuration {
+  declaredDurationMs: number;
+  /** 被采纳样本的中位数；无采纳样本时为 null。 */
+  measuredDurationMs: number | null;
+  effectiveDurationMs: number;
+  corrected: boolean;
+  direction: DurationCorrectionDirection;
+  /** 只数**被采纳**的样本（审计口径）。 */
+  sampleCount: number;
+}
+
+/** 单个样本是否可接受：有限、落在带内、且不超过 `max(声明×2, 绝对上限)`。 */
+export function isMeasuredDurationAcceptable(
+  measuredDurationMs: number,
+  declaredDurationMs: number | null,
+): boolean {
+  if (!Number.isFinite(measuredDurationMs)) {
+    return false;
+  }
+  if (measuredDurationMs < DURATION_BAND.MIN_MS || measuredDurationMs > DURATION_BAND.MAX_MS) {
+    return false;
+  }
+  const cap = Math.max(
+    declaredDurationMs === null ? 0 : declaredDurationMs * DURATION_BAND.MAX_DECLARED_MULTIPLE,
+    DURATION_BAND.ABSOLUTE_CAP_MS,
+  );
+  return measuredDurationMs <= cap;
+}
+
+/** 中位数（偶数个取中间两个的平均，再取整）。 */
+export function medianDuration(values: readonly number[]): number {
+  if (values.length === 0) {
+    throw new Error('medianDuration 需要至少一个值');
+  }
+  const sorted = [...values].sort((left, right) => left - right);
+  const middle = Math.floor(sorted.length / 2);
+  if (sorted.length % 2 === 1) {
+    return sorted[middle] ?? 0;
+  }
+  const lower = sorted[middle - 1] ?? 0;
+  const upper = sorted[middle] ?? 0;
+  return Math.floor((lower + upper) / 2);
+}
+
+/**
+ * 由「声明值 + 全部实测样本 + 该段已记录的最大覆盖」算出**实际生效的分母**。
+ * 纯函数、无 IO；调用方负责取样本与库内值。
+ */
+export function resolveEffectiveDuration(input: {
+  declaredDurationMs: number;
+  samples: readonly DurationSample[];
+  maxCoveredMs: number;
+}): EffectiveDuration {
+  const declared = normalizeInt(input.declaredDurationMs);
+  const accepted = input.samples.filter((sample) =>
+    isMeasuredDurationAcceptable(sample.measuredDurationMs, declared === 0 ? null : declared),
+  );
+
+  const base = {
+    declaredDurationMs: declared,
+    measuredDurationMs: null as number | null,
+    sampleCount: accepted.length,
+  };
+
+  if (accepted.length === 0) {
+    return { ...base, effectiveDurationMs: declared, corrected: false, direction: 'NONE' };
+  }
+
+  const median = medianDuration(accepted.map((sample) => sample.measuredDurationMs));
+  const floor = Math.max(DURATION_BAND.MIN_MS, normalizeInt(input.maxCoveredMs));
+
+  if (median < declared) {
+    const effectiveDurationMs = Math.max(median, floor);
+    return {
+      ...base,
+      measuredDurationMs: median,
+      effectiveDurationMs,
+      corrected: effectiveDurationMs !== declared,
+      direction: 'LOWER',
+    };
+  }
+
+  if (median === declared) {
+    return {
+      ...base,
+      measuredDurationMs: median,
+      effectiveDurationMs: declared,
+      corrected: false,
+      direction: 'NONE',
+    };
+  }
+
+  // 上调：**只记录不生效**，除非有足够多的用户互相接近（防单点抬高分母 ⇒ 永久冻结该段的斩浪）
+  const agreeing = accepted.filter(
+    (sample) =>
+      Math.abs(sample.measuredDurationMs - median) <= median * DURATION_BAND.AGREEMENT_TOLERANCE,
+  ).length;
+  if (agreeing < DURATION_BAND.UPWARD_MIN_AGREEMENT) {
+    return {
+      ...base,
+      measuredDurationMs: median,
+      effectiveDurationMs: declared,
+      corrected: false,
+      direction: 'PENDING_AGREEMENT',
+    };
+  }
+
+  const effectiveDurationMs = Math.max(median, floor);
+  return {
+    ...base,
+    measuredDurationMs: median,
+    effectiveDurationMs,
+    corrected: effectiveDurationMs !== declared,
+    direction: 'RAISED',
+  };
+}
