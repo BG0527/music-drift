@@ -3491,3 +3491,36 @@ if (!outcome.ok) {
 | ⑤ | **t40**（真实麦克风录音 P0 排查） | audio-engineer |
 | ⑥ | 美化（**5 个 skill** + 水/河流/海洋/漂流瓶主题元素） | **待派**（与 t41 串行，避免并发写 `pages/**`） |
 | — | ④ 的前端 UI | 待 t41 让出 `pages/**` |
+
+---
+
+## 88. t42 开工前被拦下（captain 的 outOfScope 疏漏）+ 裁决 (A) + 转派 backend-core
+
+### 88.1 ⚠️ captain 的疏漏：把「规则本体所在模块」划进了 outOfScope
+t42 的规则变更（留言目标：固定发起者 → 用户指定）**本体在域内核**：
+- `domain/messages.ts:52` `attachPrivateMessage()` **硬编码 `toUserId: state.initiatorId`** ← 旧规则本体；
+- `domain/messages.ts:22` `canAttachPrivateMessage()`：接唱者才能写 / 发起者不能写；
+- `domain/messages.ts` `visibleMessagesFor()`：旧可见性（发起者看全部）；
+- `domain/types.ts:44` `PrivateMessage.toUserId`：唯一收件人字段；
+- API 侧（`routes/interactions.ts`、`store/notifications.ts`）**只是调用这些函数**。
+⇒ 而我给 t42 的 outOfScope **包含了 `packages/shared/src/domain/`** ⇒ 在声明内**做不完**；只改 API 层必然留下**两套规则并存**（任务文本自己禁止的失效模式）。
+⇒ **教训（与 §75.2 / §79.5 同源）**：**划 scope 前必须先确认「规则本体在哪个模块」** —— 声明不只是权限边界，它还是"这个任务是否可完成"的**可行性前提**。architect **在开工前读码拦下**、没有先做一半（先做一半会同时留下两套规则，返工更贵）。
+
+### 88.2 裁决 (A)：授权改域内核
+- **字段采纳 `targetSegmentIndex`**（**1-based，与 `Segment.index` 同语义**）—— 理由：① 不信任前端送来的身份；② 「之前段的作者」本身就是**位置语言**；服务端按 `(bottleId, index)` 解析并校验「**必须 < `nextRecordIndex` 且为有效段**」，另加「目标 ≠ 发送者」；
+- **测试按「反转而非追加」纪律改写**（规则变了 ⇒ 既有断言必须反转），并要求给**反转前后对比**。
+
+### 88.3 DELIVERED 语义：确认 architect 的定义 + **补一条**
+它给的可测定义（"留言 DELIVERED ⇔ 目标本人是执行 `SEA` 那次去向决策的人"）**只覆盖入海那一刻**；而用户原话是「**只有回传到他手上时**有通知」⇒ **漂流中目标拿到瓶子**（随后他选投河继续漂）也应及时送达。完整规则：
+1. **持有者变成目标** ⇒ DELIVERED + **通知目标**；
+2. `BOTTLE_WENT_TO_SEA` 时仍 PENDING ⇒ UNDELIVERED + **通知留言者**（**用户第③条原话**："整首接唱完成入海却没有回传到留言接收者"）；
+3. `SEGMENT_CUT`（被斩段属目标）/ `BOTTLE_DAMAGED` / `returnChainBroken` ⇒ UNDELIVERED + **通知留言者**。
+（若读码发现第 1 条与现有实现等价 —— 即除入海外不存在"目标成为持有者"的路径 —— 需**用测试说明**。）
+
+### 88.4 转派 backend-core（并尊重一条能力边界）
+architect 主动报告「**会话上下文已接近上限**（累计约 40 次工具调用、多轮完整交付）」，并说"若由另一位成员在新会话承接，我认可 —— 定位与提案都在 findings 里，不必重新调研"。
+⇒ **转派 `backend-core`**：`domain/**` 这套内核正是它写的（t4 / t17），交接成本最低；architect 的定位以**行号级**完整交接，**不重复调研**。
+⇒ 记：**成员主动报告自己的上下文/能力边界，与"开工前拦下不可完成的任务"是同一类行为** —— 都在防止"做一半就断"（本会话已发生 6 次"报告前失败"，这类主动报告正是解药）。
+
+### 88.5 归档方式
+工具不允许改 inScope ⇒ **披露式归档**（t20 先例）：`changedPaths` 只列声明内路径，`packages/shared/src/domain/**` 的改动在 output 逐条披露 + captain 背书。**不得**为绕过校验而把它塞进 changedPaths（那是事后扩大声明，工具拒绝是对的）。
