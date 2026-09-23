@@ -2807,3 +2807,28 @@ frontend-flow 把 `one-screen-check.mjs` 改为 hermetic 后**立刻**发现：*
 
 ### 62.4 包级状态
 `pnpm --filter @music-drift/web test` 现为 **exit 0（54 文件 / 479 例）** ⇒ frontend-flow 的 **P0（#2 发起后无法录第一段）已转绿**。architect 本轮只报 api/shared 的真实退出码、**未把 web 红归因成缺陷** —— 处置正确。
+
+---
+
+## 63. t31 开工前的两个答复：批准 0006 回填 + 选 **(A) 三处全改**
+
+### 63.1 批准 0006 迁移（DML、幂等、无 DDL）
+内容：`INSERT ... SELECT` 给现存 `licensed_source = 'placeholder'` 的歌补齐 `song_segments` 行（每段 20000ms，与 seed 的 `SEGMENT_DURATION_MS` 一致；`on conflict (song_id, "index") do nothing`）。
+背景（architect 实测）：dev 库 `song_segments` 只有 **12 行**（3 首库曲 × 4 段），**占位曲一行都没有** ⇒ 不回填则 fail-closed 落地后金路径（用的正是占位曲）直接断。
+⇒ **批准**：纯 DML + 幂等 + 无 DDL + 与 seed 既有口径一致。
+
+### 63.2 选 **(A) 三处全改**（而非 (B) 只改两处 + grep 证明）
+- **(A)**：① `db/segments.ts` 去掉 `?? cmd.durationMs`（无预设直接抛）；② `routes/bottles.ts` 无预设 → **422 + 新码**（不是 500）；③ `audio/ingest.ts` 的 `presetDurationMs` 由可选改**必填** ⇒ "无预设 → 回退区间"在**类型层面**不存在。
+- **(B)**：只做 ①②，用 grep 证明 API 侧已无调用者。
+- **裁决 (A)**，理由：**(B) 的 grep 是弱保证** —— 今天没有调用者不代表明天没有，任何人新增一个调用就会让"已被证明死掉"的回退路径**静默复活**；而**类型必填是强保证**（编译期即拒绝）。
+  ⇒ 成文原则：**能靠类型消除的错误，不要靠纪律去记住。**
+- 代价与授权：`apps/api/src/audio/` 下既有调用/测试（含 **t7 的测试文件**，跨 owner）需显式传预设 ⇒ **授权改动，但限"显式传预设"这类机械修改：不得改断言、不得改测试意图**；若会改变测试语义则停下回报。
+- 同时认可：`test-helpers.insertSong` 一并建预设（否则大量既有集成测试会因突然的 fail-closed 集体断，那种红是"夹具不完整"而非"规则错"）。
+
+### 63.3 architect 的两条既有事实核查（省了两件事、避了一处越界）
+- **seed 脚本本来就会给占位曲写预设**（`apps/api/src/db/seed.ts` 按 `SEGMENT_DURATION_MS = 20_000` 写 `song_segments`）⇒ 新库与 hermetic 库（金路径、集成测试）**不会**被 fail-closed 打断 ⇒ 省掉"重写 seed"，只需核对。
+- **新错误码不必动契约**：`packages/shared/src/contracts/common.ts:32-34` 的 `RuleCodeSchema = z.enum([...RULE_CODES, ...AUDIO_RULE_CODES])` 是**运行时合并** ⇒ 只在 `packages/shared/src/audio/errors.ts`（inScope 内）加码，即可自动进入 422 错误体词汇，**不必碰 `contracts/error-codes.ts`**（captain 划的边界外）⇒ 又避开一处越界。
+  ⇒ 这正是要推广的工作方式：**先查证"要不要越界"，而不是先越界再解释。**
+
+### 63.4 当前绿基线（captain 亲测）
+`pnpm -r test` → **exit 0**：shared 21/231 · api 19/179 · web 54/479 = **94 文件 889 例**（含已转绿的 P0「发起者录第 1 段」）。这是本会话第一次达到"全仓全绿且含 P0 修复"的状态。
