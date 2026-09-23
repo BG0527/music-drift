@@ -3031,3 +3031,40 @@ design-system/button.tsx:17 … ring-2 ring-peacock   ring-offset-2 ring-offset-
 ```
 ⇒ `Button`（捞取）的焦点环是 `ring-peacock` = **2.05:1** —— **与 V1 是同一条违规**，只是发生在**焦点态**；且同一页面两个 CTA 的焦点表现不一致。
 ⇒ 批准在调用点用 `className` 覆盖（只改 `pages/**`，不碰 design-system，不越 t32 的界）。**收口必须带验证**：① 贴改动后 `grep -n "focus-visible:ring"` 输出证明三处一致；② **token 守卫扩展到焦点环色**（`sea-glass` 对各面 ≥3:1），使**焦点态达标也进机器门禁**，而不是靠肉眼看。
+
+---
+
+## 73. 14:00 停机归档 + 三条重要更正 + 一个「测试全绿但真实浏览器里是坏的」缺陷
+
+### 73.1 停机（用户令 14:00）
+- 13:53–13:55 发停机令（三名在飞成员），要求：**停在自洽点 + 未完成清单落进仓库 + 不 commit**；
+- 三份 handover 全部落盘：`frontend-flow-t32-unfinished.md` / `audio-engineer-t30-unfinished.md` / `frontend-ds-v1-ready-to-land.md`（**这是本会话第二次靠"交接必须进仓库"这条纪律保住上下文**）；
+- captain 统一提交（含在飞半成品）；**未取绿基线**（在途窗口，按 §52.3）。
+
+### 73.2 ⭐ 重大发现：点踩功能在**真实浏览器里本来是坏的**（而所有自动化测试都是绿的）
+audio-engineer 在真实浏览器跑完整链路时发现：`POST /api/segments/:id/listen` **21 次全部 400**。
+- **根因**：`coveredMs` 来自 `currentTime * 1000`（**浮点**），而契约是 `z.number().int()`；
+- **后果**：**覆盖率永远推不上去 ⇒ 点踩门槛永远不满足** ⇒ **点踩功能实际不可用**；
+- 已修（唯一归一化点向下取整）+ 新增用例用**真实契约 schema** 校验实际请求体；复测 **21/21 全 200**。
+⇒ **为什么全绿也漏了它**：脚本构造的 `coveredMs` 天然是整数，真实浏览器产生浮点 ⇒ **又一次「测试绿但产品废」**，且**只能被真实浏览器验证抓到**。
+⇒ 处置：**把「真实浏览器跑一遍真实链路」提升为交付前必做**（单测 / 集成 / live-check 都不足以覆盖这一类）—— 这正是 t14（E2E）存在的理由，本会话此前一直没做。
+
+### 73.3 ⚠️ 用户可见阻塞：录制按钮现在是**禁用状态**（页面未接线）
+- 事实（实测）：`grep -rn presetDurationMs apps/web/src/features/bottle apps/web/src/pages` = **空** ⇒ `#4` 的**组件层完成、页面未接线**；而 fail-closed 落地后，组件在 `presetMissing` 时**禁用录制按钮**。
+- ⇒ **用户点进录制页会看到「不能录」** —— 不是回归，而是"fail-closed 已落地 + 页面还没接线"叠加出的**临时断点**。
+- 修法（一行，frontend-flow 域）：`presetDurationMs={song.segments.find((s) => s.index === segmentIndex)?.durationMs ?? null}`（数据源 `GET /api/songs` 已有，**不需要新契约字段**）。
+- ⇒ **恢复后第一优先**（它比视觉更靠前：挡住的是"接唱"这条主链路）。
+
+### 73.4 更正 captain 的两处判断（本会话第五次同类教训）
+1. **`measuredDurationMs` 已不是 typecheck 红点** ⇒ t31 **不必再等它**；剩余红点全在 t32 在途（`features/api` 的 `Collection`、`relay-timeline.tsx` 的 Icon size `14`）。
+2. **`recorder-panel.tsx` 里那句是注释、不是调用点** —— captain 据它推断"页面已接线"，实际是空的（见 §73.3）。
+⇒ 教训：**从代码里看到一句话，不等于那句话描述的行为已发生**；"已接线"这类判断要用 **`grep` 调用点**来证，**不能用注释来证**。
+
+### 73.5 授权数据操作的差异（如实记录）
+captain 授权删 **2 支**引用无预设歌的 DRAFT；frontend-flow 实际命中 **3 支**（第三支创建于 `05:38:07 UTC`，**在 captain 盘点之后**，同一发起者）。
+⇒ 第三支恰好是「**选到无切分歌 → 卡死**」的**又一次现场复现** ⇒ 说明 §65.2 那条缺陷在真实使用中会**持续产生死草稿**。
+⇒ 备份 `backup_t32.{bottles,events,anon_codes}` 留库；复查引用无预设歌的 DRAFT = **0**；`songs` 仍 4 首。
+
+### 73.6 待用户恢复后裁决（不阻塞）
+仓库外一次性浏览器探针 `D:/music-rec-probe/probe.mjs`（Playwright npx 缓存 + 一次性库 + 假麦克风）是否入库？
+captain 初裁：**不入库**（AGENTS.md §7 规定 E2E 工具属待裁决项；它是一次性证据工具），但**保留在仓库外** —— 它给出的是「**真浏览器真的在放声**」这一级证据，对本会话有独特价值。

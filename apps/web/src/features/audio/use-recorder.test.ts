@@ -32,7 +32,9 @@ describe('useRecorder：环境与权限', () => {
       isSecureContext: false,
       hostname: '192.168.1.9',
     });
-    const { result } = renderHook(() => useRecorder({ environment, presetDurationMs: ANY_PRESET_MS }));
+    const { result } = renderHook(() =>
+      useRecorder({ environment, presetDurationMs: ANY_PRESET_MS }),
+    );
 
     expect(result.current.status).toBe('unsupported');
     expect(result.current.support.reason).toBe('INSECURE_CONTEXT');
@@ -46,7 +48,9 @@ describe('useRecorder：环境与权限', () => {
 
   it('浏览器缺 MediaRecorder → 建议换浏览器，并可开始与否由 support 决定', () => {
     const { environment } = makeRecorderEnvironment({ hasMediaRecorder: false });
-    const { result } = renderHook(() => useRecorder({ environment, presetDurationMs: ANY_PRESET_MS }));
+    const { result } = renderHook(() =>
+      useRecorder({ environment, presetDurationMs: ANY_PRESET_MS }),
+    );
 
     expect(result.current.status).toBe('unsupported');
     expect(result.current.support.guidance).toContain('MediaRecorder');
@@ -54,7 +58,9 @@ describe('useRecorder：环境与权限', () => {
 
   it('支持任何容器都不行 → unsupported（不能静默失败）', async () => {
     const { environment } = makeRecorderEnvironment({ isTypeSupported: () => false });
-    const { result } = renderHook(() => useRecorder({ environment, presetDurationMs: ANY_PRESET_MS }));
+    const { result } = renderHook(() =>
+      useRecorder({ environment, presetDurationMs: ANY_PRESET_MS }),
+    );
 
     await act(async () => {
       await result.current.start();
@@ -71,7 +77,9 @@ describe('useRecorder：环境与权限', () => {
         throw denied;
       },
     });
-    const { result } = renderHook(() => useRecorder({ environment, presetDurationMs: ANY_PRESET_MS }));
+    const { result } = renderHook(() =>
+      useRecorder({ environment, presetDurationMs: ANY_PRESET_MS }),
+    );
 
     await act(async () => {
       await result.current.start();
@@ -90,7 +98,9 @@ describe('useRecorder：环境与权限', () => {
         throw Object.assign(new Error('none'), { name: 'NotFoundError' });
       },
     });
-    const { result } = renderHook(() => useRecorder({ environment, presetDurationMs: ANY_PRESET_MS }));
+    const { result } = renderHook(() =>
+      useRecorder({ environment, presetDurationMs: ANY_PRESET_MS }),
+    );
 
     await act(async () => {
       await result.current.start();
@@ -154,7 +164,9 @@ describe('useRecorder：录完可以试听自己那一段（用户实测需求 �
   it('录完自动准备试听：拿到 objectURL，且元素 src 指向它', async () => {
     vi.useFakeTimers();
     const harness = envWithPreview();
-    const { result } = renderHook(() => useRecorder({ environment: harness.environment, presetDurationMs: ANY_PRESET_MS }));
+    const { result } = renderHook(() =>
+      useRecorder({ environment: harness.environment, presetDurationMs: ANY_PRESET_MS }),
+    );
 
     await act(async () => {
       await result.current.start();
@@ -174,7 +186,9 @@ describe('useRecorder：录完可以试听自己那一段（用户实测需求 �
   it('togglePreview：播放 → 暂停 → 继续；状态文字可读（不是静默）', async () => {
     vi.useFakeTimers();
     const harness = envWithPreview();
-    const { result } = renderHook(() => useRecorder({ environment: harness.environment, presetDurationMs: ANY_PRESET_MS }));
+    const { result } = renderHook(() =>
+      useRecorder({ environment: harness.environment, presetDurationMs: ANY_PRESET_MS }),
+    );
     await act(async () => {
       await result.current.start();
     });
@@ -203,7 +217,9 @@ describe('useRecorder：录完可以试听自己那一段（用户实测需求 �
   it('试听到结尾：状态变 ended，再点从头重听（与播放器同一条语义）', async () => {
     vi.useFakeTimers();
     const harness = envWithPreview();
-    const { result } = renderHook(() => useRecorder({ environment: harness.environment, presetDurationMs: ANY_PRESET_MS }));
+    const { result } = renderHook(() =>
+      useRecorder({ environment: harness.environment, presetDurationMs: ANY_PRESET_MS }),
+    );
     await act(async () => {
       await result.current.start();
     });
@@ -235,7 +251,9 @@ describe('useRecorder：录完可以试听自己那一段（用户实测需求 �
   it('重录（reset）会释放 objectURL：不留 blob 泄漏', async () => {
     vi.useFakeTimers();
     const harness = envWithPreview();
-    const { result } = renderHook(() => useRecorder({ environment: harness.environment, presetDurationMs: ANY_PRESET_MS }));
+    const { result } = renderHook(() =>
+      useRecorder({ environment: harness.environment, presetDurationMs: ANY_PRESET_MS }),
+    );
     await act(async () => {
       await result.current.start();
     });
@@ -259,7 +277,9 @@ describe('useRecorder：录完可以试听自己那一段（用户实测需求 �
   it('卸载也会释放 objectURL（离开录音页不留泄漏）', async () => {
     vi.useFakeTimers();
     const harness = envWithPreview();
-    const { result, unmount } = renderHook(() => useRecorder({ environment: harness.environment, presetDurationMs: ANY_PRESET_MS }));
+    const { result, unmount } = renderHook(() =>
+      useRecorder({ environment: harness.environment, presetDurationMs: ANY_PRESET_MS }),
+    );
     await act(async () => {
       await result.current.start();
     });
@@ -281,7 +301,9 @@ describe('useRecorder：录制与停止', () => {
   it('录制中：状态 recording、计时按秒推进、电平每帧刷新', async () => {
     vi.useFakeTimers();
     const { environment } = makeRecorderEnvironment();
-    const { result } = renderHook(() => useRecorder({ environment, bars: 12, presetDurationMs: ANY_PRESET_MS }));
+    const { result } = renderHook(() =>
+      useRecorder({ environment, bars: 12, presetDurationMs: ANY_PRESET_MS }),
+    );
 
     await act(async () => {
       await result.current.start();
@@ -325,7 +347,9 @@ describe('useRecorder：录制与停止', () => {
   it('手动 stop：得到 Blob + 时长 + 归一化容器；麦克风轨道与电平表都被释放', async () => {
     vi.useFakeTimers();
     const { environment, stopTrack, meterStop } = makeRecorderEnvironment();
-    const { result } = renderHook(() => useRecorder({ environment, presetDurationMs: ANY_PRESET_MS }));
+    const { result } = renderHook(() =>
+      useRecorder({ environment, presetDurationMs: ANY_PRESET_MS }),
+    );
 
     await act(async () => {
       await result.current.start();
@@ -354,7 +378,9 @@ describe('useRecorder：录制与停止', () => {
   it('判定以**曲库预设**为分母：录满无违规，差太多则给出可读文案（不再是 15–30 区间）', async () => {
     vi.useFakeTimers();
     const { environment } = makeRecorderEnvironment();
-    const { result } = renderHook(() => useRecorder({ environment, presetDurationMs: ANY_PRESET_MS }));
+    const { result } = renderHook(() =>
+      useRecorder({ environment, presetDurationMs: ANY_PRESET_MS }),
+    );
 
     await act(async () => {
       await result.current.start();
@@ -375,7 +401,9 @@ describe('useRecorder：录制与停止', () => {
   it('reset：回到 idle 并清空录音与错误（重录用它）', async () => {
     vi.useFakeTimers();
     const { environment } = makeRecorderEnvironment();
-    const { result } = renderHook(() => useRecorder({ environment, presetDurationMs: ANY_PRESET_MS }));
+    const { result } = renderHook(() =>
+      useRecorder({ environment, presetDurationMs: ANY_PRESET_MS }),
+    );
 
     await act(async () => {
       await result.current.start();
@@ -402,7 +430,9 @@ describe('useRecorder：录制与停止', () => {
     vi.useFakeTimers();
     const getUserMedia = vi.fn(async () => fakeStream());
     const { environment } = makeRecorderEnvironment({ getUserMedia });
-    const { result } = renderHook(() => useRecorder({ environment, presetDurationMs: ANY_PRESET_MS }));
+    const { result } = renderHook(() =>
+      useRecorder({ environment, presetDurationMs: ANY_PRESET_MS }),
+    );
 
     await act(async () => {
       await result.current.start();
@@ -423,11 +453,13 @@ describe('useRecorder：本段固定时长（用户第 4 条裁决 · t29 的曲
    * - **录满自动停**：到本段时长就收尾（不再让人录到 30 秒然后被服务端拒）；
    * - **判定读曲库值**：与上传/服务端校验共用 `checkRecordingDurationAgainstPreset` 与同一容差。
    */
-  
+
   it('给了本段时长 → 到点自动停（不再跑到 30 秒上限）', async () => {
     vi.useFakeTimers();
     const { environment } = makeRecorderEnvironment();
-    const { result } = renderHook(() => useRecorder({ environment, presetDurationMs: ANY_PRESET_MS }));
+    const { result } = renderHook(() =>
+      useRecorder({ environment, presetDurationMs: ANY_PRESET_MS }),
+    );
 
     await act(async () => {
       await result.current.start();
@@ -442,11 +474,12 @@ describe('useRecorder：本段固定时长（用户第 4 条裁决 · t29 的曲
     expect(result.current.durationViolations).toEqual([]);
   });
 
-
   it('提前停止 → 违规文案说明本段固定时长与相差多少（用户能知道还差多久）', async () => {
     vi.useFakeTimers();
     const { environment } = makeRecorderEnvironment();
-    const { result } = renderHook(() => useRecorder({ environment, presetDurationMs: ANY_PRESET_MS }));
+    const { result } = renderHook(() =>
+      useRecorder({ environment, presetDurationMs: ANY_PRESET_MS }),
+    );
 
     await act(async () => {
       await result.current.start();
@@ -468,7 +501,9 @@ describe('useRecorder：本段固定时长（用户第 4 条裁决 · t29 的曲
   it('±2.0 秒以内算合格（与服务端用同一容差，不出现"前端说行、后端说不行"）', async () => {
     vi.useFakeTimers();
     const { environment } = makeRecorderEnvironment();
-    const { result } = renderHook(() => useRecorder({ environment, presetDurationMs: ANY_PRESET_MS }));
+    const { result } = renderHook(() =>
+      useRecorder({ environment, presetDurationMs: ANY_PRESET_MS }),
+    );
 
     await act(async () => {
       await result.current.start();

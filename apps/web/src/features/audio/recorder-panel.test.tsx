@@ -549,7 +549,6 @@ describe('RecorderPanel：本段固定时长（用户第 4 条裁决 —— 取�
         segmentIndex={2}
         totalSegments={4}
         environment={environment}
-        presetDurationMs={ANY_PRESET_MS}
         presetDurationMs={PRESET}
       />,
     );
@@ -570,7 +569,6 @@ describe('RecorderPanel：本段固定时长（用户第 4 条裁决 —— 取�
         segmentIndex={2}
         totalSegments={4}
         environment={environment}
-        presetDurationMs={ANY_PRESET_MS}
         presetDurationMs={PRESET}
       />,
     );
@@ -594,7 +592,6 @@ describe('RecorderPanel：本段固定时长（用户第 4 条裁决 —— 取�
         segmentIndex={2}
         totalSegments={4}
         environment={environment}
-        presetDurationMs={ANY_PRESET_MS}
         presetDurationMs={PRESET}
       />,
     );
@@ -619,7 +616,6 @@ describe('RecorderPanel：本段固定时长（用户第 4 条裁决 —— 取�
         segmentIndex={2}
         totalSegments={4}
         environment={environment}
-        presetDurationMs={ANY_PRESET_MS}
         presetDurationMs={PRESET}
       />,
     );
