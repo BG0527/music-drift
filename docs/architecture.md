@@ -2515,3 +2515,36 @@ t21 第 27 步断言原先依赖 t22 的**在飞实现**（验证污染）。t22
 ### 52.6 探针目录污染：`apps/web/dist__no_build_probe/`
 frontend-ds 做"无 `dist` 场景"实测时在工作区建了该目录；**eslint 的 `**/dist/**` ignore 不覆盖这个目录名** ⇒ 探针产物被 lint 扫到，成为此前 14 problem 中的"一大批"（audio-engineer 观察其随后消失）。
 ⇒ 纪律：**探针 / 实验产物一律放仓库外（如 `/tmp`）或先写进 `.gitignore`**；否则"临时探针"会变成别人的噪声源与假红源。（reference：reviewer 把全部探针放在 `/tmp/mdb-head`、仓库零改动，做法正确。）
+
+---
+
+## 53. t25 完成：F1 阻断**部分**关闭 + F3 收敛 + F2 安全分析结论
+
+### 53.1 F1 修复方式（比 captain 的建议更省）
+`slackMs = previous.coveredMs <= floor(duration × 0.5) ? RATE_SLACK_MS : 0` —— **宽限只发一次**，增长项只剩 `floor(elapsed × 1.25)`。
+逐步求和 ≡ `firstGranted + 总真实耗时 × 1.25`，与 captain 建议的「锚定首次上报预算」**代数等价** ⇒ **不需要新增 `firstSeenAt` 列**（省掉 `db/schema.ts` + `drizzle/**` 改动，也避开了 t25 声明范围外的文件）。
+零延时连打上限 = `0.5D + 3000`，在 15–30s 段长内**恒 < `0.8D`**。
+- 红（修复前）：单测 `expected 24000 to be less than 24000`（第 10 次即时上报正好等于门槛）、`expected 21000 to be 18000`（宽限被按请求重复发放）；集成（真 HTTP + 真库，不推进假时钟）`expected true to be false`（早期上报已达门槛）。
+- 绿（修复后）：`api test` **rc=0**（19 文件/179 例）、`test:integration` **rc=0**（21/173）、`typecheck` **rc=0**（三包 Done）、改动 4 文件 `eslint` **rc=0**；攻击用例现在每次 `reachedThreshold=false`、终值 `coveredMs=18000`、`DISLIKE=422`、`votes` 行数 0。
+- **正常路径未被废掉（关键回归）**：1×/秒上报单调增长，单测第 6 次达标、集成 15 次后 ratio ≥ 0.8 且 `DISLIKE=200`。
+
+### 53.2 ⚠️ F1 只是**部分**关闭：新发现的残余名（「等够时间」≠「真的听」）
+首次预算 `0.5D` 是**白给**的；之后攻击者**只需真实等待约 `0.24×D`（30s 段 ≈ 7.2s）再报一次**即可达标 —— **实际播放 0 秒**。
+即攻击成本从「零等待连打（~100ms）」变成「等约 7.2 秒」，但**仍然不需要真的听**（诚实用户需 24s）。10 个这样的攻击者仍可斩浪。
+要彻底堵住必须**改契约**：上传播放位置序列由服务端重算 span，或按**播放心跳计费**。
+**物理上限（必须对用户讲清）**：纯 Web 架构下服务端**无法**知道客户端是否真的出声 —— 任何方案（心跳 / 位置序列）都只能做到「**必须真实耗费 ≥N 秒墙钟时间**」，无法证明"人耳真的听到了"。因此可达目标是**把伪造成本提高到与诚实路径同量级**，而不是"不可能伪造"。已报用户裁决。
+
+### 53.3 F3 收敛方式
+标题改为「内核 tracker 的区间并集语义经上报被服务端**原样 + 上限**记账」，注释明说**服务端不重算 span**；**新增两条判别用例**：客户端报 25000 → 服务端只采 15000（证明不照抄客户端数字）、客户端报 0 → 不回退已记进度（**记账权威在服务端**）。原「端到端同一条规则」的虚假证据链已拆。
+
+### 53.4 F2 安全分析结论（architect 先想清楚，已同步 audio-engineer）
+**谎报更小的 duration ⇒ 分母变小 ⇒ 门槛变低 ⇒ 所有人更容易踩它**（受害者是**被踩的那个段**，而非作者）；谎报更大 ⇒ 便于段作者自保（自己那段更难被斩）。`measuredDurationMs` 与 `coveredMs` 一样来自客户端 ⇒ **只修诚实路径，不改变威胁模型**。
+防护分层（都不构成硬边界）：① 必须先有 `listen_progress` 行且 `coveredMsAtReportMs` 与库内值一致（**由可选改为必填**）② **只允许下调立即生效**，上调需 ≥2 个用户互相接近（±10%）③ 落库审计 ④ 跨用户取中位数 ⑤ 下限 = `max(500ms, 该段已记录最大 coveredMs)`（避免 ratio > 1 与追溯作废已听进度）。
+冻结接口：`POST /api/segments/:id/duration`、`422 MEASURED_DURATION_REJECTED`（已同步 t28）。
+
+### 53.5 out-of-scope 备案（captain 批准并记账）
+额外修 `apps/api/src/auth/repository.integration.test.ts`：5 处「直接 assign 随机代号」因 `anon_codes.code`**全局唯一** + 21 个集成文件**共享同一测试库**而**概率性假红**（本轮全量真红一次：`listCodesForUser … expected [] to include '灯塔守望#887'`）⇒ 改为 `assignCodeWithRetry()`（与 `routes/auth.integration.test.ts` 既有做法一致）。
+**批准**：修掉一个真实假红源优于"保持声明整洁"；归档沿用 t20 先例（changedPaths 只列声明内 + output 披露）。
+
+### 53.6 新纪律已在一线生效（证据）
+architect 过程中两次遇到红，均确认为**别人正在写的文件**（`apps/web` 的 sea 页面语法错、t24 的 sea 分页），按 §52.3 **未归因、未加重试**，60s 后复跑 rc=0。⇒ §52.3 的纪律不只是写在文档里。

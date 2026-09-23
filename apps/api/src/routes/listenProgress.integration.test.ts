@@ -16,6 +16,7 @@ import {
   CastVoteResponseSchema,
   ErrorResponseSchema,
   ListenProgressResponseSchema,
+  type ListenProgressResponse,
 } from '@music-drift/shared/contracts';
 import type { FastifyInstance } from 'fastify';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
@@ -286,7 +287,73 @@ describe('覆盖率持久化：跨请求、跨 app 实例保留（退出再回�
     expect(again.ratio).toBeLessThan(DEFAULT_POLICY.dislikeListenRatioThreshold);
   });
 
-  it('覆盖率语义与内核 ListenTracker 一致：拖动不计、循环不叠加（端到端同一条规则）', async () => {
+  /**
+   * t25 / F1（review 阻断项）的**回归钉**：原实现的宽限 `RATE_SLACK_MS` 是**按请求**发放的
+   * （`cap = previous + floor(elapsed×1.25) + 3000`），于是零播放、零延时、连打 3–4 次即跨过 80%。
+   * 这里用真 HTTP + 真库 + 不推进假时钟复现同一攻击，要求**恒不达标**且点踩拿 422。
+   */
+  it('t25/F1：N=10 次即时上报（零播放、零延时）仍跨不过门槛，点踩必须 422', async () => {
+    const owner = await register('at');
+    const listener = await register('at');
+    const { segmentId } = await createSegment(owner.cookie);
+
+    let last: ListenProgressResponse | undefined;
+    for (let attempt = 0; attempt < 10; attempt += 1) {
+      const response = await report(listener.cookie, segmentId, SEGMENT_DURATION_MS);
+      expect(response.statusCode).toBe(200);
+      const progress = ListenProgressResponseSchema.parse(response.json());
+      last = progress;
+      // 每一次都必须不达标（不是"最后不达标"，是**全程**不达标）
+      expect(progress.reachedThreshold).toBe(false);
+      expect(progress.ratio).toBeLessThan(DEFAULT_POLICY.dislikeListenRatioThreshold);
+    }
+    expect(last?.reachedThreshold).toBe(false);
+    expect(last?.ratio).toBeLessThan(DEFAULT_POLICY.dislikeListenRatioThreshold);
+    // 硬上限：零延时连打最多到「首次预算 + 一次宽限」= 0.5×30s + 3s
+    expect(last?.coveredMs).toBe(18_000);
+
+    const rejected = await vote(listener.cookie, segmentId, 'DISLIKE');
+    expect(rejected.statusCode).toBe(422);
+    expect(rejected.body).toContain('LISTEN_THRESHOLD_NOT_REACHED');
+    const votes = await db.query<{ count: string }>(
+      `select count(*)::text as count from votes where segment_id = $1`,
+      [segmentId],
+    );
+    expect(votes[0]?.count).toBe('0'); // 被拒的票零副作用
+  });
+
+  it('t25 回归：正常 1×/秒实时上报持续增长并最终达到门槛（修漏洞不废掉正常路径）', async () => {
+    const owner = await register('rt');
+    const listener = await register('rt');
+    const { segmentId } = await createSegment(owner.cookie);
+
+    const ratios: number[] = [];
+    for (let second = 0; second < 15; second += 1) {
+      clock.advance(1_000); // 真实播放 1 秒
+      const response = await report(listener.cookie, segmentId, SEGMENT_DURATION_MS);
+      expect(response.statusCode).toBe(200);
+      ratios.push(ListenProgressResponseSchema.parse(response.json()).ratio);
+    }
+
+    // 单调不减
+    for (let index = 1; index < ratios.length; index += 1) {
+      expect(ratios[index]!).toBeGreaterThanOrEqual(ratios[index - 1]!);
+    }
+    // 有限次内达到门槛，且此时点踩被接受
+    expect(ratios[ratios.length - 1]!).toBeGreaterThanOrEqual(
+      DEFAULT_POLICY.dislikeListenRatioThreshold,
+    );
+    expect((await vote(listener.cookie, segmentId, 'DISLIKE')).statusCode).toBe(200);
+  });
+
+  /**
+   * ⚠️ 标题按它**真正证明的东西**写（t25/F3 收敛）：这条**不是**「服务端与内核同一条覆盖率规则」——
+   * 服务端不重算 span，它只把客户端上报的数字（在段长上限内）记账 + 用共享函数算比率。
+   * 它证明的是：内核 tracker 的**区间并集语义**（拖动不计、循环不叠加）在端到端上报后
+   * 由服务端原样记账，且两端用**同一个** `listenedRatio`/`canDislike` 得出同一结论。
+   * 「服务端不照抄客户端数字」由下面两条判别用例单独证明。
+   */
+  it('内核 tracker 的区间并集语义（拖动不计、循环不叠加）经上报被服务端原样+上限记账', async () => {
     const owner = await register('tr');
     const listener = await register('tr');
     const { segmentId } = await createSegment(owner.cookie);
@@ -317,11 +384,41 @@ describe('覆盖率持久化：跨请求、跨 app 实例保留（退出再回�
     // 拖动跳过的 10–20s **不在**覆盖率里；重复听的 5–8s **不叠加**
     expect(local.coveredMs).toBeGreaterThan(11_000);
     expect(local.coveredMs).toBeLessThan(13_000);
-    // 服务端与客户端用同一个模块判比率 ⇒ 两端必然同值、同结论
+    // 这条断言**只**证明「服务端把客户端数字（在段长上限内）原样记账、比率用同一个共享函数算」，
+    // 不能证明「服务端自己按 span 重算过覆盖率」—— 服务端不重算（见下面两条判别用例）。
     expect(server.coveredMs).toBe(Math.min(local.coveredMs, SEGMENT_DURATION_MS));
     expect(server.ratio).toBeCloseTo(local.ratio, 10);
     expect(server.threshold).toBe(tracker.threshold);
     expect(server.reachedThreshold).toBe(local.dislikeUnlocked);
+  });
+
+  it('F3 判别：服务端**不照抄**客户端数字（自身限速在起作用）', async () => {
+    const owner = await register('cp');
+    const listener = await register('cp');
+    const { segmentId } = await createSegment(owner.cookie);
+
+    // 客户端声称 25s（低于段长、够得着门槛），但首次上报的服务端上限 = 段长一半
+    const response = await report(listener.cookie, segmentId, 25_000);
+    const server = ListenProgressResponseSchema.parse(response.json());
+
+    expect(server.coveredMs).toBe(SEGMENT_DURATION_MS / 2);
+    expect(server.coveredMs).not.toBe(25_000); // 若相等，说明服务端只是"照抄+判比率"
+    expect(server.reachedThreshold).toBe(false);
+  });
+
+  it('F3 判别：客户端报 0 不会回退服务端已记的进度（记账权威在服务端）', async () => {
+    const owner = await register('zb');
+    const listener = await register('zb');
+    const { segmentId } = await createSegment(owner.cookie);
+
+    await report(listener.cookie, segmentId, 12_000);
+    clock.advance(4_000);
+    const grown = ListenProgressResponseSchema.parse((await report(listener.cookie, segmentId, 20_000)).json());
+
+    const regressed = ListenProgressResponseSchema.parse((await report(listener.cookie, segmentId, 0)).json());
+
+    expect(regressed.coveredMs).toBe(grown.coveredMs); // 只增不减，不采信 0
+    expect(regressed.coveredMs).toBeGreaterThan(0);
   });
 });
 

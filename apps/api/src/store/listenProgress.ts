@@ -5,8 +5,9 @@
  * 1. **覆盖率语义**（听过区间并集、拖动不计、循环不叠加、时长不可信 → 0）由
  *    `packages/shared/src/audio/listening.ts` 提供：客户端用 `createListenTracker` 生成 `coveredMs`，
  *    服务端用同一个模块的 `listenedRatio` / `canDislike` 判比率与门槛 —— **本文件不重算覆盖率**；
- * 2. **增长规则**（本文件 `nextCoveredMs`）：只增不减 + 首次封顶一半 + 之后按墙上时间限速，
- *    使"上报"只是**增量输入**，无法靠单次伪造跨过门槛；
+ * 2. **增长规则**（本文件 `nextCoveredMs`）：只增不减 + 首次封顶一半 + 之后按**真实墙上时间**限速
+ *    （宽限一次性、锚定首次上报预算，不按请求发放 —— t25/F1），使"上报"只是**增量输入**，
+ *    既无法靠单次伪造、也无法靠连打多次跨过门槛；
  * 3. **持久化**（本文件 store）：`listen_progress(user_id, segment_id) = (covered_ms, duration_ms, updated_at)`，
  *    跨进程/跨会话保留 ⇒ "退出再回来不清零"。
  *
@@ -23,8 +24,9 @@ import type { Db, Queryable } from '../db/client.js';
 /**
  * 增长规则参数（**唯一实现**；测试里逐个钉住）：
  * - 首次上报最多给 `duration × 0.5`：必须**小于**点踩门槛，单次伪造才跨不过去；
- * - 之后每次最多增长 `距上次上报的真实耗时 × 1.25 + 3s`：
- *   正常播放按 1× 实时速率上报，永远吃不到这个夹子；伪造者想跳到门槛必须**真的等够时间**。
+ * - 之后最多按 `距上次上报的真实耗时 × 1.25` 增长；`RATE_SLACK_MS` 是**一次性**宽限，
+ *   **锚定"首次上报预算"**（只在进度仍处于首次放行区间内时发放），不再按请求发放
+ *   —— 见 `nextCoveredMs` 里 t25/F1 的说明。
  */
 export const LISTEN_GROWTH = {
   FIRST_REPORT_MAX_RATIO: 0.5,
@@ -74,7 +76,27 @@ export function nextCoveredMs(
   }
 
   const elapsedMs = Math.max(0, Math.floor(nowMs) - Math.floor(previous.updatedAtMs));
-  const cap = previous.coveredMs + Math.floor(elapsedMs * LISTEN_GROWTH.RATE_TOLERANCE) + LISTEN_GROWTH.RATE_SLACK_MS;
+  /**
+   * t25 / F1（review 阻断项）—— 宽限**锚定首次上报预算，只发一次**：
+   *
+   * 旧式 `cap = previous + floor(elapsed × 1.25) + RATE_SLACK_MS` 把 3s 宽限**按请求**发放，
+   * 于是 `elapsed = 0` 时每次上报仍净增 3000ms ⇒ 零播放连打 4 次就跨过 80% 门槛（真 HTTP 复现）。
+   *
+   * 修法：只有当进度**仍处于首次放行区间内**（`previous.coveredMs <= firstGrantCap`）才发这一次宽限，
+   * 之后完全按真实墙上时间增长。效果等价于锚定式预算
+   * `firstGranted + floor((now − firstSeenAt) × 1.25) + RATE_SLACK_MS`
+   * （每步只加 `elapsed × 1.25`，求和即得"首次预算 + 总真实耗时 × 1.25"，**不需要额外存 firstSeenAt**）。
+   *
+   * 不变式（有具名测试）：零延时连打任意次数，上限 = `firstGrantCap + RATE_SLACK_MS`。
+   * 在 CONTEXT §14.1 允许的段长 15–30s 内 `0.5D + 3000 < 0.8D`（D > 10s）恒成立 ⇒ 永远跨不过门槛。
+   *
+   * 已知残余（非本任务范围，需业务裁决）：**"等够时间"≠"真的听"** —— 首次预算 0.5D 是白给的，
+   * 之后只要真实等待 ~0.24×D（30s 段约 7.2s）再报一次即可达标。要做到"必须真的听"，
+   * 需要上传播放位置序列（服务端重算 span）或按播放心跳计费，属契约级改动。
+   */
+  const firstGrantCap = Math.floor(durationMs * LISTEN_GROWTH.FIRST_REPORT_MAX_RATIO);
+  const slackMs = previous.coveredMs <= firstGrantCap ? LISTEN_GROWTH.RATE_SLACK_MS : 0;
+  const cap = previous.coveredMs + Math.floor(elapsedMs * LISTEN_GROWTH.RATE_TOLERANCE) + slackMs;
   const coveredMs = Math.max(previous.coveredMs, Math.min(bounded, cap));
   return { coveredMs, clamped: coveredMs < bounded };
 }

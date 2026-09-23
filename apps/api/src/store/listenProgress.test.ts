@@ -37,19 +37,84 @@ describe('nextCoveredMs：只增不减 + 首次封顶一半 + 之后按真实时
     expect(decision.clamped).toBe(false);
   });
 
-  it('同一时刻连续上报：只能多拿一个"宽限"（3s），不能一步跳满', () => {
-    const previous = { coveredMs: 15_000, updatedAtMs: 1_000 };
-    const decision = nextCoveredMs(previous, { coveredMs: DURATION_30S, durationMs: DURATION_30S }, 1_000);
+  it('同一时刻连续上报：宽限**只发一次**（锚定首次上报预算），不按请求次数累积', () => {
+    const first = { coveredMs: 15_000, updatedAtMs: 1_000 };
+    const once = nextCoveredMs(first, { coveredMs: DURATION_30S, durationMs: DURATION_30S }, 1_000);
 
-    expect(decision.coveredMs).toBe(15_000 + LISTEN_GROWTH.RATE_SLACK_MS);
-    expect(decision.clamped).toBe(true);
-    expect(decision.coveredMs).toBeLessThan(DURATION_30S * DEFAULT_POLICY.dislikeListenRatioThreshold);
+    // 第一次后续上报：拿到一次性宽限
+    expect(once.coveredMs).toBe(15_000 + LISTEN_GROWTH.RATE_SLACK_MS);
+    expect(once.clamped).toBe(true);
+
+    // 第二次立即上报（elapsed 仍为 0）：**不再发放**宽限
+    const twice = nextCoveredMs(
+      { coveredMs: once.coveredMs, updatedAtMs: 1_000 },
+      { coveredMs: DURATION_30S, durationMs: DURATION_30S },
+      1_000,
+    );
+    expect(twice.coveredMs).toBe(once.coveredMs);
+    expect(twice.coveredMs).toBeLessThan(DURATION_30S * DEFAULT_POLICY.dislikeListenRatioThreshold);
+  });
+
+  /**
+   * t25 / F1 的**核心不变式**（原实现缺这条，才让「3–4 次即时上报即跨门槛」漏到线上）：
+   * 连打再多次、零播放、零延时，也**永远**跨不过点踩门槛。
+   * 旧实现 `cap = previous + floor(elapsed×1.25) + 3000` 每次请求都发 3s ⇒ 4 次即 24s ⇒ 绕过。
+   */
+  it('t25/F1 不变式：N=10 次即时上报（零播放、零延时）仍达不到点踩门槛', () => {
+    const threshold = DURATION_30S * DEFAULT_POLICY.dislikeListenRatioThreshold;
+    let previous: { coveredMs: number; updatedAtMs: number } | null = null;
+    const now = 1_000; // 时钟**一次都不推进**
+
+    for (let attempt = 0; attempt < 10; attempt += 1) {
+      const decision = nextCoveredMs(previous, { coveredMs: DURATION_30S, durationMs: DURATION_30S }, now);
+      previous = { coveredMs: decision.coveredMs, updatedAtMs: now };
+      expect(decision.coveredMs).toBeLessThan(threshold);
+    }
+
+    // 硬上限：零延时下最多只能到「首次预算 + 一次宽限」，且必须严格低于门槛
+    expect(previous?.coveredMs).toBe(
+      Math.floor(DURATION_30S * LISTEN_GROWTH.FIRST_REPORT_MAX_RATIO) + LISTEN_GROWTH.RATE_SLACK_MS,
+    );
+  });
+
+  it('t25/F1 边界：最小允许段长（15s）下连打同样跨不过门槛', () => {
+    const duration = 15_000;
+    const threshold = duration * DEFAULT_POLICY.dislikeListenRatioThreshold;
+    let previous: { coveredMs: number; updatedAtMs: number } | null = null;
+
+    for (let attempt = 0; attempt < 20; attempt += 1) {
+      const decision = nextCoveredMs(previous, { coveredMs: duration, durationMs: duration }, 1_000);
+      previous = { coveredMs: decision.coveredMs, updatedAtMs: 1_000 };
+      expect(decision.coveredMs).toBeLessThan(threshold);
+    }
+  });
+
+  it('正常路径不被夹：1×/秒实时上报持续增长，最终达到门槛（修漏洞不能废掉正常功能）', () => {
+    const threshold = DURATION_30S * DEFAULT_POLICY.dislikeListenRatioThreshold;
+    let previous: { coveredMs: number; updatedAtMs: number } | null = null;
+    const growth: number[] = [];
+    let now = 1_000;
+
+    for (let second = 0; second < 20; second += 1) {
+      const decision = nextCoveredMs(previous, { coveredMs: DURATION_30S, durationMs: DURATION_30S }, now);
+      growth.push(decision.coveredMs);
+      previous = { coveredMs: decision.coveredMs, updatedAtMs: now };
+      now += 1_000; // 每秒上报一次，按 1× 实时速率
+    }
+
+    // 单调不减（进度只增不减）
+    for (let index = 1; index < growth.length; index += 1) {
+      expect(growth[index]!).toBeGreaterThanOrEqual(growth[index - 1]!);
+    }
+    // 且确实在有限次内达到门槛（否则就是"修了漏洞但顺手废掉正常路径"）
+    expect(growth[growth.length - 1]!).toBeGreaterThanOrEqual(threshold);
+    expect(growth.findIndex((coveredMs) => coveredMs >= threshold)).toBeLessThan(10);
   });
 
   it('等待后按墙上时间增长（1.25 倍容差），最终够得着门槛', () => {
     const previous = { coveredMs: 15_000, updatedAtMs: 1_000 };
-    // 等 10 秒：15s + 10×1.25 + 3s = 30.5s → 夹到段长 30s（= 100%）
-    const decision = nextCoveredMs(previous, { coveredMs: DURATION_30S, durationMs: DURATION_30S }, 11_000);
+    // 等 12 秒：15s + 12×1.25 = 30s → 夹到段长（100%）
+    const decision = nextCoveredMs(previous, { coveredMs: DURATION_30S, durationMs: DURATION_30S }, 13_000);
 
     expect(decision.coveredMs).toBe(DURATION_30S);
     expect(decision.clamped).toBe(false);

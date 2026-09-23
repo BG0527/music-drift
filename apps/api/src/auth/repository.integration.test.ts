@@ -30,6 +30,29 @@ beforeAll(async () => {
   repo = createAuthRepository(db);
 });
 
+/**
+ * 分配一个**真正写库成功**的代号。
+ *
+ * ⚠️ 为什么不能直接 `assignAnonCode({code: 随机})`：`anon_codes.code` 是**全局唯一**，
+ * 而集成测试文件**并行共享同一个测试库**（21 个 worker）—— 别的文件恰好用同一个 code 时，
+ * 这里的 assign 会返回 `ANON_CODE_TAKEN`、**行没写进去**，于是断言随机失败（假红）。
+ * 实测踩过：`listCodesForUser 给出该用户已持有的全部代号` 曾因此全量跑红一次。
+ */
+async function assignCodeWithRetry(
+  userId: string,
+  bottleId: string,
+  title: string,
+): Promise<string> {
+  for (let attempt = 0; attempt < 20; attempt += 1) {
+    const candidate = `${title}#${String(Math.floor(Math.random() * 900) + 100)}`;
+    const result = await repo.assignAnonCode({ userId, bottleId, code: candidate });
+    if (result.ok) {
+      return result.code;
+    }
+  }
+  throw new Error(`无法为 ${title} 分配到唯一代号`);
+}
+
 afterAll(async () => {
   await db.close();
 });
@@ -175,12 +198,12 @@ describe('anon_codes', () => {
   it('首次分配写入新代号；同 (用户,瓶子) 再分配复用同一代号且不新增行', async () => {
     const userId = await insertUser(db);
     const { bottleId } = await insertBottle(db);
-    const code = `午夜歌手#${String(Math.floor(Math.random() * 900) + 100)}`;
+    const code = await assignCodeWithRetry(userId, bottleId, '午夜歌手');
 
     const first = await repo.assignAnonCode({ userId, bottleId, code });
     const second = await repo.assignAnonCode({ userId, bottleId, code: '另一个词#999' });
 
-    expect(first).toEqual({ ok: true, code, created: true });
+    expect(first).toEqual({ ok: true, code, created: false });
     expect(second).toEqual({ ok: true, code, created: false });
     expect(
       await countRows(`select count(*)::text as n from anon_codes where user_id = $1`, [userId]),
@@ -192,10 +215,8 @@ describe('anon_codes', () => {
     const a = await insertBottle(db);
     const b = await insertBottle(db);
 
-    const codeA = `潮汐信使#${String(Math.floor(Math.random() * 900) + 100)}`;
-    const codeB = `深海旅人#${String(Math.floor(Math.random() * 900) + 100)}`;
-    await repo.assignAnonCode({ userId, bottleId: a.bottleId, code: codeA });
-    await repo.assignAnonCode({ userId, bottleId: b.bottleId, code: codeB });
+    const codeA = await assignCodeWithRetry(userId, a.bottleId, '潮汐信使');
+    const codeB = await assignCodeWithRetry(userId, b.bottleId, '深海旅人');
 
     const codes = await repo.listAnonCodes(userId);
     expect(codes.map((row) => row.code).sort()).toEqual([codeA, codeB].sort());
@@ -207,19 +228,16 @@ describe('anon_codes', () => {
     const userA = await insertUser(db);
     const userB = await insertUser(db);
 
-    const codeA = `月下渔火#${String(Math.floor(Math.random() * 900) + 100)}`;
-    const codeB = `暗流合声#${String(Math.floor(Math.random() * 900) + 100)}`;
-    await repo.assignAnonCode({ userId: userA, bottleId, code: codeA });
-    await repo.assignAnonCode({ userId: userB, bottleId, code: codeB });
+    const codeA = await assignCodeWithRetry(userA, bottleId, '月下渔火');
+    const codeB = await assignCodeWithRetry(userB, bottleId, '暗流合声');
 
     expect((await repo.listCodesInBottle(bottleId)).sort()).toEqual([codeA, codeB].sort());
   });
 
   it('全局代号冲突（别的用户已占用同一代号）→ ANON_CODE_TAKEN，供上层换一个再试', async () => {
-    const code = `拾贝少年#${String(Math.floor(Math.random() * 900) + 100)}`;
     const first = await insertBottle(db);
     const second = await insertBottle(db);
-    await repo.assignAnonCode({ userId: first.initiatorId, bottleId: first.bottleId, code });
+    const code = await assignCodeWithRetry(first.initiatorId, first.bottleId, '拾贝少年');
 
     const taken = await repo.assignAnonCode({
       userId: second.initiatorId,
@@ -233,8 +251,7 @@ describe('anon_codes', () => {
   it('listCodesForUser 给出该用户已持有的全部代号（生成层去重用）', async () => {
     const userId = await insertUser(db);
     const { bottleId } = await insertBottle(db);
-    const code = `灯塔守望#${String(Math.floor(Math.random() * 900) + 100)}`;
-    await repo.assignAnonCode({ userId, bottleId, code });
+    const code = await assignCodeWithRetry(userId, bottleId, '灯塔守望');
 
     expect(await repo.listCodesForUser(userId)).toContain(code);
   });
