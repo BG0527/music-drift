@@ -199,7 +199,7 @@ describe('RecorderPanel：录完之后的校验与动作', () => {
       fireEvent.click(screen.getByRole('button', { name: /停止录制/ }));
     });
 
-    const warning = screen.getByRole('status');
+    const warning = screen.getByTestId('duration-violation');
     expect(warning.textContent).toContain('20.6 秒'); // 本段固定时长
     expect(warning.textContent).toContain('9.0 秒'); // 实际录到
     expect(warning.textContent).toContain('相差');
@@ -630,7 +630,7 @@ describe('RecorderPanel：本段固定时长（用户第 4 条裁决 —— 取�
       fireEvent.click(screen.getByRole('button', { name: /停止录制/ }));
     });
 
-    const warning = screen.getByRole('status');
+    const warning = screen.getByTestId('duration-violation');
     expect(warning.textContent).toContain('20.6 秒');
     expect(warning.textContent).toContain('相差 4.6 秒');
     expect(screen.getByRole('button', { name: /用这一段/ })).toBeDisabled();
@@ -649,5 +649,84 @@ describe('RecorderPanel：本段固定时长（用户第 4 条裁决 —— 取�
     // 说明挂在按钮上（读屏用户能听到"为什么不能点"）
     expect(start.getAttribute('aria-describedby')).toBe(notice.getAttribute('id'));
     expect(document.body.textContent).not.toMatch(/15–30 秒/);
+  });
+});
+
+describe('RecorderPanel：录到静音时必须明说（t40 用户实测「试听没有声音」）', () => {
+  /*
+   * 用户实测："录完之后点试听，也没有声音"。可控复现（真 Chromium + 受控输入，docs/audio.md §11）：
+   * 数字静音 ⇒ 解码峰值 **-673.8 dBFS**、波形柱高 4%（= 面板最小柱高），而当时应用**一句话都没有**。
+   * 于是用户只能怀疑"功能没做"。所以结论必须落在 UI 上：说清"没录到声音" + 去查什么 + 不许用这一段。
+   */
+  const SILENT = { peakDbfs: -673.8, rmsDbfs: -673.8, durationSeconds: 3.2 };
+  const LOUD = { peakDbfs: -4.8, rmsDbfs: -21.9, durationSeconds: 3.2 };
+
+  async function record(environment: ReturnType<typeof makeRecorderEnvironment>['environment']) {
+    render(
+      <RecorderPanel
+        segmentIndex={1}
+        totalSegments={4}
+        environment={environment}
+        presetDurationMs={ANY_PRESET_MS}
+      />,
+    );
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: /开始录制/ }));
+    });
+    await act(async () => {
+      vi.advanceTimersByTime(19_500);
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: /停止录制/ }));
+    });
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+  }
+
+  it('静音：给出实测峰值 + 可执行指引，并禁用「用这一段」（只能重录）', async () => {
+    vi.useFakeTimers();
+    const { environment } = makeRecorderEnvironment({ measureClip: async () => SILENT });
+    await record(environment);
+
+    const warning = screen.getByTestId('clip-silent');
+    expect(warning.textContent).toContain('-673.8 dBFS');
+    expect(warning.textContent).toMatch(/输入设备|静音/);
+    expect(warning.className).toMatch(/warning-tint/);
+
+    const useThis = screen.getByRole('button', { name: /用这一段/ });
+    expect(useThis).toBeDisabled();
+    expect(useThis.getAttribute('aria-describedby')).toBe(warning.getAttribute('id'));
+    expect(screen.getByRole('button', { name: /重录/ })).toBeEnabled();
+    vi.useRealTimers();
+  });
+
+  it('正常音量：显示实测峰值（让用户看到"凭什么说正常"），不拦', async () => {
+    vi.useFakeTimers();
+    const { environment } = makeRecorderEnvironment({ measureClip: async () => LOUD });
+    await record(environment);
+
+    expect(screen.getByTestId('clip-ok').textContent).toContain('-4.8 dBFS');
+    expect(screen.queryByTestId('clip-silent')).toBeNull();
+    expect(screen.getByRole('button', { name: /用这一段/ })).toBeEnabled();
+    vi.useRealTimers();
+  });
+
+  it('量不了（解码失败）：如实说"测不出"，既不吓人也不放行假绿', async () => {
+    vi.useFakeTimers();
+    const { environment } = makeRecorderEnvironment({
+      measureClip: async () => {
+        throw new Error('boom');
+      },
+    });
+    await record(environment);
+
+    const note = screen.getByTestId('clip-unavailable');
+    expect(note.textContent).toMatch(/测不出/);
+    expect(screen.queryByTestId('clip-silent')).toBeNull();
+    // 量不了 ≠ 静音：不能因此拦住用户（用户自己点试听判断）
+    expect(screen.getByRole('button', { name: /用这一段/ })).toBeEnabled();
+    vi.useRealTimers();
   });
 });

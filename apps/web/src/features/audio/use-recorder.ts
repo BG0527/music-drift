@@ -30,6 +30,7 @@ import {
   type RecorderEnvironment,
   type RecorderStream,
 } from './recorder-environment';
+import { judgeClipLevel, type ClipLevel } from './clip-level';
 import type { AudioElementLike } from './use-segment-player';
 
 export type RecorderStatus = 'unsupported' | 'idle' | 'requesting' | 'recording' | 'recorded';
@@ -70,6 +71,21 @@ export interface UseRecorderOptions {
 /** 试听状态（与分段播放器同一套语义，便于 UI 文案复用）。 */
 export type PreviewState = 'idle' | 'playing' | 'paused' | 'ended';
 
+/**
+ * "这一段到底有没有录到声音"的实测结论（t40）。
+ *
+ * - `ok`：量到了声音（附峰值 dBFS）；
+ * - `silent`：量到的是静音/几乎没有信号 —— UI 要**明确告诉用户**并给指引（用户实测的问题就出在这里）；
+ * - `unavailable`：量不了（宿主不支持 / 解码失败）—— **绝不猜成 silent**，UI 如实说"测不出"。
+ */
+export interface ClipLevelReport {
+  status: 'ok' | 'silent' | 'unavailable';
+  /** 实测峰值（dBFS）；量不到时为 null。 */
+  peakDbfs: number | null;
+  message: string;
+  guidance: string | null;
+}
+
 export interface UseRecorderResult {
   status: RecorderStatus;
   /** 刚录好那一段的本地地址（未录/已重录时为 null）。 */
@@ -85,6 +101,8 @@ export interface UseRecorderResult {
   nearLimit: boolean;
   recording: SegmentRecording | null;
   durationViolations: AudioViolation[];
+  /** 录完当场实测的录音电平（t40）；还没录完/重录后为 null。 */
+  clipLevel: ClipLevelReport | null;
   /** 本段固定时长（曲库权威值）；拿不到时为 null。 */
   presetDurationMs: number | null;
   /** 本段时长是否缺失 —— 为 true 时 `start()` 拒绝执行（fail-closed，与 t31 服务端一致）。 */
@@ -180,6 +198,7 @@ export function useRecorder(options: UseRecorderOptions = {}): UseRecorderResult
   const [elapsedMs, setElapsedMs] = useState(0);
   const [levels, setLevels] = useState<number[]>([]);
   const [recording, setRecording] = useState<SegmentRecording | null>(null);
+  const [clipLevel, setClipLevel] = useState<ClipLevelReport | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [previewState, setPreviewState] = useState<PreviewState>('idle');
 
@@ -202,6 +221,12 @@ export function useRecorder(options: UseRecorderOptions = {}): UseRecorderResult
   const previewUrlRef = useRef<string | null>(null);
   const previewHasPlayedRef = useRef(false);
   const previewAtEndRef = useRef(false);
+  /**
+   * 解码测量的会话号：每次 finalize/reset 自增。
+   * 解码是异步的（可能几百毫秒），晚到的结果**必须丢掉** —— 否则用户点了"重录"之后，
+   * 上一段的静音结论会盖到新一轮上（当年覆盖率上报踩过同类竞态）。
+   */
+  const measureSessionRef = useRef(0);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const meterTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -269,6 +294,52 @@ export function useRecorder(options: UseRecorderOptions = {}): UseRecorderResult
     [environment],
   );
 
+  /**
+   * 录完当场量一次"有没有声音"（t40）。
+   *
+   * 三条纪律：
+   * 1. **不阻塞主路径**：产物（`recording`）与试听先交付，解码在后台跑；
+   * 2. **会话号守卫**：晚到的结果若属于已被重录/重置的那一轮，直接丢弃；
+   * 3. **失败不猜**：端口缺失或解码抛错 ⇒ `unavailable`，绝不报成 `silent`（误判会让用户白重录）。
+   */
+  const measureClip = useCallback(
+    (blob: Blob, session: number): void => {
+      const port = environment.measureClip;
+      if (port === undefined) {
+        if (session === measureSessionRef.current) {
+          setClipLevel({
+            status: 'unavailable',
+            peakDbfs: null,
+            message: '这个浏览器测不出录音电平（不影响录制与试听）—— 请自己点「试听本段」确认。',
+            guidance: null,
+          });
+        }
+        return;
+      }
+      void port(blob)
+        .then((level: ClipLevel) => {
+          if (session !== measureSessionRef.current) return;
+          const verdict = judgeClipLevel(level);
+          setClipLevel({
+            status: verdict.status,
+            peakDbfs: Number.isFinite(level.peakDbfs) ? level.peakDbfs : null,
+            message: verdict.message,
+            guidance: verdict.guidance,
+          });
+        })
+        .catch(() => {
+          if (session !== measureSessionRef.current) return;
+          setClipLevel({
+            status: 'unavailable',
+            peakDbfs: null,
+            message: '这一段测不出电平（解码失败）—— 请自己点「试听本段」确认。',
+            guidance: null,
+          });
+        });
+    },
+    [environment],
+  );
+
   const releaseMic = useCallback((): void => {
     streamRef.current?.getTracks().forEach((track) => track.stop());
     streamRef.current = null;
@@ -305,6 +376,10 @@ export function useRecorder(options: UseRecorderOptions = {}): UseRecorderResult
     const produced: SegmentRecording = { blob, mime, durationMs };
     setRecording(produced);
     setStatus('recorded');
+    // t40：当场量"有没有声音"（异步、不阻塞；新一轮 = 新会话号，旧结果自动作废）
+    measureSessionRef.current += 1;
+    setClipLevel(null);
+    measureClip(blob, measureSessionRef.current);
     // 用户需求 ③：录完就能试听（旧的那一份先释放，避免 blob 泄漏）
     releasePreview();
     preparePreview(blob);
@@ -312,6 +387,7 @@ export function useRecorder(options: UseRecorderOptions = {}): UseRecorderResult
   }, [
     autoStopMs,
     environment,
+    measureClip,
     options,
     preparePreview,
     releaseMic,
@@ -333,6 +409,8 @@ export function useRecorder(options: UseRecorderOptions = {}): UseRecorderResult
 
     setError(null);
     setRecording(null);
+    setClipLevel(null);
+    measureSessionRef.current += 1; // 新一轮录制：作废上一轮的解码结果
     setElapsedMs(0);
     setStatus('requesting');
 
@@ -422,6 +500,8 @@ export function useRecorder(options: UseRecorderOptions = {}): UseRecorderResult
 
   const reset = useCallback((): void => {
     sessionActiveRef.current = false;
+    measureSessionRef.current += 1; // 重录：上一段的电平结论不再适用
+    setClipLevel(null);
     releasePreview();
     stopTimers();
     teardownMeter();
@@ -495,6 +575,7 @@ export function useRecorder(options: UseRecorderOptions = {}): UseRecorderResult
 
   return {
     status,
+    clipLevel,
     presetDurationMs,
     presetToleranceMs,
     presetMissing,

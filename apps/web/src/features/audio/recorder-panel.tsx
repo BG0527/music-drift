@@ -103,6 +103,7 @@ export function RecorderPanel({
 }: RecorderPanelProps) {
   const headingId = useId();
   const presetNoticeId = useId();
+  const clipNoticeId = useId();
   const recorder = useRecorder({
     ...(environment === undefined ? {} : { environment }),
     presetDurationMs,
@@ -142,8 +143,16 @@ export function RecorderPanel({
   /** 本段时长缺失 = 不允许录制（与 hook 的 fail-closed 同一判定：按钮与说明同时体现）。 */
   const presetMissing = recorder.presetMissing;
   const canRecord = support.ok && !disabled && !presetMissing;
+  /**
+   * 录完实测的"有没有声音"（t40）。**只有 `silent` 才拦**：
+   * `unavailable`（量不了）不拦 —— 不能因为"我们测不出来"就阻止用户提交；
+   * `ok` 也不拦，但把实测峰值显示出来，让用户看到结论的依据。
+   */
+  const clip = recorder.clipLevel;
+  const clipSilent = clip?.status === 'silent';
   const tooShort = durationViolations[0]?.message ?? null;
-  const canUseRecording = recording !== null && durationViolations.length === 0 && !disabled;
+  const canUseRecording =
+    recording !== null && durationViolations.length === 0 && !disabled && !clipSilent;
   /**
    * 有没有"可试听的成品"：录完 + 拿得到本地地址。
    * 拿不到地址（宿主不支持 objectURL）时**安静地不给这个按钮**，其余动作照常可用 ——
@@ -258,6 +267,42 @@ export function RecorderPanel({
 
       {poiStatus(tooShort, status)}
 
+      {/* t40：录完当场把"有没有声音"告诉用户（用户实测的问题正是"录到静音却毫无提示"） */}
+      {status === 'recorded' && clip !== null ? (
+        clip.status === 'silent' ? (
+          <p
+            id={clipNoticeId}
+            data-testid="clip-silent"
+            role="status"
+            className="flex items-start gap-2 rounded-base border border-warning-border bg-warning-tint px-4 py-3 text-[0.875rem] leading-[1.6] text-warning"
+          >
+            <Icon name="MicOff" size={16} />
+            <span>
+              <strong className="block font-semibold">{clip.message}</strong>
+              {clip.guidance}
+            </span>
+          </p>
+        ) : clip.status === 'ok' ? (
+          <p
+            data-testid="clip-ok"
+            role="status"
+            className="flex items-center gap-2 text-[0.875rem] leading-[1.6] text-on-dark-muted"
+          >
+            <Icon name="AudioWaveform" size={16} />
+            <span>{clip.message}</span>
+          </p>
+        ) : (
+          <p
+            data-testid="clip-unavailable"
+            role="status"
+            className="flex items-center gap-2 text-[0.875rem] leading-[1.6] text-on-dark-muted"
+          >
+            <Icon name="Info" size={16} />
+            <span>{clip.message}</span>
+          </p>
+        )
+      ) : null}
+
       {/* 本段时长缺失：把"为什么不能录"写在按钮旁边，并用 aria-describedby 挂到按钮上
           （不用 role="status"，避免与"时长不合格 / 上传进度"那两处状态区互相干扰） */}
       {presetMissing ? (
@@ -295,6 +340,7 @@ export function RecorderPanel({
             <Button
               variant="primary"
               disabled={!canUseRecording}
+              {...(clipSilent ? { 'aria-describedby': clipNoticeId } : {})}
               onClick={() => {
                 if (recording !== null) onRecorded?.(recording);
               }}
@@ -371,6 +417,7 @@ function poiStatus(message: string | null, status: string) {
   return (
     <p
       role="status"
+      data-testid="duration-violation"
       className="flex items-start gap-2 rounded-base border border-warning-border bg-warning-tint px-4 py-3 text-[0.875rem] leading-[1.6] text-warning"
     >
       <Icon name="AlertTriangle" size={16} />

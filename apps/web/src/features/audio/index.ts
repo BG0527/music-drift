@@ -41,10 +41,23 @@ export {
 
 export {
   useRecorder,
+  type ClipLevelReport,
   type RecorderStatus,
   type SegmentRecording,
   type UseRecorderResult,
 } from './use-recorder';
+
+// t40：真实麦克风盲区的量化判定（"这一段到底有没有录到声音"）
+export {
+  SILENT_PEAK_DBFS,
+  formatPeakDbfs,
+  judgeClipLevel,
+  measureClipLevel,
+  measureSamples,
+  toDbfs,
+  type ClipLevel,
+  type ClipVerdict,
+} from './clip-level';
 export {
   useSegmentPlayer,
   type AudioElementLike,

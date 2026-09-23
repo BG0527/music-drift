@@ -564,3 +564,128 @@ describe('useRecorder：没有本段固定时长 = 不允许录制（fail-closed
     expect(result.current.status).toBe('recording');
   });
 });
+
+describe('useRecorder：录完当场量"有没有录到声音"（t40 真实麦克风盲区）', () => {
+  /*
+   * 用户实测"录完点试听没有声音"。可控复现（真 Chromium + 受控输入，见 docs/audio.md §11）：
+   * 数字静音 → 解码峰值 -673.8 dBFS，而应用当时**什么都不说**，用户只能自己怀疑"功能没做"。
+   * 所以录完必须**当场量一次**并把结论交给 UI：ok / silent / unavailable（量不了就老实说量不了）。
+   */
+  const SILENT = { peakDbfs: -673.8, rmsDbfs: -673.8, durationSeconds: 3.2 };
+  const LOUD = { peakDbfs: -4.8, rmsDbfs: -21.9, durationSeconds: 3.2 };
+
+  async function recordOnce(result: { current: { start: () => Promise<void> } }, ms = 3_000) {
+    await act(async () => {
+      await result.current.start();
+    });
+    await act(async () => {
+      vi.advanceTimersByTime(ms);
+    });
+    act(() => {
+      (result.current as unknown as { stop: () => void }).stop();
+    });
+  }
+
+  it('录到了声音（-4.8 dBFS）→ status=ok，并给出实测峰值', async () => {
+    vi.useFakeTimers();
+    const { environment } = makeRecorderEnvironment({ measureClip: async () => LOUD });
+    const { result } = renderHook(() =>
+      useRecorder({ environment, presetDurationMs: ANY_PRESET_MS }),
+    );
+
+    await recordOnce(result);
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(result.current.clipLevel?.status).toBe('ok');
+    expect(result.current.clipLevel?.peakDbfs).toBeCloseTo(-4.8, 1);
+    expect(result.current.clipLevel?.message).toContain('-4.8 dBFS');
+    vi.useRealTimers();
+  });
+
+  it('录到的是静音（-673.8 dBFS）→ status=silent + 可执行指引', async () => {
+    vi.useFakeTimers();
+    const { environment } = makeRecorderEnvironment({ measureClip: async () => SILENT });
+    const { result } = renderHook(() =>
+      useRecorder({ environment, presetDurationMs: ANY_PRESET_MS }),
+    );
+
+    await recordOnce(result);
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(result.current.clipLevel?.status).toBe('silent');
+    expect(result.current.clipLevel?.guidance).toMatch(/输入设备|静音/);
+    vi.useRealTimers();
+  });
+
+  it('量不了（宿主不支持/解码失败）→ unavailable，**不误判成静音**、不影响录制产物', async () => {
+    vi.useFakeTimers();
+    const { environment } = makeRecorderEnvironment({
+      measureClip: async () => {
+        throw new Error('decodeAudioData 不支持这个容器');
+      },
+    });
+    const { result } = renderHook(() =>
+      useRecorder({ environment, presetDurationMs: ANY_PRESET_MS }),
+    );
+
+    await recordOnce(result);
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(result.current.clipLevel?.status).toBe('unavailable');
+    expect(result.current.recording).not.toBeNull(); // 产物照常交付
+    vi.useRealTimers();
+  });
+
+  it('没提供 measureClip 端口（老宿主）→ unavailable，不是 silent', async () => {
+    vi.useFakeTimers();
+    const { environment } = makeRecorderEnvironment();
+    const { result } = renderHook(() =>
+      useRecorder({ environment, presetDurationMs: ANY_PRESET_MS }),
+    );
+
+    await recordOnce(result);
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(result.current.clipLevel?.status).toBe('unavailable');
+    vi.useRealTimers();
+  });
+
+  it('解码结果**晚到**且用户已重录 → 不污染新一轮（竞态）', async () => {
+    vi.useFakeTimers();
+    let resolveMeasure: ((value: typeof SILENT) => void) | null = null;
+    const { environment } = makeRecorderEnvironment({
+      measureClip: () =>
+        new Promise((resolve) => {
+          resolveMeasure = resolve;
+        }),
+    });
+    const { result } = renderHook(() =>
+      useRecorder({ environment, presetDurationMs: ANY_PRESET_MS }),
+    );
+
+    await recordOnce(result);
+    act(() => {
+      result.current.reset(); // 用户点了重录
+    });
+    await act(async () => {
+      resolveMeasure?.(SILENT);
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(result.current.clipLevel).toBeNull();
+    vi.useRealTimers();
+  });
+});

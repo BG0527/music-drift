@@ -3547,3 +3547,37 @@ architect 主动报告「**会话上下文已接近上限**（累计约 40 次�
 - **② 公海页码 ⇒ 映射到已走过的游标链**（`useSeaPages` 缓存 `pages[]`；第 N 页 = 依次 `fetchNextPage()`；回看 = 渲染缓存；页码数 = 已取页数 + `hasNextPage ? 1 : 0`，**不请求 `total`**）⇒ **正确**：复用 cursor/keyset，**未新增第二套分页语义**；
 - **③ 漂流日志 ⇒ 前端过滤**（映射层收口），理由（执行者原话，captain 采纳并升级为职责边界）：
   > 「接口返回的是**事件流 = 服务端真相**；"**给用户看什么**"是**展示策略**，不该烧进契约。」
+
+---
+
+## 90. t40 完成（P0）：根因**不是链路坏了，而是"录到静音时零提示"**
+
+### 90.1 量化复现（真 Chromium + `--use-file-for-fake-audio-capture=<wav>`，把"麦克风"换成受控音频）
+| 输入 | 解码峰值 | 应用自己波形最大柱高 | 试听播放 | 修复前提示 |
+| --- | --- | --- | --- | --- |
+| 440Hz @ −12dBFS（≈真人在说话） | **−4.8 dBFS** | 26–58% | `paused=false, currentTime 0.86` | **无** |
+| 数字静音（≈选错设备/系统静音） | **−673.8 dBFS** | **4%**（= 面板最小柱高） | `paused=false, currentTime 0.96` | **无** |
+⇒ **录制 / objectURL / 试听播放都没坏**（两种情况都真的在"播放"）；**坏在"静音录音被静默接受"** ⇒ 用户只能怀疑"功能根本没做"。**这正是用户那句"感觉没录进我的麦克风"的来源。**
+
+### 90.2 六项排查（每条都有实测，不是推断）
+① `constraints { audio: true }`、**无设备选择 UI**（真机取系统默认 ⇒ 选到哪只不由我们决定）② `audio/webm;codecs=opus` @128kbps，非空轨 ③ 解码成功（3.2s / 48kHz / 单声道）④ `src=blob:`、`muted=false`、`volume=1`、`paused=false` 且 `currentTime` 推进 ⇒ **自动播放策略没拦** ⑤ 轨道 `enabled=true, muted=false, readyState=live` ⇒ **无人置位** ⑥ 权限被拒 ⇒ 报错 + 回 idle、**不产生 recording** ⇒ **不存在"没权限却录出空音频"**（captain 在派单时怀疑的那条，被排除）。
+
+### 90.3 修复（全在其域内）
+- `clip-level.ts`（新，纯函数）：`measureClipLevel` / `judgeClipLevel`，阈值 **−60 dBFS** —— **只抓"完全没有信号"**，放过小声真实录音。它的理由：**误判会逼用户白重录，比不提示更糟**；
+- `recorder-environment.ts`：新端口 `measureClip(blob)`，用 `decodeAudioData` **独立量"文件里到底有什么"**；
+- `use-recorder.ts`：录完后台量一次，**会话号守卫**丢弃晚到结果（重录后不被上一段污染）；
+- `recorder-panel.tsx` **三态**：`silent` ⇒ 警告（含实测峰值 + 去查什么）**且禁用「用这一段」**（`aria-describedby`）；`ok` ⇒ 显示实测峰值；`unavailable` ⇒ **如实说"测不出"、不拦**。
+
+### 90.4 回归
+静音 ⇒ `这一段几乎没有录到声音（峰值 -673.8 dBFS，低于 -60 dBFS）…` + 「用这一段」禁用；正弦 ⇒ `本段录到了声音（峰值 -5.3 dBFS）` 不拦；**t30 全链路仪器 `[result] ALL PASS`**（真录满 20 秒 → 真上传 → 真投递 → 播放 → 试听）⇒ **新门槛没有拦住正常录音**（这是修复的关键回归）。
+
+### 90.5 它验证到哪一层（不粉饰）+ 需要用户两句话
+**用户本人的麦克风无法被它验证**。因此：
+- 若真机是"录到静音" ⇒ 现在**当场显示峰值**并指向设备/权限 ⇒ 事实定在**环境层**；
+- 若真机录到正常音量却仍听不到 ⇒ 大概率是**输出路由**（蓝牙/HDMI 被切走、标签页音量 0），`docs/audio.md` §11.5 第 6 条即查此。
+⇒ **请用户回两句**：① **录制时波形会不会动？** ② **录完面板写的峰值是多少？** —— 这两句能把剩余可能性**一次收干**。
+
+### 90.6 命令与边界
+`pnpm --filter @music-drift/web test` **exit 0**（64 文件 / 554 通过 + 1 跳过）· `pnpm -r typecheck` **exit 0** · eslint/prettier exit 0 · `features/audio` 19 文件 / **250 例**（新增 19 例）。
+⚠️ 首次 `typecheck` exit 2，红点在 **apps/api 在途写入**（20 秒内红点从 `routes/interactions.ts(200,7)` 变成 `store/notifications.ts(92,7) TS1359`，45 秒后复测 exit 0）⇒ **backend-core 的 t42 在途**，它按 **mtime 归因**、未动别人文件 ✓
+⚠️ 越界声明：仓库外新仪器 `mic-probe.mjs` + 两个 WAV **不在工作区**、不入 changedPaths；配方与生成命令已落进 `docs/audio.md` §11.7 ✓

@@ -9,6 +9,7 @@
  * 生产实现在文件末尾（`createBrowserRecorderEnvironment`），消费方通常不需要感知它。
  */
 import { normalizeMimeType } from '@music-drift/shared/audio';
+import { measureClipLevel, type ClipLevel } from './clip-level';
 import type { AudioElementLike } from './use-segment-player';
 
 export interface RecorderTrack {
@@ -43,6 +44,14 @@ export interface RecorderEnvironment {
   createObjectURL?: (blob: Blob) => string;
   /** 释放 objectURL（默认 `URL.revokeObjectURL`）：重录/卸载时必须调用，避免 blob 泄漏。 */
   revokeObjectURL?: (url: string) => void;
+  /**
+   * **量一段录音的实际电平**（t40）：解码 `blob` → 算峰值/RMS（dBFS）。
+   *
+   * 为什么必须由产品自己量：真实麦克风从未被验证过，用户实测"录完试听没有声音"，
+   * 根因只能在"录到的内容"里 —— 用它把"有没有声音"从主观感受变成可展示的数值（含静音判定）。
+   * 失败/不支持时**抛错**，由调用方记成 `unavailable`（绝不猜成"静音"）。
+   */
+  measureClip?: (blob: Blob) => Promise<ClipLevel>;
   isSecureContext: boolean;
   hostname: string;
   hasGetUserMedia: boolean;
@@ -99,6 +108,25 @@ export function createBrowserRecorderEnvironment(): RecorderEnvironment {
       return element;
     },
     createObjectURL: (blob) => URL.createObjectURL(blob),
+    /**
+     * 解码录音并量电平。用 `AudioContext.decodeAudioData`：
+     * 它**独立于**录制链路（不碰 MediaRecorder、不碰试听元素），所以量出来的就是"文件里到底有什么声音"。
+     * 兼容两种 API 形状：现代返回 Promise；老 WebKit 只回调 ⇒ 同一处收口（见下方 `decodeAudio`）。
+     */
+    measureClip: async (blob) => {
+      const AudioContextCtor = globals.AudioContext ?? globals.webkitAudioContext;
+      if (AudioContextCtor === undefined) {
+        throw new Error('AudioContext 不可用，无法测量录音电平');
+      }
+      const bytes = await blob.arrayBuffer();
+      const context = new AudioContextCtor();
+      try {
+        const decoded = await decodeAudio(context, bytes);
+        return measureClipLevel(decoded.getChannelData(0), decoded.duration);
+      } finally {
+        void context.close();
+      }
+    },
     revokeObjectURL: (url) => {
       URL.revokeObjectURL(url);
     },
@@ -154,6 +182,30 @@ export function createBrowserRecorderEnvironment(): RecorderEnvironment {
     },
     now: () => Date.now(),
   };
+}
+
+/**
+ * 解码一段录音字节（t40）。
+ *
+ * 为什么要兼容两种形状：现代浏览器 `decodeAudioData` 返回 Promise，老 WebKit 只接受回调。
+ * 两处都交给同一个 Promise 收口（Promise 重复 resolve 是幂等的），避免"新浏览器能用、老 Safari 抛错"。
+ */
+function decodeAudio(context: AudioContext, bytes: ArrayBuffer): Promise<AudioBuffer> {
+  return new Promise<AudioBuffer>((resolve, reject) => {
+    const onError = (error?: unknown): void => {
+      reject(error instanceof Error ? error : new Error('decodeAudioData 失败'));
+    };
+    const maybePromise = context.decodeAudioData(
+      bytes,
+      (buffer) => {
+        resolve(buffer);
+      },
+      onError,
+    ) as unknown as Promise<AudioBuffer> | undefined;
+    if (maybePromise !== undefined && typeof maybePromise.then === 'function') {
+      maybePromise.then(resolve, onError);
+    }
+  });
 }
 
 /** 归一化录音容器（`audio/webm;codecs=opus` → `audio/webm`），与上传/校验口径一致。 */
