@@ -3438,3 +3438,30 @@ if (!outcome.ok) {
 ### 85.5 归档口径
 它**一行代码没动**（只读 + 跑命令），给出三个文件的 md5 供与 captain 复核树比对；`commandsRun` 为五次实跑退出码（含真浏览器）。
 `docs/api.md` 由 captain 落笔：**409 与 404 必须可区分**，客户端收到 409 应提示「已被别人接走」并给出口，**不要**导航到瓶子页当作成功。
+
+---
+
+## 86. 用户第十三轮 6 条 + `ui-ux-pro-max` 安装成功（含 captain 一处错误结论的更正）
+
+### 86.1 六条需求与处置
+| # | 用户原话要点 | 处置 |
+| --- | --- | --- |
+| ① | `/` 与 `/river` **本质都是河道页**；主体采用 `/river` 样式 + 加首页的**心情标签**（点击有切换动画、**无实质功能**） | **t41**（frontend-flow）：合并为一页，并要求说明重定向方向 |
+| ② | 公海作品要 **1.2.3 页**式分页 | **t41**；⚠️ 后端是 **cursor/keyset**（t24）⇒ **禁止新增第二套分页语义**，需后端配合先回报 captain |
+| ③ | 漂流日志太冗余；只留核心操作（发起/投河/回传/入海/完成）；**不显示赞/踩记录** | **t41**（含"过滤在前端还是后端 + 理由"） |
+| ④ | **私密留言不是只回传发起者**：用户可指定**之前段的某一个人**；只有回传到他手上才通知、且**只有他能看到**；**传递失败则通知留言者** | **待派** —— 这是 **CONTEXT §5 规则变更**（留言目标从"固定发起者"变成"用户指定"）⇒ 需先定细节再设计 |
+| ⑤ | 「录音功能是否实现了？我感觉没录入我的麦克风声音」→ 追问后用户明确：**试听也没声音** | **t40 = P0**（audio-engineer）。**这是我们的验证盲区**：此前所有"录音通过"都来自 **Playwright 假麦克风**，**真实麦克风从未验证** |
+| ⑥ | 安装 skillhub 的 `ui-ux-pro-max-zh` ＋ 让前端 subagent **调用所有前端 skill** 美化一遍（**含增加水/河流/海洋/漂流瓶主题元素**） | skill **已装**（§86.2）；**美化待派**（与 t41 **串行**，避免并发写 `pages/**`） |
+
+### 86.2 ⭐ `ui-ux-pro-max` 安装成功（含 **captain 一处错误结论的更正** + 两个真实坑）
+- **⚠️ 更正：网络其实是通的。** 用户要求"再试一次"后：`curl https://skillhub.cn/install/skillhub.md` → **HTTP 200 / 2769 字节** ✓
+  ⇒ 我此前判"**没有外网访问**"是**错误结论** —— 我只测了一个域名（`githubusercontent` 超时），就概括成了"无网络"。
+  ⇒ **教训：把"某个域名不通"当成"没有网络"是过度概括**（与 §75.2「未命中先查自己的检查手段」同源；也与我一整天在记的"查询范围不足 ⇒ 事实判断错误"同源）。
+- **`skillhub` CLI 已存在**（2026.8.5）⇒ 按文档直接：`skillhub install @org-02qudk26/ui-ux-pro-max-zh --dir .dsh/skills`；
+- **坑 1**：CLI 打印 `✓ Installed` 时因 **Windows GBK 控制台编码**抛 `UnicodeEncodeError` 而**崩溃**（但文件已解压完）⇒ 用 `PYTHONIOENCODING=utf-8 PYTHONUTF8=1` 重试即通过；
+- **坑 2**：装出来的结构是**嵌套**的 `.dsh/skills/@org-02qudk26/ui-ux-pro-max-zh/`，而项目级约定是**扁平** `.dsh/skills/<name>/SKILL.md` ⇒ 手工移动到扁平位置；
+- 结果：`.dsh/skills/ui-ux-pro-max-zh/`（**352 行** SKILL.md + README + `_meta.json`），**本会话 skill catalog 已收录 `ui-ux-pro-max`** ✓（无需重启）。
+
+### 86.3 派单纪律更新：四个 → **五个** skill
+**项目级前端 skill 现为 5 个**：`frontend-design` · `afrexai-ui-design-system` · `css-animation-creator` · `motion-web` · **`ui-ux-pro-max`**。
+§77.2 的纪律相应更新为**五个都要逐个 load**、引用条款原文、且 captain **可拿引文去 `.dsh/skills/*/SKILL.md` 核对**。
