@@ -133,9 +133,23 @@
   --motion-exit-duration: 240ms;
   --motion-animated-properties: transform, opacity;
   --motion-reduced-duration: 150ms;
+
+  /* ── 水域母题层（2026-09-24 amend · t43）：装饰强度与纹理周期 ──────────────
+     契约在 DESIGN.md 的 `motif:` 块。组件/样式只能引用这里的 --motif-*，
+     禁止在 water.css 或页面里内联 alpha / px（守卫：__tests__/water-motif.test.tsx）。 */
+  --motif-sheen-alpha-dark: 0.1;
+  --motif-sheen-alpha-light: 0.05;
+  --motif-texture-alpha: 0.05;
+  --motif-texture-line-gap: 12px;
+  --motif-tide-line-alpha: 0.55;
 }
 
 /* ── z-index 契约落成 utilities（Tailwind v4 无 z-index 命名空间）── */
+/* 装饰层：必须配合宿主 `isolate` 使用（否则负 z-index 会落到宿主背景之下而看不见） */
+@utility z-underlay {
+  z-index: -1;
+}
+
 @utility z-base {
   z-index: var(--z-base);
 }

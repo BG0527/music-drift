@@ -89,3 +89,45 @@ export function RippleRing({ className }: DecorProps) {
     />
   );
 }
+
+/* ── 水域母题层（t43）：三个**零布局高度**的装饰层。契约在 DESIGN.md 的 `motif:` 块，
+      样式在 water.css。三者一律 `aria-hidden` + `pointer-events-none` + 绝对定位：
+      既不会被读屏念出来、也不挡点击，更不会推高页面（"一屏装下"是硬门）。
+      宿主元素需要 `relative`（定位基准）+ `isolate`（否则负 z-index 会落到宿主背景之下而看不见）。 */
+
+/**
+ * 水面光带：深水暗底顶部的一层极淡渐变，暗示"从水面往下看"。
+ * 用在**深底**（强度 `sheenAlphaDark`）；浅底必须显式传 `tone="light"`（更淡，避免压住正文）。
+ */
+export function WaterSheen({ className, tone = 'dark' }: DecorProps & { tone?: 'dark' | 'light' }) {
+  return (
+    <span
+      aria-hidden="true"
+      className={cn(
+        'water-sheen pointer-events-none absolute inset-0 z-underlay',
+        tone === 'light' && 'water-sheen-light',
+        className,
+      )}
+    />
+  );
+}
+
+/** 水位线肌理：横向细线平铺，让大块暗底不再像空白模板（线距取 `textureLineGap`）。 */
+export function WaterTexture({ className }: DecorProps) {
+  return (
+    <span
+      aria-hidden="true"
+      className={cn('water-texture pointer-events-none absolute inset-0 z-underlay', className)}
+    />
+  );
+}
+
+/** 潮线：贴宿主下沿的一根渐隐细线（sea-glass → 透明），替代硬分隔且**不占高度**。 */
+export function TideLine({ className }: DecorProps) {
+  return (
+    <span
+      aria-hidden="true"
+      className={cn('tide-line pointer-events-none absolute inset-x-0 bottom-0 z-underlay', className)}
+    />
+  );
+}

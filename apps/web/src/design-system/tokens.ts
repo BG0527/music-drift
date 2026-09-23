@@ -84,6 +84,18 @@ export const motion = {
   animatedProperties: ['transform', 'opacity'],
 } as const;
 
+/**
+ * 水域母题层契约（与 theme.css 的 `--motif-*` 同值）。
+ * 装饰强度与纹理周期只在这里定义；样式层只能引用 `var(--motif-*)`。
+ */
+export const motif = {
+  sheenAlphaDark: 0.1,
+  sheenAlphaLight: 0.05,
+  textureAlpha: 0.05,
+  textureLineGap: '12px',
+  tideLineAlpha: 0.55,
+} as const;
+
 /** z-index 契约。 */
 export const zIndex = {
   base: 0,

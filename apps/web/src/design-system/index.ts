@@ -14,7 +14,16 @@ export { Toast, type ToastProps } from './toast';
 export { Modal, type ModalProps } from './modal';
 export { Tabs, type TabItem, type TabsProps } from './tabs';
 export { SidebarNav, BottomNav, type NavItem, type NavProps } from './nav';
-export { WaveDivider, RiverLine, BottleMark, RippleRing, type DecorProps } from './wave';
+export {
+  WaveDivider,
+  RiverLine,
+  BottleMark,
+  RippleRing,
+  WaterSheen,
+  WaterTexture,
+  TideLine,
+  type DecorProps,
+} from './wave';
 export { Icon, type IconName, type IconProps } from './icon';
 export { cn } from './utils';
 export * from './tokens';

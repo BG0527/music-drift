@@ -8,7 +8,7 @@
  * 几何一律写显式 px：`theme.css` 把 `--spacing` 覆盖成 0.5rem，
  * 于是 `h-40` = 320px、`h-28` = 224px（不是 160/112）—— 这正是"按钮巨大、排版比例不对"的来源。
  */
-import { Button, Icon, RippleRing, cn } from '../design-system';
+import { Button, Icon, RippleRing, TideLine, WaterSheen, WaterTexture, cn } from '../design-system';
 import { useDrawBottle, useInvalidateBottle } from '../features/api/mutations';
 import { ConflictNotice } from '../features/bottle/conflict-notice';
 import { MoodChips } from '../features/bottle/mood-chips';
@@ -37,9 +37,11 @@ export function RiverPage() {
 
   return (
     <div className="flex flex-col gap-[20px] md:gap-[32px]">
-      <header className="flex flex-col gap-[4px]">
+      {/* 潮线：贴页头下沿的渐隐细线（零布局高度），替代一条硬分隔线 */}
+      <header className="relative isolate flex flex-col gap-[4px] pb-[12px]">
         <h1 className="text-[1.5rem] font-semibold text-abyss">暖流河道</h1>
         <p className="text-[0.875rem] text-slate-current">拾起那些搁浅在黑夜里的声线</p>
+        <TideLine />
       </header>
 
       <div className="grid gap-[16px] md:gap-[24px] lg:grid-cols-2">
@@ -47,8 +49,12 @@ export function RiverPage() {
         <section
           aria-labelledby="draw-heading"
           data-anchor="river-draw"
-          className="flex min-h-[230px] flex-col items-center justify-center gap-[12px] rounded-2xl bg-deep-current px-[16px] py-[16px] text-wave-white md:min-h-[517px] md:gap-[24px] md:px-[48px] md:py-[40px]"
+          className="relative isolate flex min-h-[230px] flex-col items-center justify-center gap-[12px] overflow-hidden rounded-2xl bg-deep-current px-[16px] py-[16px] text-wave-white md:min-h-[517px] md:gap-[24px] md:px-[48px] md:py-[40px]"
         >
+          {/* 水域母题层：零布局高度（绝对定位 + z-underlay），不影响一屏；见 DESIGN.md 的 motif 契约 */}
+          <WaterSheen />
+          <WaterTexture />
+
           <h2 id="draw-heading" className="sr-only">
             从河道捞一个漂流瓶
           </h2>
@@ -112,8 +118,12 @@ export function RiverPage() {
         <section
           aria-labelledby="cast-heading"
           data-anchor="river-drop"
-          className="flex min-h-[230px] flex-col items-center justify-center gap-[12px] rounded-2xl bg-deep-current px-[16px] py-[16px] text-wave-white md:min-h-[517px] md:gap-[24px] md:px-[48px] md:py-[40px]"
+          className="relative isolate flex min-h-[230px] flex-col items-center justify-center gap-[12px] overflow-hidden rounded-2xl bg-deep-current px-[16px] py-[16px] text-wave-white md:min-h-[517px] md:gap-[24px] md:px-[48px] md:py-[40px]"
         >
+          {/* 水域母题层：零布局高度（绝对定位 + z-underlay），不影响一屏；见 DESIGN.md 的 motif 契约 */}
+          <WaterSheen />
+          <WaterTexture />
+
           <h2 id="cast-heading" className="sr-only">
             投下一支漂流瓶
           </h2>

@@ -106,7 +106,16 @@ motion:
   toastInfoDuration: 5000ms
   toastErrorPersistent: true   # 错误不许自动消失，必须手动关闭（不许静默失败）
   animatedProperties: [transform, opacity]
+# 水域母题层（2026-09-24 amend · t43）：只在这里定装饰的**强度**与**纹理周期**。
+# 组件只能引用 --motif-*，禁止内联 alpha / px（守卫：__tests__/water-motif.test.tsx）。
+motif:
+  sheenAlphaDark: 0.1      # 深水暗底上的水面光带（deep-current / trench）
+  sheenAlphaLight: 0.05    # 浅底上的水面光带（wave-white / foam）
+  textureAlpha: 0.05       # 水位线肌理（横向细线）的强度
+  textureLineGap: 12px     # 水位线的线距（repeating-linear-gradient 的周期）
+  tideLineAlpha: 0.55      # 潮线（sea-glass → 透明 的渐隐细线）
 zIndex:
+  underlay: -1   # 装饰层：在宿主背景**之上**、内容**之下**（宿主必须 isolate，否则会被背景盖住）
   base: 0
   sticky: 100
   overlay: 200
@@ -296,6 +305,12 @@ Water contours, tide lines, river-channel guides, ripples, drift-bottle silhouet
   - **② 场景涟漪（scene ripple）**：**hero 的常驻水面母题**（Figma `home-river` 的 240·180·130 同心圆）。**允许 `infinite` 常驻**，但只有在同时满足「**低幅度 + 低速度、不争夺注意力**」与「`reduced-motion` 下静止」时才成立；它**不进内容区**、不承载任何信息（`aria-hidden`）。
   - **产品理由（写进契约，不让它游走在契约之外）**：涟漪是本系统的水主题母题（见 Overview 的母题清单），hero 同心圆是用户设计稿的既定形态；两者共用 `rippleDuration`（2400ms）。
 - **Toast 生命周期:** 成功 3000ms / 信息 5000ms 后自动退场（退场用 `exitDuration`）；**错误常驻到手动关闭**（`toastErrorPersistent`）——错误不许静默消失。
+- **水域母题层（water motif，2026-09-24 amend · t43）**：三个**零布局高度**的装饰件，把「水面—河道—深海—漂流瓶」的世界观落到页面上：
+  1. **水面光带（water sheen）**：深水暗底顶部的一层极淡渐变，暗示"从水面往下看"；强度 `sheenAlphaDark`（浅底用 `sheenAlphaLight`）。
+  2. **水位线肌理（water texture）**：横向细线平铺（周期 `textureTile`，强度 `textureAlpha`），让大块暗底不再像空白模板（`frontend-design` L59：把质量地板做到不喧哗）。
+  3. **潮线（tide line）**：`sea-glass → 透明` 的渐隐细线，替代区块之间的硬分隔线（母题见 Overview 的 tide lines）。
+  - **产品理由**：这本就是一个关于"水面之上与深海之下"的产品；这三层让页面有**地点感**，而不是"任何 App 都能用的背景"。
+  - **不许喧宾夺主（硬约束，三条同时成立）**：① 一律 `aria-hidden="true"` + `pointer-events-none` + **绝对定位**（零布局高度，因此不会破坏"一屏装下"）；② 只出现在**深水暗底与区块边缘**，不进入内容区、不压在正文之下 —— 浅底上若要用，强度必须降到 `sheenAlphaLight` 并实测文字对比度不退化；③ 本层**不含任何动画**（静态纹理），因此 `reduced-motion` 下无需额外降级（若将来加漂移，必须走 `motion-web` §1 decoration 三条件并引用 `motion` 契约）。
 - **Performance:** Only transform and opacity animated. No layout-triggering properties.
 
 深度层级（形态语言）:
