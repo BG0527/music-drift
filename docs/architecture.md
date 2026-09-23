@@ -3702,3 +3702,9 @@ architect 主动报告「**会话上下文已接近上限**（累计约 40 次�
 
 ### 95.4 歌词（#5）：用户裁决**先跳过**，美化做完再说
 ⇒ 从当前待办里摘下（不删档），等美化收口后由 captain 重新提请。
+
+### 95.5 t43 skill 引文核对结果：**19/19 逐字命中**（captain 亲跑，不是采信自述）
+按 §77.2 的核对义务，captain 写脚本解析 `docs/ui-review/theme-pass.md` 里全部 19 条 `| 「…」` 引文行，去掉 markdown 记号后取 18 字特征窗口，在 `.dsh/skills/*/SKILL.md` 里做逐字包含比对：
+- 结果：**19 条全部命中，未命中 0 条**；归属 skill 与文档标注一致（`motion-web` / `frontend-design` / `afrexai-ui-design-system` / `css-animation-creator` / `ui-ux-pro-max-zh`）。
+- 顺带确认一个新装 skill 的关系：`ui-ux`（带 CLI）与 `ui-ux-pro-max-zh`（纯文档）**共享同一批条款文本**（多条引文在两个文件里都有）⇒ 前者是后者的**可执行完整版**，不是另一个体系。这解释了第一批为什么只能用后者的静态条款。
+- 同时复核了文档里那条**诚实标注**：`ui-ux-pro-max-zh` 确实只有 `README.md` / `SKILL.md` / `_meta.json`、**没有 `scripts/`**，成员"CLI 无法执行"的记录属实，没有伪造输出。
