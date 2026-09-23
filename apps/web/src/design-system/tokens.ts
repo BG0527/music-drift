@@ -103,6 +103,12 @@ export const motif = {
   wakeAlpha: 0.45,
 } as const;
 
+/** 水流漂移契约（与 theme.css 的 --motion-drift-* 同值）。 */
+export const drift = {
+  duration: 24000,
+  shift: '10px',
+} as const;
+
 /** z-index 契约。 */
 export const zIndex = {
   base: 0,

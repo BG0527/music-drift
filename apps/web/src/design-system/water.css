@@ -27,7 +27,24 @@
  *   `aria-hidden`（组件加）、**完全无动画**（静态绘制）⇒ `reduced-motion` 无需额外降级。
  * - **无图片、无依赖**：全部是 CSS 渐变 / mask。
  */
+/* 水流漂移（t46）：只动 transform；时长/幅度取自 motion 契约；CSS 动画 ⇒ 受 below 的全局
+   reduced-motion 重置管辖（motion.css 里 `animation: none !important` 会把它冻住）。 */
 @layer components {
+  @keyframes ocean-drift {
+    from {
+      transform: translate3d(calc(var(--drift-shift) * -1), 0, 0);
+    }
+    to {
+      transform: translate3d(var(--drift-shift), 0, 0);
+    }
+  }
+
+  .water-drift {
+    animation: ocean-drift var(--drift-duration) ease-in-out infinite alternate;
+    /* 平移会让图层露边 ⇒ 先按同一 token 出血；margin 是**静态**声明，不在动画属性白名单之外 */
+    margin: calc(var(--drift-shift) * -1);
+  }
+
   /* ① 水面光带：从顶部往下淡出的渐变，暗示"从水面往下看"。
      深底用 sheenAlphaDark；浅底必须加 `.water-sheen-light`（更淡，避免压住正文）。 */
   .water-sheen {

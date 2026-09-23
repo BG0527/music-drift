@@ -214,3 +214,118 @@ describe('t44 漂流瓶与航迹母题', () => {
     );
   });
 });
+
+
+/* ── t46 第三批：全站扩面 ───────────────────────────────────────────────────
+   用户第十四轮：「还要更明显：其他页面也加水与瓶子」。
+   判据（机器可检）：① 每个页面至少一处母题；② 用整面水层（WaterTexture/WaterSheen）
+   的页面，宿主必须 `isolate`（否则 z-underlay 会掉到背景之下而看不见 —— t43 踩过）；
+   ③ 空状态里要有"漂流瓶"（用户点名）。 */
+const MOTIF_TAGS = ['<BottleMark', '<TideLine', '<WakeLine', '<WaterSheen', '<WaterTexture'];
+/** 页面里是否出现任一母题组件（用 includes 而不是正则：避免转义坑）。 */
+const hasMotif = (src: string): boolean => MOTIF_TAGS.some((tag) => src.includes(tag));
+const FULL_SURFACE_TAGS = ['<WaterTexture', '<WaterSheen'];
+const hasFullSurface = (src: string): boolean =>
+  FULL_SURFACE_TAGS.some((tag) => src.includes(tag));
+
+describe('t46 扩面：每个页面至少一处水或漂流瓶母题', () => {
+  const PAGES = [
+    'river-page.tsx',
+    'sea-page.tsx',
+    'sea-detail-page.tsx',
+    'drift-log-page.tsx',
+    'profile-page.tsx',
+    'settings-page.tsx',
+    'song-picker-page.tsx',
+    'admin-page.tsx',
+    'not-found-page.tsx',
+  ] as const;
+
+  for (const page of PAGES) {
+    it(`${page} 至少一处母题`, () => {
+      const src = pageSource(page);
+      expect(hasMotif(src), `${page} 没有任何水域/漂流瓶母题`).toBe(true);
+    });
+  }
+
+  it('用整面水层（WaterTexture/WaterSheen）的页面，宿主必须 isolate', () => {
+    const offenders = PAGES.filter((page) => {
+      const src = pageSource(page);
+      return hasFullSurface(src) && !src.includes('isolate');
+    });
+    expect(offenders, '这些页面有整面水层但宿主没 isolate（装饰会看不见）').toEqual([]);
+  });
+
+  it('空状态里有漂流瓶（用户点名）：选歌页与公海页', () => {
+    expect(pageSource('song-picker-page.tsx'), '选歌页空状态缺漂流瓶').toContain('BottleMark');
+    expect(pageSource('sea-page.tsx'), '公海页空状态缺漂流瓶').toContain('BottleMark');
+  });
+});
+
+/* ── t46 第三批：水缓缓流动（常驻漂移）───────────────────────────────────────
+   DESIGN.md 的「水域母题层」旧硬约束③写的是"本层不含任何动画"，并预告："若将来加漂移，
+   必须走 motion-web §1 decoration 三条件并引用 motion 契约"。本组就是那个"将来"。
+   判据（全部用 includes 断言，不用正则 —— 避免上一版把控制字符写进正则的事故）：
+     ① 漂移参数来自 motion 契约；② 只动 transform；③ **是 CSS 动画**（这样 motion.css 的
+        全局 reduced-motion 重置才管得到它），不得 JS/WAAPI 驱动；④ 旧条文已删（不许两份规则并存）。 */
+/** 精确判据：`<WaterTexture …>` 标签内是否真的写了 `drift`（不能只看文件里有没有 "drift" 这个词）。 */
+const usesDrift = (src: string): boolean => {
+  let i = src.indexOf('<WaterTexture');
+  while (i !== -1) {
+    if (src.slice(i, i + 80).includes(' drift')) return true;
+    i = src.indexOf('<WaterTexture', i + 1);
+  }
+  return false;
+};
+
+describe('t46 水流漂移：走契约 + reduced-motion 可静止（能真的区分）', () => {
+  const motionCssDrift = readFileSync(join(DS_DIR, 'motion.css'), 'utf8');
+
+  it('DESIGN.md 的 motion 块登记了漂移时长与位移', () => {
+    expect(frontMatter, 'DESIGN.md motion 块缺 driftDuration').toContain('driftDuration:');
+    expect(frontMatter, 'DESIGN.md motion 块缺 driftShift').toContain('driftShift:');
+  });
+
+  it('theme.css 暴露 --motion-drift-* 契约值', () => {
+    expect(themeCss).toContain('--motion-drift-duration');
+    expect(themeCss).toContain('--motion-drift-shift');
+  });
+
+  it('漂移是 CSS 动画（受全局 reduced-motion 重置管辖），且只动 transform', () => {
+    expect(waterCss, 'water.css 缺漂移关键帧').toContain('@keyframes ocean-drift');
+    const frames = waterCss.split('@keyframes ocean-drift')[1]?.split('}')[0] ?? '';
+    expect(frames, '缺关键帧体').not.toBe('');
+    expect(frames, '漂移只能动 transform').toContain('transform:');
+    for (const banned of ['width:', 'height:', 'top:', 'left:', 'margin:', 'padding:']) {
+      expect(frames, `漂移不得动 ${banned}`).not.toContain(banned);
+    }
+    expect(waterCss, '漂移时长必须取契约 token').toContain('var(--drift-duration)');
+    expect(waterCss, '漂移幅度必须取契约 token').toContain('var(--drift-shift)');
+  });
+
+  it('漂移不得用 JS/WAAPI 驱动（会绕过 reduced-motion 的 CSS 重置）', () => {
+    expect(waterCss, 'water.css 不得出现 JS 动画').not.toContain('.animate(');
+    expect(waterCss, 'water.css 不得用 rAF 驱动').not.toContain('requestAnimationFrame');
+  });
+
+  it('motion.css 的全局 reduced-motion 重置覆盖所有动画（漂移因此静止）', () => {
+    expect(motionCssDrift, 'motion.css 缺 reduced-motion 媒体查询').toContain(
+      'prefers-reduced-motion: reduce',
+    );
+    expect(motionCssDrift, '缺通用 animation: none !important（漂移会漏网）').toContain(
+      'animation: none !important',
+    );
+  });
+
+  it('至少 3 个页面真的用了漂移（不是写了没人用）', () => {
+    const users = ['sea-page.tsx', 'profile-page.tsx', 'settings-page.tsx'].filter((page) =>
+      usesDrift(pageSource(page)),
+    );
+    expect(users.length, `只有 ${String(users.length)} 个页面用了 drift`).toBeGreaterThanOrEqual(3);
+  });
+
+  it('旧硬约束③已从 DESIGN.md 删除，且新条文在位（不许两份规则并存）', () => {
+    expect(designMd, '旧条文还在：本层不含任何动画').not.toContain('本层不含任何动画');
+    expect(designMd, '新条文缺失').toContain('低幅度常驻漂移');
+  });
+});

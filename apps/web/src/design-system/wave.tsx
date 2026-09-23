@@ -116,13 +116,19 @@ export function WaterSheen({ className, tone = 'dark' }: DecorProps & { tone?: '
  * 水位线肌理：双线距干涉纹（12/27px，108px 才重复）+ 左右渐隐 mask，让大块底色不再像空白模板、
  * 也不像账本格线。**深底用默认值；浅底必须传 `tone="light"`**（强度更低，正文对比度优先）。
  */
-export function WaterTexture({ className, tone = 'dark' }: DecorProps & { tone?: 'dark' | 'light' }) {
+export function WaterTexture({
+  className,
+  tone = 'dark',
+  drift = false,
+}: DecorProps & { tone?: 'dark' | 'light'; drift?: boolean }) {
   return (
     <span
       aria-hidden="true"
       className={cn(
         'pointer-events-none absolute inset-0 z-underlay',
         tone === 'light' ? 'water-texture-light' : 'water-texture',
+        // 缓缓流动（t46）：只动 transform、参数取 motion 契约、reduced-motion 下由全局重置冻住
+        drift && 'water-drift',
         className,
       )}
     />

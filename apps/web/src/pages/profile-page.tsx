@@ -14,7 +14,15 @@ import { CollectionsPanel } from '../features/bottle/collections-panel';
 import { NotificationList } from '../features/bottle/notification-list';
 import { MyBottles } from '../features/bottle/my-bottles';
 import { useSession } from '../features/session/session-context';
-import { Button, Card, Icon, WaveDivider } from '../design-system';
+import {
+  BottleMark,
+  Button,
+  Card,
+  Icon,
+  TideLine,
+  WaterTexture,
+  WaveDivider,
+} from '../design-system';
 
 export function ProfilePage() {
   const session = useSession();
@@ -22,8 +30,13 @@ export function ProfilePage() {
   const [panel, setPanel] = useState<'collections' | 'badges' | null>(null);
 
   return (
-    <div className="flex flex-col gap-3">
-      <header className="flex flex-col gap-2">
+    <div className="relative isolate flex flex-col gap-3">
+      {/* 水域母题（t46 扩面）：整面水位线 + 页头潮线 + 一只漂流瓶（全部绝对定位、零布局高度） */}
+      <WaterTexture tone="light" drift />
+      <header className="relative flex flex-col gap-2 pb-[12px]">
+        <BottleMark size={52} className="absolute right-0 -bottom-[6px] hidden text-peacock md:block" />
+        <BottleMark size={36} className="absolute right-0 -bottom-[4px] text-peacock md:hidden" />
+        <TideLine />
         <h1 className="text-[1.75rem] font-bold text-abyss">我的</h1>
         <p className="max-w-[46rem] text-[1rem] leading-[1.6] text-slate-current">
           账号只用来认领你自己的漂流瓶。别人在瓶子里看到的是匿名代号，看不到你的账号。

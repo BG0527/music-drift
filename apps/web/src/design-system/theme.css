@@ -142,6 +142,9 @@
   --motif-texture-alpha: 0.05;
   --motif-texture-line-gap: 12px;
   --motif-tide-line-alpha: 0.55;
+  /* t46：水流漂移（走 motion 契约；只动 transform） */
+  --motion-drift-duration: 24000ms;
+  --motion-drift-shift: 10px;
   /* t44 增强：水感（双线距干涉 + 左右渐隐）+ 浅底强度上限 + 航迹虚线 */
   --motif-texture-line-gap-alt: 27px;
   --motif-texture-fade: 22%;

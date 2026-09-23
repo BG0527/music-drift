@@ -80,7 +80,9 @@ export function SeaDetailPage({ id }: { id: string }) {
   const summary = sea.data;
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="relative isolate flex flex-col gap-6">
+      {/* 内容区母题（t46 扩面要求"详情页内容区"）：整面水位线缓缓流动（绝对定位、零布局高度） */}
+      <WaterTexture tone="light" drift />
       {note === null ? null : (
         <Toast tone={voteError === null ? 'info' : 'warning'} message={note} />
       )}

@@ -47,7 +47,7 @@ export function SeaPage() {
     <div className="relative isolate flex flex-col gap-6">
       {/* 可见的"海面"：顶部一条水面带（渐隐光 + 水位线），高度固定 220px 且绝对定位 ⇒ 不进文档流 */}
       <WaterSheen tone="light" className="bottom-auto h-[220px]" />
-      <WaterTexture tone="light" />
+      <WaterTexture tone="light" drift />
       <header className="relative flex flex-col gap-2 pb-[12px]">
         <h1 className="text-[1.75rem] font-bold text-abyss">公海大厅</h1>
         <p className="max-w-[46rem] text-[1rem] leading-[1.6] text-slate-current">

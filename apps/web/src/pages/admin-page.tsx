@@ -9,7 +9,12 @@
  * 一屏一件事（先看队列再裁决），表格形态用卡片列表而不是密集表格（移动端不横向溢出）。
  */
 import { useState } from 'react';
-import { EmptyState, Tabs } from '../design-system';
+import {
+  EmptyState,
+  Tabs,
+  TideLine,
+  WaterTexture,
+} from '../design-system';
 import { ReportQueue } from '../features/admin/report-queue';
 import { useSession } from '../features/session/session-context';
 import { TEXT_LINK_STRONG } from './shell/link-styles';
@@ -44,8 +49,11 @@ export function AdminPage() {
   }
 
   return (
-    <div className="flex flex-col gap-6">
-      <header className="flex flex-col gap-2">
+    <div className="relative isolate flex flex-col gap-6">
+      {/* 水域母题（t46 扩面）：审核台也在同一个水面之下 —— 只放水位线 + 潮线（不放瓶子：这里不是"我的瓶子"） */}
+      <WaterTexture tone="light" />
+      <header className="relative flex flex-col gap-2 pb-[12px]">
+        <TideLine />
         <h1 className="text-[1.75rem] font-bold text-abyss">审核台</h1>
         <p className="max-w-[46rem] text-[1rem] leading-[1.6] text-slate-current">
           人工审核是最终决定权（CONTEXT §8）：可以驳回、删段、删瓶下架、封禁作者。

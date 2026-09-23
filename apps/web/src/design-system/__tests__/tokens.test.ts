@@ -159,6 +159,8 @@ describe('布局 / 圆角 / 层级 token 与 DESIGN.md 一致', () => {
       '--motion-shimmer-duration: 1400ms',
       '--motion-ripple-duration: 2400ms',
       '--motion-exit-duration: 240ms',
+      '--motion-drift-duration: 24000ms',
+      '--motion-drift-shift: 10px',
     ]) {
       expect(themeCss, `缺少动效契约 ${declaration}`).toContain(declaration);
     }
@@ -179,6 +181,8 @@ describe('布局 / 圆角 / 层级 token 与 DESIGN.md 一致', () => {
       ['1400ms', '--shimmer-duration: 1400ms'],
       ['2400ms', '--ripple-duration: 2400ms'],
       ['240ms', '--exit-duration: 240ms'],
+      ['24000ms', '--drift-duration: 24000ms'],
+      ['10px', '--drift-shift: 10px'],
     ];
     for (const [contract, working] of pairs) {
       expect(themeCss, `theme.css 缺少契约值 ${contract}`).toContain(contract);

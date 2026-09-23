@@ -80,3 +80,42 @@
 - 若用户仍觉得不够明显：**先实测**再把 `textureAlphaLight` 往 0.12 上调（不得跳过实测）。
 - 公海分页区/我的/设置页可继续加母题；`features/bottle/**`（我的页空态）属别人在途，**不碰**。
 - 若加水流漂移：必须走 `motion-web` §1 + `motion` 契约，并做真机/录屏验证。
+
+---
+
+# t46（第三批）状态 —— 母题扩面 + 水缓缓流动
+
+任务 `t46`（attempt 2, attempt_id `3e708841-8980-4e91-bc9c-39a9694d1fee`）。证据文档：`docs/ui-review/theme-pass-3.md`。
+
+## 进度表（t46，**严格先红后绿**）
+
+| 批次 | 内容 | 红 → 绿（原始输出见 theme-pass-3.md） |
+| --- | --- | --- |
+| D1 扩面·守卫先行 | 先写「每页至少一处母题 + 整面水层宿主必须 isolate + 空状态要有瓶子」断言 | **9 failed → 4 failed**（修掉误报后正是"缺母题的 4 页"）→ 补齐实现后 **30 passed** |
+| D2 扩面·实现 | `profile-page`（我的）/ `settings-page`（设置）/ `admin-page`（审核台）/ `not-found-page`（404）各补：整面水位线 + 页头潮线 + 漂流瓶（404 与公海/选歌用瓶子做空态母题） | 同上 |
+| D3 漂移·守卫先行 | 先写「drift token 已登记 / theme.css 暴露 / 只动 transform / **是 CSS 动画**（受全局 reduced-motion 重置管辖）/ 不得 JS 驱动 / ≥3 页面真的用了 drift / 旧条文已删」断言 | **5 failed** → 实现后 **37 passed** |
+| D4 漂移·实现 | `DESIGN.md` motion 块加 `driftDuration: 24000ms` + `driftShift: 10px`（含产品理由）；`theme.css` 暴露 `--motion-drift-*`；`motion.css` `:root` 加同名工作变量；`water.css` 加 `@keyframes ocean-drift` + `.water-drift`（只动 transform，含 `margin` 出血避免露边）；`wave.tsx` 的 `WaterTexture` 加 `drift` 开关；`sea/profile/settings` 三页整面水层开启 | 同上 |
+| D5 旧条文替换 | `DESIGN.md` 硬约束③「本层不含任何动画」→「**含一条低幅度常驻漂移**，条件如下」；**旧表述已从 DESIGN.md 中彻底移出**（守卫断言 `not.toContain('本层不含任何动画')`） | ✅（第一次没删干净，被自己的守卫抓到 → 已修） |
+| D6 反向控制（reduced-motion 能真的区分） | 临时移除 `motion.css` 的全局 `animation: none !important` | **1 failed（正是那条"漂移会漏网"）→ 还原后 37 passed** |
+| D7 | 三条门 + 一屏 | `pnpm -r test/typecheck/lint` **EXIT=0**（shared 242 / api 180 / web 594 passed + 1 skipped） |
+| D8 | **375 上我造成过一次红，已修** | `FAIL /settings settings-attribution=823 > 812`：我给该页头加 `pb-[12px]`，而它原本只剩 ~1px 余量（改前 811）⇒ 去掉 pb + 留注释；重跑 **1440 与 375 均 12/12 EXIT=0** |
+| D9 | `sea-detail` **内容区**补母题（acceptance 明确要求） | 整面水位线（带漂移）+ 外层 `relative isolate` |
+| D10 | 证据文档 `docs/ui-review/theme-pass-3.md`（一页一项表 + 两批红绿原文 + 反向控制 + 对比度实测 + 三条门/一屏原文） | ✅ |
+
+## 关键事实
+1. **漂移必须是 CSS 动画**，这是"reduced-motion 下静止"能成立的前提：`motion.css` 里有一条通用
+   `*, *::before, *::after { animation: none !important }` —— CSS 动画会被它冻住；**JS/WAAPI 会绕过它**。
+   守卫把这条写成了断言（含"不得出现 `.animate(` / `requestAnimationFrame`"）。
+2. 漂移参数：`driftDuration 24000ms`（极慢）+ `driftShift ±10px`（极小），`alternate` 来回。
+   产品理由（已写进 `DESIGN.md`）：**静止的水面像贴图**。
+3. 踩坑记录（避免重演）：python heredoc 里的 ``/`\s` 会被吃成控制字符，**把反斜杠写进 TS 正则会毁掉断言**
+   （本批两次红都源于此）。已改用 **`includes` 断言 + 无正则**的写法；后续同类守卫照此办理。
+4. 用户明确「别折腾」的项：页头潮线与航迹的 10px 间距 —— **本批没碰**。
+
+## 下一步（未做，明确登记）
+- 若用户仍要"更明显"：把 `driftShift` 上调（仍须只动 transform + 实测一屏/对比度）。
+- 深底页（河道两面板、公海/详情深底页头）尚未开漂移；若要开，用同一 token 即可。
+
+**⚠️ 两个必须记住的边界**
+- **`/settings` 在 375 下余量 ≈1px**（实测 811/812）⇒ 任何再往该页加高度都会顶破硬门；要加内容必须先压缩既有间距。
+- 写守卫别用带反斜杠的正则（python heredoc 会把 `` 吃成退格、`\s` 报 warning）：本批两次假红都源于此，已改用 `includes` 断言。

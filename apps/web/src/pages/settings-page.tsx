@@ -9,7 +9,16 @@ import { useLibraryMetadata } from '../features/api/queries';
 import { useLogout } from '../features/api/mutations';
 import { LibraryAttribution } from '../features/audio';
 import { useSession } from '../features/session/session-context';
-import { Button, Card, Icon, Modal, WaveDivider } from '../design-system';
+import {
+  BottleMark,
+  Button,
+  Card,
+  Icon,
+  Modal,
+  TideLine,
+  WaterTexture,
+  WaveDivider,
+} from '../design-system';
 import { useNavigate } from './shell/router-context';
 
 export function SettingsPage() {
@@ -27,8 +36,15 @@ export function SettingsPage() {
   const [attributionOpen, setAttributionOpen] = useState(false);
 
   return (
-    <div className="flex flex-col gap-6">
-      <header className="flex flex-col gap-2">
+    <div className="relative isolate flex flex-col gap-6">
+      {/* 水域母题（t46 扩面）：同上（水位线 + 潮线 + 瓶子） */}
+      <WaterTexture tone="light" drift />
+      <header className="relative flex flex-col gap-2">
+        {/* 注：这里**不加** pb —— /settings 在 375 下只剩 ~1px 余量（实测 settings-attribution=811/812），
+            加 12px 会直接把一屏门顶破。潮线是绝对定位，贴着页头下沿即可。 */}
+        <BottleMark size={52} className="absolute right-0 -bottom-[6px] hidden text-peacock md:block" />
+        <BottleMark size={36} className="absolute right-0 -bottom-[4px] text-peacock md:hidden" />
+        <TideLine />
         <h1 className="text-[1.75rem] font-bold text-abyss">设置</h1>
         <p className="max-w-[46rem] text-[1rem] leading-[1.6] text-slate-current">
           这一版只保留最小设置：看看匿名规则、退出登录、确认页面版本。

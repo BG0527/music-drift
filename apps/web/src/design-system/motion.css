@@ -16,6 +16,8 @@
   --ripple-duration: 2400ms;
   --exit-duration: 240ms;
   --reduced-duration: 150ms;
+  --drift-duration: 24000ms;
+  --drift-shift: 10px;
 }
 
 @keyframes ocean-rise {

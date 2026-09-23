@@ -105,6 +105,11 @@ motion:
   toastSuccessDuration: 3000ms
   toastInfoDuration: 5000ms
   toastErrorPersistent: true   # 错误不许自动消失，必须手动关闭（不许静默失败）
+  # 水域母题层的水流漂移（t46，用户裁决「加水缓缓流动」）。产品理由：这一版的主题就是「水」，
+    # 而静止的水面看起来像贴图；让水线以**极慢、极小幅度**横向流动（洋流），页面才"活着"。
+    # 约束：只动 transform；低幅度低速度不争夺注意力；reduced-motion 下由全局重置冻结。
+  driftDuration: 24000ms   # 24s 一个来回的一半（配 alternate）—— 慢到不引人注意
+  driftShift: 10px         # 横向位移幅度（±10px）—— 小到只"感觉到"而不是"看到"
   animatedProperties: [transform, opacity]
 # 水域母题层（2026-09-24 amend · t43）：只在这里定装饰的**强度**与**纹理周期**。
 # 组件只能引用 --motif-*，禁止内联 alpha / px（守卫：__tests__/water-motif.test.tsx）。
@@ -317,7 +322,7 @@ Water contours, tide lines, river-channel guides, ripples, drift-bottle silhouet
   2. **水位线肌理（water texture）**：横向细线平铺（周期 `textureTile`，强度 `textureAlpha`），让大块暗底不再像空白模板（`frontend-design` L59：把质量地板做到不喧哗）。
   3. **潮线（tide line）**：`sea-glass → 透明` 的渐隐细线，替代区块之间的硬分隔线（母题见 Overview 的 tide lines）。
   - **产品理由**：这本就是一个关于"水面之上与深海之下"的产品；这三层让页面有**地点感**，而不是"任何 App 都能用的背景"。
-  - **不许喧宾夺主（硬约束，三条同时成立）**：① 一律 `aria-hidden="true"` + `pointer-events-none` + **绝对定位**（零布局高度，因此不会破坏"一屏装下"）；② 只出现在**深水暗底与区块边缘**，不进入内容区、不压在正文之下 —— 浅底上若要用，强度必须降到 `sheenAlphaLight` 并实测文字对比度不退化；③ 本层**不含任何动画**（静态纹理），因此 `reduced-motion` 下无需额外降级（若将来加漂移，必须走 `motion-web` §1 decoration 三条件并引用 `motion` 契约）。
+  - **不许喧宾夺主（硬约束，三条同时成立）**：① 一律 `aria-hidden="true"` + `pointer-events-none` + **绝对定位**（零布局高度，因此不会破坏"一屏装下"）；② 只出现在**深水暗底与区块边缘**，不进入内容区、不压在正文之下 —— 浅底上若要用，强度必须降到 `sheenAlphaLight` 并实测文字对比度不退化；③ **含一条低幅度常驻漂移**（water drift，t46 起生效）：水面缓缓横向流动，参数取 `driftDuration`（24s）/ `driftShift`（±10px），**只动 `transform`**、由 CSS 动画实现（因此被全局 `reduced-motion` 重置冻结为静止）。`motion-web` §1 的 decoration 三条件逐条成立：① 产品理由＝「静止的水面像贴图」，已写在本条；② 低幅度低速度、不争夺注意力；③ `reduced-motion` 下静止。
 - **漂流瓶母题（bottle motif，t44 补）**：用户点名的第三类母题。已有内联 SVG `BottleMark`（瓶身 + 瓶塞 + 一道水线 + 底部椭圆水影）本批**首次落到页面上**：公海大厅与漂流日志的页头右侧各一枚，骑在潮线上、与标题同高（绝对定位，零布局高度）。产品理由：**公海就是瓶子入海之后的去处**，页头出现"漂着的瓶子"是这个页面最该有的那一件事。
 - **航迹虚线（wake line，t44 补）**：漂流瓶划过水面留下的**断续**水痕（与潮线的"实线渐隐"区分）。落在页头与内容之间，1px 高、绝对定位。产品理由：接力是**一条路径**（河道），航迹把这个"经过"的语义画出来，而不是再加一层静态底纹。
 - **浅底装饰强度上限（t44 定，先定后用）**：浅底（wave-white）上**只允许** `textureAlphaLight`（**0.09**）级别的纹理/光带，且装饰一律在内容**之下**（`z-underlay`），不得压住正文。
