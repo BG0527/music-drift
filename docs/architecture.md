@@ -3156,3 +3156,30 @@ C2 紧贴 `foam` 环（三处 CTA）· 移动端内圈 **+16px**（md 不动）�
 ⇒ 属"**规则换了、文案没跟着换**"（本会话第二类判据问题）的又一例，且**它是用户可见的正文**，比错误提示更显眼。
 ⇒ 处置：派 frontend-flow 全站扫除该口径（见任务）。
 ⇒ 方法论价值：**这一处只有"人眼看渲染结果"才能发现** —— 三条门、像素采样、12/12 守卫全部绿，但文案是错的。**这就是我坚持"captain 亲眼看图 + 请用户自己跑一遍"的理由。**
+
+---
+
+## 77. 项目级 skill 安装 `motion-web` + ⭐ 前端派单纪律（skill 加载必须**可核**）
+
+### 77.1 安装
+用户要求在项目级 skill 目录安装 `motion-web`（前端动效）。
+- **位置**：`.dsh/skills/motion-web/SKILL.md`（与既有三个前端 skill 同目录、同格式：YAML frontmatter `name` / `description`）
+- **已生效**：本会话 skill catalog 已收录 `motion-web` ✓
+- **内容（10 节）**：① 先定目的（feedback / guidance / continuity / decoration，**decoration 需产品理由**）② **参数只能取自设计契约的动效 token，禁止内联新值** ③ 只动 `transform` / `opacity` ④ 编排（进出配对、stagger 等距、单一"主角"、入场 ≤600ms）⑤ React 落地（**显式状态机优先于布尔组合**、卸载动画需显式延迟卸载、不在 effect 里同步 setState 驱动动画、不用 setInterval 拼动画）⑥ 性能（60fps、避 layout thrash、`will-change` 用完移除）⑦ 可访问性（**reduced-motion 覆盖每一项**、动效不得是唯一反馈、焦点态至少两项区分）⑧ **可验证性（核心纪律）**：每个动效要有可断言契约，并**明确各层能/不能证明什么**（jsdom 证明不了渲染）⑨ 禁止清单 ⑩ 落地前 7 条自检
+- **设计取舍（关键）**：它**不另立一套动效参数**，而是要求引用 `DESIGN.md` 的动效契约 —— 避免出现"第二份规则"（本会话反复的教训）。
+
+### 77.2 ⭐ 前端派单纪律：skill 加载必须**可核**
+用户要求：保证子 agent 做前端时正确加载**所有**项目级前端 skill。
+- **当前清单（4 个）**：`frontend-design` · `afrexai-ui-design-system` · `css-animation-creator` · **`motion-web`**
+- **纪律（写入所有前端任务）**：
+  1. 开工前**逐个 load**（四个都列在任务描述里，避免只加载自己记得的那几个）；
+  2. 报告里**引用具体条款原文**（不接受"已调用 skill"这种空口声明）；
+  3. **captain 可核对**：skill 文件就在仓库里（`.dsh/skills/*/SKILL.md`）⇒ **引用的条款必须能在原文中找到** —— 这是把"声称加载"变成"可验证"的关键手段；
+  4. 引用必须**与本次改动相关**（不要求机械引用，但要求引用的条款能解释你做的某个选择）。
+
+### 77.3 ⚠️ 安装的可见性边界（必须说清）
+**`.dsh/` 被项目 `.gitignore` 忽略** ⇒ 项目级 skills 是**本地安装、不入库**（`git add .dsh/...` 被直接拒绝）。
+- **好处**：符合 `.dsh` 作为**工具配置**的定位（不该混进项目版本控制）；
+- **代价**：**其他机器 / clone 不会有这些 skill** ⇒ 换环境或部署时需按 §77.1 的记录**重新安装**（清单：`frontend-design` / `afrexai-ui-design-system` / `css-animation-creator` / `motion-web`；位置 `.dsh/skills/<name>/SKILL.md`）；
+- **本会话内无影响**：成员与 captain 共享同一文件系统，能正常 load。
+⇒ 因此 §77.2 的"captain 可核对条款原文"**依赖本机文件**；引用核对在本机有效 ✓
