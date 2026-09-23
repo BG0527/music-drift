@@ -3008,3 +3008,26 @@ frontend-ds 在 t34 的 `commandsRun` 里写了 `{"command":"git diff | grep -c 
 ### 70.4 连带责任（captain 自记）
 captain **已经**在 §69.1 引用过它报的 3 ⇒ **证据污染会沿引用链扩散**。
 ⇒ 配套纪律：**任何被引用进文档的数字，引用者须标明来源（自测 / 转述）**。
+
+---
+
+## 72. V1 落地规格的三条补充（captain 全批）
+
+### 72.1 C2 的环**紧贴控件边缘**（而非放到 130px 涟漪处）
+理由（**解读稳健性**，非外观偏好）：WCAG 1.4.11 的对象是**控件自身的可感知边界**；若放在 130px 处（md 下距 CTA 边缘 10px），它会重新变成"这是边界还是多加一圈涟漪"——**可争议**；紧贴边缘则**两种解读都成立**。
+实测：`foam 环 vs deep-current = 10.5:1`，**与位置无关** ⇒ 差别只在"是否紧贴控件"。
+
+### 72.2 ⚠️ 焦点态会被静止环"吃掉"（真实的交互退化风险）
+`ring` 系共享同一组 CSS 变量 ⇒ 静止态加 `ring-2 ring-foam` 后，若焦点态仍只是"**同一个 2px 环换个颜色**"，会比现在（静止无环 → 焦点出现环）**更难辨认**。
+⇒ 处置（批准）：静止 `ring-2 ring-foam`；焦点 `focus-visible:ring-[3px]` + `ring-sea-glass` + `ring-offset-2 ring-offset-deep-current` —— **更粗 + 换色 + 偏移带**，三重区分，与静止态在**结构上**不同（不只是色差）。
+⇒ 教训：**"给控件加一圈边界"不是无副作用的操作** —— 它会与 `ring` 体系的共享变量互吃。
+
+### 72.3 焦点环同 patch 收口（批准）
+实测（命令原文 + 粘贴输出，遵守 §70）：
+```
+home-page.tsx:90            … ring-2 ring-sea-glass ring-offset-2 ring-offset-deep-current …
+river-page.tsx:135          … ring-2 ring-sea-glass ring-offset-2 ring-offset-deep-current …
+design-system/button.tsx:17 … ring-2 ring-peacock   ring-offset-2 ring-offset-wave-white …
+```
+⇒ `Button`（捞取）的焦点环是 `ring-peacock` = **2.05:1** —— **与 V1 是同一条违规**，只是发生在**焦点态**；且同一页面两个 CTA 的焦点表现不一致。
+⇒ 批准在调用点用 `className` 覆盖（只改 `pages/**`，不碰 design-system，不越 t32 的界）。**收口必须带验证**：① 贴改动后 `grep -n "focus-visible:ring"` 输出证明三处一致；② **token 守卫扩展到焦点环色**（`sea-glass` 对各面 ≥3:1），使**焦点态达标也进机器门禁**，而不是靠肉眼看。
