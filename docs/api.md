@@ -410,3 +410,21 @@ pnpm --filter @music-drift/api test:integration
 
 ### 码表补充
 `HOLDING_ALREADY_TAKEN`（409）语义 = 「**同瓶并发抢占失败**」（`/api/river/draw` 与 `/api/sea/:id/targeted-segment` **共用**；后者此前漏检，t39 已修）。
+
+---
+
+## 私密留言：目标由发送者按**段号**指定（t42 规则变更 · CONTEXT §5）
+
+### 契约
+- `AttachPrivateMessageRequest = { content, targetSegmentIndex }` —— **`targetSegmentIndex` 是 1-based 段号**（与 `Segment.index` 同语义），**服务端解析成该段作者**；**客户端不传 `userId`**（不信任前端送来的身份）；
+- `PrivateMessage` 增 `targetSegmentIndex`；
+- 错误码：**`422 MESSAGE_TARGET_NOT_AVAILABLE`**（目标段不存在 / 已被斩 / 写给自己）、**`400`**（缺字段或非正整数）。
+
+### 语义
+| 项 | 规则 |
+| --- | --- |
+| **可见性** | **只有目标能看到**（送达后）；发送者能看到自己写的；**发起者与其它段作者一律看不到** |
+| **送达时刻** | **目标当轮拿到瓶子即送达**（`BOTTLE_DRAWN` / `BOTTLE_RETURNED`）—— **不必等到入海** |
+| **三种失败** | ① **目标段被斩**（`SEGMENT_CUT`）② **父链断裂 / `DAMAGED`** ③ **整首完成入海、却未回传到目标**（`BOTTLE_WENT_TO_SEA`）⇒ 一律 `UNDELIVERED` + **通知留言者** |
+| **通知收件人** | `MESSAGE_DELIVERED` ⇒ **目标**；`MESSAGE_UNDELIVERED` ⇒ **留言者** |
+| **唯一实现** | 内核 `messagesDeliveredTo` / `messagesUndelivered` / `messagesUndeliveredFor` 三个纯函数**是"送达/失败"的唯一实现**；投影层按**内核重放**同步，不得另写一份 |

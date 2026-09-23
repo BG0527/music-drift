@@ -3612,3 +3612,34 @@ architect 主动报告「**会话上下文已接近上限**（累计约 40 次�
 ### 91.3 一条方法论（认可）
 它把"需要写 notifications 但当前无写入口"**就地在测试文件里标注** —— 比事后在报告里提一句有效得多：**下一个看到这段代码的人会立刻知道这里缺什么**，而不会以为"测试绿了就没问题"。这与"把未做项放在它该在的位置"一致。
 顺便：它**同时暴露了我们的一个系统性缺口** —— `notifications` 表**此前没有任何写入口**（所以第④条的"失败通知"无处落地）。这与早期修过的"`BOTTLE_DAMAGED` 从不终结 PENDING 留言"是同族问题：**状态存了，但没人写它**。
+
+---
+
+## 92. t42 闭合 + ⚠️ captain **第二次**「用注释证明行为」
+
+### 92.1 ⚠️ 我的错：那条「遗漏」其实早已实现
+我依据 `apps/api/src/routes/interactions.integration.test.ts:523` 的 ⚠️ 注释（"当前全仓**无任何写入口**"）判定"UNDELIVERED 通知没有写入口"并要求补 —— **实际它已实现**：`store/notifications.ts` 按**内核前后状态比对**写通知（凡 `MESSAGE_STATE_EVENTS` 的事件都重放"本事件前/后"两份状态）⇒ PENDING→**DELIVERED** 通知 `message.toUserId`（**目标**）；PENDING→**UNDELIVERED** 通知 `message.fromUserId`（**留言者**）。
+那条注释**写于 t9**，t12 补齐写入后就成了**过期误导**（已被改成 ✅）。
+⇒ **我在同一天第二次犯同一个错**：§73.4 我因 `recorder-panel.tsx` 的一句注释推断"页面已接线"（实际没有）；这次又因一句注释推断"功能没写"（实际已写）。
+⇒ **纪律（第二次强调）**：**注释不是证据。** 判断"某行为是否发生"必须看 **调用点 / 测试 / 运行结果**（grep 调用点、跑测试），**不能读注释** —— 注释只说明"作者当时想说什么"，而它可能早已过期。
+
+### 92.2 三条失败路径的用例（每条**三面证据**）
+`routes/messageTargeting.integration.test.ts`（新增 8 例）：
+1. 『失败①：**目标段被斩** → 留言者收到 `MESSAGE_UNDELIVERED`，目标什么也看不到』
+2. 『失败②：**父链断裂 / 瓶子 DAMAGED**（锚段被斩）→ 留言者收到 `MESSAGE_UNDELIVERED`』
+3. 『失败③：**整首完成入海、但留言没回传到目标** → 留言者收到 `MESSAGE_UNDELIVERED`（用户明确补充的那条）』
+每条断言：**发送者收到通知** + **目标看不到内容** + **DB 行 = UNDELIVERED**（三面，不是只看状态码）。
+
+### 92.3 它补这条时挖出并修掉两处**真问题**
+1. **投影层与内核不一致（两个真相源）**：旧投影**只在 `BOTTLE_WENT_TO_SEA`** 改 `messages` 状态，`SEGMENT_CUT`/`DAMAGED` 不动 ⇒ `GET /messages`（读内核）与**任何直接读表的统计/审计互相打脸**。已改为"事件落库后**按内核重放**同步投影"（复用同一份 `MESSAGE_STATE_EVENTS`）⇒ **单一真相源**；
+2. **同一规则的第二份实现**：`notifications.ts` 里为 `BOTTLE_DAMAGED` 手写的一段"直接 UPDATE messages + 通知"（注释还声明「不存在两个写入者」，在新实现下**已不成立**）⇒ 按"**替换机制要删掉旧机制**"**整段删除**（连同失效的 `PendingMessageRow`）；**删后失败②用例仍绿** ⇒ 证明内核驱动那条路径**确实覆盖**了它。
+   ⇒ 这是"删旧机制"的正确验证方式：**不是宣称覆盖了，而是把它删掉、看测试还绿不绿。**
+
+### 92.4 设计：三路齐全 + 唯一实现
+`domain/messages.ts` 新增 **`messagesDeliveredTo` / `messagesUndelivered` / `messagesUndeliveredFor` 三个纯函数，作为"送达/失败"的唯一实现**；
+`events.ts` 三路齐全：`BOTTLE_DRAWN`/`BOTTLE_RETURNED` ⇒ **目标拿到即送达** · `SEGMENT_CUT` ⇒ 目标段被斩即未送达 · `BOTTLE_DAMAGED`/`BOTTLE_WENT_TO_SEA` ⇒ 其余 PENDING 未送达。
+既有断言**反转**：`returnInterruption.test.ts`（"必须入海才送达"→"回传到目标手上即送达"；"发起者不能写"→"任何在场者都能写，目标只按段号判"）· `timeout.test.ts`（补字段）；新增 `messages.test.ts`（11 例）。
+
+### 92.5 verify（最终树）
+`api test` exit 0（19/180）· `api test:integration` **exit 0**（23 文件 / **189 例**，170.84s）· `typecheck` exit 0 · `shared test` exit 0（22/242，含 `messages.test.ts` 11 例）· `lint` exit 0。
+披露式归档：`packages/shared/src/domain/**` 未列入 changedPaths，**逐条在 output 披露**（`messages.ts`/`events.ts`/`types.ts`/`errors.ts` + 两处断言反转 + 新增 `messages.test.ts`）；**`apps/web/**` 零改动** ✓（前端留给 t41）。
