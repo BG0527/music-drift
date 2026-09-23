@@ -2864,3 +2864,24 @@ frontend-flow 把 `one-screen-check.mjs` 改为 hermetic 后**立刻**发现：*
 - **t26**（F2 后端 repair，failed）：用户第 4 条使 F2 整体作废 ⇒ 已按 §60.2 撤干净（−294 行、零残留、DB 表已 drop）⇒ **不需要 follow-up repair**。
 - **t28**（F2 前端，failed）：同上作废；其客户端时长校正代码由 **t30**（audio-engineer）删除（t30 的 inScope 含 `docs/audio.md`，覆盖系统提示的 "unaudited path"）。
 - 系统的 `Delivery: blocked` 会持续提示 "failed without a follow-up repair" —— 这是**语义不匹配**：它假设 failed 必然需要一个 repair，而这两条的"follow-up"是**作废与清理**，且已经发生。
+
+---
+
+## 65. 开发库级联清理完成（演示风险消除）+ 一条用户可见卡死（选歌页 × 无切分）
+
+### 65.1 级联清理（frontend-flow 执行，captain 批准并先行干跑核对）
+- **方法**：显式顺序删除 + **单事务** + **`pg` 客户端参数化传 SQL**（不用 `docker exec … psql -f /dev/stdin`，从根上避开今天的 `-i` 静默坑）：
+  `listen_progress → votes → collections → messages → anon_codes → holdings → events → bottle_segments → bottles → song_segments → songs`（每步报数，不用 `onDelete` 兜底）
+- **备份留库**：`backup_t12.{songs,bottles,bottle_segments,holdings,events}`（只备份将删行；恢复 = `insert into <表> select * from backup_t12.<表>`）
+- **将删 = 实删**：songs **17** / bottles **17** / bottle_segments **4** / holdings **9** / events **18**（其余 6 张关联表 0 行）—— 与 captain 干跑数字完全一致
+- **复查**：`songs` = **4**（3 首真曲 + 1 首 `user-provided`）、`test` 歌 = **0**、**河道/公海里的 test 瓶子 = 0** ✓、`GET /api/songs` 4 首、`/api/sea` 两区均 200
+- **演示意义**：消除了"演示时在河道里随机捞到垃圾瓶子"的真实风险
+
+### 65.2 ⚠️ 一条**用户可见的卡死**（选歌页 × 无切分）
+- 事实（captain 查证）：`user-provided` 的「别人写的歌」`total_segments = 4`，但 **`song_segments` 有 0 行**；且**已有 2 支引用它的 DRAFT 空草稿**（0 段、缺口 1,2,3,4）—— **两支都是 DRAFT、不在河道**，故不污染演示池。
+- 后果：用户从选歌页选中它 → 创建草稿 → **录制被 fail-closed 拒** → **卡在草稿**。这与刚修的 P0「发起后无法录第一段」是**同类症状、不同原因**（一个是 holder 语义，一个是缺预设）。
+- 处置（派 **t32**）：**选歌页对无切分的歌禁用并写明理由**（判据：`segments.length === 0`；**不得静默隐藏** —— 用户要能知道它存在、以及为什么不能选）；服务端 fail-closed 作为第二层兜底。
+- **产品缺口（记为待办 + 触发条件）**：若将来真要支持"用户上传自己的歌"，**上传路径必须同时生成切分与段预设**，否则新歌一上传就会卡死在同一个地方。
+
+### 65.3 一轮协作观察
+frontend-flow 在"报 findings 但不动别人域"这件事上做得对：它只报"`user-provided` 无切分、属 architect 域、我没动"，由 captain 查证后决定处置 —— 避免了跨域冲突。**而它自己的清理动作则严格按批准口径**（只删 `test`，`user-provided` 一行没碰）。
