@@ -1,5 +1,5 @@
-import { existsSync, readFileSync, readdirSync } from 'node:fs';
-import { resolve } from 'node:path';
+import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
+import { join, resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 /**
@@ -179,17 +179,51 @@ describe('布局 / 圆角 / 层级 token 与 DESIGN.md 一致', () => {
   });
 });
 
-describe('构建产物尺度守卫（需先 build，顺序见 docs/ui-review/spacing-scale-decision.md §7）', () => {
+describe('尺度守卫：源码级恒跑 + 产物级「新鲜才断言」', () => {
+  // ── ① 源码级负向守卫：**不依赖 build，永不跳过** ──────────────────────
+  // 这是主守卫：把「按 0.5rem 覆盖 --spacing」这个事故钉死在任何 CSS 源文件上。
+  it('任何 CSS 源文件都不得声明 --spacing（恒跑守卫，ADR §48）', () => {
+    const cssFiles = readdirSync(dsDir, { recursive: true, encoding: 'utf8' })
+      .map((entry) => String(entry).replaceAll(String.fromCharCode(92), '/'))
+      .filter((entry) => entry.endsWith('.css'));
+    expect(cssFiles.length, '没扫到任何 CSS 源文件，守卫失效').toBeGreaterThan(0);
+    for (const file of cssFiles) {
+      const text = readFileSync(join(dsDir, file), 'utf8');
+      // 注释里允许出现 `--spacing`（用于术语说明），只查真实的声明
+      const codeOnly = text.replace(/\/\*[\s\S]*?\*\//g, '');
+      expect(codeOnly, `${file} 声明了 --spacing（会让所有数字档 ×2）`).not.toMatch(/--spacing\s*:/);
+    }
+  });
+
+  // ── ② 产物级：只有在"产物比主题源文件新"时才断言 ────────────────────
+  // 为什么不是无脑断言：产物可能是**过期**的（build 之后又改了 theme.css），
+  // 用过期产物做断言会给出假安全感。因此三种情形分别是：
+  //   产物不存在        → 跳过（测试名写明原因）
+  //   产物比源文件旧    → 跳过（测试名写明"产物过期"）
+  //   产物比源文件新    → 真正断言 `--spacing` 不得为 .5rem
   const distAssets = resolve(repoRoot, 'apps', 'web', 'dist', 'assets');
-  const builtCss = existsSync(distAssets)
+  const themeSource = resolve(dsDir, 'theme.css');
+  const builtCssName = existsSync(distAssets)
     ? readdirSync(distAssets).find((name) => name.startsWith('index-') && name.endsWith('.css'))
     : undefined;
 
-  it.skipIf(builtCss === undefined)('产物里 --spacing 必须是 .25rem 且不得是 .5rem', () => {
-    const css = readFileSync(resolve(distAssets, builtCss as string), 'utf8');
-    // 不覆盖时产物里**不应出现** --spacing 值；若将来有人显式写成 0.25rem 也接受
-    expect(css).not.toMatch(/--spacing:\s*0?\.5rem/);
-  });
+  const skipReason: string | undefined = (() => {
+    if (builtCssName === undefined) return 'dist 不存在（未 build）';
+    const builtAt = statSync(resolve(distAssets, builtCssName)).mtimeMs;
+    const sourceAt = statSync(themeSource).mtimeMs;
+    if (builtAt < sourceAt) return '产物比 theme.css 旧（需重新 build）';
+    return undefined;
+  })();
+
+  it.skipIf(skipReason !== undefined)(
+    `构建产物里 --spacing 不得为 .5rem（dist 缺失/过期时自动跳过：${skipReason ?? '产物新鲜，本次已执行'}）`,
+    () => {
+      const css = readFileSync(resolve(distAssets, builtCssName as string), 'utf8');
+      expect(css, '产物里出现 --spacing: .5rem ⇒ 基准被再次覆盖').not.toMatch(/--spacing:\s*0?\.5rem/);
+      // 正面确认：Tailwind 默认基准在场
+      expect(css).toMatch(/--spacing:\s*0?\.25rem/);
+    },
+  );
 });
 
 describe('纪律守卫（禁 emoji / 禁写死视口高度 / 禁纯黑）', () => {
