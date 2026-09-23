@@ -181,6 +181,171 @@ describe('公海列表（CONTEXT §6.1）：默认只看已完成区，未完成
   });
 });
 
+describe('公海列表真分页（§46.2）：cursor 真消费 + 真 nextCursor + 稳定排序', () => {
+  /**
+   * 造一支**已完成**的公海作品：第 1 段由发起者录，第 2–4 段必须换人
+   *（内核 `hasEverSung` 禁止同瓶二次接唱 —— 用同一个账号跑 4 段会得到 422/409 的假红）。
+   */
+  async function seedCompleteSeaBottle(authorCookie: string): Promise<string> {
+    const bottleId = await createBottle(authorCookie);
+    await sing(authorCookie, bottleId);
+    await resolve(authorCookie, bottleId, 'SEA');
+    for (let hop = 0; hop < 3; hop += 1) {
+      const singer = (await register('pgs')).cookie;
+      expect(await take(singer, bottleId)).toBe(200);
+      await sing(singer, bottleId);
+      await resolve(singer, bottleId, 'SEA');
+    }
+    return bottleId;
+  }
+
+  /** 逐页取完，返回每一页（用于断言"不重叠 + 并集等于全量"）。 */
+  async function walkPages(
+    query: string,
+    limit: number,
+    maxPages = 20,
+  ): Promise<{ items: { id: string }[]; nextCursor: string | null }[]> {
+    const pages: { items: { id: string }[]; nextCursor: string | null }[] = [];
+    let cursor: string | null = null;
+    for (let page = 0; page < maxPages; page += 1) {
+      const url =
+        '/api/sea?' + query + '&limit=' + String(limit) + (cursor === null ? '' : '&cursor=' + encodeURIComponent(cursor));
+      const response = await app.inject({ method: 'GET', url });
+      expect(response.statusCode).toBe(200);
+      const body = response.json() as { items: { id: string }[]; nextCursor: string | null };
+      pages.push(body);
+      if (body.nextCursor === null) {
+        return pages;
+      }
+      cursor = body.nextCursor;
+    }
+    throw new Error('分页没有终止：nextCursor 一直非 null（游标没有真正推进）');
+  }
+
+  it('第 2 页与第 1 页**不重叠**，逐页并集 = 全量（计数证据）', async () => {
+    const author = await register('pg');
+    // 造 5 支已完成公海作品 + 3 支未完成（未完成的默认不该出现在列表里）
+    for (let index = 0; index < 5; index += 1) {
+      await seedCompleteSeaBottle(author.cookie);
+    }
+    const incomplete: string[] = [];
+    for (let index = 0; index < 3; index += 1) {
+      incomplete.push(await seedIncompleteSeaBottle(author.cookie));
+    }
+
+    // 全量（不分页）作为基准
+    const full = await app.inject({ method: 'GET', url: '/api/sea?limit=100' });
+    expect(full.statusCode).toBe(200);
+    const fullIds = (full.json() as { items: { id: string }[] }).items.map((item) => item.id);
+    expect(fullIds.length).toBeGreaterThanOrEqual(5);
+    for (const id of incomplete) {
+      expect(fullIds).not.toContain(id); // 默认只看已完成区
+    }
+
+    const pages = await walkPages('', 2);
+    const walked = pages.flatMap((page) => page.items.map((item) => item.id));
+
+    // 计数证据：不重叠（无重复）+ 并集 = 全量
+    expect(new Set(walked).size).toBe(walked.length);
+    expect(new Set(walked)).toEqual(new Set(fullIds));
+    expect(walked.length).toBe(fullIds.length);
+
+    // 除最后一页外每页都必须**满**（不得"某页不足 limit 却仍有下一页"）
+    for (const [index, page] of pages.entries()) {
+      if (index < pages.length - 1) {
+        expect(page.items.length, `第 ${String(index + 1)} 页应满 ${String(2)} 条`).toBe(2);
+        expect(page.nextCursor).not.toBeNull();
+      }
+    }
+    expect(pages[pages.length - 1]?.nextCursor).toBeNull();
+    expect(pages.length).toBeGreaterThan(1); // 真的分页了，不是一页装作到底
+  });
+
+  it('同一游标重复请求 → 返回同一页（稳定排序键）', async () => {
+    const first = await app.inject({ method: 'GET', url: '/api/sea?limit=2' });
+    const firstBody = first.json() as { items: { id: string }[]; nextCursor: string | null };
+    expect(firstBody.nextCursor).not.toBeNull();
+
+    const again = await app.inject({
+      method: 'GET',
+      url: '/api/sea?limit=2&cursor=' + encodeURIComponent(String(firstBody.nextCursor)),
+    });
+    const againBody = again.json() as { items: { id: string }[]; nextCursor: string | null };
+    const repeat = await app.inject({
+      method: 'GET',
+      url: '/api/sea?limit=2&cursor=' + encodeURIComponent(String(firstBody.nextCursor)),
+    });
+    expect((repeat.json() as { items: { id: string }[] }).items.map((item) => item.id)).toEqual(
+      againBody.items.map((item) => item.id),
+    );
+    // 且与第 1 页不重叠
+    const firstIds = firstBody.items.map((item) => item.id);
+    for (const id of againBody.items.map((item) => item.id)) {
+      expect(firstIds).not.toContain(id);
+    }
+  });
+
+  it('遍历期间新插入的作品不会造成漏项或重复（新数据排在游标之前）', async () => {
+    const author = await register('pn');
+    for (let index = 0; index < 4; index += 1) {
+      await seedCompleteSeaBottle(author.cookie);
+    }
+
+    const page1 = await app.inject({ method: 'GET', url: '/api/sea?limit=2' });
+    const page1Body = page1.json() as { items: { id: string }[]; nextCursor: string | null };
+    expect(page1Body.nextCursor).not.toBeNull();
+
+    // 遍历中途插一支**新的已完成**作品：它的 updated_at 最新 ⇒ 排在游标之前，不该出现在后续页
+    const fresh = await seedCompleteSeaBottle(author.cookie);
+
+    const seen = page1Body.items.map((item) => item.id);
+    let cursor: string | null = page1Body.nextCursor;
+    while (cursor !== null) {
+      const response = await app.inject({
+        method: 'GET',
+        url: '/api/sea?limit=2&cursor=' + encodeURIComponent(cursor),
+      });
+      const body = response.json() as { items: { id: string }[]; nextCursor: string | null };
+      for (const id of body.items.map((item) => item.id)) {
+        expect(seen, '同一支瓶子不得在后续页重复出现').not.toContain(id);
+        seen.push(id);
+      }
+      cursor = body.nextCursor;
+    }
+    expect(seen).not.toContain(fresh); // 新插入的排在游标之前：后续页不该再给
+  });
+
+  it('zone=INCOMPLETE 也能分页；非法 cursor → 400（不静默忽略）', async () => {
+    const author = await register('pz');
+    for (let index = 0; index < 3; index += 1) {
+      await seedIncompleteSeaBottle(author.cookie);
+    }
+    const pages = await walkPages('seaZone=INCOMPLETE', 2);
+    const walked = pages.flatMap((page) => page.items.map((item) => item.id));
+    expect(walked.length).toBeGreaterThanOrEqual(3);
+    expect(new Set(walked).size).toBe(walked.length);
+    for (const [index, page] of pages.entries()) {
+      if (index < pages.length - 1) {
+        expect(page.items.length).toBe(2);
+      }
+    }
+
+    // `zone=` 旧名仍然可用（向后兼容），且与 canonical `seaZone` 等价
+    const alias = await app.inject({ method: 'GET', url: '/api/sea?zone=INCOMPLETE&limit=100' });
+    const canonical = await app.inject({ method: 'GET', url: '/api/sea?seaZone=INCOMPLETE&limit=100' });
+    expect(alias.statusCode).toBe(200);
+    expect((alias.json() as { items: { id: string }[] }).items.map((item) => item.id)).toEqual(
+      (canonical.json() as { items: { id: string }[] }).items.map((item) => item.id),
+    );
+
+    // 非法 cursor 必须报错而不是被忽略（忽略 = 又静默回到第一页）
+    for (const bad of ['not-a-cursor', 'Zm9v', 'MTIzNDU2Nzg5MDAwOnh4']) {
+      const response = await app.inject({ method: 'GET', url: '/api/sea?limit=2&cursor=' + encodeURIComponent(bad) });
+      expect(response.statusCode, `cursor=${bad} 应被拒绝`).toBe(400);
+    }
+  });
+});
+
 describe('公海详情与指定接唱（CONTEXT §6.2）', () => {
   let initiatorCookie = '';
   let initiatorId = '';

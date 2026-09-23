@@ -4,14 +4,14 @@
  * 分区口径来自内核 `isComplete` / `seaZoneOf`（ADR-015 §16.4），不在路由里重算。
  */
 import { hasEverSung, isComplete, seaZoneOf, violation } from '@music-drift/shared/domain';
-import { SeaZoneSchema, UuidSchema } from '@music-drift/shared';
+import { BottleListQuerySchema, UuidSchema } from '@music-drift/shared';
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { problemFromViolations, sendProblem, transportProblem } from '../http/problem.js';
 import { createActorResolver } from '../http/session.js';
 import type { Clock } from '@music-drift/shared/domain';
 import type { Db } from '../db/client.js';
-import type { BottleStore } from '../store/bottles.js';
+import { decodeSeaCursor, type BottleStore, type SeaCursorPosition } from '../store/bottles.js';
 import { createRequestContext } from '../store/context.js';
 import { toBottleSummary } from '../store/dto.js';
 
@@ -20,11 +20,6 @@ export interface SeaRoutesOptions {
   store: BottleStore;
   clock: Clock;
 }
-
-const SeaListQuerySchema = z.object({
-  zone: SeaZoneSchema.optional(),
-  limit: z.coerce.number().int().min(1).max(100).default(20),
-});
 
 export function registerSeaRoutes(app: FastifyInstance, options: SeaRoutesOptions): void {
   const actors = createActorResolver(options.db, options.clock);
@@ -39,14 +34,31 @@ export function registerSeaRoutes(app: FastifyInstance, options: SeaRoutesOption
   }
 
   app.get('/api/sea', async (request, reply) => {
-    const query = SeaListQuerySchema.safeParse(request.query ?? {});
+    /** 查询参数用**契约里那一份**（`BottleListQuerySchema`），不再维护内联 schema。 */
+    const query = BottleListQuerySchema.safeParse(request.query ?? {});
     if (!query.success) {
       return sendProblem(reply, transportProblem('INVALID_BODY'));
     }
-    const rows =
-      query.data.zone === undefined
-        ? await options.store.listSeaBottles({ limit: query.data.limit })
-        : await options.store.listSeaBottles({ zone: query.data.zone, limit: query.data.limit });
+    // `zone` 是 `seaZone` 的旧别名（向后兼容）；默认只看**已完成区**（CONTEXT §6.1）
+    const zone = query.data.seaZone ?? query.data.zone ?? 'COMPLETED';
+
+    let after: SeaCursorPosition | undefined;
+    if (query.data.cursor !== undefined) {
+      const decoded = decodeSeaCursor(query.data.cursor);
+      if (decoded === null) {
+        // 解不开的游标**必须报错**：静默忽略等于"每次都回到第一页"（第 4 类静默损失）
+        return sendProblem(reply, transportProblem('INVALID_BODY'));
+      }
+      after = decoded;
+    }
+
+    const page = await options.store.listSeaBottles({
+      zone,
+      status: query.data.status ?? null,
+      limit: query.data.limit,
+      after,
+    });
+    const rows = page.rows;
     // 一次性把这一页用到的曲名查出来（避免每行一条查询）
     const songIds = [...new Set(rows.map((row) => row.songId))];
     const titles = new Map<string, string>();
@@ -66,10 +78,9 @@ export function registerSeaRoutes(app: FastifyInstance, options: SeaRoutesOption
         items.push(toBottleSummary(row, state, titles.get(row.songId) ?? ''));
       }
     }
-    // 默认只看**已完成区**（CONTEXT §6.1：公海是完成作品的归宿；未完成区须显式查询）。
-    const filtered =
-      query.data.zone === undefined ? items.filter((item) => item.isComplete) : items;
-    return reply.send({ items: filtered, nextCursor: null });
+    // 分区判定已由 store 交给**内核**完成（`seaZoneOf`），这里不再自己 filter
+    //（"先取 limit 再过滤"会让某页静默少给行，甚至返回空页却声称到底 —— §46.2 的原始缺陷）
+    return reply.send({ items, nextCursor: page.nextCursor });
   });
 
   app.get('/api/sea/:id', async (request, reply) => {

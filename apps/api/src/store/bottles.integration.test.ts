@@ -14,7 +14,13 @@ import {
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createDb, type Db } from '../db/client.js';
 import { insertSong, insertUser } from '../db/test-helpers.js';
-import { createBottleStore, type BottleStore } from './bottles.js';
+import {
+  createBottleStore,
+  decodeSeaCursor,
+  encodeSeaCursor,
+  type BottleStore,
+  type SeaCursorPosition,
+} from './bottles.js';
 import { createRequestContext } from './context.js';
 
 const DATABASE_URL = process.env['DATABASE_URL'] ?? '';
@@ -192,9 +198,77 @@ describe('bottleStore：内核命令 ↔ 事件流 ↔ 投影 ↔ 重放', () =>
     expect(row?.status).toBe(replayed.status);
     expect(seaZoneOf(replayed)).toBe('COMPLETED');
     const completed = await store.listSeaBottles({ zone: 'COMPLETED', limit: 50 });
-    expect(completed.some((candidate) => candidate.id === bottleId)).toBe(true);
+    expect(completed.rows.some((candidate) => candidate.id === bottleId)).toBe(true);
     const incomplete = await store.listSeaBottles({ zone: 'INCOMPLETE', limit: 50 });
-    expect(incomplete.some((candidate) => candidate.id === bottleId)).toBe(false);
+    expect(incomplete.rows.some((candidate) => candidate.id === bottleId)).toBe(false);
+  });
+
+  it('listSeaBottles：真游标分页（逐页不重叠、末页 nextCursor 为 null、畸形游标解码为 null）', async () => {
+    // 造两支**已完成**的公海作品（4 段各由不同用户录 —— 内核禁止同瓶二次接唱）
+    const makeCompleteSeaLockedBottle = async (): Promise<string> => {
+      const songId = await insertSong(db, 4);
+      const bottleId = crypto.randomUUID();
+      const initiatorId = await insertUser(db);
+      await store.createBottle({ bottleId, songId, initiatorId, ctx: ctxAt(9 * HOUR) });
+      let snapshot = (await store.loadState(bottleId))!;
+      await store.applyOutcome(bottleId, recordSegment(snapshot, { userId: initiatorId, note: null }, ctxAt(9 * HOUR)));
+      snapshot = (await store.loadState(bottleId))!;
+      await store.applyOutcome(bottleId, chooseResolution(snapshot, { userId: initiatorId, resolution: 'RIVER' }, ctxAt(9 * HOUR)));
+      for (let hop = 0; hop < 3; hop += 1) {
+        const singerId = await insertUser(db);
+        // 第 1 棒从河道捞（作品刚投河）；之后作品在**公海未完成区**，必须用"指定接唱"拿到持有权。
+        // ⚠️ 第一版这里三棒都调用 drawFromRiver：后两棒被内核拒绝（BOTTLE_NOT_IN_RIVER），
+        // 而我当时没断言 outcome.ok ⇒ 夹具静默只录了 2 段，红的现象看起来像 store 的 bug。
+        const drawOutcome =
+          hop === 0
+            ? await store.drawFromRiver({ bottleId, userId: singerId, ctx: ctxAt(9 * HOUR) })
+            : await store.takeTargetedSegment({ bottleId, userId: singerId, ctx: ctxAt(9 * HOUR) });
+        expect(drawOutcome?.ok, `第 ${String(hop + 1)} 棒应拿到持有权`).toBe(true);
+        snapshot = (await store.loadState(bottleId))!;
+        const recordOutcome = recordSegment(snapshot, { userId: singerId, note: null }, ctxAt(9 * HOUR));
+        expect(recordOutcome.ok).toBe(true);
+        await store.applyOutcome(bottleId, recordOutcome);
+        snapshot = (await store.loadState(bottleId))!;
+        const seaOutcome = chooseResolution(snapshot, { userId: singerId, resolution: 'SEA' }, ctxAt(9 * HOUR));
+        expect(seaOutcome.ok).toBe(true);
+        await store.applyOutcome(bottleId, seaOutcome);
+      }
+      snapshot = (await store.loadState(bottleId))!;
+      expect(snapshot.segments.length, '夹具必须真的录满 4 段').toBe(4);
+      expect(isComplete(snapshot)).toBe(true);
+      return bottleId;
+    };
+    const mine = [await makeCompleteSeaLockedBottle(), await makeCompleteSeaLockedBottle()];
+
+    // 逐页取完（limit=1，保证真的翻页）
+    const seen: string[] = [];
+    let after: SeaCursorPosition | undefined;
+    let cursor: string | null = null;
+    for (let page = 0; page < 50; page += 1) {
+      const result = await store.listSeaBottles({ zone: 'COMPLETED', limit: 1, after });
+      expect(result.rows.length).toBeLessThanOrEqual(1);
+      for (const row of result.rows) {
+        expect(seen, '同一支瓶子不得跨页重复').not.toContain(row.id);
+        seen.push(row.id);
+      }
+      if (result.nextCursor === null) {
+        cursor = null;
+        break;
+      }
+      cursor = result.nextCursor;
+      after = decodeSeaCursor(result.nextCursor) ?? undefined;
+    }
+    expect(cursor).toBeNull(); // 走到了末页
+    expect(seen).toContain(mine[0]);
+    expect(seen).toContain(mine[1]);
+    expect(new Set(seen).size).toBe(seen.length);
+
+    // 游标编解码：正常往返；畸形的**必须**解成 null（调用方据此回 400，而不是静默回到第一页）
+    const roundTrip = encodeSeaCursor({ updatedAtMs: 1_700_000_000_000, id: mine[0]! });
+    expect(decodeSeaCursor(roundTrip)).toEqual({ updatedAtMs: 1_700_000_000_000, id: mine[0] });
+    for (const bad of ['', 'not-a-cursor', 'Zm9v', 'MTIzOnh4', 'MTcwMDAwMDAwMDAwMDpub3QtYS11dWlk']) {
+      expect(decodeSeaCursor(bad), `游标 ${bad} 应解码失败`).toBeNull();
+    }
   });
 
   it('listParticipatedBottles：被斩段的作者（含发起者）不再算参与过，其余参与者不受影响（§46.1）', async () => {
@@ -209,7 +283,7 @@ describe('bottleStore：内核命令 ↔ 事件流 ↔ 投影 ↔ 重放', () =>
     await store.applyOutcome(bottleId, recordSegment(state, { userId: initiatorId, note: null }, ctx));
     state = (await store.loadState(bottleId))!;
     await store.applyOutcome(bottleId, chooseResolution(state, { userId: initiatorId, resolution: 'RIVER' }, ctx));
-    state = (await store.loadState(bottleId))!;
+    // 捞取不需要先读 state（它自己会读），少一次无用赋值 —— eslint 的 no-useless-assignment 正是钉这个
     await store.drawFromRiver({ bottleId, userId: singerId, ctx });
     state = (await store.loadState(bottleId))!;
     await store.applyOutcome(bottleId, recordSegment(state, { userId: singerId, note: null }, ctx));
@@ -323,6 +397,33 @@ describe('bottleStore：内核命令 ↔ 事件流 ↔ 投影 ↔ 重放', () =>
     const replayed = (await store.loadState(bottleId))!;
     expect(gaps(replayed)).toEqual([1]);
     expect(replayed.status).toBe('DAMAGED');
+  });
+
+  it('VOTE_CAST 投影缺少 extras.vote 时**响亮失败**（审计字段不许默认成满分，t24/F4）', async () => {
+    const songId = await insertSong(db, 4);
+    const initiatorId = await insertUser(db);
+    const bottleId = crypto.randomUUID();
+    const ctx = ctxAt(8 * HOUR);
+    await store.createBottle({ bottleId, songId, initiatorId, ctx });
+    let state = (await store.loadState(bottleId))!;
+    await store.applyOutcome(bottleId, recordSegment(state, { userId: initiatorId, note: null }, ctx));
+    state = (await store.loadState(bottleId))!;
+
+    const voterId = await insertUser(db);
+    const outcome = castVote(
+      state,
+      { userId: voterId, segmentId: state.segments[0]!.id, value: 'LIKE', listenedRatio: 0 },
+      ctx,
+    );
+    expect(outcome.ok).toBe(true);
+
+    // 不带 extras.vote → 必须抛错，而不是把 listened_ratio 悄悄写成 1
+    await expect(store.applyOutcome(bottleId, outcome)).rejects.toThrow(/listenedRatio/);
+    const rows = await db.query<{ count: string }>(
+      `select count(*)::text as count from votes where segment_id = $1`,
+      [state.segments[0]!.id],
+    );
+    expect(rows[0]?.count).toBe('0'); // 零副作用：宁可没写成，也不写假的
   });
 
   it('loadState 对不存在的瓶子返回 null（路由据此给 404）', async () => {

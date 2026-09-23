@@ -13,6 +13,7 @@ import {
   participants,
   replayBottle,
   resolveDrawParent,
+  seaZoneOf,
   type BottleState,
   type CommandOutcome,
   type DomainContext,
@@ -24,10 +25,48 @@ import { insertBottleSegment } from '../db/segments.js';
 import { projectNotifications } from './notifications.js';
 
 /**
- * `listParticipatedBottles` 的候选超取倍数：候选里含"段被斩"的瓶子，会被内核判定筛掉；
+ * 候选超取倍数（`listParticipatedBottles` 与 `listSeaBottles` 共用）：候选里含被内核判定筛掉的行，
  * 不多取就会**静默少给**几行（契约说返回 limit 以内，但少给是静默损失）。
  */
 const CANDIDATE_OVERFETCH = 3;
+
+/** 公海列表的游标位置：稳定排序键 `(updated_at, id)` 上的一行。 */
+export interface SeaCursorPosition {
+  updatedAtMs: number;
+  id: string;
+}
+
+/** 游标编码（base64url）——对客户端**不透明**，只要求原样回传。 */
+export function encodeSeaCursor(position: SeaCursorPosition): string {
+  return Buffer.from(position.updatedAtMs + ':' + position.id, 'utf8').toString('base64url');
+}
+
+/**
+ * 游标解码；**畸形一律返回 null**（调用方据此回 400）。
+ * 之所以不接受"解不开就当没给"：那会让客户端以为在翻页、实际每次拿到的都是第一页（静默损失）。
+ */
+export function decodeSeaCursor(raw: string): SeaCursorPosition | null {
+  let decoded: string;
+  try {
+    decoded = Buffer.from(raw, 'base64url').toString('utf8');
+  } catch {
+    return null;
+  }
+  const separator = decoded.indexOf(':');
+  if (separator <= 0) {
+    return null;
+  }
+  const updatedAtMs = Number(decoded.slice(0, separator));
+  const id = decoded.slice(separator + 1);
+  if (!Number.isSafeInteger(updatedAtMs) || updatedAtMs <= 0) {
+    return null;
+  }
+  // id 必须是 uuid（否则是伪造/串台游标，直接拒绝而不是让它静默变成"从头开始"）
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)) {
+    return null;
+  }
+  return { updatedAtMs, id };
+}
 
 export interface BottleRow {
   id: string;
@@ -118,7 +157,21 @@ export interface BottleStore {
   }): Promise<CommandOutcome | null>;
   releaseHolding(bottleId: string, holderId: string, at: Date): Promise<number>;
   listSongs(): Promise<SongRow[]>;
-  listSeaBottles(input: { zone?: 'COMPLETED' | 'INCOMPLETE'; limit: number }): Promise<BottleRow[]>;
+  /**
+   * 公海列表（**真游标分页**，§46.2）。
+   *
+   * 排序键 = `(updated_at DESC, id DESC)`（`id` 是稳定的次序决胜，避免同一毫秒并列时顺序漂移）：
+   * - 键集分页（`(updated_at, id) < (游标)`），**不是 offset** —— 遍历期间插入的新行排在游标之前，
+   *   既不会让后续页重复，也不会挤掉尚未取到的旧行；
+   * - `zone` 的判定**由内核给**（`seaZoneOf`），SQL 里的分区子查询只当**候选预筛**；
+   * - 返回 `nextCursor`：**只有确实还有下一行时**才非 null（因此"某页不满 limit 却仍有下一页"在实现上不可能出现）。
+   */
+  listSeaBottles(input: {
+    zone: 'COMPLETED' | 'INCOMPLETE' | null;
+    status?: string | null;
+    limit: number;
+    after?: SeaCursorPosition | undefined;
+  }): Promise<{ rows: BottleRow[]; nextCursor: string | null }>;
   /**
    * 我参与过的瓶子（CONTEXT §11.1 漂流日志）：判定 = **我在该瓶有有效段**（内核 `participatedIn`，§46.1）。
    *
@@ -196,20 +249,24 @@ async function projectMedia(
         [String(event['segmentId']), stamp],
       );
       return;
-    case 'VOTE_CAST':
+    case 'VOTE_CAST': {
+      /**
+       * 审计字段**不允许有默认值**（t24/F4，评审 low）：缺失时原来的 `?? 1` 会把 `votes.listened_ratio`
+       * 静默写成 100% —— 一个让"没有数据"看起来"满分"的方向错误，而这类假正面证据会一路污染统计与评审。
+       * 这里改为**响亮失败**：宁可抛错，也不写假数据（`VOTE_CAST` 事件本身不带比例，只能由调用方传）。
+       */
+      const listenedRatio = extras.vote?.listenedRatio;
+      if (listenedRatio === undefined) {
+        throw new Error('VOTE_CAST 投影缺少 extras.vote.listenedRatio：审计字段不允许猜（fail-closed）');
+      }
       await tx.query(
         `insert into votes (id, segment_id, user_id, value, listened_ratio, created_at)
          values (gen_random_uuid(), $1, $2, $3, $4, $5)
          on conflict (segment_id, user_id, value) do nothing`,
-        [
-          String(event['segmentId']),
-          actorId,
-          String(event['value']),
-          extras.vote?.listenedRatio ?? 1,
-          stamp,
-        ],
+        [String(event['segmentId']), actorId, String(event['value']), listenedRatio, stamp],
       );
       return;
+    }
     case 'MESSAGE_ATTACHED':
       await tx.query(
         `insert into messages (id, bottle_id, from_user_id, to_user_id, content, status, created_at)
@@ -453,26 +510,89 @@ export function createBottleStore(db: Db): BottleStore {
     },
 
     /** 公海：缺口由**段投影**直接算（等价于内核 `gaps`，避免逐瓶重放）。 */
-    async listSeaBottles(input): Promise<BottleRow[]> {
-      const rows = await db.query<BottleDbRow>(
-        `select b.id, b.song_id, b.initiator_id, b.status, b.total_segments, b.revision,
-                b.current_holder_id, b.current_caster_id, b.created_at, b.updated_at
-         from bottles b
-         where b.status = 'SEA'
-           and ($1::text is null
-             or ($1 = 'COMPLETED' and not exists (
-                   select 1 from generate_series(1, b.total_segments) as g(idx)
-                   where not exists (select 1 from bottle_segments s
-                                     where s.bottle_id = b.id and s."index" = g.idx and s.deleted_at is null)))
-             or ($1 = 'INCOMPLETE' and exists (
-                   select 1 from generate_series(1, b.total_segments) as g(idx)
-                   where not exists (select 1 from bottle_segments s
-                                     where s.bottle_id = b.id and s."index" = g.idx and s.deleted_at is null))))
-         order by b.updated_at desc
-         limit $2`,
-        [input.zone ?? null, input.limit],
-      );
-      return rows.map(toBottleRow);
+    async listSeaBottles(input): Promise<{ rows: BottleRow[]; nextCursor: string | null }> {
+      /**
+       * 候选页大小：多取一些（§46.1 的同一思路）—— SQL 的分区子查询只是**候选预筛**，
+       * 真正的分区判定在内核（`seaZoneOf`），两者不一致时（例如段行与事件流短暂不同步）
+       * 会筛掉一些候选；不多取就会静默少给行。
+       */
+      const candidatePageSize = Math.max(input.limit * CANDIDATE_OVERFETCH, input.limit + 1);
+
+      const queryCandidates = async (after: SeaCursorPosition | null): Promise<BottleDbRow[]> =>
+        await db.query<BottleDbRow>(
+          `select b.id, b.song_id, b.initiator_id, b.status, b.total_segments, b.revision,
+                  b.current_holder_id, b.current_caster_id, b.created_at, b.updated_at
+           from bottles b
+           where b.status = 'SEA'
+             and ($3::text is null or b.status = $3)
+             and ($4::timestamptz is null or (b.updated_at, b.id) < ($4::timestamptz, $5::uuid))
+             and ($1::text is null
+               or ($1 = 'COMPLETED' and not exists (
+                     select 1 from generate_series(1, b.total_segments) as g(idx)
+                     where not exists (select 1 from bottle_segments s
+                                       where s.bottle_id = b.id and s."index" = g.idx and s.deleted_at is null)))
+               or ($1 = 'INCOMPLETE' and exists (
+                     select 1 from generate_series(1, b.total_segments) as g(idx)
+                     where not exists (select 1 from bottle_segments s
+                                       where s.bottle_id = b.id and s."index" = g.idx and s.deleted_at is null))))
+           order by b.updated_at desc, b.id desc
+           limit $2`,
+          // ⚠️ `$4` 必须是**时间值**（Date/ISO），不能传 epoch 毫秒数：
+          // 传数字时 PG 会当成日期字符串解析 → `date/time field value out of range`（t24 实测踩到，500）
+          [
+            input.zone,
+            candidatePageSize + 1,
+            input.status ?? null,
+            after === null ? null : new Date(after.updatedAtMs),
+            after?.id ?? null,
+          ],
+        );
+
+      const accepted: BottleRow[] = [];
+      let after: SeaCursorPosition | null = input.after ?? null;
+      let exhausted = false;
+      /**
+       * 一直推进游标直到"装满 limit+1 行"或"候选取尽"——**不返回空页假装到底**。
+       * 循环次数天然有界：每一轮都把游标向前推进一整页候选行。
+       */
+      while (accepted.length < input.limit + 1 && !exhausted) {
+        const candidates = await queryCandidates(after);
+        if (candidates.length === 0) {
+          // 候选取尽：没有"多出来的那一行"⇒ 末页（不赋 `exhausted`，否则是死赋值、lint 会钉它）
+          break;
+        }
+        const lastCandidate = candidates[candidates.length - 1];
+        if (lastCandidate !== undefined) {
+          after = { updatedAtMs: lastCandidate.updated_at.getTime(), id: lastCandidate.id };
+        }
+        if (candidates.length <= candidatePageSize) {
+          exhausted = true; // 本次候选不足一页 ⇒ 之后没有更多行了
+        }
+        for (const candidate of candidates) {
+          if (accepted.length >= input.limit + 1) {
+            break;
+          }
+          const state = await loadState(candidate.id);
+          if (state === null) {
+            continue;
+          }
+          // 分区判定由**内核**给（不在这里重算 isComplete 的规则）
+          if (input.zone !== null && seaZoneOf(state) !== input.zone) {
+            continue;
+          }
+          accepted.push(toBottleRow(candidate));
+        }
+      }
+
+      const hasMore = accepted.length > input.limit;
+      const rows = accepted.slice(0, input.limit);
+      const lastReturned = rows[rows.length - 1];
+      const nextCursor =
+        hasMore && lastReturned !== undefined
+          ? encodeSeaCursor({ updatedAtMs: lastReturned.updatedAt.getTime(), id: lastReturned.id })
+          : // 没有"多出来的那一行"就说明到头了（即便上一轮候选刚好用尽，也不会给出悬空游标）
+            null;
+      return { rows, nextCursor };
     },
 
     async listParticipatedBottles(input): Promise<BottleRow[]> {

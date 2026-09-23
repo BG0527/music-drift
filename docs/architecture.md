@@ -2549,3 +2549,32 @@ frontend-ds 做"无 `dist` 场景"实测时在工作区建了该目录；**eslin
 
 ### 53.6 新纪律已在一线生效（证据）
 architect 过程中两次遇到红，均确认为**别人正在写的文件**（`apps/web` 的 sea 页面语法错、t24 的 sea 分页），按 §52.3 **未归因、未加重试**，60s 后复跑 rc=0。⇒ §52.3 的纪律不只是写在文档里。
+
+---
+
+## 54. t24 完成（公海真分页）+ ROUNDS 处置 + F4「响亮失败」
+
+### 54.1 `ROUNDS 12→5` 的追问结论与处置（captain 要的那个答案）
+- **回答：12 轮是「重复」，不是「覆盖面」** —— 每轮是**独立同形的 4 人接力**（注册 4 人 → 发起 → 4 段交接 → 末段回传 → 新持有者选去向），**无并发语义、无递进场景**；唯一作用是提高"撞见偶发"的概率（对应 t19 那个未定位的偶发）。
+- **处置：采 captain 的优先方案** —— `ROUNDS` **回退到 12**（恢复敏感度），改 `TEST_TIMEOUT_MS = 180_000`，把"机器忙"从判别力里剥离。实测：单跑 ~1.7s/轮 → 12 轮 **22.1s**；争用下曾 ~5s/轮 → 12 轮 60s+。**未削弱任何断言**；单跑 `✓ 12 轮…22119ms` / `1 passed`。
+- ⇒ 定为标准：**遇到"机器忙导致的红"，要剥离争用（提高超时 / 独占运行），不要缩小场景。**
+
+### 54.2 F4 修复比 captain 的建议更强（教训升级）
+captain 建议 `?? 0`（fail-closed）；backend-core 指出 **`?? 0` 仍是"默认值"、仍可被绕过** ⇒ 改为**响亮失败**：`VOTE_CAST` 投影缺 `extras.vote.listenedRatio` 时**直接抛错**。新增用例断言 `rejects.toThrow(/listenedRatio/)` **且 votes 计数仍为 0**（零副作用）。
+⇒ **审计字段的缺失必须响亮失败，而不是取一个"安全默认值"** —— 默认值仍然是一种静默。
+
+### 54.3 t24 公海真分页要点
+- **契约复用**：内联 `SeaListQuerySchema` **整块删除**（全仓 grep 为 0），改调契约 `BottleListQuerySchema`。唯一契约改动 = 给旧名 `zone` 加 `@deprecated` **等价别名** —— 否则前端与金路径在用的 `?zone=` 会被 zod **静默丢弃**（正是本轮在修的缺陷类型）；用例钉住旧名与 canonical 返回**完全相同**的 items。
+- **稳定排序键**：`(updated_at DESC, id DESC)` + **键集游标**（非 offset）；`id` 不可变决胜 ⇒ 同毫秒也全序；新插入排在游标之前 ⇒ 不重复、不挤掉旧行。
+- **过滤 × 分页（captain 点的陷阱）**：删掉"先取 limit 再 `filter(isComplete)`"，改 store 内**候选超取（limit×3）+ 内核 `seaZoneOf` 判定 + 推进游标直到 limit+1**；`nextCursor` 仅在确实还有下一行时非 null ⇒「某页不满 limit 却仍有下一页」**实现上不可能**；候选取尽直接 `break`，**不返回空页假装到底**。
+- 真 `nextCursor` 已贴原始值；**畸形 cursor → 400**（不静默忽略）。
+- 红→绿：实现前 `Tests 4 failed | 8 passed (12)`（指纹 `expected Set{} to deeply equal Set{ …(6) }`：旧实现把前两条候选滤掉 ⇒ 空页 + 声称到底；`expected null not to be null`）→ 实现后 `12 passed`。
+- **过程中又抓一个真缺陷**：游标里的 epoch 毫秒被当 `timestamptz` 传参 → PG `date/time field value out of range: "1790137681667"`（22008）→ 路由 **500**；改传 `Date` 并写进注释与文档。
+
+### 54.4 §52.3 的可自助判据（采纳 backend-core 的建议）
+在「红绿结论必须标注测量时刻与在途任务」之外，追加**可自助执行的检查**：
+**看到红 → 先查该文件的 mtime 是否在最近 N 分钟（建议 N=5）内** —— 是则先判为"在途窗口"，等其收尾后复跑再下结论。
+本轮 backend-core 两次遇到 `typecheck` exit 2，error 全在**别人正在写的文件**（`listenProgress.integration.test.ts:299`，mtime 12:28→12:34，t25 在途；`apps/web/src/features/audio/**`，frontend-flow 在途），按纪律**未归因、未加重试**，收尾后复跑 exit 0。
+
+### 54.5 状态：`pnpm lint` 回到 **0 problem** 基线
+backend-core 清掉两条（t22 遗留的 `no-useless-assignment` + 新代码里 `break` 后的死赋值）⇒ `pnpm lint` **exit 0**。§48.10 记录的 lint 退化已完全关闭。

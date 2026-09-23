@@ -105,9 +105,21 @@ export const BottleDetailSchema = BottleSummarySchema.extend({
   damagedAt: IsoDateTimeSchema.nullable(),
 });
 
+/**
+ * 列表查询（**唯一**一份：`/api/sea` 直接复用它，不再维护内联 schema）。
+ *
+ * 游标口径：`cursor` 是**不透明字符串**，由服务端按稳定排序键
+ * `(updated_at DESC, id DESC)` 生成（`encodeSeaCursor`），客户端只需原样回传；
+ * 末页 `nextCursor` 为 `null`。**不要**自己拼游标，也不要把它当 offset。
+ */
 export const BottleListQuerySchema = z.object({
   /** 公海列表默认只看已完成区（ADR-015 §16.4）。 */
   seaZone: SeaZoneSchema.optional(),
+  /**
+   * @deprecated 旧名，等价于 `seaZone`：保留一段时间以免既有客户端（前端分页控件 / 金路径脚本）
+   * 静默失效 —— "参数名改了但被忽略"正是本项目反复抓到的第 4 类静默损失。
+   */
+  zone: SeaZoneSchema.optional(),
   status: BottleStatusSchema.optional(),
   limit: z.coerce.number().int().min(1).max(100).default(20),
   cursor: z.string().min(1).optional(),
