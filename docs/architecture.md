@@ -3708,3 +3708,23 @@ architect 主动报告「**会话上下文已接近上限**（累计约 40 次�
 - 结果：**19 条全部命中，未命中 0 条**；归属 skill 与文档标注一致（`motion-web` / `frontend-design` / `afrexai-ui-design-system` / `css-animation-creator` / `ui-ux-pro-max-zh`）。
 - 顺带确认一个新装 skill 的关系：`ui-ux`（带 CLI）与 `ui-ux-pro-max-zh`（纯文档）**共享同一批条款文本**（多条引文在两个文件里都有）⇒ 前者是后者的**可执行完整版**，不是另一个体系。这解释了第一批为什么只能用后者的静态条款。
 - 同时复核了文档里那条**诚实标注**：`ui-ux-pro-max-zh` 确实只有 `README.md` / `SKILL.md` / `_meta.json`、**没有 `scripts/`**，成员"CLI 无法执行"的记录属实，没有伪造输出。
+
+## 96. t45 复核（captain 只读核验，未改代码）+ 一条被自己查清的疑问
+
+### 96.1 四项静态核验通过（**看调用点，不看注释**）
+1. `targetSegmentIndex` 真进请求体：`apps/web/src/features/api/mutations.ts:224,231`（入参类型）+ `features/bottle/private-messages.tsx:86`（`.mutateAsync({ content, targetSegmentIndex: effectiveTarget })`）。
+2. 老口径清零：全仓 grep「回传给发起者 / 只回传给发起 / 给发起者留言」**0 命中**。
+3. 7 个用例名都能读出规则（符合 §2.5「测试名要能读出规则」）。
+4. 候选来源是**服务端投影**而非第二份真相：`useBottle().segments` 的 `deletedAt` 在契约里（`packages/shared/src/contracts/bottles.ts:29`），API 自己也用同一字段判断（`apps/api/src/routes/bottles.ts:219`）。
+
+### 96.2 ⭐ 疑问「一人能否在一瓶里拥有多段」—— answer = **不能**，两处独立守卫
+`private-messages.tsx` 用 `find(ownerId === me)` 取「我这一段」作候选基准。captain 起初怀疑：若一人可拥有多段，`find` 取第一段会让候选集算错。
+**查证结果（captain 自己查的，没让成员再跑一轮）**：
+- `packages/shared/src/domain/bottle.ts:57-61` 录段时 `hasEverSung` ⇒ `CANNOT_RECORD_TWICE_IN_BOTTLE`（依据 `CONTEXT §4.3 / §10.1`，**含被斩的软删行**）；
+- `packages/shared/src/domain/bottle.ts:100-104` 捞取时同样 `hasEverSung` ⇒ `ALREADY_SANG_IN_BOTTLE`（依据 `CONTEXT §15`「演唱过的瓶子永不再捞给同一用户」，**含被斩的软删行**）。
+⇒ 「一人一瓶至多一段」被录段与捞取两条路径**分别**守住，`find` 取到的是唯一那一段，候选基准正确。
+⇒ 方法论留痕：这条疑问是 captain 复核 diff 时**自己提出、自己查证、自己结案**的 —— **不把未定性的怀疑当成 bug 派给成员**（省一轮会话），但也不因为"看起来对"就放过（`§63 (A)-over-(B)` 的同类判断）。
+
+### 96.3 会话失败统计更新
+`frontend-flow` 会话失败 **第 6 次**（本次在「写回报前」断）。**工作零丢失**（`docs/handover-private-message-target.md` 7082B 完整记录了红→绿、三条门、真浏览器 ALL PASS、落地清单）⇒ 「未完成清单必须活在仓库」这条纪律的回报率 **9/9**。
+刻意做法：把回报拆成"**只补齐原始输出 + 置 completed，不重做实现**"的小批次（§94.3 的会话脆弱性对策：小批次 + 批中写交接）。
