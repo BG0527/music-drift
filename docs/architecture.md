@@ -3252,5 +3252,10 @@ audio-engineer 按新装的 `motion-web` 重审动效，**§5「不要靠改 `ke
 ⇒ 价值：**避免用噪音淹没真问题，也避免 captain 误判漏报**。这是审计该有的样子 —— 不是凑发现数。
 另：它**显式登记两处 skill 间冲突**（`afrexai` 的 `hover_lift` 含 shadow ↔ `motion-web` §3；`afrexai` Modal 200–300ms ↔ `DESIGN.md` 480ms），并按 AGENTS.md §4 取 `DESIGN.md` —— 处置正确（非 Figma 出入、不需 §5 上报，但**必须写下来**）。
 
-### 79.5 验证分层的口径（它自己声明）
+### 79.5 ⭐ captain 抽查 skill 引文：7/7 命中（含一次我自己的误判）
+抽查方式：把执行者引用的条款**逐条 grep `.dsh/skills/*/SKILL.md` 原文**（这是"保证子 agent 正确加载 skill"唯一可执行的动作）。
+结果：`motion-web` §1/§2/§3/§4/§8 + `frontend-design` L32 **全部命中**；§5 第一次报"未命中"——**原因是 captain 的 grep 串不准**（我写的是"不要靠改 `key` 造成子树重建"，而原文是"**避免 remount 抖动**：进/退场不要靠改 `key` 造成**整棵**子树重建"），换准确串后命中 ✓。
+⇒ **结论：7/7**。教训与 §75.2 同源：**"未命中/undeclared"这类否定结论，先确认自己的检查手段**。抽查不命中时，第一种可能是对方引错，第二种是我查错 —— 必须先排除第二种。
+
+### 79.6 验证分层的口径（它自己声明）
 本审计结论**全在"源码结构层"（L1）**；**jsdom 与静态截图都不能证明动效**（`home-page.tsx:68` 已踩过这个坑）；§10 给了真实 Chromium 的 `getAnimations()` + `emulateMedia({ reducedMotion: 'reduce' })` 断言配方，并单列必须真机/录屏的项（触摸 active 反馈、60fps、低端设备）。
