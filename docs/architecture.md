@@ -2732,3 +2732,27 @@ frontend-flow 把 `one-screen-check.mjs` 改为 hermetic 后**立刻**发现：*
 
 ### 59.6 优先级（本轮）
 **#2（P0，闭环入口）> #4（规则修正，且它让 F2 工作作废，越早定越好）> #1 / #3（体验）> #5（等用户材料，低优先）**
+
+---
+
+## 60. 撤回的落盘实况 + 处置（选 A）+ 新惯例「schema 批准须落盘前再确认」
+
+### 60.1 事实：撤回到达时，按**当时有效**的批准已落盘（时间差仅几秒）
+- 新增 4 文件（`apps/api/drizzle/0005_stormy_toad_men.sql`、`meta/0005_snapshot.json`、`src/store/segmentDuration.ts`、`src/routes/segments.ts`）+ 修改 7 处，**全部未提交**（无一行进入提交历史）。
+- ⚠️ **DB 副作用已经发生**：已跑过 `pnpm db:migrate` ⇒ dev 库 `music_drift` 与具名测试库 `music_drift_test` **已真实建出** `segment_duration_reports` 表。
+⇒ 教训：**批准与落盘之间没有闸**；"不得再做"的指令**无法回溯撤销已经发生的副作用**（数据库层尤其）。
+
+### 60.2 处置：选 **A（撤干净）**，并追加删除已提交的 F2 判定层
+- **A 内容**：`rm` 4 个新文件 + `git checkout --` 还原 7 处 + **drop 两个库里的表**（最紧急：`_journal.json` 里已有 idx 5，任何人 `db:migrate` 都会把表建出来，副作用会扩散）。
+- **追加**：删掉已提交在 `0591be0` 的 F2 判定层（`DURATION_BAND` / `isMeasuredDurationAcceptable` / `medianDuration` / `resolveEffectiveDuration`）与其 10 条测试。
+- **不选 B/C 的理由**：第 4 条已确认**取代** F2（不是"待定"）⇒ 保留代码只会留下**指向已 drop 表、无人调用**的悬空代码（静默陷阱）；C 还会让迁移留在 journal 里。
+- 提交由 captain 执行；architect 附还原后的 `git status` 与 md5 作为"回到干净状态"的证据。
+
+### 60.3 ⭐ 新惯例（采纳 architect 的提议）：**schema / 迁移类批准，落盘前必须再确认一次**
+> 执行前用一句话复述：「**我现在要建 / 改 X，是否仍然批准**」，得到确认再落盘。
+
+理由：**批准有时效性** —— 需求一变，旧批准即失效，而"失效"这件事在工具与流程里**没有任何信号**；只能靠**落盘前再确认一次**兜住。此惯例写入所有 schema 类任务的描述。
+
+### 60.4 本轮派单
+- **t29（architect）**：领域规则 —— 每段录制时长固定（曲库权威）+ 服务端校验语义改写（`SEGMENT_MIN_MS/MAX_MS` 与 `AUDIO_DURATION_OUT_OF_RANGE` 改为「必须匹配该段预设时长 ±容差」）。验收含一条硬要求：**必须明确回答** F2 是"从根上消失"还是"仍然存在（因为 X）" —— **不接受只写"已解决"**。
+- **t30（audio-engineer）**：用户 #1（播放完成后再点＝重播+提示 / 未完成点击＝暂停+可见）+ #3（录制后试听）+ 清理 F2 作废代码 + #4 的录制端固定时长 UI。
