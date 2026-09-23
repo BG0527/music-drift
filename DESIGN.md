@@ -241,6 +241,10 @@ Scale:
 ## Layout
 
 - **Grid:** CSS Grid primary. Max-width containment: 1280px centered with 1.5rem side padding.
+  - **侧边距分档（2026-09-23 amend · B5）**：**移动 1.5rem（24px）**；**桌面 48px**。
+    · 依据：Figma 帧实测页面内边距 40/48（用户设计派生）；裁定「以 Figma 派生为准」，故本文档补桌面档以匹配设计。
+    · 出处：`docs/ui-review/visual-audit.md` B5。
+    · **可回退**：删去本分档，即回到「全断点统一 1.5rem」的原文口径。
 - **Spacing rhythm:** Balanced. Base unit: 0.5rem (8px).
   —— 这里的 Base unit 指**节奏步长**（间距只取 8px 派生档：4/8/12/16/24/32/48/64）。
   它**不是** Tailwind `--spacing` 的值：后者的语义是「**尺度值 1 的长度**」，本项目取框架默认 `0.25rem`（=4px），
@@ -248,7 +252,17 @@ Scale:
   4px = `p-1`，44px 触控底线 = `min-h-11`（`--touch-target-min: 44px`）。
   **禁止覆盖 `--spacing`** —— 覆盖会让**每一个**数字档 utility ×2（`min-h-11` 变 88px、侧栏 `w-64` 变 512px）。
 - **Section vertical gaps:** clamp(4rem, 8vw, 8rem).
+  - **适用范围限定（2026-09-23 amend · B1）**：上式的 `clamp(4rem, 8vw, 8rem)`（1440 下 ≈ 115.2px）**仅适用于有纵向余量的场景**；
+    **H5「一屏装下、禁止下滑」语境取 32–40px**（当前实现 32px）。
+    · 理由：该式与**用户直接指令**「所有页面一屏装下、禁止下滑」（`docs/architecture.md` §46.3）冲突；**用户直接指令优先于本文档这类内部契约**。
+    · 出处：`docs/ui-review/visual-audit.md` B1（实测页面 gap 32px，对照本文档 115.2px）。
+    · **可回退**：若用户改选「大留白 + 允许滚动」，删去本限定即恢复原文口径（大留白生效）。
 - **Hero layout:** Asymmetric composition.
+  - **收敛到 Figma 实际形态（2026-09-23 amend · B2）**：**Hero 主交互区为居中同心圆**（Figma `home-river` 骨架：240·180·130 涟漪 + 110 主按钮）；
+    「非对称」指的是**同页内容层**（标题左对齐、快捷入口右对齐），**不适用于 hero 主交互区本身**。
+    · 理由：Figma 是**用户的设计**，文档应匹配设计 —— 修回 Figma 属合规，不需用户批准。
+    · 出处：`docs/ui-review/visual-audit.md` B2。
+    · **可回退**：删去本限定，即回到「hero 整体非对称构图」的原文口径。
 - **Feature sections:** Asymmetric grid with varied card sizes. No 3-equal-columns.
 - **Mobile collapse:** All multi-column layouts collapse below 768px. No horizontal overflow.
 - **z-index contract:** base (0) / sticky-nav (100) / overlay (200) / modal (300) / toast (500).

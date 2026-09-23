@@ -2956,3 +2956,25 @@ frontend-flow 在"报 findings 但不动别人域"这件事上做得对：它只
   **如实置 failed，不为了让状态好看而伪绿；把闭合留给真正转绿的那个窗口。**
 - 本会话前两次同类张力：① t20 的 inScope 漏写 `drizzle/` ⇒ `update_task` 拒绝归档，而问题只是**声明疏漏**；② `Delivery` 报 "failed without a follow-up repair"，而那两条的实际"follow-up"是**作废与清理**（已发生）。
 ⇒ 记录目的：**不要为了让工具满意而修改结论**；把语义缺口写清楚，留痕比"状态好看"重要。
+
+---
+
+## 69. t34 完成：DESIGN.md 三处 amend 落地（**+14 行 / 0 删除**）
+
+| # | 位置 | 新增内容要点 |
+| --- | --- | --- |
+| **B1** | `Section vertical gaps: clamp(4rem, 8vw, 8rem)` 之后 | 加**适用范围限定**：115.2px **仅适用于有纵向余量的场景**；**H5「一屏装下、禁止下滑」语境取 32–40px**（当前实现 32px）。理由：与**用户直接指令**（§46.3）冲突 ⇒ **用户直接指令优先于本文档这类内部契约** |
+| **B2** | `Hero layout: Asymmetric composition` 之后 | 收敛到 Figma 实际形态：**hero 主交互区为居中同心圆**（Figma `home-river`：240·180·130 涟漪 + 110 主按钮）；「非对称」指**同页内容层**（标题左对齐、快捷入口右对齐），**不适用于 hero 主交互区本身** |
+| **B5** | `Grid: … with 1.5rem side padding` 之后 | 补桌面档：**移动 1.5rem（24px）/ 桌面 48px**（Figma 帧实测 40/48） |
+
+**可追溯性（captain 要求的"可回退"已落实）**：每块带 ① 日期标记 `2026-09-23 amend · B?` ② 出处指向 `docs/ui-review/visual-audit.md` ③ **「可回退」一行 + 最小回退动作**（B1 特别注明：若用户改选「大留白 + 允许滚动」，删去该限定即恢复）。
+
+### 69.1 证据（captain 独立复核）
+- `git diff --stat DESIGN.md` = **1 file changed, 14 insertions(+), 0 deletions** ⇒ **纯追加，原文未被替换**；
+- `git diff | grep -c '^@@'` = **3** ⇒ 恰好三个 hunk（B1/B2/B5），没顺手改别的；
+- 三条原文 `grep -c -F` 各 **1 处**仍在；
+- `grep -c '^## ' DESIGN.md` = **13**（与基线一致）· `verify.sh` 31 条核心纪律 **FAIL=0** · YAML OK · **colors = 30** · prettier clean；
+- md5：`47ed2abc…` → **`458b8c80…`**。
+
+### 69.2 方法论：**"amend 不是重写"要用数字证明**
+`+14 / 0 删除`、`3 个 hunk`、`原文 grep -c -F 各 1 处`、`节结构 13 不变` —— 这四条合起来才构成"我只动了这三处"的证据。仅凭"我改了三处"的自述不可核。⇒ 记为文档类改动的取证口径。
