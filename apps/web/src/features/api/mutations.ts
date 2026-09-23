@@ -221,10 +221,14 @@ export function useTakeTargetedSegment(): UseMutationResult<BottleSummary, unkno
 /** 写一条私密留言（接唱者 → 发起者）；成功后刷新留言列表（可见性仍由服务端决定）。 */
 export function useAttachMessage(
   bottleId: string,
-): UseMutationResult<PrivateMessage, unknown, { content: string }> {
+): UseMutationResult<PrivateMessage, unknown, { content: string; targetSegmentIndex: number }> {
   const client = useQueryClient();
   return useMutation({
-    mutationFn: (input: { content: string }) =>
+    /**
+     * 契约（t42）：收件人**由发送者按段号指定** —— `{ content, targetSegmentIndex }`，
+     * 服务端按 1-based 段号解析出作者。前端**不传**收件人 id（那会变成第二份"谁是谁"的真相）。
+     */
+    mutationFn: (input: { content: string; targetSegmentIndex: number }) =>
       apiPost(`/api/bottles/${bottleId}/messages`, input, PrivateMessageSchema),
     onSuccess: () => {
       void client.invalidateQueries({ queryKey: ['bottle', bottleId, 'messages'] });
