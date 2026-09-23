@@ -10,7 +10,14 @@ import {
   bottleSummary,
 } from '../../test/fixtures';
 import { fakeRecorderEnvironment, renderWithProviders } from '../../test/harness';
+import { song } from '../../test/fixtures';
 import { BottlePage } from '../bottle-page';
+
+/**
+ * 曲库桩：录制面板的分母 = 曲库该段的固定时长（用户第 4 条），
+ * 所以只要页面会渲染录制面板，就必须把 `/api/songs` 档上。
+ */
+const songsHandler = { path: '/api/songs', respond: () => ({ body: [song()] }) };
 
 const SESSION_B = {
   user: { id: USER_B, handle: '接棒的人', email: 'b@example.com', role: 'USER' },
@@ -69,6 +76,7 @@ describe('漂流瓶接唱页', () => {
       {
         route: `/bottles/${BOTTLE_ID}`,
         handlers: [
+          songsHandler,
           { path: '/api/auth/me', respond: () => ({ body: SESSION_B }) },
           {
             path: `/api/bottles/${BOTTLE_ID}`,
@@ -104,6 +112,7 @@ describe('漂流瓶接唱页', () => {
     renderWithProviders(<BottlePage id={BOTTLE_ID} />, {
       route: `/bottles/${BOTTLE_ID}`,
       handlers: [
+        songsHandler,
         { path: '/api/auth/me', respond: () => ({ body: SESSION_B }) },
         { path: `/api/bottles/${BOTTLE_ID}`, respond: () => ({ body: bottleDetail() }) },
       ],

@@ -1,4 +1,18 @@
-# t32 交接（frontend-flow）— 停机快照（13:5x，用户令 14:00 停机）
+# t32 交接（frontend-flow）— **已收口（含 attempt 3 的补做）**
+> **状态：已完成（2026-09-23 18:3x）。** 本文最初是 14:00 停机快照；attempt 3 把当时未完成的
+> 四项补齐，实测如下：
+>
+> | 项 | 结果 |
+> | --- | --- |
+> | **1️⃣ 录制时长接线（用户 #4）** | `record-step.tsx` 现在自己从曲库取本段固定时长并交给 `RecorderPanel`（`presetDurationMs`）；有预设 ⇒ 可录、无预设 ⇒ 禁用**并给理由**。`record-step.test.tsx` **6 passed** |
+> | **2️⃣ 全仓门** | `pnpm -r test` **exit 0**（shared 231 / api 180 / web **492**）、`pnpm -r typecheck` **exit 0**、`pnpm lint` **exit 0** |
+> | **3️⃣ 指定接唱失败态** | 不再静默：`ConflictNotice` 显示服务端中文原因 + 出口。`collect-and-targeted.test.tsx` **5 passed** |
+> | **4️⃣ 收藏/徽章「有数据」联调** | hermetic 真实数据：4 人接力成完整作品→入海；第 2 位接唱者收藏成功（**201**）且拿到 **DRIFT_PARTICIPANT** 派生徽章。截图 `docs/ui-review/after-t32/me-collections-real-1440.png`、`me-badges-real-1440.png`（弹窗里真实曲名「占位曲目 · 一」/「漂流参与者 · 你接唱过这支作品，它后来入了海。」） |
+> | **一屏** | 1440 **12/12**、375 **12/12**（`evidence/5-t32-desktop-1440.txt`、`6-t32-mobile-375.txt`，两条 exit 0） |
+> | **环境告警** | 期间发现 `music-drift-postgres` 容器 **Exited 3h**（守卫起不来、开发库连不上）⇒ `docker start music-drift-postgres` 已恢复，数据完好（songs 4 / bottles 44 / `backup_t12` 5 张备份表都在） |
+>
+> 下面 §1–§6 保留为**当时**的停机快照（含未完成项与归属证据），已在 attempt 3 逐条关闭。
+
 
 > 停机原因：captain 转达用户令「14:00 停机，等『继续』再开工」。本文是**停机时刻的真实状态**：
 > 我停在哪、哪些是绿的、哪些没做完、下一个接手者/我自己恢复时从哪继续。

@@ -313,6 +313,7 @@ function BottleView({ bottle, seams }: { bottle: BottleDetail; seams?: BottlePag
           >
             <RecordStep
               bottleId={bottle.id}
+              songId={bottle.songId}
               segmentIndex={nextIndex}
               totalSegments={bottle.totalSegments}
               recorderEnvironment={seams?.recorderEnvironment}

@@ -9,6 +9,8 @@
  *
  * 失败语义用 **warning 而不是 danger**（DESIGN.md §Error States 第 4 条）：数据没丢，只是没传上去。
  */
+import { useSongs } from '../api/queries';
+import { AsyncBoundary } from '../../pages/shell/async-boundary';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { RecordSegmentResponse } from '@music-drift/shared';
 import {
@@ -28,6 +30,14 @@ export interface RecordStepProps {
   /** 本次录的是歌里的第几段。**必须来自服务端**（`missingSegmentIndexes[0]` / `nextRecordIndex`）。 */
   segmentIndex: number;
   totalSegments: number;
+  /**
+   * 这首曲子的 id。
+   *
+   * **为什么必须有**：本段的录制时长 = 曲库该段的固定时长（`SongSchema.segments[].durationMs`），
+   * 这是"听够/录够"的唯一分母来源；拿不到它录音层会 **fail-closed 禁用录制**。
+   * 所以由本组件自己去曲库取（页面只把 `songId` 交进来）——避免每个调用点各写一遍取值逻辑而漏掉。
+   */
+  songId: string;
   /** 上传成功回调（拿到服务端确认的段号与最新详情）。 */
   onUploaded: (response: RecordSegmentResponse) => void;
   /** 附言（CONTEXT §12.2，可选）。 */
@@ -42,6 +52,7 @@ export interface RecordStepProps {
 
 export function RecordStep({
   bottleId,
+  songId,
   segmentIndex,
   totalSegments,
   onUploaded,
@@ -55,6 +66,7 @@ export function RecordStep({
     () => ({ ...createBrowserRecorderEnvironment(), ...recorderEnvironment }),
     [recorderEnvironment],
   );
+  const songs = useSongs();
   const [phase, setPhase] = useState<UploadPhase>('validating');
   const [ratio, setRatio] = useState<number | null>(null);
   const [failure, setFailure] = useState<{ message: string; retryable: boolean } | null>(null);
@@ -141,20 +153,43 @@ export function RecordStep({
 
   return (
     <div className={cn('flex flex-col gap-4', className)}>
-      <RecorderPanel
-        segmentIndex={segmentIndex}
-        totalSegments={totalSegments}
-        environment={environment}
-        {...(phase === 'validating' ? {} : { upload: uploadView })}
-        disabled={disabled || uploading}
-        onRecorded={(recording) => {
-          if (startedRef.current) return;
-          startedRef.current = true;
-          void upload(recording).finally(() => {
-            startedRef.current = false;
-          });
+      {/*
+        曲库是**异步**的，所以这里自己带加载/失败态（`AsyncBoundary`）：
+        在拿到"这一段多长"之前不渲染录音控件 —— 否则会先给一个能点、随后被禁用的假按钮，
+        甚至让用户录一段注定被服务端拒的音。
+      */}
+      <AsyncBoundary
+        query={songs}
+        skeleton={<div aria-busy="true" className="h-[140px] rounded-base bg-tide-pool" />}
+      >
+        {(items) => {
+          /**
+           * 本段固定时长：`=== undefined`（曲库里没这首 / 没这一段）⇒ 传 `null`，
+           * 录音层据此禁用录制并说明理由（不退回"随便录 15–30 秒"）。
+           */
+          const preset =
+            items
+              .find((item) => item.id === songId)
+              ?.segments.find((segment) => segment.index === segmentIndex)?.durationMs ?? null;
+          return (
+            <RecorderPanel
+              segmentIndex={segmentIndex}
+              totalSegments={totalSegments}
+              presetDurationMs={preset}
+              environment={environment}
+              {...(phase === 'validating' ? {} : { upload: uploadView })}
+              disabled={disabled || uploading}
+              onRecorded={(recording) => {
+                if (startedRef.current) return;
+                startedRef.current = true;
+                void upload(recording).finally(() => {
+                  startedRef.current = false;
+                });
+              }}
+            />
+          );
         }}
-      />
+      </AsyncBoundary>
 
       {failure === null ? null : (
         <Card

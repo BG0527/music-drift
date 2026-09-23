@@ -1,20 +1,18 @@
 [setup] 建一次性数据库（复用 apps/api 的派生 / 迁移 / 种子机制）…
-[setup] 库 music_drift_test_1790142537_39352_etca6l（种子 3 首）· API http://127.0.0.1:50454 · web http://127.0.0.1:50461
-[preflight] 浏览器会话有效：layoutmudonbo1
+[setup] 库 music_drift_test_1790159265_49288_0jbh67（种子 3 首）· API http://127.0.0.1:61095 · web http://127.0.0.1:61103
+[preflight] 浏览器会话有效：layoutmudyluzi
 viewport=375x812 口径=mobile(锚点+无横向滚动) threshold=812 negativeControl=false hermetic
 OK   /                                    height=816  home-pick=355
-[2m13:49:08[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/design-system/index.css[22m
 OK   /river                               height=1030 river-draw=470 river-drop=810
 OK   /sea                                 height=812  sea-list=497
 OK   /new                                 height=926  new-catalog=713
-OK   /sea/a9f56dfc-f3dd-40aa-b49e-950fb582f781 height=1393 sea-play=554
-OK   /me                                  height=1278 me-bottles=718
+OK   /sea/3aedd5fc-c5b7-44c8-8761-0faaa71641c7 height=1393 sea-play=554
+OK   /me                                  height=1252 me-bottles=691
 OK   /settings                            height=1089 settings-attribution=811
-OK   /bottles/aa82f471-67e9-4dd9-9a50-ee6fdb16e455 height=1443 bottle-play=770 bottle-action=770
-[2m13:49:19[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/design-system/index.css[22m
-OK   /bottles/9582cba7-2c88-4378-8421-50179d3a792a height=1409 bottle-play=736 bottle-action=736
-OK   /bottles/7b28647a-8a8e-4111-ba78-921fd3bada34 height=1403 bottle-record=740
-OK   /bottles/aa82f471-67e9-4dd9-9a50-ee6fdb16e455/log height=812  
+OK   /bottles/2ee8ef99-2af5-4b57-912a-6b49df49ea3d height=1443 bottle-play=770 bottle-action=770
+OK   /bottles/87e7be5b-ea63-4c60-80de-5aba300d1cf5 height=1409 bottle-play=736 bottle-action=736
+OK   /bottles/d4344c9a-8405-442c-95bf-4fc3eb348161 height=1403 bottle-record=740
+OK   /bottles/2ee8ef99-2af5-4b57-912a-6b49df49ea3d/log height=812  
 OK   /nope-does-not-exist                 height=812  
-[teardown] 删库 music_drift_test_1790142537_39352_etca6l → 已删除
+[teardown] 删库 music_drift_test_1790159265_49288_0jbh67 → 已删除
 ✅ 全部页面达标（手机口径：无横向滚动 + 关键锚点在首屏内）

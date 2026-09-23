@@ -110,3 +110,35 @@ describe('指定接唱按钮', () => {
     });
   });
 });
+
+/**
+ * 失败不能静默（仓库纪律："不吞 4xx"）：服务端拒绝时必须把**原因 + 出口**摆出来。
+ * 两种拒绝都来自内核：已完成 → `BOTTLE_ALREADY_COMPLETE`；本瓶唱过 → `ALREADY_SANG_IN_BOTTLE`。
+ */
+describe('指定接唱：被拒的时候有可见出口', () => {
+  it('服务端 422（已完成）：显示中文原因，且给回公海的出口（不是点了没反应）', async () => {
+    renderWithProviders(<TargetedSegmentButton bottleId={BOTTLE_ID} />, {
+      handlers: [
+        {
+          method: 'POST',
+          path: `/api/sea/${BOTTLE_ID}/targeted-segment`,
+          respond: () => ({
+            status: 422,
+            body: {
+              error: {
+                message: '这件作品已经完成，不能再接唱。',
+                violations: [
+                  { code: 'BOTTLE_ALREADY_COMPLETE', message: '这件作品已经完成。' },
+                ],
+              },
+            },
+          }),
+        },
+      ],
+    });
+
+    fireEvent.click(await screen.findByRole('button', { name: /我来接这一段/ }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(/已经完成/);
+  });
+});
