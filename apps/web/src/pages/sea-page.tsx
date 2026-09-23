@@ -11,7 +11,7 @@ import { useState } from 'react';
 import type { BottleSummary } from '@music-drift/shared';
 import { useSeaPages } from '../features/api/queries';
 import { progressLabel, BOTTLE_STATUS_LABEL } from '../features/bottle/relay-status';
-import { Button, Card, EmptyState, Icon, Skeleton, Tabs } from '../design-system';
+import { Card, EmptyState, Icon, Skeleton, Tabs, cn } from '../design-system';
 import { AsyncBoundary } from './shell/async-boundary';
 import { Link } from './shell/router';
 import { TEXT_LINK, TEXT_LINK_STRONG } from './shell/link-styles';
@@ -60,10 +60,51 @@ export function SeaPage() {
 }
 
 function SeaZoneList({ zone }: { zone: Zone }) {
-  // **真分页**：游标由服务端给，前端只做"追加"。「加载更多」只在
-  // `nextCursor !== null` 时出现 —— 没有下一页就不摆一个点了没反应的按钮（禁止假分页）。
+  /**
+   * **页码式分页**（用户第十三轮 ②），但**不新增第二套分页语义**：
+   *
+   * - 后端只有 cursor/keyset ⇒ 前端把「页码」当作**游标链上的索引**：
+   *   第 N 页 = 从第 1 页开始依次 `fetchNextPage()` 推进游标到第 N 页；
+   *   回看前面的页 = 直接用 `useInfiniteQuery` 已经缓存的那一页（不再发请求）；
+   * - 页码数 = **已取页数 + (hasNextPage ? 1 : 0)** —— 不请求 `total`、不造 offset，
+   *   所以"第 3 页"只在游标真的走得到时才出现（`nextCursor === null` 时不会凭空多一页）；
+   * - 每一页仍然只显示**这一页**的作品（不是「加载更多」那种追加）。
+   */
   const sea = useSeaPages(zone, SEA_PAGE_SIZE);
-  const items = (sea.data?.pages ?? []).flatMap((page) => page.items);
+  const [page, setPage] = useState(1);
+  const [fetchingToPage, setFetchingToPage] = useState<number | null>(null);
+  const fetchedPages = sea.data?.pages.length ?? 0;
+  const pageCount = fetchedPages + (sea.hasNextPage ? 1 : 0);
+
+  /**
+   * 去第 N 页。
+   *
+   * 已取到的页 ⇒ 直接用缓存（不发请求）。
+   * 没取到的页 ⇒ 在**点击事件里**逐页推进游标（不用 effect：effect 里同步 setState 会级联渲染，
+   * 仓库 lint 也会拦）。每一轮都看 `fetchNextPage()` 的返回结果，页数没涨就停（不会空转）。
+   */
+  const goToPage = (target: number): void => {
+    if (target === page) return;
+    if (target <= fetchedPages) {
+      setPage(target);
+      return;
+    }
+    setFetchingToPage(target);
+    void (async () => {
+      let have = fetchedPages;
+      while (have < target) {
+        const result = await sea.fetchNextPage();
+        const nextCount = result.data?.pages.length ?? have;
+        if (nextCount <= have) break; // 没有下一页了：停下来（界面按实际页数收敛）
+        have = nextCount;
+      }
+      setPage(Math.min(target, Math.max(have, 1)));
+      setFetchingToPage(null);
+    })();
+  };
+
+  const current = sea.data?.pages[page - 1];
+  const items = current?.items ?? [];
 
   return (
     <AsyncBoundary
@@ -114,35 +155,44 @@ function SeaZoneList({ zone }: { zone: Zone }) {
             {list.map((bottle, index) => (
               <li
                 key={bottle.id}
-                // guidance（motion-web §1「新内容入场」）：原来只有首批 4 张有入场，
-                // 「加载更多」追加的第 5 张起是凭空出现。现在每一项都有，
-                // 交错取模 4 保持「等距且小」的延迟（§4：不要不等距随机延迟，也不要无限增长的长尾）。
+                // guidance（motion-web §1「新内容入场」）：交错取模 4，保持「等距且小」的延迟
                 className={`enter-rise stagger-${String((index % 4) + 1)}`}
               >
                 <SeaBottleCard bottle={bottle} />
               </li>
             ))}
           </ul>
-          {sea.hasNextPage ? (
-            <div className="flex flex-wrap items-center gap-4">
-              <Button
-                variant="ghost"
-                loading={sea.isFetchingNextPage}
-                onClick={() => {
-                  void sea.fetchNextPage();
-                }}
-              >
-                加载更多作品
-              </Button>
-              <p className="text-[0.875rem] text-slate-current">
-                已经看了 {list.length} 支，公海里还有更多。
-              </p>
-            </div>
-          ) : (
-            <p className="text-[0.875rem] text-slate-current">
-              一共 {list.length} 支，这就是全部了。
+
+          <nav aria-label="分页" className="flex flex-wrap items-center gap-[8px]">
+            {Array.from({ length: pageCount }, (_unused, offset) => offset + 1).map((number) => {
+              const active = number === page;
+              return (
+                <button
+                  key={number}
+                  type="button"
+                  aria-label={`第 ${String(number)} 页`}
+                  aria-current={active ? 'page' : undefined}
+                  onClick={() => {
+                    goToPage(number);
+                  }}
+                  className={cn(
+                    'flex h-[44px] min-h-[44px] min-w-[44px] items-center justify-center rounded-pill px-[12px] text-[0.875rem] transition-transform duration-[var(--motion-hover-duration)] ease-[var(--motion-entry-easing)]',
+                    fetchingToPage === number ? 'opacity-60' : '',
+                    active
+                      ? 'bg-peacock font-semibold text-wave-white'
+                      : 'border border-driftline text-peacock hover:scale-[var(--motion-hover-scale)]',
+                  )}
+                >
+                  {number}
+                </button>
+              );
+            })}
+            <p className="ml-[8px] text-[0.875rem] text-slate-current">
+              {sea.hasNextPage
+                ? `第 ${String(page)} 页 · 后面还有更多`
+                : `共 ${String(fetchedPages)} 页`}
             </p>
-          )}
+          </nav>
         </div>
       )}
     </AsyncBoundary>

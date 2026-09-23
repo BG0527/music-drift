@@ -27,6 +27,7 @@ export const RULE_CODES = [
   'MESSAGE_SENDER_NOT_PARTICIPANT',
   'MESSAGE_CONTENT_EMPTY',
   'MESSAGE_BOTTLE_NOT_DRIFTING',
+  'MESSAGE_TARGET_NOT_AVAILABLE',
 ] as const;
 
 export type RuleCode = (typeof RULE_CODES)[number];
@@ -58,6 +59,7 @@ export const RULE_MESSAGES: Record<RuleCode, string> = {
   MESSAGE_SENDER_NOT_PARTICIPANT: '只有接唱者能给发起者留私密留言。',
   MESSAGE_CONTENT_EMPTY: '留言内容不能为空。',
   MESSAGE_BOTTLE_NOT_DRIFTING: '这个瓶子已经不再漂流，留言无法送达。',
+  MESSAGE_TARGET_NOT_AVAILABLE: '这条留言的目标不可选：只能选之前某一段的作者，且不能选自己。',
 };
 
 /** 冲突类（409）与规则类（422）的默认映射。 */
@@ -83,6 +85,7 @@ export const RULE_HTTP_STATUS: Record<RuleCode, 409 | 422> = {
   MESSAGE_SENDER_NOT_PARTICIPANT: 422,
   MESSAGE_CONTENT_EMPTY: 422,
   MESSAGE_BOTTLE_NOT_DRIFTING: 422,
+  MESSAGE_TARGET_NOT_AVAILABLE: 422,
 };
 
 export function violation(code: RuleCode, message?: string | undefined): RuleViolation {

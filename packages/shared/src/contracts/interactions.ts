@@ -68,14 +68,27 @@ export const MessageStatusSchema = z.enum(['PENDING', 'DELIVERED', 'UNDELIVERED'
 
 export const AttachPrivateMessageRequestSchema = z.object({
   content: z.string().min(1).max(500),
+  /**
+   * 目标段号（**1-based，与 `Segment.index` 同语义**）：收件人 = 该段的作者。
+   *
+   * 为什么用段号而不是 `toUserId`：
+   * 1. **不信任前端送来的身份** —— 谁是谁由服务端按 `(bottleId, index)` 解析；
+   * 2. 「之前各段的作者」本身就是**位置语言**，前端列表里展示的也是"第 N 段 · 匿名代号"。
+   *
+   * 服务端校验：该段必须**存在且有效**（隐含 `index < nextRecordIndex`），且作者 ≠ 发送者；
+   * 不满足 → `422 MESSAGE_TARGET_NOT_AVAILABLE`。
+   */
+  targetSegmentIndex: z.number().int().min(1),
 });
 
 export const PrivateMessageSchema = z.object({
   id: UuidSchema,
   bottleId: UuidSchema,
-  /** 发送者看到的自己的留言（含未送达状态）；发起者只看已送达的。 */
+  /** 可见性由服务端定：**只有目标**（已送达）与**发送者**（含未送达）拿得到内容。 */
   content: z.string().min(1),
   status: MessageStatusSchema,
+  /** 我选的目标段号（发送者用它渲染"给第 N 段的作者"；目标用它认出这是给自己的）。 */
+  targetSegmentIndex: z.number().int().min(1),
   createdAt: IsoDateTimeSchema,
 });
 

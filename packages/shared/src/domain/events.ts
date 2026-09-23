@@ -6,6 +6,9 @@
  * reducer 只做机械搬运，不读时钟、不读策略。
  */
 import { SYSTEM_ACTOR_ID } from './constants';
+// ⚠️ 只引入三个**纯函数**（无 IO、无状态）：它们就是"留言何时送达/何时失败"的唯一实现。
+// messages.ts 只从 events.ts 引 `type`（编译期擦除），因此运行期不存在循环依赖。
+import { messagesDeliveredTo, messagesUndelivered, messagesUndeliveredFor } from './messages';
 import { findSegment } from './queries';
 import type { BottleState, Segment, VoteValue } from './types';
 
@@ -75,6 +78,8 @@ export type DomainEvent =
   | (EventBase & { type: 'VOTE_CAST'; segmentId: string; value: VoteValue })
   | (EventBase & {
       type: 'MESSAGE_ATTACHED';
+      /** 目标段号：收件人 `toUserId` 就是这一段作者（服务端按段号解析，见 `messages.ts`）。 */
+      targetSegmentIndex: number;
       messageId: string;
       toUserId: string;
       content: string;
@@ -163,6 +168,8 @@ export function reduceBottle(state: BottleState, event: DomainEvent): BottleStat
         status: 'HELD',
         holder: { holderId: event.actorId, acquiredAt: event.at, origin: 'DRAW' },
         parents: { ...state.parents, [event.actorId]: event.parentId },
+        // 目标拿到瓶子即送达（用户口径：回传到目标手上就有通知，不必等到入海）
+        messages: messagesDeliveredTo(state.messages, event.actorId),
         updatedAt: event.at,
       };
 
@@ -171,6 +178,7 @@ export function reduceBottle(state: BottleState, event: DomainEvent): BottleStat
         ...state,
         status: 'HELD',
         holder: { holderId: event.toUserId, acquiredAt: event.at, origin: 'RETURN' },
+        messages: messagesDeliveredTo(state.messages, event.toUserId),
         updatedAt: event.at,
       };
 
@@ -198,11 +206,9 @@ export function reduceBottle(state: BottleState, event: DomainEvent): BottleStat
         holder: null,
         returnCompleted: state.returnCompleted || event.returnCompleted,
         returnChainBroken: state.returnChainBroken || event.chainBroken,
-        messages: state.messages.map((message) =>
-          message.status === 'PENDING'
-            ? { ...message, status: event.returnCompleted ? 'DELIVERED' : 'UNDELIVERED' }
-            : message,
-        ),
+        // 失败③：入海即终结 —— 此刻仍是 PENDING 的留言**就是没送到目标**（用户明确补充的那条）。
+        // 已送达的（目标先前已拿到过瓶子）不受影响。
+        messages: messagesUndelivered(state.messages),
         updatedAt: event.at,
       };
 
@@ -224,15 +230,22 @@ export function reduceBottle(state: BottleState, event: DomainEvent): BottleStat
       };
     }
 
-    case 'SEGMENT_CUT':
+    case 'SEGMENT_CUT': {
+      const cutSegment = findSegment(state, event.segmentId);
       return {
         ...state,
         // 段号是歌的固定位置：只软删，位置留空（ADR-015 §16.1）。
         segments: state.segments.map((segment) =>
           segment.id === event.segmentId ? { ...segment, deletedAt: event.at } : segment,
         ),
+        // 失败①：被斩段如果正是某条留言的**目标**，那条留言再也送不到
+        messages:
+          cutSegment === null
+            ? [...state.messages]
+            : messagesUndeliveredFor(state.messages, cutSegment.ownerId),
         updatedAt: event.at,
       };
+    }
 
     case 'BOTTLE_GAP_OPENED':
       return {
@@ -252,6 +265,8 @@ export function reduceBottle(state: BottleState, event: DomainEvent): BottleStat
         holder: null,
         damagedAt: event.at,
         returnChainBroken: true,
+        // 失败②：父链断裂 / 瓶子损坏 —— 仍未送达的留言全部未送达
+        messages: messagesUndelivered(state.messages),
         updatedAt: event.at,
       };
 
@@ -264,6 +279,7 @@ export function reduceBottle(state: BottleState, event: DomainEvent): BottleStat
             id: event.messageId,
             fromUserId: event.actorId,
             toUserId: event.toUserId,
+            targetSegmentIndex: event.targetSegmentIndex,
             content: event.content,
             createdAt: event.at,
             status: 'PENDING',

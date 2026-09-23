@@ -10,7 +10,12 @@ import {
   startBottle,
 } from './test-support';
 
-/** A 投河 → B 接唱投河 → C 接唱并留一条私密留言给 A。 */
+/**
+ * A 投河 → B 接唱投河 → C 接唱并留一条私密留言给 **A（第 1 段的作者）**。
+ *
+ * 规则变更后（用户第十三轮第 ④ 条）：目标是**发送者按段号指定的那一段作者**，
+ * 这里显式选第 1 段 ⇒ 收件人仍是 A，但那是"选出来的"，不再是"规则固定的"。
+ */
 function chainWithNote(): ReturnType<typeof createHarness> & {
   state: ReturnType<typeof startBottle>;
 } {
@@ -19,7 +24,11 @@ function chainWithNote(): ReturnType<typeof createHarness> & {
   let state = castToRiverBy(startBottle(ctx), ctx, 'u:A');
   state = castToRiverBy(drawAndSing(state, ctx, 'u:B'), ctx, 'u:B');
   state = drawAndSing(state, ctx, 'u:C');
-  state = attachPrivateMessage(state, { userId: 'u:C', content: '这句是给你的。' }, ctx).state;
+  state = attachPrivateMessage(
+    state,
+    { userId: 'u:C', content: '这句是给你的。', targetSegmentIndex: 1 },
+    ctx,
+  ).state;
   return { ...harness, state };
 }
 
@@ -58,20 +67,26 @@ describe('CONTEXT §4.3 / §5.2 / §10.1 — 回传中断', () => {
     ]);
   });
 
-  it('规则3：私密留言只在最终回传到发起者并入海时送达', () => {
+  it('规则3（已按用户裁决反转）：留言在**回传到目标手上**那一刻即送达，不再要求先入海', () => {
     const { ctx, state } = chainWithNote();
 
     const backToB = resolve(state, ctx, 'u:C', 'RETURN');
-    expect(visibleMessagesFor(backToB, 'u:A')).toEqual([]);
+    expect(visibleMessagesFor(backToB, 'u:A')).toEqual([]); // 还在 B 手上 → 目标看不到
 
     const backToA = resolve(backToB, ctx, 'u:B', 'RETURN');
     expect(backToA.holder?.holderId).toBe('u:A');
-    expect(visibleMessagesFor(backToA, 'u:A')).toEqual([]); // 还没入海，尚未送达
+    // ⚠️ 反转点：旧断言是 `[]`（"还没入海，尚未送达"）；新规则下 A 是**目标**，
+    //    持有者变成他的那一刻就送达了（用户原话「只有回传到他手上时有通知」）。
+    expect(backToA.messages.map((message) => message.status)).toEqual(['DELIVERED']);
+    expect(visibleMessagesFor(backToA, 'u:A').map((message) => message.content)).toEqual([
+      '这句是给你的。',
+    ]);
 
     const settled = resolve(backToA, ctx, 'u:A', 'SEA');
 
     expect(settled.returnCompleted).toBe(true);
     expect(settled.returnChainBroken).toBe(false);
+    expect(settled.messages.map((message) => message.status)).toEqual(['DELIVERED']); // 入海不再改写已送达
     expect(visibleMessagesFor(settled, 'u:A').map((message) => message.content)).toEqual([
       '这句是给你的。',
     ]);
@@ -91,31 +106,49 @@ describe('CONTEXT §4.3 / §5.2 / §10.1 — 回传中断', () => {
 
     const broken = resolve(resolve(state, ctx, 'u:C', 'RETURN'), ctx, 'u:B', 'SEA');
 
-    expectRejected(attachPrivateMessage(broken, { userId: 'u:C', content: '再补一句。' }, ctx), [
-      'MESSAGE_BOTTLE_NOT_DRIFTING',
-    ]);
+    expectRejected(
+      attachPrivateMessage(
+        broken,
+        { userId: 'u:C', content: '再补一句。', targetSegmentIndex: 2 },
+        ctx,
+      ),
+      [
+        'MESSAGE_BOTTLE_NOT_DRIFTING',
+      ],
+    );
   });
 
-  it('规则3：私密留言只能由接唱者发给发起者', () => {
+  it('规则3（已按用户裁决反转）：谁都能写 —— 只要在该瓶唱过；不再要求"必须由接唱者写给发起者"', () => {
     const harness = createHarness();
     const ctx = harness.ctx;
     let state = castToRiverBy(startBottle(ctx), ctx, 'u:A');
     state = castToRiverBy(drawAndSing(state, ctx, 'u:B'), ctx, 'u:B');
     state = drawAndSing(state, ctx, 'u:C');
 
-    expectRejected(attachPrivateMessage(state, { userId: 'u:A', content: '自说自话' }, ctx), [
-      'MESSAGE_SENDER_NOT_PARTICIPANT',
-    ]);
-    expectRejected(attachPrivateMessage(state, { userId: 'u:Z', content: '路人' }, ctx), [
-      'MESSAGE_SENDER_NOT_PARTICIPANT',
-    ]);
+    // 旧断言：发起者写留言 → MESSAGE_SENDER_NOT_PARTICIPANT（"只能接唱者写给发起者"）。
+    // 新规则只按**段号**说话：发起者也可以写给"之前各段"里的别人 —— 这里他的目标只能是
+    // 第 2 段（B）或第 3 段（C）……而他自己是第 1 段，所以把 **第 2 段（B）** 作为目标应当**被接受**。
+    const ok = attachPrivateMessage(
+      state,
+      { userId: 'u:A', content: '给后面这位。', targetSegmentIndex: 2 },
+      ctx,
+    );
+    expect(ok.ok).toBe(true);
+    expect(ok.state.messages[0]?.toUserId).toBe('u:B');
+
+    // 真正的"不在场者"依旧不能写（他在该瓶没有任何段）
+    expectRejected(
+      attachPrivateMessage(state, { userId: 'u:Z', content: '路人', targetSegmentIndex: 1 }, ctx),
+      ['MESSAGE_SENDER_NOT_PARTICIPANT'],
+    );
   });
 
   it('规则3：留言内容不能为空', () => {
     const { ctx, state } = chainWithNote();
 
-    expectRejected(attachPrivateMessage(state, { userId: 'u:C', content: '   ' }, ctx), [
-      'MESSAGE_CONTENT_EMPTY',
-    ]);
+    expectRejected(
+      attachPrivateMessage(state, { userId: 'u:C', content: '   ', targetSegmentIndex: 1 }, ctx),
+      ['MESSAGE_CONTENT_EMPTY'],
+    );
   });
 });

@@ -11,6 +11,7 @@
 import { Button, Icon, RippleRing, cn } from '../design-system';
 import { useDrawBottle, useInvalidateBottle } from '../features/api/mutations';
 import { ConflictNotice } from '../features/bottle/conflict-notice';
+import { MoodChips } from '../features/bottle/mood-chips';
 import { useSession } from '../features/session/session-context';
 import { Link } from './shell/router';
 import { useNavigate } from './shell/router-context';
@@ -177,6 +178,9 @@ export function RiverPage() {
           我参与过的漂流瓶
         </Link>
       </div>
+
+      {/* 心情标签（用户第十三轮 ①）：从首页搬来，**只作展示**，点击只有视觉反馈 */}
+      <MoodChips />
     </div>
   );
 }

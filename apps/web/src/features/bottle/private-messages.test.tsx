@@ -22,6 +22,8 @@ function message(overrides: Partial<Record<string, unknown>> = {}) {
     bottleId: BOTTLE_ID,
     content: '你写的这首歌我听过很多次。',
     status: 'PENDING',
+    // 契约（`PrivateMessageSchema`）新增必填：这条留言是写给第几段的作者
+    targetSegmentIndex: 2,
     createdAt: '2026-09-23T02:00:00.000Z',
     ...overrides,
   };
@@ -52,6 +54,8 @@ describe('私密留言', () => {
     setup({ items: [message(), message({ id: '33333333-3333-4333-8333-333333333333' })] });
 
     expect(await screen.findAllByText('你写的这首歌我听过很多次。')).toHaveLength(2);
+    // 契约要求带上目标段号（发送者据此认出"这条是给第 N 段作者的"）
+    expect(screen.getAllByText(/给第 2 段的作者/)).toHaveLength(2);
   });
 
   it('未送达要解释清楚（不是只标个状态）', async () => {

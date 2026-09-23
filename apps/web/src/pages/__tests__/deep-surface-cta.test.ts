@@ -59,7 +59,6 @@ describe('深底 CTA 的边界装置（源码模式守卫：落地前应红、�
   };
 
   const CASES = [
-    { file: 'home-page.tsx', marker: 'aria-label="捞一个漂流瓶"', where: '首页 hero' },
     { file: 'river-page.tsx', marker: 'aria-label="捞一个漂流瓶"', where: '河道·捞取' },
     { file: 'river-page.tsx', marker: 'aria-label="投下一支漂流瓶"', where: '河道·投下' },
   ] as const;

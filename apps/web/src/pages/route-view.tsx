@@ -10,7 +10,6 @@ import { activeNavKey } from './shell/routes';
 import { AdminPage } from './admin-page';
 import { BottlePage } from './bottle-page';
 import { DriftLogPage } from './drift-log-page';
-import { HomePage } from './home-page';
 import { LoginPage } from './login-page';
 import { NotFoundPage } from './not-found-page';
 import { ProfilePage } from './profile-page';
@@ -30,7 +29,8 @@ export function RouteView() {
   function content() {
     switch (match.name) {
       case 'home':
-        return <HomePage />;
+        // 合并后 `/` 不再是独立首页：它只是河道的旧入口（router 会把它规范化成 /river）
+        return <RiverPage />;
       case 'new':
         return <SongPickerPage />;
       case 'river':

@@ -44,7 +44,10 @@ export interface Holding {
 export interface PrivateMessage {
   id: string;
   fromUserId: string;
+  /** 收件人：由 `targetSegmentIndex` 解析出来的**那一段的作者**（不再固定是发起者）。 */
   toUserId: string;
+  /** 发送者选定的目标段号（1-based，与 `Segment.index` 同语义）；服务端据此解析收件人。 */
+  targetSegmentIndex: number;
   content: string;
   createdAt: number;
   status: MessageStatus;

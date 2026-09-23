@@ -127,6 +127,9 @@ export function PrivateMessages({ open, bottleId, canWrite, onClose }: PrivateMe
                 >
                   <p className="text-[0.9375rem] leading-[1.6] text-abyss">{item.content}</p>
                   <p className="flex flex-wrap items-center gap-x-[12px] text-[0.8125rem]">
+                    <span className="text-slate-current">
+                      给第 {String(item.targetSegmentIndex)} 段的作者
+                    </span>
                     <span
                       className={cn('rounded-pill px-3 py-1', STATUS_STYLE[item.status])}
                     >

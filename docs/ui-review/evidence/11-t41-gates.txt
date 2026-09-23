@@ -1,0 +1,13 @@
+# t41 三条门（真实输出）
+
+$ pnpm -r test
+packages/shared test:  Test Files  22 passed (22)
+packages/shared test:       Tests  242 passed (242)
+apps/api test:  Test Files  19 passed (19)
+apps/api test:       Tests  180 passed (180)
+apps/web test:  Test Files  64 passed (64)
+apps/web test:       Tests  554 passed | 1 skipped (555)
+exit=0
+test exit=0
+typecheck exit=0
+lint exit=0

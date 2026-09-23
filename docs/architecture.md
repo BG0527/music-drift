@@ -3643,3 +3643,17 @@ architect 主动报告「**会话上下文已接近上限**（累计约 40 次�
 ### 92.5 verify（最终树）
 `api test` exit 0（19/180）· `api test:integration` **exit 0**（23 文件 / **189 例**，170.84s）· `typecheck` exit 0 · `shared test` exit 0（22/242，含 `messages.test.ts` 11 例）· `lint` exit 0。
 披露式归档：`packages/shared/src/domain/**` 未列入 changedPaths，**逐条在 output 披露**（`messages.ts`/`events.ts`/`types.ts`/`errors.ts` + 两处断言反转 + 新增 `messages.test.ts`）；**`apps/web/**` 零改动** ✓（前端留给 t41）。
+
+---
+
+## 93. t41 完成（①②③ 全做完）+ 全绿复核
+
+### 93.1 captain 独立复核（frontend-flow 会话**第五次**在报告前失败，工作已落盘）
+- 全仓 `pnpm -r test` → **exit 0**：shared 22/242 · api 19/180 · **web 64 文件 / 554 通过 + 1 跳过**；
+- 一屏守卫：**1440 exit 0（"✅ 全部页面达标（桌面口径：一屏装下）"）** · **375 exit 0（"✅ 全部页面达标（手机口径：无横向滚动 + 关键锚点在首屏内）"）**；
+- **② 页码分页**：`pages/sea-page.tsx` 页码相关命中 15 处（映射到已走过的游标链，**未新增第二套分页语义**）；
+- **③ 日志精简**：`features/bottle/drift-events.ts` 新增 **`CORE_EVENT_TYPES` 白名单** + `EVENT_LABELS`（如 `BOTTLE_CREATED: '发起：选定了这首歌'`、`BOTTLE_WENT_TO_SEA: '入海：成为公海里的公共作品'`），且文件注释**直接引用用户第③条原话**（"漂流日志太详细冗余了，保留核心操作就好"）⇒ 后来者能读懂为什么有这份白名单。
+
+### 93.2 会话失败的次数与代价（本会话累计）
+`frontend-flow` 已 **5 次**在"报告/回写之前"失败（另有 architect 1 次、backend-core 1 次 ⇒ **共 7 次**）。**7 次都没有丢工作** —— 唯一原因是 state 活在仓库：`docs/handover/*`、证据文件、以及**可被 captain 独立复核的代码与测试**。
+⇒ 这条纪律的回报率目前是 **7/7**；若当初把状态只留在会话里，这 7 次全都是不可恢复的。

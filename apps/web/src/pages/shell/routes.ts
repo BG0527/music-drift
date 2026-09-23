@@ -36,6 +36,7 @@ interface RoutePattern {
 
 const PATTERNS: readonly RoutePattern[] = [
   { name: 'login', segments: ['login'] },
+  // `home` 只作为**旧入口**保留在表里（否则 `/` 会掉进 404）：router 会把 `/` 规范化成 `/river`
   { name: 'home', segments: [] },
   { name: 'new', segments: ['new'] },
   { name: 'river', segments: ['river'] },
@@ -55,6 +56,14 @@ function toSegments(pathname: string): string[] {
 }
 
 /** 把一条 pathname 解析成「哪一页 + 参数」；认不出来就是 `notFound`（页面渲染 404 空态，不白屏）。 */
+/**
+ * 旧入口 `/` ⇒ 河道（canonical `/river`）。**唯一的 URL 规范化点**：匹配路由之前先过它
+ * （河道页合并，用户第十三轮 ①）。
+ */
+export function canonicalHref(pathname: string): string {
+  return pathname === '/' ? '/river' : pathname;
+}
+
 export function matchRoute(pathname: string): RouteMatch {
   const segments = toSegments(pathname);
   for (const pattern of PATTERNS) {

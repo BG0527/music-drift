@@ -12,8 +12,8 @@
  *
  * | 触发 | 收件人 | 类型 |
  * | --- | --- | --- |
- * | 全链回传后入海（`returnCompleted`）→ 留言由 PENDING 转 DELIVERED | **发起者**（留言接收者） | `MESSAGE_DELIVERED` |
- * | 中途入海 / 回传链断（留言永远送不到） | **发送者**（§5.2「你的留言未送达」） | `MESSAGE_UNDELIVERED` |
+ * | 留言由 PENDING 转 **DELIVERED**（= **目标**当轮拿到瓶子） | **留言的目标**（`toUserId`；不再固定是发起者） | `MESSAGE_DELIVERED` |
+ * | 留言由 PENDING 转 **UNDELIVERED**（目标段被斩 / 瓶子 DAMAGED / 完整入海仍未送到） | **留言的发送者**（§5.2「你的留言未送达」） | `MESSAGE_UNDELIVERED` |
  * | 作品入海 | **所有参与者**（发起者 + 每位唱过的人，**含被斩浪的人** §16.7） | `BOTTLE_REACHED_SEA` |
  *
  * 两条边界：
@@ -33,7 +33,7 @@ import { readDomainEvents } from '../db/events.js';
 
 /** 通知类型（写入方与展示方共用同一批稳定字符串；文案在展示层）。 */
 export const NOTIFICATION_TYPES = {
-  /** 私密留言送达（收件人 = 发起者）。 */
+  /** 私密留言送达（收件人 = **该留言的目标**，由 `targetSegmentIndex` 解析而来）。 */
   MESSAGE_DELIVERED: 'MESSAGE_DELIVERED',
   /** 私密留言未送达（收件人 = 发送者）。 */
   MESSAGE_UNDELIVERED: 'MESSAGE_UNDELIVERED',
@@ -48,11 +48,20 @@ export const NOTIFICATION_TYPES = {
 
 export type NotificationType = (typeof NOTIFICATION_TYPES)[keyof typeof NOTIFICATION_TYPES];
 
-interface PendingMessageRow {
-  id: string;
-  from_user_id: string;
-  to_user_id: string;
-}
+/**
+ * 会改变留言状态的事件集合（内核里就这么几个）：
+ * - `MESSAGE_ATTACHED`：只新增 PENDING（**不产生通知** —— §5.1 私密性）；
+ * - `BOTTLE_DRAWN` / `BOTTLE_RETURNED`：目标拿到瓶子 → PENDING → DELIVERED；
+ * - `SEGMENT_CUT`（目标段被斩）/ `BOTTLE_DAMAGED` / `BOTTLE_WENT_TO_SEA`：仍未送达 → UNDELIVERED。
+ */
+export const MESSAGE_STATE_EVENTS = new Set([
+  'MESSAGE_ATTACHED',
+  'BOTTLE_DRAWN',
+  'BOTTLE_RETURNED',
+  'SEGMENT_CUT',
+  'BOTTLE_DAMAGED',
+  'BOTTLE_WENT_TO_SEA',
+]);
 
 /** 写一行通知（幂等：同收件人 + 同类型 + 同 bottleId + 同 messageId 只留一行）。 */
 async function insertNotification(
@@ -97,12 +106,6 @@ async function insertNotification(
   );
 }
 
-async function pendingMessages(tx: Queryable, bottleId: string): Promise<PendingMessageRow[]> {
-  return tx.query<PendingMessageRow>(
-    `select id, from_user_id, to_user_id from messages where bottle_id = $1 and status = 'PENDING'`,
-    [bottleId],
-  );
-}
 
 /**
  * 通知的收件人 = **有效段的作者**（发起者只要第 1 段还在，也在其中）。
@@ -160,23 +163,33 @@ export async function projectNotifications(
 ): Promise<void> {
   const type = String(event['type']);
 
-  if (type === 'BOTTLE_WENT_TO_SEA') {
-    const returnCompleted = event['returnCompleted'] === true;
-    const songTitle = await songTitleOf(tx, bottleId);
-
-    // ① 留言的终局：送达 → 通知发起者；未送达 → 通知发送者（§5.2）
-    for (const message of await pendingMessages(tx, bottleId)) {
-      if (returnCompleted) {
+  // ① 留言状态转移：**唯一来源 = 内核**。把「本事件之前」重放一次、再带上本事件重放一次，
+  //    一比就知道哪条留言从 PENDING 变成了什么：
+  //      PENDING → DELIVERED   ⇒ 通知**目标**（`toUserId`）
+  //      PENDING → UNDELIVERED ⇒ 通知**发送者**（`fromUserId`，§5.2「你的留言未送达」）
+  //    这样"什么算送达、什么算失败"不需要在 API 层重写一份 —— 三个失败路径分别由内核的
+  //    `SEGMENT_CUT`（目标段被斩）/ `BOTTLE_DAMAGED`（父链断裂/损坏）/ `BOTTLE_WENT_TO_SEA`
+  //    （整首完成入海但未送到目标）落成状态变化，这里只做搬运。
+  if (MESSAGE_STATE_EVENTS.has(type)) {
+    const events = await readDomainEvents(tx, bottleId);
+    const before = replayBottle(events);
+    const after = replayBottle([...events, event as unknown as DomainEvent]);
+    for (const message of before.messages) {
+      if (message.status !== 'PENDING') {
+        continue;
+      }
+      const statusAfter = after.messages.find((candidate) => candidate.id === message.id)?.status;
+      if (statusAfter === 'DELIVERED') {
         await insertNotification(tx, {
-          userId: message.to_user_id,
+          userId: message.toUserId,
           type: NOTIFICATION_TYPES.MESSAGE_DELIVERED,
           bottleId,
           messageId: message.id,
           at,
         });
-      } else {
+      } else if (statusAfter === 'UNDELIVERED') {
         await insertNotification(tx, {
-          userId: message.from_user_id,
+          userId: message.fromUserId,
           type: NOTIFICATION_TYPES.MESSAGE_UNDELIVERED,
           bottleId,
           messageId: message.id,
@@ -184,6 +197,10 @@ export async function projectNotifications(
         });
       }
     }
+  }
+
+  if (type === 'BOTTLE_WENT_TO_SEA') {
+    const songTitle = await songTitleOf(tx, bottleId);
 
     // ② 作品**完整**入海 → 通知**有效段的作者**（被斩浪者不算参与过，§46.1）
     //
@@ -210,29 +227,4 @@ export async function projectNotifications(
     return;
   }
 
-  if (type === 'BOTTLE_DAMAGED') {
-    /**
-     * 回传链断（作品损坏）也是"留言永远送不到"的终局之一。
-     *
-     * ⚠️ t9 的投影只在 `BOTTLE_WENT_TO_SEA` 上把 PENDING 改掉，`BOTTLE_DAMAGED` 没处理 ——
-     * 那会让留言**永远停在 PENDING**，同时我们又要告诉发送者"未送达"（两处真相矛盾）。
-     * 因此这里**由本模块**把 PENDING 终结为 UNDELIVERED（`projectBottleRow` 不碰 DAMAGED 的留言，
-     * 不存在两个写入者），再通知发送者。
-     */
-    const terminated = await tx.query<PendingMessageRow>(
-      `update messages set status = 'UNDELIVERED'
-       where bottle_id = $1 and status = 'PENDING'
-       returning id, from_user_id, to_user_id`,
-      [bottleId],
-    );
-    for (const message of terminated) {
-      await insertNotification(tx, {
-        userId: message.from_user_id,
-        type: NOTIFICATION_TYPES.MESSAGE_UNDELIVERED,
-        bottleId,
-        messageId: message.id,
-        at,
-      });
-    }
-  }
 }

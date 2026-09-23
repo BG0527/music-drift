@@ -319,7 +319,7 @@ describe('投票（CONTEXT §7.2–§7.4）：门槛、自踩、一人一票、�
   });
 });
 
-describe('私密留言（CONTEXT §5 / §4.3）：只有接唱者能写，只有发起者最终能看到', () => {
+describe('私密留言（CONTEXT §5）：目标由发送者按**段号**指定，只有目标能看到', () => {
   let initiatorCookie = '';
   let initiatorId = '';
   let lastSingerCookie = '';
@@ -341,22 +341,49 @@ describe('私密留言（CONTEXT §5 / §4.3）：只有接唱者能写，只有
     const write = await app.inject({
       method: 'POST',
       url: '/api/bottles/' + bottleId + '/messages',
-      payload: { content: '匿名的话' },
+      payload: { content: '匿名的话', targetSegmentIndex: 1 },
     });
     expect(write.statusCode).toBe(401);
     const read = await app.inject({ method: 'GET', url: '/api/bottles/' + bottleId + '/messages' });
     expect(read.statusCode).toBe(401);
   });
 
-  it('发起者不能给自己留言（留言是「接唱者 → 发起者」的点对点）→ 422', async () => {
+  it('目标不能是自己 → 422 MESSAGE_TARGET_NOT_AVAILABLE（旧规则"发起者不能写"已按用户裁决反转）', async () => {
+    // 用一支**独立且正在漂流**的瓶子做这条断言：公海里的瓶子（本 describe 的 bottleId 此刻在公海）
+    // 会先撞 MESSAGE_BOTTLE_NOT_DRIFTING（更根本的拒绝），测不到目标规则。
+    const author = await register('mt');
+    const songId = await insertSong(db, 4);
+    const created = await app.inject({
+      method: 'POST',
+      url: '/api/bottles',
+      payload: { songId },
+      headers: { cookie: author.cookie },
+    });
+    expect(created.statusCode).toBe(201);
+    const drifting = (created.json() as { id: string }).id;
+    const recorded = await app.inject({
+      method: 'POST',
+      url: '/api/bottles/' + drifting + '/segments',
+      payload: webmPayload(),
+      headers: { cookie: author.cookie, 'content-type': 'audio/webm', 'x-audio-duration-ms': '20000' },
+    });
+    expect(recorded.statusCode).toBe(201);
+    const cast = await app.inject({
+      method: 'POST',
+      url: '/api/bottles/' + drifting + '/resolution',
+      payload: { resolution: 'RIVER' }, // 投河 → IN_RIVER（可写留言）
+      headers: { cookie: author.cookie },
+    });
+    expect(cast.statusCode).toBe(200);
+    // 瓶里只有第 1 段（作者自己的）⇒ 他选第 1 段 = 选自己
     const response = await app.inject({
       method: 'POST',
-      url: '/api/bottles/' + bottleId + '/messages',
-      payload: { content: '我说给我自己听' },
-      headers: { cookie: initiatorCookie },
+      url: '/api/bottles/' + drifting + '/messages',
+      payload: { content: '我说给我自己听', targetSegmentIndex: 1 },
+      headers: { cookie: author.cookie },
     });
     expect(response.statusCode).toBe(422);
-    expect(response.body).toContain('MESSAGE_SENDER_NOT_PARTICIPANT');
+    expect(response.body).toContain('MESSAGE_TARGET_NOT_AVAILABLE');
   });
 
   it('接唱者写留言 → 201 PENDING；空内容 → 422（写留言只能在「持有中」这个漂流窗口内）', async () => {
@@ -371,7 +398,7 @@ describe('私密留言（CONTEXT §5 / §4.3）：只有接唱者能写，只有
     const empty = await app.inject({
       method: 'POST',
       url: '/api/bottles/' + bottleId + '/messages',
-      payload: { content: '   ' },
+      payload: { content: '   ', targetSegmentIndex: 1 },
       headers: { cookie: lastSingerCookie },
     });
     expect(empty.statusCode).toBe(422);
@@ -380,13 +407,15 @@ describe('私密留言（CONTEXT §5 / §4.3）：只有接唱者能写，只有
     const created = await app.inject({
       method: 'POST',
       url: '/api/bottles/' + bottleId + '/messages',
-      payload: { content: '给你留一句：副歌我改高了' },
+      // 目标 = 第 1 段（发起者）：服务端据此解析收件人，客户端全程没传过 userId
+      payload: { content: '给你留一句：副歌我改高了', targetSegmentIndex: 1 },
       headers: { cookie: lastSingerCookie },
     });
     expect(created.statusCode).toBe(201);
-    const body = created.json() as { id: string; status: string };
+    const body = created.json() as { id: string; status: string; targetSegmentIndex: number };
     messageId = body.id;
     expect(body.status).toBe('PENDING');
+    expect(body.targetSegmentIndex).toBe(1);
     expect(messageId).not.toBe('');
   });
 
@@ -411,7 +440,7 @@ describe('私密留言（CONTEXT §5 / §4.3）：只有接唱者能写，只有
     }
   });
 
-  it('全链回传入海后 → 留言 DELIVERED，发起者可见（§5.1 / §5.2 的送达分支）', async () => {
+  it('回传到**目标**手上即 DELIVERED（本例目标是发起者 ⇒ 他此时可见）；无需等到入海', async () => {
     // 回传是**逐跳**的（CONTEXT §4.3）：末段作者 → 上一段作者 → … → 发起者；
     // 谁持有谁选去向，所以这条链要一跳一跳走完（不能在别人手上替它入海）。
     await resolve(lastSingerCookie, bottleId, 'RETURN');
@@ -445,7 +474,7 @@ describe('私密留言（CONTEXT §5 / §4.3）：只有接唱者能写，只有
     const response = await app.inject({
       method: 'POST',
       url: '/api/bottles/' + bottleId + '/messages',
-      payload: { content: '太晚了' },
+      payload: { content: '太晚了', targetSegmentIndex: 1 },
       headers: { cookie: lastSingerCookie },
     });
     expect(response.statusCode).toBe(422);
@@ -463,7 +492,7 @@ describe('私密留言：中途入海 → 未送达（CONTEXT §5.2）', () => {
     const created = await app.inject({
       method: 'POST',
       url: '/api/bottles/' + bottleId + '/messages',
-      payload: { content: '不知道还能不能送到' },
+      payload: { content: '不知道还能不能送到', targetSegmentIndex: 1 },
       headers: { cookie: singerCookie },
     });
     expect(created.statusCode).toBe(201);
@@ -491,9 +520,11 @@ describe('私密留言：中途入海 → 未送达（CONTEXT §5.2）', () => {
       [bottleId],
     );
     expect(rows[0]?.status).toBe('UNDELIVERED');
-    // ⚠️ §5.2 的「C 会收到通知：你的留言未送达」需要写入 notifications —— 当前全仓**无任何写入口**
-    //（`grep -rn "insert into notifications" apps packages` 为空），归属 t12（plan.md 切片 5 的「通知」），
-    // 已作为发现上报 captain；t9 只负责读/标记已读两条 API。
+    // ✅ §5.2 的「留言者会收到通知：你的留言未送达」**已实现**（t42）：
+    // 写入点在 `store/notifications.ts` 的"内核前后状态比对"里 —— 留言 PENDING → UNDELIVERED 就
+    // 给**发送者**写一条 `MESSAGE_UNDELIVERED`；三条失败路径（目标段被斩 / DAMAGED / 完整入海未送达）
+    // 各有集成用例，见 `routes/messageTargeting.integration.test.ts` 的「§5.2 三种失败都通知留言者」。
+    //（此处原先的 ⚠️ 过期警示写于 t9：当时全仓确实没有写入口；t12 补齐写入后它就成了误导，t42 更新。）
   });
 });
 

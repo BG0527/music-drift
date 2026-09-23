@@ -62,7 +62,7 @@ describe('CONTEXT §11.3 — 超时（时钟必须可注入）', () => {
     state = drawAndSing(state, ctx, 'u:C');
     const withNote = attachPrivateMessage(
       state,
-      { userId: 'u:C', content: '路上小心。' },
+      { userId: 'u:C', content: '路上小心。', targetSegmentIndex: 1 },
       ctx,
     ).state;
 

@@ -23,7 +23,12 @@ import {
   visibleMessagesFor,
 } from '@music-drift/shared/domain';
 import { canDislike } from '@music-drift/shared/audio';
-import { CastVoteRequestSchema, SubmitListenProgressRequestSchema, UuidSchema } from '@music-drift/shared';
+import {
+  AttachPrivateMessageRequestSchema,
+  CastVoteRequestSchema,
+  SubmitListenProgressRequestSchema,
+  UuidSchema,
+} from '@music-drift/shared';
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { problemFromOutcome, problemFromViolations, sendProblem, transportProblem } from '../http/problem.js';
@@ -187,7 +192,7 @@ export function registerInteractionRoutes(
       return sendProblem(reply, transportProblem('UNAUTHENTICATED'));
     }
     const params = IdParamsSchema.safeParse(request.params);
-    const body = z.object({ content: z.string().min(1).max(500) }).safeParse(request.body);
+    const body = AttachPrivateMessageRequestSchema.safeParse(request.body);
     if (!params.success || !body.success) {
       return sendProblem(reply, transportProblem('INVALID_BODY'));
     }
@@ -197,7 +202,12 @@ export function registerInteractionRoutes(
     }
     const outcome = attachPrivateMessage(
       state,
-      { userId: actor.user.id, content: body.data.content },
+      {
+        userId: actor.user.id,
+        content: body.data.content,
+        // 目标由**段号**表达；收件人在内核里解析成该段作者（不采信客户端送来的 userId）
+        targetSegmentIndex: body.data.targetSegmentIndex,
+      },
       createRequestContext(clock),
     );
     const problem = problemFromOutcome(outcome);
@@ -213,11 +223,16 @@ export function registerInteractionRoutes(
       bottleId: params.data.id,
       content: body.data.content,
       status: 'PENDING',
+      targetSegmentIndex: body.data.targetSegmentIndex,
       createdAt: new Date(clock.now()).toISOString(),
     });
   });
 
-  /** 可见性由**内核**决定：中间传递者看不到任何留言；发起者只看已送达的；发送者看自己的。 */
+  /**
+   * 可见性由**内核**决定（用户第十三轮第 ④ 条后的规则）：
+   * **只有目标**（该留言已送达给他）能看内容；**发送者**能看到自己写的（含未送达）；
+   * 发起者与其他段作者一律看不到。前端只渲染这里返回的。
+   */
   app.get('/api/bottles/:id/messages', async (request, reply) => {
     const actor = await actors.resolve(request);
     if (actor === null) {
@@ -237,6 +252,7 @@ export function registerInteractionRoutes(
         bottleId: params.data.id,
         content: message.content,
         status: message.status,
+        targetSegmentIndex: message.targetSegmentIndex,
         createdAt: new Date(message.createdAt).toISOString(),
       })),
     );

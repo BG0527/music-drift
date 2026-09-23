@@ -344,7 +344,7 @@ async function seedData() {
  */
 function routesFor(seed) {
   return [
-    { path: '/', anchors: ['home-pick'] },
+    { path: '/', anchors: ['river-draw', 'river-drop'] },
     { path: '/river', anchors: ['river-draw', 'river-drop'] },
     { path: '/sea', anchors: ['sea-list'] },
     { path: '/new', anchors: ['new-catalog'] },

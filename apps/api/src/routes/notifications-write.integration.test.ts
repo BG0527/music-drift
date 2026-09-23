@@ -177,7 +177,7 @@ describe('通知写入 ①：私密留言**送达** → 通知发起者（§5.2 
     const created2 = await app.inject({
       method: 'POST',
       url: '/api/bottles/' + bottleId + '/messages',
-      payload: { content: '给你留一句：副歌我改高了' },
+      payload: { content: '给你留一句：副歌我改高了', targetSegmentIndex: 1 },
       headers: { cookie: lastSinger.cookie },
     });
     expect(created2.statusCode).toBe(201);
@@ -265,7 +265,7 @@ describe('通知写入 ②：私密留言**未送达** → 通知发送者（§5
     const created = await app.inject({
       method: 'POST',
       url: '/api/bottles/' + bottleId + '/messages',
-      payload: { content: '不知道还能不能送到' },
+      payload: { content: '不知道还能不能送到', targetSegmentIndex: 1 },
       headers: { cookie: singer.cookie },
     });
     expect(created.statusCode).toBe(201);

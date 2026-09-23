@@ -22,7 +22,7 @@ import type { Db, Queryable } from '../db/client.js';
 import { appendDomainEvent, readDomainEvents } from '../db/events.js';
 import { activeHoldingOf, applyDomainEventToHoldings, claimHolding } from '../db/holdings.js';
 import { insertBottleSegment } from '../db/segments.js';
-import { projectNotifications } from './notifications.js';
+import { MESSAGE_STATE_EVENTS, projectNotifications } from './notifications.js';
 
 /**
  * 候选超取倍数（`listParticipatedBottles` 与 `listSeaBottles` 共用）：候选里含被内核判定筛掉的行，
@@ -340,10 +340,6 @@ async function projectBottleRow(tx: Queryable, event: Record<string, unknown>): 
            updated_at = $2 where id = $1`,
         [bottleId, stamp, event['returnCompleted'] === true, event['chainBroken'] === true],
       );
-      await tx.query(
-        `update messages set status = $2 where bottle_id = $1 and status = 'PENDING'`,
-        [bottleId, event['returnCompleted'] === true ? 'DELIVERED' : 'UNDELIVERED'],
-      );
       return;
     case 'BOTTLE_DAMAGED':
       await tx.query(
@@ -393,6 +389,25 @@ export function createBottleStore(db: Db): BottleStore {
           ...(record['toUserId'] === undefined ? {} : { toUserId: String(record['toUserId']) }),
         });
         await appendDomainEvent(tx, event);
+
+        /**
+         * 留言投影的**状态**由内核说了算：事件落库后重放一次，把每条留言的状态同步过来。
+         *
+         * 为什么不再"每个事件手写一条规则"（旧实现只在 `BOTTLE_WENT_TO_SEA` 里一刀切把 PENDING 改终态）：
+         * 规则变更后「送达 = 目标拿到瓶子」（DRAWN/RETURNED）、「失败」有三条路径
+         *（SEGMENT_CUT 目标段被斩 / BOTTLE_DAMAGED / BOTTLE_WENT_TO_SEA），
+         * 手写就会在投影层留下**第二份**判定；而 `messages` 表一旦与内核重放不一致，
+         * `GET /messages`（读内核）与任何直接读表的统计/审计就会互相打脸（t42 实测到过这个不一致）。
+         */
+        if (MESSAGE_STATE_EVENTS.has(String(record['type']))) {
+          const replayed = replayBottle(await readDomainEvents(tx, bottleId));
+          for (const message of replayed.messages) {
+            await tx.query(`update messages set status = $2 where id = $1 and status <> $2`, [
+              message.id,
+              message.status,
+            ]);
+          }
+        }
       }
     });
   }

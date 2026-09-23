@@ -17,13 +17,17 @@ describe('漂流日志页', () => {
 
     const list = await screen.findByTestId('drift-log');
     const items = within(list).getAllByRole('listitem');
-    expect(items).toHaveLength(4);
+    // 精简后只剩三条核心操作（发起 / 接唱 / 投河）：斩浪与点跩都不在日志里
+    expect(items).toHaveLength(3);
+    expect(items.map((item) => item.textContent).join('|')).not.toContain('斩浪');
+    expect(items.map((item) => item.textContent).join('|')).not.toContain('投了一票');
     expect(items[0]!.textContent).toContain('发起');
     expect(items[0]!.textContent).toContain('午夜歌手#042');
-    expect(items[2]!.textContent).toContain('系统');
-    expect(items[2]!.textContent).toContain('斩浪');
+    expect(items[1]!.textContent).toContain('接唱');
+    expect(items[2]!.textContent).toContain('投河');
     // 不允许把事件类型枚举漏成界面文案
     expect(list.textContent).not.toContain('SEGMENT_CUT');
+    expect(list.textContent).not.toContain('VOTE_CAST');
   });
 
   it('瓶子不存在 / 没有事件（404）时用可读提示，不白屏', async () => {
@@ -53,6 +57,8 @@ describe('漂流日志页', () => {
 const EVENTS = [
   bottleEvent({ seq: 1, type: 'BOTTLE_CREATED', actorId: USER_A }),
   bottleEvent({ seq: 2, type: 'SEGMENT_RECORDED', actorId: USER_A }),
+  // 下面两条是**该被过滤掉**的：系统行为（斩浪）与互动流水（点跩）
   bottleEvent({ seq: 3, type: 'SEGMENT_CUT', actorId: 'SYSTEM' }),
-  bottleEvent({ seq: 4, type: 'BOTTLE_CAST_TO_RIVER', actorId: USER_A }),
+  bottleEvent({ seq: 4, type: 'VOTE_CAST', actorId: USER_A }),
+  bottleEvent({ seq: 5, type: 'BOTTLE_CAST_TO_RIVER', actorId: USER_A }),
 ];

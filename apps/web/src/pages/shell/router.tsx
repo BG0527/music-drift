@@ -9,7 +9,7 @@
  * 3. 每次路径变化设置 `document.title`，并把页面滚动回顶部。
  */
 import { useEffect, useMemo, useState, type AnchorHTMLAttributes, type ReactNode } from 'react';
-import { interceptTarget, safeNextPath, type RouteName } from './routes';
+import { canonicalHref, interceptTarget, safeNextPath, type RouteName } from './routes';
 import {
   APP_NAME,
   RouterContext,
@@ -41,11 +41,24 @@ export function RouterProvider({
   children: ReactNode;
   initialPath?: string | undefined;
 }) {
-  const [href, setHref] = useState(() => initialPath ?? readHref());
+  /**
+   * 河道页合并（用户第十三轮 ①）：`/` 与 `/river` 是同一个页面，canonical = `/river`。
+   *
+   * 规范化放在**匹配之前**（纯函数 + 一次性 `replaceState`），而不是在 effect 里 setState：
+   * ① 用 `replaceState` 不留历史条目 ⇒ 从登录页进 `/` 之后按「返回」不会在两页之间弹；
+   * ② 不在 effect 里同步 setState（那会级联渲染，仓库的 lint 规则也会拦）。
+   * `replaceState` 是幂等的，StrictMode 下重复执行也无副作用。
+   */
+  const [href, setHref] = useState(() => {
+    const raw = initialPath ?? readHref();
+    const canonical = canonicalHref(raw);
+    if (canonical !== raw) window.history.replaceState({}, '', canonical);
+    return canonical;
+  });
 
   useEffect(() => {
     const onPopState = (): void => {
-      setHref(readHref());
+      setHref(canonicalHref(readHref()));
     };
     window.addEventListener('popstate', onPopState);
     return () => {
