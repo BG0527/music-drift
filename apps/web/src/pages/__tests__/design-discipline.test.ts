@@ -32,7 +32,6 @@ const OWNED_DIRS = [
   join(WEB_SRC, 'features', 'bottle'),
   join(WEB_SRC, 'features', 'api'),
   join(WEB_SRC, 'features', 'session'),
-  join(WEB_SRC, 'features', 'profile'),
 ];
 
 const SOURCES = OWNED_DIRS.flatMap((dir) => collectSources(dir));
@@ -145,6 +144,26 @@ describe('布局纪律（375px 与 1440px 都不横向溢出）', () => {
         if (Number(match[2]) > 1 && prefix === '') found.push(match[0]);
       }
       return found.length === 0 ? null : `${rel(file)}: ${found.join(',')}`;
+    });
+    expect(offenders).toEqual([]);
+  });
+
+  it('可点元素里的裸文本必须带 nowrap 机制（否则 375px 下会被压成一列一个字符）', () => {
+    // 真实事故：`<Link className="inline-flex gap-2">捞一个漂流瓶</Link>` —— 裸文本在 flex 容器里
+    // 是匿名 flex item，空间不足时缩到 min-content，于是出现「捞 一 个 漂 流 瓶」竖排。
+    // 允许的两种机制：① 用 pages/shell/link-styles 的 TEXT_LINK*（自带 whitespace-nowrap）；
+    // ② 元素自身 className 里显式写 whitespace-nowrap。
+    const offenders = offendersOf((text, file) => {
+      if (!rel(file).startsWith('pages/') && !rel(file).startsWith('features/')) return null;
+      const found: string[] = [];
+      for (const match of text.matchAll(/<(Link|Button)[^>]*>([^<>{}]{2,60})<\/\1>/g)) {
+        const tag = match[0];
+        const bare = (match[2] ?? '').trim();
+        if (bare.length < 2) continue;
+        if (tag.includes('TEXT_LINK') || tag.includes('whitespace-nowrap')) continue;
+        found.push(`${match[1]}: ${bare.slice(0, 24)}`);
+      }
+      return found.length === 0 ? null : `${rel(file)}: ${found.join(' | ')}`;
     });
     expect(offenders).toEqual([]);
   });

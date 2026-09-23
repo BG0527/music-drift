@@ -5,11 +5,16 @@
  * （`castVote` / `attachPrivateMessage` / `visibleMessagesFor`）；徽章是**派生**的
  * （ADR-014 裁决 #1：不落库），每次由内核 `evaluateBadges` 现算。
  *
+ * ⚠️ t20：点踩门槛**不再采信请求体里的 `listenedRatio`**，改为读服务端持久化的已听覆盖率
+ *（`POST /api/segments/:id/listen` 增量上报 + 只增不减）。覆盖率语义复用 `shared/audio`，
+ * 本模块只做"读进度 → 判门槛 → 交给内核"，不重算覆盖率。
+ *
  * ⚠️ 已接受的行为（captain 裁决，勿当 bug 修）：点赞与点踩是**两个独立的票** ——
  * 同一用户可对同一段**分别投一赞一踩**；点赞不抵消点踩、不提高斩杀阈值，点踩照常计入阈值。
  * 契约注释与 `docs/api.md` 都显式记录了这一点。
  */
 import {
+  DEFAULT_POLICY,
   attachPrivateMessage,
   castVote,
   evaluateBadges,
@@ -17,15 +22,17 @@ import {
   seaZoneOf,
   visibleMessagesFor,
 } from '@music-drift/shared/domain';
-import { CastVoteRequestSchema, UuidSchema } from '@music-drift/shared';
+import { canDislike } from '@music-drift/shared/audio';
+import { CastVoteRequestSchema, SubmitListenProgressRequestSchema, UuidSchema } from '@music-drift/shared';
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
-import { problemFromOutcome, sendProblem, transportProblem } from '../http/problem.js';
+import { problemFromOutcome, problemFromViolations, sendProblem, transportProblem } from '../http/problem.js';
 import { createActorResolver } from '../http/session.js';
 import type { Clock } from '@music-drift/shared/domain';
 import type { Db } from '../db/client.js';
 import type { BottleStore } from '../store/bottles.js';
 import { createRequestContext } from '../store/context.js';
+import { createListenProgressStore } from '../store/listenProgress.js';
 
 export interface InteractionRoutesOptions {
   db: Db;
@@ -35,9 +42,53 @@ export interface InteractionRoutesOptions {
 
 const IdParamsSchema = z.object({ id: UuidSchema });
 
-export function registerInteractionRoutes(app: FastifyInstance, options: InteractionRoutesOptions): void {
+export function registerInteractionRoutes(
+  app: FastifyInstance,
+  options: InteractionRoutesOptions,
+): void {
   const actors = createActorResolver(options.db, options.clock);
   const { db, store, clock } = options;
+  /**
+   * 已听覆盖率仓储：阈值取自**内核策略**（`createDomainContext` 缺省即 `DEFAULT_POLICY`，
+   * 所以这里的门槛与 `ctx.policy.dislikeListenRatioThreshold` 是同一个值，不存在第二份常量）。
+   */
+  const listen = createListenProgressStore(db, { threshold: DEFAULT_POLICY.dislikeListenRatioThreshold });
+
+  /**
+   * 上报已听覆盖率（t20）：**增量输入**，服务端只增不减地记账（跨会话保留）。
+   *
+   * 前端在播放过程中**周期性**调用（例如每 5 秒 + 暂停/切页时），body 只带 `coveredMs`
+   *（客户端 `ListenTracker` 的"听过区间并集"）。服务端按墙上时间限速增长，
+   * 因此"一次上报就报满"拿不到门槛（详见 `store/listenProgress.ts`）。
+   */
+  app.post('/api/segments/:id/listen', async (request, reply) => {
+    const actor = await actors.resolve(request);
+    if (actor === null) {
+      return sendProblem(reply, transportProblem('UNAUTHENTICATED'));
+    }
+    const params = IdParamsSchema.safeParse(request.params);
+    const body = SubmitListenProgressRequestSchema.safeParse(request.body);
+    if (!params.success || !body.success) {
+      return sendProblem(reply, transportProblem('INVALID_BODY'));
+    }
+    const progress = await listen.record({
+      userId: actor.user.id,
+      segmentId: params.data.id,
+      coveredMs: body.data.coveredMs,
+      nowMs: clock.now(),
+    });
+    if (progress === null) {
+      return sendProblem(reply, transportProblem('NOT_FOUND'));
+    }
+    return reply.send({
+      segmentId: params.data.id,
+      coveredMs: progress.coveredMs,
+      durationMs: progress.durationMs,
+      ratio: progress.ratio,
+      threshold: progress.threshold,
+      reachedThreshold: progress.reachedThreshold,
+    });
+  });
 
   app.post('/api/segments/:id/votes', async (request, reply) => {
     const actor = await actors.resolve(request);
@@ -49,9 +100,10 @@ export function registerInteractionRoutes(app: FastifyInstance, options: Interac
     if (!params.success || !body.success) {
       return sendProblem(reply, transportProblem('INVALID_BODY'));
     }
-    const owners = await db.query<{ bottle_id: string }>(`select bottle_id from bottle_segments where id = $1`, [
-      params.data.id,
-    ]);
+    const owners = await db.query<{ bottle_id: string }>(
+      `select bottle_id from bottle_segments where id = $1`,
+      [params.data.id],
+    );
     const bottleId = owners[0]?.bottle_id;
     if (bottleId === undefined) {
       return sendProblem(reply, transportProblem('NOT_FOUND'));
@@ -60,17 +112,62 @@ export function registerInteractionRoutes(app: FastifyInstance, options: Interac
     if (state === null) {
       return sendProblem(reply, transportProblem('NOT_FOUND'));
     }
+    /**
+     * 判定依据 = **服务端持久化**的已听覆盖率（不是请求体里那个字段）。
+     * 用 `canDislike`（`shared/audio`，与客户端同一实现）判门槛，阈值来自内核策略 ⇒ 不写死 0.8。
+     */
+    const progress = await listen.read({ userId: actor.user.id, segmentId: params.data.id });
+    if (progress === null) {
+      return sendProblem(reply, transportProblem('NOT_FOUND'));
+    }
+    const listenedRatio = progress.ratio;
     const ctx = createRequestContext(clock);
     const outcome = castVote(
       state,
-      { userId: actor.user.id, segmentId: params.data.id, value: body.data.value, listenedRatio: body.data.listenedRatio },
+      {
+        userId: actor.user.id,
+        segmentId: params.data.id,
+        value: body.data.value,
+        listenedRatio,
+      },
       ctx,
     );
-    const problem = problemFromOutcome(outcome);
-    if (problem !== null) {
-      return sendProblem(reply, problem);
+    if (!outcome.ok) {
+      /**
+       * 内核的规则是**有序**的（自踩 → 重复票 → 段已斩 → 听满），所以先让它说话；
+       * 只有"覆盖率不足"这一条换成 API 层功能码（客户端据此**弹「需要听满 X%」的提醒**，
+       * 与通用的规则违反不是同一种处置）。其余违规照旧走内核映射（409/422 + 内核码）。
+       */
+      const ratioViolation = outcome.violations.find((violation) => violation.code === 'LISTEN_RATIO_TOO_LOW');
+      if (ratioViolation !== undefined) {
+        return sendProblem(
+          reply,
+          problemFromViolations([
+            {
+              code: 'LISTEN_THRESHOLD_NOT_REACHED',
+              message:
+                '需要听满 ' +
+                String(Math.round(progress.threshold * 100)) +
+                '% 才能点踩（服务端记录的已听覆盖率 ' +
+                String(Math.round(listenedRatio * 100)) +
+                '%，请继续聆听后再试）。',
+            },
+          ]) ?? transportProblem('INTERNAL'),
+        );
+      }
+      const problem = problemFromOutcome(outcome);
+      return problem === null
+        ? sendProblem(reply, transportProblem('INTERNAL'))
+        : sendProblem(reply, problem);
     }
-    await store.applyOutcome(bottleId, outcome, { vote: { listenedRatio: body.data.listenedRatio } });
+    // 用 `canDislike`（shared/audio，与客户端同一实现）复核一次：内核与本模块的口径必须一致
+    if (body.data.value === 'DISLIKE' && !canDislike(listenedRatio, progress.threshold)) {
+      return sendProblem(reply, transportProblem('INTERNAL'));
+    }
+    // 入库的是**服务端**算出的覆盖率（旧客户端发来的字段不参与判定，也不入库）
+    await store.applyOutcome(bottleId, outcome, {
+      vote: { listenedRatio },
+    });
     const after = await store.loadState(bottleId);
     const segment = after?.segments.find((candidate) => candidate.id === params.data.id);
     return reply.send({
@@ -79,6 +176,7 @@ export function registerInteractionRoutes(app: FastifyInstance, options: Interac
       likeCount: segment?.likes.length ?? 0,
       dislikeCount: segment?.dislikes.length ?? 0,
       dislikeThreshold: ctx.policy.dislikeThreshold,
+      listenedRatio,
       segmentCut: outcome.events.some((event) => event.type === 'SEGMENT_CUT'),
     });
   });
@@ -108,7 +206,8 @@ export function registerInteractionRoutes(app: FastifyInstance, options: Interac
     }
     await store.applyOutcome(params.data.id, outcome);
     const attached = outcome.events.find((event) => event.type === 'MESSAGE_ATTACHED');
-    const messageId = attached !== undefined && 'messageId' in attached ? String(attached.messageId) : '';
+    const messageId =
+      attached !== undefined && 'messageId' in attached ? String(attached.messageId) : '';
     return reply.code(201).send({
       id: messageId,
       bottleId: params.data.id,
@@ -162,7 +261,13 @@ export function registerInteractionRoutes(app: FastifyInstance, options: Interac
     await db.query(
       `insert into reports (id, target_type, target_id, reporter_id, reason, status, created_at)
        values (gen_random_uuid(), $1, $2, $3, $4, 'PENDING', $5)`,
-      [body.data.targetType, body.data.targetId, actor.user.id, body.data.reason, new Date(clock.now())],
+      [
+        body.data.targetType,
+        body.data.targetId,
+        actor.user.id,
+        body.data.reason,
+        new Date(clock.now()),
+      ],
     );
     return reply.code(204).send();
   });
@@ -208,7 +313,9 @@ export function registerInteractionRoutes(app: FastifyInstance, options: Interac
       `update notifications set read_at = $3 where id = $1 and user_id = $2 returning id`,
       [params.data.id, actor.user.id, new Date(clock.now())],
     );
-    return rows.length === 0 ? sendProblem(reply, transportProblem('NOT_FOUND')) : reply.code(204).send();
+    return rows.length === 0
+      ? sendProblem(reply, transportProblem('NOT_FOUND'))
+      : reply.code(204).send();
   });
 
   /** 徽章：派生判定（ADR-014 #1 不落库）；只返回本人参与过、且已定稿（在公海）的作品。 */
@@ -229,7 +336,9 @@ export function registerInteractionRoutes(app: FastifyInstance, options: Interac
       if (!participants(state).some((record) => record.userId === actor.user.id)) {
         continue;
       }
-      for (const award of evaluateBadges(state).filter((candidate) => candidate.userId === actor.user.id)) {
+      for (const award of evaluateBadges(state).filter(
+        (candidate) => candidate.userId === actor.user.id,
+      )) {
         awards.push({
           userId: award.userId,
           kind: award.kind,

@@ -66,7 +66,9 @@ describe('业务 API：主流程 + 错误语义 + 幂等', () => {
     const suffix = Date.now().toString().slice(-6);
     cookieA = await register('a' + suffix);
     cookieB = await register('b' + suffix);
-    const singer = await db.query<{ id: string }>(`select id from users where handle = $1`, ['b' + suffix]);
+    const singer = await db.query<{ id: string }>(`select id from users where handle = $1`, [
+      'b' + suffix,
+    ]);
     singerId = singer[0]?.id ?? '';
     store = createBottleStore(db);
   });
@@ -135,8 +137,12 @@ describe('业务 API：主流程 + 错误语义 + 幂等', () => {
     });
 
     expect(response.statusCode).toBe(422);
-    const body = response.json() as { error: { message: string; violations: Array<{ code: string }> } };
-    expect(body.error.violations.map((violation) => violation.code)).toEqual(['CANNOT_RECORD_TWICE_IN_BOTTLE']);
+    const body = response.json() as {
+      error: { message: string; violations: Array<{ code: string }> };
+    };
+    expect(body.error.violations.map((violation) => violation.code)).toEqual([
+      'CANNOT_RECORD_TWICE_IN_BOTTLE',
+    ]);
     expect(body.error.message).toContain('不能');
   });
 
@@ -149,7 +155,8 @@ describe('业务 API：主流程 + 错误语义 + 幂等', () => {
     });
     expect(forbidden.statusCode).toBe(422);
     expect(
-      (forbidden.json() as { error: { violations: Array<{ code: string }> } }).error.violations[0]?.code,
+      (forbidden.json() as { error: { violations: Array<{ code: string }> } }).error.violations[0]
+        ?.code,
     ).toBe('RESOLUTION_NOT_AVAILABLE');
 
     const cast = await app.inject({
@@ -163,7 +170,11 @@ describe('业务 API：主流程 + 错误语义 + 幂等', () => {
   });
 
   it('捞取路由：可用、返回契约形状、不 5xx（河道是共享随机池）', async () => {
-    const draw = await app.inject({ method: 'POST', url: '/api/river/draw', headers: { cookie: cookieA } });
+    const draw = await app.inject({
+      method: 'POST',
+      url: '/api/river/draw',
+      headers: { cookie: cookieA },
+    });
 
     // 河道是**全体**共享的随机池：捞到哪一支（或捞不到）取决于别的测试文件留下的瓶子。
     // 因此这里只钉「路由可用 + 契约形状 + 绝不 5xx」；「捞取归属/父链/一次只有一个赢家」
@@ -180,7 +191,11 @@ describe('业务 API：主流程 + 错误语义 + 幂等', () => {
   it('接唱与去向（持有者走路由）：带缺口入海 → SEA、seaZone=INCOMPLETE、缺口显式（ADR-015 §16.4）', async () => {
     // 用 store **确定性地**把「我这一支瓶子」交给第二个账号（等价于捞取），避免依赖共享河道的随机结果；
     // 余下步骤全部走路由，覆盖 route → 内核 → 投影 的完整链路。
-    const claimed = await store.drawFromRiver({ bottleId, userId: singerId, ctx: createRequestContext(clock) });
+    const claimed = await store.drawFromRiver({
+      bottleId,
+      userId: singerId,
+      ctx: createRequestContext(clock),
+    });
     expect(claimed?.ok).toBe(true);
     const record = await app.inject({
       method: 'POST',
@@ -218,7 +233,9 @@ describe('业务 API：主流程 + 错误语义 + 幂等', () => {
       headers: { cookie: cookieB },
     });
     const seaAtBefore = (before.json() as { seaAt: string }).seaAt;
-    const eventsBefore = await countRows(`select count(*)::text as count from events where bottle_id = $1`);
+    const eventsBefore = await countRows(
+      `select count(*)::text as count from events where bottle_id = $1`,
+    );
     const holdingsBefore = await countRows(
       `select count(*)::text as count from holdings where bottle_id = $1 and released_at is null`,
     );
@@ -237,9 +254,13 @@ describe('业务 API：主流程 + 错误语义 + 幂等', () => {
       headers: { cookie: cookieB },
     });
     expect((after.json() as { seaAt: string }).seaAt).toBe(seaAtBefore);
-    expect(await countRows(`select count(*)::text as count from events where bottle_id = $1`)).toBe(eventsBefore);
+    expect(await countRows(`select count(*)::text as count from events where bottle_id = $1`)).toBe(
+      eventsBefore,
+    );
     expect(
-      await countRows(`select count(*)::text as count from holdings where bottle_id = $1 and released_at is null`),
+      await countRows(
+        `select count(*)::text as count from holdings where bottle_id = $1 and released_at is null`,
+      ),
     ).toBe(holdingsBefore);
   });
 

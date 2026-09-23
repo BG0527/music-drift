@@ -27,7 +27,11 @@ function iso(date: Date | null): string | null {
  * ⚠️ `songTitle` **必须**由调用方查出来传进来：它不在 `bottles` 行里，早先这里写死空串，
  * 于是 `GET /api/sea` 返回的 `songTitle: ''` 直接违反契约 `BottleSummarySchema.songTitle.min(1)`
  * —— 公海列表会没有曲名。改成必填参数，让漏传在类型检查期就红。 */
-export function toBottleSummary(row: BottleRow, state: BottleState, songTitle: string): BottleSummary {
+export function toBottleSummary(
+  row: BottleRow,
+  state: BottleState,
+  songTitle: string,
+): BottleSummary {
   return {
     id: row.id,
     songId: row.songId,
@@ -44,7 +48,10 @@ export function toBottleSummary(row: BottleRow, state: BottleState, songTitle: s
   };
 }
 
-export function toSegments(rows: readonly BottleSegmentRow[], codes: ReadonlyMap<string, string>): Segment[] {
+export function toSegments(
+  rows: readonly BottleSegmentRow[],
+  codes: ReadonlyMap<string, string>,
+): Segment[] {
   return rows.map((row) => ({
     id: row.id,
     index: row.index,
@@ -60,6 +67,8 @@ export function toSegments(rows: readonly BottleSegmentRow[], codes: ReadonlyMap
 }
 
 export interface DetailInput {
+  /** §9.1：因"漂流中不可见后续"被裁掉的段数（0 = 未裁）。 */
+  hiddenLaterSegmentCount?: number | undefined;
   row: BottleRow;
   state: BottleState;
   segments: readonly BottleSegmentRow[];
@@ -85,8 +94,11 @@ export function toBottleDetail(input: DetailInput): BottleDetail {
     returnChainBroken: state.returnChainBroken,
     segments,
     availableResolutions:
-      viewerId === null ? [] : availableResolutions(state, { userId: viewerId }).map((resolution) => resolution),
+      viewerId === null
+        ? []
+        : availableResolutions(state, { userId: viewerId }).map((resolution) => resolution),
     isHolder: viewerId !== null && currentHolderId(state) === viewerId,
+    hiddenLaterSegmentCount: input.hiddenLaterSegmentCount ?? 0,
     replacementContext: replacementContext(state),
     riverCastAt: iso(state.riverCastAt === null ? null : new Date(state.riverCastAt)),
     seaAt: iso(state.seaAt === null ? null : new Date(state.seaAt)),

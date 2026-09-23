@@ -164,6 +164,48 @@ const plan = planMonoSequentialMix({
 要点：缺口保留为**静音占位**并显式标注（段号永不压缩）；对齐误差阈值 120ms（D-05）；
 阶段二叠加伴奏时只换 `MixPlanner`，调用方不改。
 
+## 5.2 透给页面的"当前段已听状态"（`SegmentPlayer.onProgress`）
+
+`t12` 的**点踩门槛（听满 80%）**需要页面拿到**真实已听比例**，因此 `SegmentPlayer` 新增一个**只做转发**的回调：
+
+```tsx
+import { SegmentPlayer, type SegmentListenSnapshot } from '../features/audio/segment-player';
+
+<SegmentPlayer
+  src={segment.audioUrl}
+  segmentIndex={segment.index} // 服务端给的段号
+  durationMs={segment.durationMs}
+  onProgress={(s: SegmentListenSnapshot) => {
+    /* s.ratio 就是当前段已听比例 */
+  }}
+/>;
+```
+
+| 字段              | 语义                                                                         | 消费者该怎么用                                                     |
+| ----------------- | ---------------------------------------------------------------------------- | ------------------------------------------------------------------ |
+| `segmentIndex`    | 这份进度属于哪一段（与服务端一致）                                           | 只在"进度回调与当前渲染的段"是同一段时才用于判定                   |
+| `ratio`           | **当前段已听比例** = `coveredMs / durationMs`，0..1；时长不可信时为 0        | 门禁用它；如需随投票上送，直接作为 `CastVoteRequest.listenedRatio` |
+| `coveredMs`       | 已覆盖区间**并集**毫秒数（判定"听满"的唯一依据）                             | 展示/诊断                                                          |
+| `playedMs`        | 累计播放毫秒数（含重播）                                                     | 仅展示；**不要**拿它算比例                                         |
+| `dislikeUnlocked` | 是否已达点踩门槛（门槛 = 内核 `DEFAULT_POLICY.dislikeListenRatioThreshold`） | 直接用于禁用/启用点踩；**不要在页面写死 `0.8`**                    |
+
+**三条纪律（避免出现第二份规则）**：
+
+1. **不要自己重算覆盖率**：区间并集/拖动不计/循环不叠加/fail-closed 全部在
+   `packages/shared/src/audio/listening.ts` 的 `ListenTracker` 里实现，本回调**只透传**其 `progress()` 结果。
+2. **阈值只有一个来源**：门槛由内核 `DEFAULT_POLICY.dislikeListenRatioThreshold` 决定；
+   UI 侧不要比较 `ratio >= 0.8` 这样的字面量，直接用 `dislikeUnlocked`（或 `canDislike(ratio)`）。
+3. **服务端仍会二次校验**：客户端 `ratio` 只是体验层门禁；投票时是否受理以 API 为准
+   （`CastVoteRequest.listenedRatio` + 服务端规则），页面不要因本地判定通过就跳过错误处理。
+
+实现与证据：`apps/web/src/features/audio/segment-player.tsx`（`SegmentListenSnapshot` + 转发）、
+`use-segment-player.ts`（唯一覆盖率来源，`ListenTracker`）。
+测试（`segment-player.test.tsx`，5 条，先红后绿）：
+透出值 = 覆盖率 / **拖动不虚高**（跳 9s 后 ratio 仍 ≈0.525 而非 0.975）/ **循环不叠加**（ratio 封顶 1，`playedMs` 才增长）/
+门槛由内核判定（17s/20s → `dislikeUnlocked`）/ 时长不可信时 fail-closed（ratio 0）。
+
+---
+
 ## 6. 接线指南（给 t11 / frontend-flow）
 
 ```tsx

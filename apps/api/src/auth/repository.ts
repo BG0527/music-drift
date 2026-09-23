@@ -19,6 +19,8 @@ export interface UserRow {
   email: string;
   passwordHash: string;
   role: 'USER' | 'ADMIN';
+  /** 封禁时间（t12 审核台）；非空 = 被封禁，身份解析层直接拒绝（401）。 */
+  bannedAt: Date | null;
   createdAt: Date;
 }
 
@@ -81,6 +83,7 @@ interface UserDbRow {
   email: string;
   password_hash: string;
   role: string;
+  banned_at: Date | null;
   created_at: Date;
 }
 
@@ -111,6 +114,7 @@ function toUserRow(row: UserDbRow): UserRow {
     email: row.email,
     passwordHash: row.password_hash,
     role: row.role === 'ADMIN' ? 'ADMIN' : 'USER',
+    bannedAt: row.banned_at,
     createdAt: row.created_at,
   };
 }
@@ -150,7 +154,7 @@ export function createAuthRepository(db: Db): AuthRepository {
 
     async findUserByEmail(email: string): Promise<UserRow | null> {
       const rows = await db.query<UserDbRow>(
-        `select id, handle, email, password_hash, role, created_at from users where email = $1`,
+        `select id, handle, email, password_hash, role, banned_at, created_at from users where email = $1`,
         [email],
       );
       const row = rows[0];
@@ -159,7 +163,7 @@ export function createAuthRepository(db: Db): AuthRepository {
 
     async findUserById(id: string): Promise<UserRow | null> {
       const rows = await db.query<UserDbRow>(
-        `select id, handle, email, password_hash, role, created_at from users where id = $1`,
+        `select id, handle, email, password_hash, role, banned_at, created_at from users where id = $1`,
         [id],
       );
       const row = rows[0];
@@ -175,7 +179,7 @@ export function createAuthRepository(db: Db): AuthRepository {
 
     async findSessionByTokenHash(tokenHash: string): Promise<SessionWithUser | null> {
       const rows = await db.query<UserDbRow & { expires_at: Date }>(
-        `select u.id, u.handle, u.email, u.password_hash, u.role, u.created_at, s.expires_at
+        `select u.id, u.handle, u.email, u.password_hash, u.role, u.banned_at, u.created_at, s.expires_at
          from sessions s
          join users u on u.id = s.user_id
          where s.token_hash = $1`,

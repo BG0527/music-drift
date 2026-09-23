@@ -135,6 +135,7 @@ describe('契约：ADR-015 三条硬语义', () => {
       segments: [],
       availableResolutions: ['RIVER', 'SEA'],
       isHolder: false,
+      hiddenLaterSegmentCount: 0,
       replacementContext: {
         gapIndex: 2,
         listenSegmentIndex: 1,

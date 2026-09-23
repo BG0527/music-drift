@@ -8,12 +8,18 @@
 import { useQuery, type UseQueryResult } from '@tanstack/react-query';
 import {
   AnonymousCodeSchema,
+  MyBottleListSchema,
+  NotificationSchema,
+  ReportSchema,
   BottleDetailSchema,
   BottleEventSchema,
   BottleSummarySchema,
   SessionResponseSchema,
   SongSchema,
   type BottleDetail,
+  type MyBottle,
+  type Notification,
+  type Report,
   type BottleEvent,
   type BottleSummary,
   type SessionResponse,
@@ -92,6 +98,40 @@ export function useSeaList(zone: 'COMPLETED' | 'INCOMPLETE'): UseQueryResult<Pag
   return useQuery({
     queryKey: QUERY_KEYS.seaList(zone),
     queryFn: () => apiGet(`/api/sea?zone=${zone}&limit=30`, pageOf(BottleSummarySchema)),
+  });
+}
+
+/**
+ * 我参与过的漂流瓶（`CONTEXT.md` §11.1 的漂流日志入口）。
+ *
+ * 语义来自服务端：**参与过 = 我发起 或 我在该瓶唱过**；被斩浪的段仍算参与过（§16.7）；
+ * 按最近活跃倒序；未登录 401。这里不做任何本地推算（前端算不出"跨设备"这件事）。
+ */
+export function useMyBottles(enabled = true): UseQueryResult<Page<MyBottle>> {
+  return useQuery({
+    queryKey: QUERY_KEYS.myBottles,
+    queryFn: () => apiGet('/api/me/bottles?limit=50', MyBottleListSchema),
+    enabled,
+  });
+}
+
+/** 审核队列（**仅管理员**；非管理员 403，未登录 401）。 */
+export function useAdminReports(
+  status: 'PENDING' | 'REVIEWED',
+  enabled = true,
+): UseQueryResult<Report[]> {
+  return useQuery({
+    queryKey: QUERY_KEYS.adminReports(status),
+    queryFn: () => apiGet(`/api/admin/reports?status=${status}`, arrayOf(ReportSchema)),
+    enabled,
+  });
+}
+
+/** 通知（只含自己的；未登录 401）。 */
+export function useNotifications(): UseQueryResult<Page<Notification>> {
+  return useQuery({
+    queryKey: QUERY_KEYS.notifications,
+    queryFn: () => apiGet('/api/notifications?limit=50', pageOf(NotificationSchema)),
   });
 }
 

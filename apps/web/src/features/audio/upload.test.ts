@@ -69,6 +69,7 @@ const BOTTLE_DETAIL = {
   segments: [],
   availableResolutions: [],
   isHolder: true,
+  hiddenLaterSegmentCount: 0,
   replacementContext: null,
   riverCastAt: null,
   seaAt: null,

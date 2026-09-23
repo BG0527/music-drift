@@ -63,7 +63,11 @@ function loadMetadata(): {
   if (Array.isArray(tracks)) {
     for (const entry of tracks) {
       const candidate = entry as { file?: unknown; tempoDecision?: unknown };
-      if (typeof candidate.file === 'string' && candidate.tempoDecision !== null && typeof candidate.tempoDecision === 'object') {
+      if (
+        typeof candidate.file === 'string' &&
+        candidate.tempoDecision !== null &&
+        typeof candidate.tempoDecision === 'object'
+      ) {
         evidenceByFile.set(candidate.file, candidate.tempoDecision as TempoDecisionEvidence);
       }
     }

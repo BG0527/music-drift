@@ -12,13 +12,14 @@
  * 已接受的行为（勿当 bug 修）：同一用户可对同一段**分别投一赞一踩**；点赞不抵消点踩、
  * 不提高斩杀阈值（`interactions.ts` 文件头 / `docs/api.md` §2.6 已记录）。
  */
+import { ReportSchema } from '@music-drift/shared';
 import { createSystemClock } from '@music-drift/shared/domain';
 import type { FastifyInstance } from 'fastify';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { buildApp } from '../app.js';
 import { createDb, type Db } from '../db/client.js';
 import { runSeed } from '../db/seed.js';
-import { insertSong } from '../db/test-helpers.js';
+import { insertSong, listenUntilThreshold, listenUntilThresholdBatch } from '../db/test-helpers.js';
 
 const DATABASE_URL = process.env['DATABASE_URL'] ?? '';
 const PASSWORD = 'Drift-Bottle-2026';
@@ -176,7 +177,7 @@ describe('投票（CONTEXT §7.2–§7.4）：门槛、自踩、一人一票、�
     const response = await app.inject({
       method: 'POST',
       url: '/api/segments/' + segmentId + '/votes',
-      payload: { value: 'DISLIKE', listenedRatio: 1 },
+      payload: { value: 'DISLIKE' },
       headers: { cookie: authorCookie },
     });
 
@@ -193,16 +194,18 @@ describe('投票（CONTEXT §7.2–§7.4）：门槛、自踩、一人一票、�
     }
   });
 
-  it('没听满 80% → 422 LISTEN_RATIO_TOO_LOW（服务端校验，不信前端）', async () => {
+  it('没听满 80% → 422 LISTEN_THRESHOLD_NOT_REACHED（判定看服务端持久化覆盖率，请求体字段不算数）', async () => {
     const response = await app.inject({
       method: 'POST',
       url: '/api/segments/' + segmentId + '/votes',
-      payload: { value: 'DISLIKE', listenedRatio: 0.79 },
+      // t20：listenedRatio 已不再被采信 —— 这里**故意**填 1，判定仍按库里的 0 走
+      payload: { value: 'DISLIKE' },
       headers: { cookie: voterCookie },
     });
 
     expect(response.statusCode).toBe(422);
-    expect(response.body).toContain('LISTEN_RATIO_TOO_LOW');
+    expect(response.body).toContain('LISTEN_THRESHOLD_NOT_REACHED');
+    expect(response.body).toContain('80%');
     const rows = await db.query<{ count: string }>(
       `select count(*)::text as count from events where bottle_id = $1 and type = 'VOTE_CAST'`,
       [bottleId],
@@ -211,14 +214,21 @@ describe('投票（CONTEXT §7.2–§7.4）：门槛、自踩、一人一票、�
   });
 
   it('听满 80% → 200 且阈值来自策略；重复投票是 422 而不是静默覆盖', async () => {
+    // t20：门槛由服务端读**持久化**覆盖率判定 ⇒ 先走真实上报端点真的"听满"
+    await listenUntilThreshold(app, voterCookie, segmentId, 20_000);
+
     const first = await app.inject({
       method: 'POST',
       url: '/api/segments/' + segmentId + '/votes',
-      payload: { value: 'DISLIKE', listenedRatio: 0.8 },
+      payload: { value: 'DISLIKE' },
       headers: { cookie: voterCookie },
     });
     expect(first.statusCode).toBe(200);
-    const body = first.json() as { dislikeCount: number; dislikeThreshold: number; segmentCut: boolean };
+    const body = first.json() as {
+      dislikeCount: number;
+      dislikeThreshold: number;
+      segmentCut: boolean;
+    };
     expect(body.dislikeCount).toBe(1);
     expect(body.dislikeThreshold).toBe(10); // DomainPolicy.dislikeThreshold
     expect(body.segmentCut).toBe(false);
@@ -226,7 +236,7 @@ describe('投票（CONTEXT §7.2–§7.4）：门槛、自踩、一人一票、�
     const again = await app.inject({
       method: 'POST',
       url: '/api/segments/' + segmentId + '/votes',
-      payload: { value: 'DISLIKE', listenedRatio: 1 },
+      payload: { value: 'DISLIKE' },
       headers: { cookie: voterCookie },
     });
     expect(again.statusCode).toBe(422);
@@ -235,7 +245,7 @@ describe('投票（CONTEXT §7.2–§7.4）：门槛、自踩、一人一票、�
     const like = await app.inject({
       method: 'POST',
       url: '/api/segments/' + segmentId + '/votes',
-      payload: { value: 'LIKE', listenedRatio: 0.1 },
+      payload: { value: 'LIKE' },
       headers: { cookie: voterCookie },
     });
     // 同一个用户：一赞一踩**并存**（已接受行为），点赞不要求听满 —— 这是内核的既定语义。
@@ -246,7 +256,7 @@ describe('投票（CONTEXT §7.2–§7.4）：门槛、自踩、一人一票、�
     const likeAgain = await app.inject({
       method: 'POST',
       url: '/api/segments/' + segmentId + '/votes',
-      payload: { value: 'LIKE', listenedRatio: 0.1 },
+      payload: { value: 'LIKE' },
       headers: { cookie: voterCookie },
     });
     expect(likeAgain.statusCode).toBe(422);
@@ -254,13 +264,16 @@ describe('投票（CONTEXT §7.2–§7.4）：门槛、自踩、一人一票、�
   });
 
   it('点赞不抵消点踩、不提高阈值：旁边挂着 10 个赞也照斩，锚被斩 → DAMAGED', async () => {
+    // t20：踩要过服务端门槛 —— 批量让 10 位观众"听满"（共用同一次等待）
+    await listenUntilThresholdBatch(app, crowd, segmentId, 20_000);
+
     let cut = false;
     let likesCast = 1; // voter 刚才那一个赞
     for (const cookie of crowd) {
       const like = await app.inject({
         method: 'POST',
         url: '/api/segments/' + segmentId + '/votes',
-        payload: { value: 'LIKE', listenedRatio: 0.2 },
+        payload: { value: 'LIKE' },
         headers: { cookie },
       });
       expect(like.statusCode).toBe(200);
@@ -268,7 +281,7 @@ describe('投票（CONTEXT §7.2–§7.4）：门槛、自踩、一人一票、�
       const dislike = await app.inject({
         method: 'POST',
         url: '/api/segments/' + segmentId + '/votes',
-        payload: { value: 'DISLIKE', listenedRatio: 0.8 },
+        payload: { value: 'DISLIKE' },
         headers: { cookie },
       });
       expect(dislike.statusCode).toBe(200);
@@ -298,7 +311,7 @@ describe('投票（CONTEXT §7.2–§7.4）：门槛、自踩、一人一票、�
     const afterCut = await app.inject({
       method: 'POST',
       url: '/api/segments/' + segmentId + '/votes',
-      payload: { value: 'DISLIKE', listenedRatio: 1 },
+      payload: { value: 'DISLIKE' },
       headers: { cookie: voterCookie },
     });
     expect(afterCut.statusCode).toBe(422);
@@ -546,30 +559,36 @@ describe('举报与人工审核队列（CONTEXT §8）：非管理员拿不到�
     expect(response.body).not.toContain('内容与曲目无关');
   });
 
-  it('管理员：列表可见 → 决策端点显式 501（t12 才实现，不假装成功）', async () => {
-    await db.query(`update users set role = 'ADMIN' where id = $1`, [reporterId]);
+  it('管理员：列表可见 → 决策端点**真实裁决**（t12 把 501 换成流转；逐条语义见 admin.integration.test.ts）', async () => {
+    const admin = await register('ar');
+    await db.query(`update users set role = 'ADMIN' where id = $1`, [admin.userId]);
 
-    const list = await app.inject({
+    const created = await app.inject({
+      method: 'POST',
+      url: '/api/reports',
+      payload: { targetType: 'BOTTLE', targetId: targetBottleId, reason: '听不懂' },
+      headers: { cookie: reporterCookie },
+    });
+    expect(created.statusCode).toBe(204);
+
+    const queue = await app.inject({
       method: 'GET',
       url: '/api/admin/reports',
-      headers: { cookie: reporterCookie },
+      headers: { cookie: admin.cookie },
     });
-    expect(list.statusCode).toBe(200);
-    const items = list.json() as { id: string; targetId: string; status: string }[];
-    const mine = items.find((item) => item.targetId === targetBottleId);
-    expect(mine).toBeDefined();
-    expect(mine?.status).toBe('PENDING');
+    expect(queue.statusCode).toBe(200);
+    const items = (queue.json() as unknown[]).map((item) => ReportSchema.parse(item));
+    expect(items.length).toBeGreaterThan(0);
 
-    const decision = await app.inject({
+    // t12：驳回 = `NONE`；这里只钉住"不再是 501、状态真的流转"，四种动作的细节由 admin 套件覆盖
+    const decided = await app.inject({
       method: 'POST',
-      url: '/api/admin/reports/' + String(mine?.id) + '/decision',
-      payload: { action: 'REMOVE_SEGMENT' },
-      headers: { cookie: reporterCookie },
+      url: '/api/admin/reports/' + items[0]!.id + '/decision',
+      payload: { decision: 'NONE' },
+      headers: { cookie: admin.cookie },
     });
-    expect(decision.statusCode).toBe(501);
-    // 未实现就不许改状态：队列里那条仍是 PENDING
-    const rows = await db.query<{ status: string }>(`select status from reports where id = $1`, [mine?.id]);
-    expect(rows[0]?.status).toBe('PENDING');
+    expect(decided.statusCode).toBe(200);
+    expect(ReportSchema.parse(decided.json()).status).toBe('REVIEWED');
   });
 
   it('无 cookie 读队列 → 401（未认证优先于未授权）', async () => {
@@ -603,9 +622,15 @@ describe('通知与徽章（CONTEXT §10.1 / ADR-014）：只读自己的，徽�
     );
     notificationId = rows[0]?.id ?? '';
 
-    const list = await app.inject({ method: 'GET', url: '/api/notifications', headers: { cookie } });
+    const list = await app.inject({
+      method: 'GET',
+      url: '/api/notifications',
+      headers: { cookie },
+    });
     expect(list.statusCode).toBe(200);
-    const items = (list.json() as { items: { id: string; readAt: string | null; payload: unknown }[] }).items;
+    const items = (
+      list.json() as { items: { id: string; readAt: string | null; payload: unknown }[] }
+    ).items;
     expect(items.map((item) => item.id)).toEqual([notificationId]);
     expect(items[0]?.readAt).toBeNull();
 

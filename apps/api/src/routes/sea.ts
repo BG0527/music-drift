@@ -31,7 +31,10 @@ export function registerSeaRoutes(app: FastifyInstance, options: SeaRoutesOption
 
   /** 曲名不在 `bottles` 行里，必须显式查：契约 `BottleSummarySchema.songTitle` 有 min(1)。 */
   async function songTitleOf(songId: string): Promise<string> {
-    const rows = await options.db.query<{ title: string }>(`select title from songs where id = $1`, [songId]);
+    const rows = await options.db.query<{ title: string }>(
+      `select title from songs where id = $1`,
+      [songId],
+    );
     return rows[0]?.title ?? '';
   }
 
@@ -64,7 +67,8 @@ export function registerSeaRoutes(app: FastifyInstance, options: SeaRoutesOption
       }
     }
     // 默认只看**已完成区**（CONTEXT §6.1：公海是完成作品的归宿；未完成区须显式查询）。
-    const filtered = query.data.zone === undefined ? items.filter((item) => item.isComplete) : items;
+    const filtered =
+      query.data.zone === undefined ? items.filter((item) => item.isComplete) : items;
     return reply.send({ items: filtered, nextCursor: null });
   });
 

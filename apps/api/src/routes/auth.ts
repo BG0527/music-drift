@@ -66,13 +66,11 @@ export function registerAuthRoutes(app: FastifyInstance, options: AuthRouteOptio
     status: number = authHttpStatusOf(code),
   ): FastifyReply {
     const violation = authViolation(code);
-    return reply
-      .status(status)
-      .send(
-        AuthErrorResponseSchema.parse({
-          error: { message: violation.message, violations: [violation] },
-        }),
-      );
+    return reply.status(status).send(
+      AuthErrorResponseSchema.parse({
+        error: { message: violation.message, violations: [violation] },
+      }),
+    );
   }
 
   function sendValidationError(
@@ -172,6 +170,15 @@ export function registerAuthRoutes(app: FastifyInstance, options: AuthRouteOptio
     const matched = verifyPassword(parsed.data.password, user?.passwordHash ?? TIMING_DUMMY_HASH);
     if (user === null || !matched) {
       return sendAuthError(reply, 'INVALID_CREDENTIALS');
+    }
+    /**
+     * 人工封禁（t12 审核台）：口令正确也要挡在门外，并且**明确说清原因** ——
+     * 报"凭证错误"会让被封的人以为是自己记错密码（误导）。403 属传输层错误，envelope 不带码。
+     */
+    if (user.bannedAt !== null) {
+      return reply.status(403).send({
+        error: { message: '这个账号已被封禁，如有疑问请联系管理员核对。', violations: [] },
+      });
     }
 
     await repo.deleteExpiredSessions(options.clock.now());

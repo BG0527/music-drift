@@ -69,12 +69,22 @@ describe('problem.ts：内核违规 → 409/422', () => {
   });
 
   it('冲突类走 409（并发抢占 / 非持有者 / 不在河道），规则类走 422', () => {
-    expect(problemFromViolations([{ code: 'HOLDING_ALREADY_TAKEN', message: 'x' }])?.status).toBe(409);
+    expect(problemFromViolations([{ code: 'HOLDING_ALREADY_TAKEN', message: 'x' }])?.status).toBe(
+      409,
+    );
     expect(problemFromViolations([{ code: 'NOT_HOLDER', message: 'x' }])?.status).toBe(409);
-    expect(problemFromViolations([{ code: 'BOTTLE_NOT_IN_RIVER', message: 'x' }])?.status).toBe(409);
-    expect(problemFromViolations([{ code: 'RESOLUTION_NOT_AVAILABLE', message: 'x' }])?.status).toBe(422);
-    expect(problemFromViolations([{ code: 'CANNOT_RECORD_TWICE_IN_BOTTLE', message: 'x' }])?.status).toBe(422);
-    expect(problemFromViolations([{ code: 'LISTEN_RATIO_TOO_LOW', message: 'x' }])?.status).toBe(422);
+    expect(problemFromViolations([{ code: 'BOTTLE_NOT_IN_RIVER', message: 'x' }])?.status).toBe(
+      409,
+    );
+    expect(
+      problemFromViolations([{ code: 'RESOLUTION_NOT_AVAILABLE', message: 'x' }])?.status,
+    ).toBe(422);
+    expect(
+      problemFromViolations([{ code: 'CANNOT_RECORD_TWICE_IN_BOTTLE', message: 'x' }])?.status,
+    ).toBe(422);
+    expect(problemFromViolations([{ code: 'LISTEN_RATIO_TOO_LOW', message: 'x' }])?.status).toBe(
+      422,
+    );
   });
 
   it('首个违规决定状态码，但全部违规都保留在 violations 里', () => {
@@ -90,7 +100,9 @@ describe('problem.ts：内核违规 → 409/422', () => {
   });
 
   it('同端点上的其它词表（音频码）也走同一出口 → 422，不会因不在内核表里而崩', () => {
-    const problem = problemFromViolations([{ code: 'AUDIO_DURATION_OUT_OF_RANGE', message: '这一段太短了。' }]);
+    const problem = problemFromViolations([
+      { code: 'AUDIO_DURATION_OUT_OF_RANGE', message: '这一段太短了。' },
+    ]);
 
     expect(problem?.status).toBe(422);
     expect(problem?.body.error.violations[0]?.code).toBe('AUDIO_DURATION_OUT_OF_RANGE');
@@ -99,7 +111,10 @@ describe('problem.ts：内核违规 → 409/422', () => {
 
   it('API 层功能码（收藏仅限已完成作品）也走同一出口 → 422 且被契约接受', () => {
     const problem = problemFromViolations([
-      { code: 'COLLECTION_REQUIRES_FINISHED_WORK', message: '收藏只对已完成并进入公海的作品开放。' },
+      {
+        code: 'COLLECTION_REQUIRES_FINISHED_WORK',
+        message: '收藏只对已完成并进入公海的作品开放。',
+      },
     ]);
 
     expect(API_RULE_CODES).toContain('COLLECTION_REQUIRES_FINISHED_WORK');
@@ -120,7 +135,12 @@ describe('problem.ts：内核违规 → 409/422', () => {
     });
     expect(rejected?.status).toBe(422);
 
-    const accepted = problemFromOutcome({ ok: true, state: {} as never, events: [], violations: [] });
+    const accepted = problemFromOutcome({
+      ok: true,
+      state: {} as never,
+      events: [],
+      violations: [],
+    });
     expect(accepted).toBe(null);
   });
 });

@@ -1,6 +1,13 @@
 import { fireEvent, screen, waitFor } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
-import { BOTTLE_ID, SEGMENT_2, USER_B, bottleDetail, bottleSummary } from '../../test/fixtures';
+import {
+  BOTTLE_ID,
+  SEGMENT_1,
+  SEGMENT_2,
+  USER_B,
+  bottleDetail,
+  bottleSummary,
+} from '../../test/fixtures';
 import { fakeRecorderEnvironment, renderWithProviders } from '../../test/harness';
 import { BottlePage } from '../bottle-page';
 
@@ -92,6 +99,93 @@ describe('漂流瓶接唱页', () => {
     });
     expect(await screen.findByRole('heading', { name: /第 2 段 · 共 4 段/ })).toBeInTheDocument();
     expect(screen.getAllByText(/缺第 2、3、4 段/).length).toBeGreaterThan(0);
+  });
+
+  it('§9.1：漂流中被裁掉后续时，明确说明"还有 N 段看不到"（不是假装瓶子丢了段）', async () => {
+    renderWithProviders(<BottlePage id={BOTTLE_ID} />, {
+      route: `/bottles/${BOTTLE_ID}`,
+      handlers: [
+        {
+          path: `/api/bottles/${BOTTLE_ID}`,
+          respond: () => ({
+            body: bottleDetail({ hiddenLaterSegmentCount: 2, isHolder: false, holderId: USER_B }),
+          }),
+        },
+      ],
+    });
+    expect(await screen.findByText(/还有 2 段是你现在看不到的/)).toBeInTheDocument();
+  });
+
+  it('点踩上送的是音频层给的真实收听比例（页面不自己算、不写死阈值）', async () => {
+    // 可控的音频元素：驱动 timeupdate 让覆盖率到 100% → 点踩按钮解禁
+    const listeners: Record<string, (() => void)[]> = {};
+    const element = {
+      src: '',
+      currentTime: 0,
+      paused: true,
+      play: () => undefined,
+      pause: () => undefined,
+      addEventListener: (type: string, handler: () => void) => {
+        listeners[type] = [...(listeners[type] ?? []), handler];
+      },
+      removeEventListener: (type: string, handler: () => void) => {
+        listeners[type] = (listeners[type] ?? []).filter((item) => item !== handler);
+      },
+    };
+
+    const { fetchMock } = renderWithProviders(
+      <BottlePage
+        id={BOTTLE_ID}
+        seams={{
+          segmentElementFactory: ((src: string) => {
+            element.src = src;
+            return element;
+          }) as never,
+        }}
+      />,
+      {
+        route: `/bottles/${BOTTLE_ID}`,
+        handlers: [
+          { path: '/api/auth/me', respond: () => ({ body: SESSION_B }) },
+          {
+            path: `/api/bottles/${BOTTLE_ID}`,
+            respond: () => ({ body: bottleDetail({ isHolder: false, holderId: USER_B }) }),
+          },
+          {
+            method: 'POST',
+            path: /\/api\/segments\/.+\/votes/,
+            respond: () => ({
+              body: {
+                segmentId: SEGMENT_1,
+                value: 'DISLIKE',
+                likeCount: 0,
+                dislikeCount: 1,
+                dislikeThreshold: 10,
+                segmentCut: false,
+              },
+            }),
+          },
+        ],
+      },
+    );
+
+    await screen.findByText('午夜歌手#042');
+    // 逐秒推进（每步 <1500ms，否则会被判成"拖动不计"）；段长 20s → 覆盖率 100%
+    for (let second = 0; second <= 20; second += 1) {
+      element.currentTime = second;
+      for (const handler of listeners['timeupdate'] ?? []) handler();
+    }
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: '点踩' })).toBeEnabled();
+    });
+    fireEvent.click(screen.getByRole('button', { name: '点踩' }));
+
+    await waitFor(() => {
+      expect(fetchMock.calls.some((call) => call.url.includes('/votes'))).toBe(true);
+    });
+    const vote = fetchMock.calls.find((call) => call.url.includes('/votes'));
+    expect(vote?.body).toEqual({ segmentId: SEGMENT_1, value: 'DISLIKE', listenedRatio: 1 });
   });
 
   it('非持有者：不出现录制区，说明"不在你手上"并给去河道的出口', async () => {

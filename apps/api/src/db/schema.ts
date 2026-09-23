@@ -20,6 +20,7 @@ import {
   jsonb,
   numeric,
   pgTable,
+  primaryKey,
   text,
   timestamp,
   uniqueIndex,
@@ -45,6 +46,11 @@ export const users = pgTable(
     email: text('email').notNull(),
     passwordHash: text('password_hash').notNull(),
     role: text('role').notNull().default('USER'),
+    /**
+     * 封禁时间（t12 审核台）：非空 = 该账号被人工封禁。
+     * 保留行而不删除用户：审核动作必须可审计、可申诉（与软删段同一原则）。
+     */
+    bannedAt: timestamp('banned_at', { withTimezone: true }),
     createdAt: createdAt(),
   },
   (table) => [
@@ -283,7 +289,9 @@ export const reports = pgTable(
     check('reports_status_check', sql`${table.status} in ('PENDING', 'REVIEWED')`),
     check(
       'reports_action_check',
-      sql`${table.action} is null or ${table.action} in ('NONE', 'REMOVE_SEGMENT', 'REMOVE_BOTTLE', 'BAN_USER')`,
+      // `RESTORE_SEGMENT`（t12）：审核台必须能**覆盖自动斩杀** —— 只列"删"的动作会让
+      // 「人工恢复」在 DB 层就被拒绝（本仓真实踩过：裁决时报 reports_action_check 违规）。
+      sql`${table.action} is null or ${table.action} in ('NONE', 'REMOVE_SEGMENT', 'RESTORE_SEGMENT', 'REMOVE_BOTTLE', 'BAN_USER')`,
     ),
     index('reports_status_idx').on(table.status),
   ],
@@ -313,6 +321,37 @@ export const messages = pgTable(
     check('messages_status_check', sql`${table.status} in ('PENDING', 'DELIVERED', 'UNDELIVERED')`),
     index('messages_bottle_idx').on(table.bottleId),
     index('messages_to_user_idx').on(table.toUserId),
+  ],
+);
+
+/**
+ * 已听覆盖率（t20）：每个 (user, segment) 一行，**只增不减**（服务端取历史最大值）。
+ *
+ * 为什么落库而不是进程内缓存：用户诉求是"听过 80% 要记录，别每次退出就清零"，
+ * 因此进度必须跨会话/跨重启存活；判定权也必须在服务端（客户端上报只是增量输入）。
+ *
+ * 覆盖率的**语义**不在这里：区间并集、拖动不计、循环不叠加、时长不可信→0 全部复用
+ * `packages/shared/src/audio/listening.ts`；本表只存 `covered_ms` 与权威 `duration_ms`。
+ */
+export const listenProgress = pgTable(
+  'listen_progress',
+  {
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    segmentId: uuid('segment_id')
+      .notNull()
+      .references(() => bottleSegments.id, { onDelete: 'cascade' }),
+    /** 已覆盖的音频区间并集长度（ms）。 */
+    coveredMs: integer('covered_ms').notNull(),
+    /** 记录时的段时长（来自 `bottle_segments.duration_ms`，不采信请求体）。 */
+    durationMs: integer('duration_ms').notNull(),
+    /** 最后一次上报时间：增长限速（"不可能一小时内容 5 秒听完"）按它与当前时间的差计算。 */
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.userId, table.segmentId] }),
+    check('listen_progress_ms_check', sql`${table.coveredMs} >= 0 and ${table.durationMs} >= 0`),
   ],
 );
 
@@ -360,7 +399,9 @@ export const riverState = pgTable('river_state', {
   /** 该用户已发起的打捞尝试次数（冷却计数的基准）。 */
   ordinal: integer('ordinal').notNull().default(0),
   /** 冷却条目（`DrawExclusion[]`）。 */
-  exclusions: jsonb('exclusions').notNull().default(sql`'[]'::jsonb`),
+  exclusions: jsonb('exclusions')
+    .notNull()
+    .default(sql`'[]'::jsonb`),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 });
 

@@ -58,10 +58,16 @@ interface Exception {
 
 const ROUTE_EXCEPTIONS = new Map<string, Exception>([
   ['health.ts', { reason: 'S0 健康检查，无任何错误路径', kind: 'no-error-path' }],
-  ['songs.ts', { reason: '只读曲库列表：空列表是合法状态，模块内没有错误路径', kind: 'no-error-path' }],
+  [
+    'songs.ts',
+    { reason: '只读曲库列表：空列表是合法状态，模块内没有错误路径', kind: 'no-error-path' },
+  ],
   [
     'auth.ts',
-    { reason: 't6 自有错误词表（authHttpStatusOf）+ 请求体校验 422，不经内核', kind: 'own-vocabulary' },
+    {
+      reason: 't6 自有错误词表（authHttpStatusOf）+ 请求体校验 422，不经内核',
+      kind: 'own-vocabulary',
+    },
   ],
 ]);
 
@@ -127,9 +133,10 @@ describe('零规则守卫（正例）：声明了错误路径的路由必须走 
       const source = routeSources.find((candidate) => candidate.file === file);
       expect(source, file + ' 必须在路由目录里存在').toBeDefined();
       if (exception.kind === 'no-error-path' && source !== undefined) {
-        expect(source.text, file + ' 声明无错误路径，就不该出现 sendProblem/problemFrom*').not.toMatch(
-          /sendProblem|problemFrom/,
-        );
+        expect(
+          source.text,
+          file + ' 声明无错误路径，就不该出现 sendProblem/problemFrom*',
+        ).not.toMatch(/sendProblem|problemFrom/);
       }
     }
   });

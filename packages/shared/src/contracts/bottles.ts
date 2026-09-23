@@ -90,6 +90,14 @@ export const BottleDetailSchema = BottleSummarySchema.extend({
   availableResolutions: z.array(ResolutionSchema),
   /** 观看者是否持有该瓶子。 */
   isHolder: z.boolean(),
+  /**
+   * 因 §9.1（漂流中不可见后续）被裁掉的段数。
+   *
+   * 为什么要有这个字段：裁剪之后 `segments` 会比 `recordedCount` 短，
+   * 界面需要能解释"**不是丢了，是你看不到**"，否则用户会以为瓶子坏了。
+   * `0` = 没有裁剪（持有者 / 已入海）。
+   */
+  hiddenLaterSegmentCount: z.number().int().nonnegative(),
   /** 有缺口且该观看者可能补位时的上下文；无缺口或已损坏为 null。 */
   replacementContext: ReplacementContextSchema.nullable(),
   riverCastAt: IsoDateTimeSchema.nullable(),

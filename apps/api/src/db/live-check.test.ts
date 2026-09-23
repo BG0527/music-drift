@@ -1,7 +1,7 @@
 /**
  * t19 Part 1b 的回归钉：**端到端检查必须跑在自己的可抛弃库上**。
  *
- * 为什么用"读文本 + 读纯函数"而不是跑一遍脚本来测：脚本要起服务、连真库、跑 26 步（那是
+ * 为什么用"读文本 + 读纯函数"而不是跑一遍脚本来测：脚本要起服务、连真库、跑 27 步（那是
  * `node apps/web/tools/golden-path-live-check.mjs` 的活，属验证命令，不属单测基线）。
  * 但"它有没有把环境隔离这件事**做在代码里**"完全可以静态钉住 —— 而这次的病根正是
  * 它把隔离留给了"环境恰好干净"。
@@ -13,7 +13,9 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import { isDerivedTestDatabaseName } from './test-database.js';
 
-const scriptPath = fileURLToPath(new URL('../../../web/tools/golden-path-live-check.mjs', import.meta.url));
+const scriptPath = fileURLToPath(
+  new URL('../../../web/tools/golden-path-live-check.mjs', import.meta.url),
+);
 const script = readFileSync(scriptPath, 'utf8');
 const packagePath = fileURLToPath(new URL('../../package.json', import.meta.url));
 const pkg = JSON.parse(readFileSync(packagePath, 'utf8')) as { scripts: Record<string, string> };
@@ -42,6 +44,58 @@ describe('live-check 的数据库隔离（hermetic）', () => {
     // 旧写法是 `const API = process.env.API_BASE ?? 'http://localhost:8787'` —— 静默默认连 dev 服务
     expect(script).not.toMatch(/process\.env\.API_BASE\s*\?\?\s*'http:\/\/localhost:8787'/);
     expect(script).toContain('API_BASE');
+  });
+});
+
+describe('第 27 步 /api/me/bottles（P0 漂流日志的端到端证明）', () => {
+  it('脚本里真的有这一步，且覆盖 role / mySegmentIndexes / 斩浪后仍算参与过', () => {
+    expect(script).toContain('/api/me/bottles');
+    expect(script).toMatch(/mySegmentIndexes/);
+    expect(script).toMatch(/role/);
+    // 斩浪语义（§16.7）—— 这条端点最容易写错的地方，必须在端到端检查里出现
+    expect(script).toMatch(/斩浪/);
+    expect(script).toMatch(/DAMAGED/);
+  });
+
+  it('步数为 27：脚本正文与注释里不得再残留旧口径「26 步」', () => {
+    expect(script).toContain('27 步');
+    expect(script).not.toMatch(/26 步/);
+  });
+});
+
+describe('外部模式不可能被误当验收证据（captain 裁决 ②）', () => {
+  it('开头就打印醒目横幅「外部模式 · 非验收证据」', () => {
+    expect(script).toContain('⚠ 外部模式 · 非验收证据');
+    // 横幅必须在跑检查之前（runChecks 调用之前出现）
+    expect(script.indexOf('⚠ 外部模式 · 非验收证据')).toBeLessThan(
+      script.indexOf('await runChecks()'),
+    );
+  });
+
+  it('非确定性步骤单列「未复现（数据不受控）」，与 pass/fail 并列且不计 pass', () => {
+    expect(script).toContain('未复现（数据不受控');
+    expect(script).toMatch(/inconclusive/);
+  });
+
+  it('hermetic 模式下「未复现」必须升级为失败（数据受控时没有借口）', () => {
+    // unreproducible(): 外部模式计 inconclusive；hermetic 模式必须走 must(false, ...)
+    expect(script).toMatch(/hermetic === null[\s\S]{0,200}inconclusive/);
+    expect(script).toMatch(/unreproducible[\s\S]{0,400}must\(false/);
+  });
+
+  it('空的 API_BASE 视为"没给"（否则会静默进入外部模式、把配置错误伪装成检查失败）', () => {
+    // 实测踩过：`API_BASE= node …` → API='' → 进了"外部模式"，所有请求打向空 URL 全红。
+    // 空字符串在 shell/CI 里非常常见（`API_BASE=$SOMETHING_UNSET`），必须当"未设置"处理。
+    expect(script).toMatch(/API_BASE[\s\S]{0,160}length > 0/);
+  });
+
+  it('文献层写死「验收证据只认 hermetic 模式」（脚本注释 + docs/api.md）', () => {
+    expect(script).toContain('验收证据只认 hermetic');
+    const api = readFileSync(
+      fileURLToPath(new URL('../../../../docs/api.md', import.meta.url)),
+      'utf8',
+    );
+    expect(api).toContain('验收证据只认 hermetic');
   });
 });
 

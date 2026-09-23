@@ -1,20 +1,20 @@
 /**
  * 个人中心（「我的」）。
  *
- * 诚实原则：**服务端目前没有「列出我参与过的瓶子」的接口**（`docs/api.md` §2 只有
- * `/api/me/anonymous-codes`、`/api/me/badges`、`/api/me/collections`），所以这里
- * ① 显示账号身份与该用户的匿名代号；② 列出**这台设备**参与过的瓶子（本机记录，文案如实说明）。
- * 缺口已在 T3.2 回报里登记，不在此处伪造一个"账号级列表"。
+ * 三段：账号身份卡 / 通知 / 我参与过的漂流瓶（服务端 `GET /api/me/bottles`）。
+ *
+ * 两处刻意的取舍：
+ * 1. **不显示匿名代号**（用户 2026-09-23 裁决）：`CONTEXT.md` §12.1 是"同一用户在不同瓶子里代号不同"，
+ *    所以不存在"你的代号"这一行 —— 填任何值都是编的；
+ * 2. 「我参与过的漂流瓶」来自服务端（跨设备可见、被斩的段仍算参与过），不是本机书签。
  */
-import { useAnonymousCodes } from '../features/api/queries';
-import { RememberedBottles } from '../features/bottle/remembered-bottles';
+import { NotificationList } from '../features/bottle/notification-list';
+import { MyBottles } from '../features/bottle/my-bottles';
 import { useSession } from '../features/session/session-context';
-import { Card, Icon, Skeleton, WaveDivider } from '../design-system';
-import { AsyncBoundary } from './shell/async-boundary';
+import { Card, Icon, WaveDivider } from '../design-system';
 
 export function ProfilePage() {
   const session = useSession();
-  const codes = useAnonymousCodes(session.status === 'authed');
 
   return (
     <div className="flex flex-col gap-6">
@@ -38,41 +38,22 @@ export function ProfilePage() {
         </div>
       </Card>
 
-      <section className="flex flex-col gap-3" aria-labelledby="codes-heading">
-        <h2 id="codes-heading" className="text-[1.0625rem] font-semibold text-abyss">
-          你的匿名代号
+      <WaveDivider />
+
+      <section className="flex flex-col gap-3" aria-labelledby="notifications-heading">
+        <h2 id="notifications-heading" className="text-[1.0625rem] font-semibold text-abyss">
+          通知
         </h2>
         <p className="text-[0.875rem] leading-[1.6] text-slate-current">
-          同一支瓶子里，所有人看到的都是这同一个代号；换一支瓶子，代号就会变。
+          只显示你自己的消息：留言送达 / 未送达（CONTEXT §5.2），以及你参与的作品进公海。
+          标记已读是幂等的，别人的消息读不到 —— 权限在服务端判定。
         </p>
-        <AsyncBoundary
-          query={codes}
-          skeleton={<Skeleton height="3rem" width="100%" />}
-          emptyWhen={(items) => items.length === 0}
-          empty={
-            <p role="status" className="text-[0.875rem] leading-[1.6] text-slate-current">
-              你还没有发起或接过瓶子，所以暂时没有代号。去河道捞一个，代号会在第一次参与时生成。
-            </p>
-          }
-        >
-          {(items) => (
-            <ul className="flex flex-wrap gap-3">
-              {items.map((code) => (
-                <li
-                  key={code.bottleId}
-                  className="rounded-pill border border-mist bg-foam px-4 py-2 text-[0.9375rem] text-abyss"
-                >
-                  {code.code}
-                </li>
-              ))}
-            </ul>
-          )}
-        </AsyncBoundary>
+        <NotificationList />
       </section>
 
       <WaveDivider />
 
-      <RememberedBottles />
+      <MyBottles />
     </div>
   );
 }

@@ -1,114 +1,139 @@
 /**
- * 首页（「今日海面」）。
+ * 首页（Figma `home-river` 的**三段结构**，一屏一动作）。
  *
- * IA 参考 Figma `home-river` 的三段结构（标题区 / 主交互区 / 我的瓶子）与文案；
- * 视觉按 `DESIGN.md`：Hero 用深水暗底（**沉浸式区块**，不是深色模式），其余保持 wave-white。
- *
- * 关键取舍：**未登录的中转不留给用户** —— 两个主行动在未登录时直接指向带 `next` 的登录页，
- * 而不是让用户点进去再吃一个 401。
+ * Figma 帧（`docs/figma/frames/4-43--home-river.md` §1）：
+ * ```text
+ * main-content 1180×871 · column · gap 32 · padding 40/48
+ *   ├── header-row 1084×50        标题 24/600 + 副标 14/400
+ *   ├── hero-fishing-zone 1084×517 · padding 48      ← 主交互区
+ *   │   └── ripple-system 240×240（240/180/130 三层涟漪）+ master-pick-btn 110×110
+ *   └── mood-filters 370×35 · gap 12 · padding 8/18   ← 5 个心情标签
+ * ```
+ * 三条纪律：
+ * 1. **一屏三段、不滚动**：所以「今日海面」列表**不在首页**（作品列表归公海；我参与过的归「我的」）；
+ * 2. **招牌主交互不许换掉**：三层涟漪 + 110×110 圆形捞取按钮，不能退化成"带边框的卡片按钮"；
+ * 3. **文字必须包在 `<span className="whitespace-nowrap">` 里**：裸文本节点在 flex 容器中是匿名 flex item，
+ *    空间不足会被压到 min-content（**一列一个字符**）—— 375px 下「捞 一 个 漂 流 瓶」竖排就是这么来的
+ *    （captain 截图实测）。
  */
-import { Card, EmptyState, Icon, WaveDivider, cn } from '../design-system';
-import { useSeaList } from '../features/api/queries';
-import { RememberedBottles } from '../features/bottle/remembered-bottles';
-import { progressLabel } from '../features/bottle/relay-status';
+import { Icon, RippleRing } from '../design-system';
 import { useSession } from '../features/session/session-context';
-import { AsyncBoundary } from './shell/async-boundary';
 import { Link } from './shell/router';
-import { TEXT_LINK, TEXT_LINK_STRONG } from './shell/link-styles';
+import { TEXT_LINK } from './shell/link-styles';
+
+/** Figma 的心情标签（Demo 只保留样式，不参与筛选 —— CONTEXT §3.1 / §3.2）。 */
+const MOOD_TAGS = ['全部', '深夜', '通勤', '告白', '雨天'] as const;
 
 export function HomePage() {
   const session = useSession();
   const authed = session.status === 'authed';
-  const sea = useSeaList('COMPLETED');
-
   const riverHref = authed ? '/river' : `/login?next=${encodeURIComponent('/river')}`;
   const newHref = authed ? '/new' : `/login?next=${encodeURIComponent('/new')}`;
+  const meHref = authed ? '/me' : `/login?next=${encodeURIComponent('/me')}`;
 
   return (
-    <div className="flex flex-col gap-8">
-      <section className="flex flex-col gap-6 rounded-2xl bg-deep-current p-8 text-wave-white">
-        <div className="flex flex-col gap-3">
-          <h1 className="text-[2rem] font-bold leading-tight md:text-[2.5rem]">暖流河道</h1>
-          <p className="max-w-[46rem] text-[1rem] leading-[1.6] text-on-dark-muted">
-            拾起那些搁浅在黑夜里的声线。唱一段 15–30 秒，投进河道，等一个陌生人接下一棒。
-          </p>
+    <div className="flex flex-col gap-[32px]">
+      {/* header-row：标题 24/600 + 副标 14/400；右侧只放次级入口，不抢主交互 */}
+      <header className="flex flex-wrap items-end justify-between gap-[16px]">
+        <div className="flex flex-col gap-[4px]">
+          <h1 className="text-[1.5rem] font-semibold text-abyss">暖流河道</h1>
+          <p className="text-[0.875rem] text-slate-current">拾起那些搁浅在黑夜里的声线</p>
         </div>
+        <nav aria-label="快捷入口" className="flex flex-wrap items-center gap-[16px]">
+          <Link to="/sea" className={TEXT_LINK}>
+            公海大厅
+          </Link>
+          <Link to={meHref} className={TEXT_LINK}>
+            我参与过的漂流瓶
+          </Link>
+          <Link to={newHref} className={TEXT_LINK}>
+            投出第一棒
+          </Link>
+        </nav>
+      </header>
 
-        <div className="flex flex-col gap-4 sm:flex-row">
+      {/* hero-fishing-zone：深水暗底 + 三层涟漪 + 110×110 主按钮（Figma 的招牌主交互） */}
+      <section
+        aria-labelledby="hero-heading"
+        className="flex flex-col items-center justify-center gap-[16px] rounded-2xl bg-deep-current px-[16px] py-[24px] text-wave-white md:min-h-[517px] md:gap-[24px] md:px-[48px] md:py-[40px]"
+      >
+        <h2 id="hero-heading" className="sr-only">
+          从河道捞一个漂流瓶
+        </h2>
+
+        <div className="relative flex h-[180px] w-[180px] items-center justify-center md:h-[240px] md:w-[240px]">
+          {/*
+            三层涟漪（桌面 240 / 180 / 130；移动按比例缩到 180 / 140 / 100 以保一屏）。
+            ⚠️ 这里**静态描边 + 动画涟漪分两层**：
+            只用 `RippleRing`（纯动画）时，涟漪会随动画淡出 —— 静止截图/静态环境下
+            招牌主交互看起来"什么都没有"（我第一版就是这样被抓到的）。
+            所以三层用静态圆圈保证**任何时刻都看得见**，再叠一层动画做"水面在动"的感觉。
+          */}
+          <span
+            aria-hidden="true"
+            className="absolute h-[180px] w-[180px] rounded-full border border-lagoon/35 md:h-[240px] md:w-[240px]"
+          />
+          <span
+            aria-hidden="true"
+            className="absolute h-[140px] w-[140px] rounded-full border border-lagoon/45 md:h-[180px] md:w-[180px]"
+          />
+          <span
+            aria-hidden="true"
+            className="absolute h-[100px] w-[100px] rounded-full border border-sea-glass/40 md:h-[130px] md:w-[130px]"
+          />
+          <RippleRing className="h-[180px] w-[180px] md:h-[240px] md:w-[240px]" />
+
           <Link
             to={riverHref}
-            className="inline-flex min-h-11 items-center justify-center gap-2 rounded-base bg-wave-white px-6 text-[1rem] font-semibold text-peacock hover:bg-foam"
+            aria-label="捞一个漂流瓶"
+            className="relative z-10 flex h-[88px] w-[88px] items-center justify-center rounded-full bg-peacock md:h-[110px] md:w-[110px] text-wave-white transition-transform duration-200 ease-out hover:scale-[1.03] hover:bg-peacock-deep focus-visible:ring-2 focus-visible:ring-sea-glass focus-visible:ring-offset-2 focus-visible:ring-offset-deep-current active:translate-y-[-1px]"
           >
-            <Icon name="Waves" size={20} />
-            捞一个漂流瓶
-          </Link>
-          <Link
-            to={newHref}
-            className="inline-flex min-h-11 items-center justify-center gap-2 rounded-base border-[1.5px] border-on-dark-muted px-6 text-[1rem] font-semibold text-wave-white hover:bg-trench"
-          >
-            <Icon name="Music" size={20} />
-            选一首歌，投出第一棒
+            <span className="flex flex-col items-center gap-[4px]">
+              <Icon name="Waves" size={24} />
+              <span className="whitespace-nowrap text-[0.8125rem] font-semibold">捞取</span>
+            </span>
           </Link>
         </div>
 
-        <p className="text-[0.875rem] leading-[1.6] text-on-dark-muted">
-          河道只能随机打捞：没有搜索，也不能指定某个人来接。捞到的人不知道你是谁 ——
-          在每个瓶子里，你都有一个单独的匿名代号。
+        <div className="flex flex-col items-center gap-[8px] text-center">
+          <p className="text-[1.125rem] font-semibold">
+            <span className="whitespace-nowrap">捞一个漂流瓶</span>
+          </p>
+          <p className="max-w-[38rem] text-[0.875rem] leading-[1.6] text-on-dark-muted">
+            捞取深海深处传来的匿名哼唱，接续她的下一句旋律。
+            <span className="whitespace-nowrap">捞到即持有</span>
+            ：同一时刻，同一条河道上只有你拿着它。
+          </p>
+          <p className="text-[0.8125rem] leading-[1.6] text-on-dark-muted">
+            河道只能随机打捞，没有搜索，也不能指定某个人来接。
+          </p>
+        </div>
+      </section>
+
+      {/* mood-filters：5 个标签；Demo 只作展示（不参与筛选） */}
+      <section aria-labelledby="mood-heading" className="flex flex-col gap-[8px] md:gap-[12px]">
+        <h2 id="mood-heading" className="sr-only">
+          心情标签
+        </h2>
+        <ul className="flex flex-wrap items-center gap-[8px] md:gap-[12px]">
+          {MOOD_TAGS.map((tag, index) => (
+            <li key={tag}>
+              <span
+                className={
+                  index === 0
+                    ? 'flex h-[44px] items-center rounded-pill bg-peacock px-[12px] text-[0.8125rem] font-semibold text-wave-white md:px-[18px] md:text-[0.875rem]'
+                    : 'flex h-[44px] items-center rounded-pill border border-driftline bg-transparent px-[12px] text-[0.8125rem] text-peacock md:px-[18px] md:text-[0.875rem]'
+                }
+              >
+                {tag}
+              </span>
+            </li>
+          ))}
+        </ul>
+        <p className="text-[0.8125rem] text-slate-current">
+          心情标签这一版只作展示（Demo 不做推荐匹配）：等曲库与匹配上线后才参与筛选。
         </p>
       </section>
-
-      <section className="flex flex-col gap-4" aria-labelledby="today-sea-heading">
-        <header className="flex flex-wrap items-baseline justify-between gap-3">
-          <h2 id="today-sea-heading" className="text-[1.375rem] font-semibold text-abyss">
-            今日海面
-          </h2>
-          <Link to="/sea" className={TEXT_LINK}>
-            去公海大厅
-          </Link>
-        </header>
-
-        <AsyncBoundary
-          query={sea}
-          emptyWhen={(page) => page.items.length === 0}
-          empty={
-            <EmptyState
-              icon="Ship"
-              title="公海还空着"
-              description="等第一批作品录满全部段位、被送进公海之后，这里就会有可以听完整的作品。"
-              action={
-                <Link to={newHref} className={TEXT_LINK_STRONG}>
-                  选一首歌，投出第一棒
-                </Link>
-              }
-            />
-          }
-        >
-          {(page) => (
-            <ul className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-              {page.items.slice(0, 3).map((bottle) => (
-                <li key={bottle.id}>
-                  <Card className="hover-lift flex h-full flex-col gap-2">
-                    <p className="text-[1.0625rem] font-semibold text-abyss">{bottle.songTitle}</p>
-                    <p className="text-[0.875rem] text-slate-current">
-                      {progressLabel(bottle)}
-                      {bottle.missingSegmentIndexes.length === 0
-                        ? ' · 全部段位都有人唱过'
-                        : ` · 缺第 ${bottle.missingSegmentIndexes.join('、')} 段`}
-                    </p>
-                    <Link to={`/sea/${bottle.id}`} className={cn(TEXT_LINK, 'mt-auto')}>
-                      听这支作品
-                    </Link>
-                  </Card>
-                </li>
-              ))}
-            </ul>
-          )}
-        </AsyncBoundary>
-      </section>
-
-      <WaveDivider />
-
-      <RememberedBottles />
     </div>
   );
 }

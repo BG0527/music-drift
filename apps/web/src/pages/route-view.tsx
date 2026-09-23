@@ -7,6 +7,7 @@
 import { AppShell } from './shell/app-shell';
 import { useRoute } from './shell/router-context';
 import { activeNavKey } from './shell/routes';
+import { AdminPage } from './admin-page';
 import { BottlePage } from './bottle-page';
 import { DriftLogPage } from './drift-log-page';
 import { HomePage } from './home-page';
@@ -46,12 +47,15 @@ export function RouteView() {
         return <ProfilePage />;
       case 'settings':
         return <SettingsPage />;
+      case 'admin':
+        return <AdminPage />;
       default:
         return <NotFoundPage />;
     }
   }
 
-  const requireLogin = match.name === 'profile' || match.name === 'settings';
+  const requireLogin =
+    match.name === 'profile' || match.name === 'settings' || match.name === 'admin';
 
   return (
     <AppShell current={current} requireLogin={requireLogin}>

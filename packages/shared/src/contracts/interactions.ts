@@ -16,8 +16,39 @@ export const VoteValueSchema = z.enum(['LIKE', 'DISLIKE']);
 
 export const CastVoteRequestSchema = z.object({
   value: VoteValueSchema,
-  /** 已播放比例 0–1：点踩必须 ≥ 0.8（CONTEXT §7.3），服务端必须校验而不是信前端。 */
-  listenedRatio: z.number().min(0).max(1),
+  /**
+   * @deprecated t20：服务端**不再采信**这个字段。
+   *
+   * 点踩门槛改为读**服务端持久化**的已听覆盖率（`POST /api/segments/:id/listen`），
+   * 因此这里传什么都不影响判定（传 1 也点不了踩）。保留为**可选**只为向后兼容：
+   * 旧客户端仍会发它，新客户端可以不带。
+   */
+  listenedRatio: z.number().min(0).max(1).optional(),
+});
+
+/**
+ * 已听覆盖率上报（t20）：**增量输入**，判定权在服务端。
+ *
+ * 只带 `coveredMs`（客户端 `ListenTracker` 算出的"听过区间并集长度"）：
+ * **时长以服务端段行为准**（`bottle_segments.duration_ms`，上传时校验写入）——
+ * 若采信请求体里的时长，伪造 `{coveredMs: X, durationMs: X}` 就是 100%。
+ */
+export const SubmitListenProgressRequestSchema = z.object({
+  coveredMs: z.number().int().nonnegative(),
+});
+
+export const ListenProgressResponseSchema = z.object({
+  segmentId: UuidSchema,
+  /** 服务端当前记账的覆盖时长（只增不减：历史最大值）。 */
+  coveredMs: z.number().int().nonnegative(),
+  /** 段时长（服务端权威值）；缺失/不可信时为 0。 */
+  durationMs: z.number().int().nonnegative(),
+  /** 覆盖率 0..1（`shared/audio` 的 `listenedRatio`：时长不可信 → 0）。 */
+  ratio: z.number().min(0).max(1),
+  /** 点踩门槛（来自内核策略，不写死）。 */
+  threshold: z.number().min(0).max(1),
+  /** 服务端认为是否已达门槛（前端据此提示"还需再听一会儿"）。 */
+  reachedThreshold: z.boolean(),
 });
 
 export const CastVoteResponseSchema = z.object({
@@ -29,6 +60,8 @@ export const CastVoteResponseSchema = z.object({
   dislikeThreshold: z.number().int().positive(),
   /** 本次投票是否触发了斩浪（触发了则该段已从作品移除）。 */
   segmentCut: z.boolean(),
+  /** 服务端记账的已听覆盖率（本次点踩的判定依据；前端可据此显示进度）。 */
+  listenedRatio: z.number().min(0).max(1),
 });
 
 export const MessageStatusSchema = z.enum(['PENDING', 'DELIVERED', 'UNDELIVERED']);
@@ -47,6 +80,42 @@ export const PrivateMessageSchema = z.object({
 });
 
 export const ReportTargetTypeSchema = z.enum(['BOTTLE', 'SEGMENT', 'MESSAGE']);
+
+export const ReportStatusSchema = z.enum(['PENDING', 'REVIEWED']);
+
+/**
+ * 审核结论（t12）。`NONE` = 驳回（不处置）；其余是人类管理员的显式动作。
+ *
+ * `RESTORE_SEGMENT` 是这条设计的关键：自动斩杀（10 踩）是**自动**动作，
+ * 人工审核必须能**覆盖**它 —— 否则审核台就只有"删"、没有"恢复"，
+ * 表现为"驳回一条举报"却无法把已被误斩的段还回去。
+ */
+export const ReportActionSchema = z.enum([
+  'NONE',
+  'REMOVE_SEGMENT',
+  'RESTORE_SEGMENT',
+  'REMOVE_BOTTLE',
+  'BAN_USER',
+]);
+
+export const ReportSchema = z.object({
+  id: UuidSchema,
+  targetType: ReportTargetTypeSchema,
+  targetId: UuidSchema,
+  reason: z.string().min(1),
+  status: ReportStatusSchema,
+  /** 裁决结论；`PENDING` 时为 null。 */
+  action: ReportActionSchema.nullable(),
+  createdAt: IsoDateTimeSchema,
+  reviewedAt: IsoDateTimeSchema.nullable(),
+});
+
+/** 裁决请求：`decision` 就是"要实施的结论"（驳回 = `NONE`）。 */
+export const ReviewDecisionRequestSchema = z.object({
+  decision: ReportActionSchema,
+  /** 审核备注（可选，只进审计，不影响行为）。 */
+  note: z.string().max(500).optional(),
+});
 
 export const CreateReportRequestSchema = z.object({
   targetType: ReportTargetTypeSchema,
@@ -79,7 +148,13 @@ export const NotificationSchema = z.object({
 
 export type VoteValue = z.infer<typeof VoteValueSchema>;
 export type CastVoteRequest = z.infer<typeof CastVoteRequestSchema>;
+export type SubmitListenProgressRequest = z.infer<typeof SubmitListenProgressRequestSchema>;
+export type ListenProgressResponse = z.infer<typeof ListenProgressResponseSchema>;
 export type CastVoteResponse = z.infer<typeof CastVoteResponseSchema>;
 export type PrivateMessage = z.infer<typeof PrivateMessageSchema>;
+export type ReportStatus = z.infer<typeof ReportStatusSchema>;
+export type ReportAction = z.infer<typeof ReportActionSchema>;
+export type Report = z.infer<typeof ReportSchema>;
+export type ReviewDecisionRequest = z.infer<typeof ReviewDecisionRequestSchema>;
 export type BadgeAward = z.infer<typeof BadgeAwardSchema>;
 export type Notification = z.infer<typeof NotificationSchema>;

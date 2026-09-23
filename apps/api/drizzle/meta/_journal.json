@@ -15,6 +15,27 @@
       "when": 1790098723936,
       "tag": "0001_brief_pretty_boy",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1790121608828,
+      "tag": "0002_good_gateway",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1790121774087,
+      "tag": "0003_sloppy_ultron",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1790123777119,
+      "tag": "0004_elite_cloak",
+      "breakpoints": true
     }
   ]
 }

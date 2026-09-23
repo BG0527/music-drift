@@ -114,6 +114,7 @@ describe('录制步骤', () => {
               segments: [],
               availableResolutions: ['RIVER', 'RETURN', 'SEA'],
               isHolder: true,
+              hiddenLaterSegmentCount: 0,
               replacementContext: null,
               riverCastAt: '2026-09-23T01:30:00.000Z',
               seaAt: null,

@@ -61,7 +61,9 @@ export async function provisionTestDatabase(): Promise<string> {
   const admin = new Client({ connectionString: adminUrlFor(testUrl) });
   await admin.connect();
   try {
-    const existing = await admin.query('select 1 from pg_database where datname = $1', [databaseName]);
+    const existing = await admin.query('select 1 from pg_database where datname = $1', [
+      databaseName,
+    ]);
     if (existing.rowCount === 0) {
       await admin.query(`create database "${databaseName}"`);
     }

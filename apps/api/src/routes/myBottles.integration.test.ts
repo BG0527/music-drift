@@ -16,7 +16,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { buildApp } from '../app.js';
 import { createDb, type Db } from '../db/client.js';
 import { runSeed } from '../db/seed.js';
-import { insertSong } from '../db/test-helpers.js';
+import { insertSong, listenUntilThresholdBatch } from '../db/test-helpers.js';
 
 const DATABASE_URL = process.env['DATABASE_URL'] ?? '';
 const PASSWORD = 'Drift-Bottle-2026';
@@ -51,7 +51,12 @@ async function register(prefix: string): Promise<{ cookie: string; userId: strin
 
 async function createAndSing(cookie: string): Promise<{ bottleId: string; segmentId: string }> {
   const songId = await insertSong(db, 4);
-  const created = await app.inject({ method: 'POST', url: '/api/bottles', payload: { songId }, headers: { cookie } });
+  const created = await app.inject({
+    method: 'POST',
+    url: '/api/bottles',
+    payload: { songId },
+    headers: { cookie },
+  });
   expect(created.statusCode).toBe(201);
   const bottleId = (created.json() as { id: string }).id;
   const recorded = await app.inject({
@@ -225,13 +230,18 @@ describe('GET /api/me/bottles（CONTEXT §11.1 漂流日志）', () => {
         [mine],
       )
     )[0]?.id as string;
+    // t20：踩门槛由服务端读持久化覆盖率判定 ⇒ 先批量让 10 位路人"听满"这一段
+    const voters: string[] = [];
     for (let index = 0; index < 10; index += 1) {
-      const voter = await register('vt');
+      voters.push((await register('vt')).cookie);
+    }
+    await listenUntilThresholdBatch(app, voters, segmentId, 20_000);
+    for (const cookie of voters) {
       const vote = await app.inject({
         method: 'POST',
         url: '/api/segments/' + segmentId + '/votes',
-        payload: { value: 'DISLIKE', listenedRatio: 0.9 },
-        headers: { cookie: voter.cookie },
+        payload: { value: 'DISLIKE' },
+        headers: { cookie },
       });
       expect(vote.statusCode).toBe(200);
     }

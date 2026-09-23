@@ -39,6 +39,8 @@ export interface BottleFixtureInput {
   segments?: BottleDetail['segments'];
   seaZone?: BottleSummary['seaZone'];
   initiatorCode?: string;
+  /** §9.1：因"漂流中不可见后续"被裁掉的段数。 */
+  hiddenLaterSegmentCount?: number;
 }
 
 /** 默认形态：A 发起、已录第 1 段、缺口 [2,3,4]、B 正持有（等待接唱）。 */
@@ -81,6 +83,7 @@ export function bottleDetail(overrides: BottleFixtureInput = {}): BottleDetail {
     segments,
     availableResolutions: overrides.availableResolutions ?? ['RIVER', 'RETURN'],
     isHolder: overrides.isHolder ?? true,
+    hiddenLaterSegmentCount: overrides.hiddenLaterSegmentCount ?? 0,
     replacementContext: null,
     riverCastAt: '2026-09-23T01:30:00.000Z',
     seaAt: null,

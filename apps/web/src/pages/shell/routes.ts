@@ -18,6 +18,7 @@ export type RouteName =
   | 'seaDetail'
   | 'profile'
   | 'settings'
+  | 'admin'
   | 'notFound';
 
 export interface RouteMatch {
@@ -44,6 +45,8 @@ const PATTERNS: readonly RoutePattern[] = [
   { name: 'seaDetail', segments: ['sea', ':id'] },
   { name: 'profile', segments: ['me'] },
   { name: 'settings', segments: ['settings'] },
+  // 审核台（仅管理员；权限由服务端判定，前端只负责别把入口露给普通用户）
+  { name: 'admin', segments: ['admin'] },
 ];
 
 function toSegments(pathname: string): string[] {
@@ -87,7 +90,7 @@ export function buildPath(name: RouteName, params: Record<string, string> = {}):
 }
 
 export interface AppNavItem {
-  key: 'river' | 'sea' | 'mine' | 'settings';
+  key: 'river' | 'sea' | 'mine' | 'settings' | 'admin';
   label: string;
   href: string;
 }
@@ -97,6 +100,9 @@ export interface AppNavItem {
  * 来源：Figma 帧 `home-river` 的侧栏 IA（`docs/figma/CONFLICTS.md` 采纳清单 #1）；
  * 移动端折叠形态见 C-14 裁决。key 与设计系统 `SidebarNav` 的图标默认表对齐。
  */
+/** 审核台入口：只在 `session.isAdmin` 时追加（**权限判定在服务端**，这里只是别露错入口）。 */
+export const ADMIN_NAV_ITEM: AppNavItem = { key: 'admin', label: '审核台', href: '/admin' };
+
 export const NAV_ITEMS: readonly AppNavItem[] = [
   { key: 'river', label: '河道', href: '/river' },
   { key: 'sea', label: '公海', href: '/sea' },
@@ -120,6 +126,8 @@ export function activeNavKey(name: RouteName): AppNavItem['key'] | null {
       return 'mine';
     case 'settings':
       return 'settings';
+    case 'admin':
+      return null;
     default:
       return null;
   }

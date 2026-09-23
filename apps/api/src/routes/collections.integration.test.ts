@@ -90,7 +90,10 @@ describe('收藏：仅限已完成公海作品（API 层功能码）', () => {
 
   it('已完成公海作品 → 201 可收藏；重复收藏幂等（不产生第二行）；取消幂等', async () => {
     // 让同一个瓶子补齐 4 段并最终入海（用另外两个账号补位，避免同瓶两唱）
-    const fillers = [await register('f1' + Date.now().toString().slice(-5)), await register('f2' + Date.now().toString().slice(-5))];
+    const fillers = [
+      await register('f1' + Date.now().toString().slice(-5)),
+      await register('f2' + Date.now().toString().slice(-5)),
+    ];
     for (const filler of fillers) {
       const drawn = await app.inject({
         method: 'POST',
@@ -135,14 +138,22 @@ describe('收藏：仅限已完成公海作品（API 层功能码）', () => {
       return;
     }
     expect(collect.statusCode).toBe(201);
-    await app.inject({ method: 'POST', url: '/api/collections/' + incompleteId, headers: { cookie: userCookie } });
+    await app.inject({
+      method: 'POST',
+      url: '/api/collections/' + incompleteId,
+      headers: { cookie: userCookie },
+    });
     const rows = await db.query<{ count: string }>(
       `select count(*)::text as count from collections where bottle_id = $1 and user_id = (select id from users where handle like 'col%')`,
       [incompleteId],
     );
     expect(rows[0]?.count).toBe('1');
 
-    const list = await app.inject({ method: 'GET', url: '/api/me/collections', headers: { cookie: userCookie } });
+    const list = await app.inject({
+      method: 'GET',
+      url: '/api/me/collections',
+      headers: { cookie: userCookie },
+    });
     expect(list.statusCode).toBe(200);
 
     const remove = await app.inject({

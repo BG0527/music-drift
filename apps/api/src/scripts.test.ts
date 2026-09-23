@@ -26,7 +26,13 @@ const pkg = JSON.parse(readFileSync(packagePath, 'utf8')) as {
 const NEEDS_ROOT_ENV = ['start', 'dev', 'db:migrate', 'db:seed', 'live-check:db'] as const;
 
 /** 明确**不**需要该 flag 的脚本（写在这里，防止将来有人一刀切地全都加上）。 */
-const DOES_NOT_NEED_ROOT_ENV = ['test', 'test:watch', 'test:integration', 'typecheck', 'db:generate'] as const;
+const DOES_NOT_NEED_ROOT_ENV = [
+  'test',
+  'test:watch',
+  'test:integration',
+  'typecheck',
+  'db:generate',
+] as const;
 
 const ENV_FLAG = '--env-file-if-exists=../../.env';
 
@@ -43,7 +49,9 @@ describe('apps/api 脚本：启动/连库路径必须加载根 .env', () => {
     for (const name of NEEDS_ROOT_ENV) {
       const script = pkg.scripts[name] ?? '';
       expect(script).toContain('--env-file-if-exists=../../.env');
-      expect(script, `scripts.${name} 不应指向其他 .env`).not.toMatch(/--env-file(?!-if-exists=\.\.\/\.\.\/\.env)/);
+      expect(script, `scripts.${name} 不应指向其他 .env`).not.toMatch(
+        /--env-file(?!-if-exists=\.\.\/\.\.\/\.env)/,
+      );
     }
   });
 

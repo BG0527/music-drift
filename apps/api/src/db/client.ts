@@ -55,7 +55,10 @@ export async function createDb(databaseUrl: string, overrides: PoolConfig = {}):
       try {
         await client.query('begin');
         const tx: Queryable = {
-          query: async <R = Record<string, unknown>>(text: string, params: readonly unknown[] = []): Promise<R[]> => {
+          query: async <R = Record<string, unknown>>(
+            text: string,
+            params: readonly unknown[] = [],
+          ): Promise<R[]> => {
             const result = await client.query(text, params as unknown[]);
             return result.rows as R[];
           },

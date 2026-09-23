@@ -7,7 +7,6 @@
 import { useCreateBottle } from '../features/api/mutations';
 import { useSongs } from '../features/api/queries';
 import { ConflictNotice } from '../features/bottle/conflict-notice';
-import { rememberBottle, browserBottleStorage } from '../features/profile/bottle-index';
 import { useSession } from '../features/session/session-context';
 import {
   BottleMark,
@@ -80,15 +79,11 @@ export function SongPickerPage() {
                       loading={create.isPending}
                       icon={<Icon name="Mic" size={18} />}
                       onClick={() => {
+                        // 「我参与过的漂流瓶」由服务端 `GET /api/me/bottles` 提供（t19），
+                        // 页面不再写任何本机书签 —— 少一处"第二真相"。
                         void create
                           .mutateAsync({ songId: song.id })
                           .then((bottle) => {
-                            rememberBottle(browserBottleStorage(), {
-                              id: bottle.id,
-                              songTitle: bottle.songTitle,
-                              role: 'INITIATOR',
-                              at: new Date().toISOString(),
-                            });
                             navigate(`/bottles/${bottle.id}`);
                           })
                           .catch(() => undefined);

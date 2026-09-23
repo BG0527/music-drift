@@ -20,12 +20,23 @@ import { createAnonCodeService } from '../auth/anonCodeService.js';
 import { createAuthRepository } from '../auth/repository.js';
 import { validateSegmentAudioUpload } from '../audio/ingest.js';
 import { readDomainEvents } from '../db/events.js';
-import { problemFromOutcome, problemFromViolations, sendProblem, transportProblem } from '../http/problem.js';
+import {
+  problemFromOutcome,
+  problemFromViolations,
+  sendProblem,
+  transportProblem,
+} from '../http/problem.js';
 
 import { createActorResolver, type ActorResolver } from '../http/session.js';
 import type { Db } from '../db/client.js';
 import type { BottleStore } from '../store/bottles.js';
 import { createRequestContext } from '../store/context.js';
+import {
+  isEventVisible,
+  isSegmentVisible,
+  lastOwnEventIndex,
+  segmentVisibility,
+} from '../store/visibility.js';
 import { toBottleDetail, toBottleSummary } from '../store/dto.js';
 
 export interface BottleRoutesOptions {
@@ -51,7 +62,10 @@ export function registerBottleRoutes(app: FastifyInstance, options: BottleRoutes
   const anonCodes = createAnonCodeService({ repo });
 
   /** 同瓶不同码：缺码就补（幂等），保证 DTO 的 `ownerCode` 永远可用。 */
-  async function codesFor(bottleId: string, userIds: readonly string[]): Promise<Map<string, string>> {
+  async function codesFor(
+    bottleId: string,
+    userIds: readonly string[],
+  ): Promise<Map<string, string>> {
     const rows = await db.query<{ user_id: string; code: string }>(
       `select user_id, code from anon_codes where bottle_id = $1`,
       [bottleId],
@@ -94,12 +108,21 @@ export function registerBottleRoutes(app: FastifyInstance, options: BottleRoutes
     if (row === null || state === null) {
       return null;
     }
-    const segments = await store.listBottleSegments(bottleId);
+    const allSegments = await store.listBottleSegments(bottleId);
+    /**
+     * §9.1：漂流中只把"我这一棒之前（含我自己）"的段交给观看者；
+     * 入海后（§9.2）全部解锁。判据集中在 `store/visibility.ts`（详情与日志共用一份，避免漂移）。
+     */
+    const visibility = segmentVisibility({ state, viewerId });
+    const segments = allSegments.filter((segment) => isSegmentVisible(visibility, segment.index));
+    const hiddenLaterSegmentCount = allSegments.length - segments.length;
     const codes = await codesFor(bottleId, [
       state.initiatorId,
       ...state.segments.map((segment) => segment.ownerId),
     ]);
-    const songs = await db.query<{ title: string }>(`select title from songs where id = $1`, [row.songId]);
+    const songs = await db.query<{ title: string }>(`select title from songs where id = $1`, [
+      row.songId,
+    ]);
     return toBottleDetail({
       row,
       state,
@@ -108,6 +131,7 @@ export function registerBottleRoutes(app: FastifyInstance, options: BottleRoutes
       songTitle: songs[0]?.title ?? '',
       voteCounts: await likeDislikeCounts(segments.map((segment) => segment.id)),
       viewerId,
+      hiddenLaterSegmentCount,
     });
   }
 
@@ -158,7 +182,10 @@ export function registerBottleRoutes(app: FastifyInstance, options: BottleRoutes
     if (!query.success) {
       return sendProblem(reply, transportProblem('INVALID_BODY'));
     }
-    const rows = await store.listParticipatedBottles({ userId: actor.user.id, limit: query.data.limit });
+    const rows = await store.listParticipatedBottles({
+      userId: actor.user.id,
+      limit: query.data.limit,
+    });
     if (rows.length === 0) {
       return reply.send({ items: [], nextCursor: null });
     }
@@ -214,8 +241,22 @@ export function registerBottleRoutes(app: FastifyInstance, options: BottleRoutes
     if (events.length === 0) {
       return sendProblem(reply, transportProblem('NOT_FOUND'));
     }
+    const actor = await actors.resolve(request);
+    const state = await store.loadState(params.data.id);
+    /**
+     * §9.1：日志与详情**同一判据**（事件里带 actorId，后面那一棒的录音事件会暴露"后面是谁"）。
+     * 入海后（§9.2）不裁 —— 完整接力链就是公海作品的卖点。
+     */
+    const visibility =
+      state === null
+        ? ({ mode: 'ALL', drifting: false } as const)
+        : segmentVisibility({ state, viewerId: actor?.user.id ?? null });
+    const ownEventIndex = lastOwnEventIndex(events, actor?.user.id ?? null);
+    const visible = events.filter((_event, position) =>
+      isEventVisible({ visibility, position, lastOwnEventIndex: ownEventIndex }),
+    );
     return reply.send(
-      events.map((event, position) => ({
+      visible.map((event, position) => ({
         seq: position + 1,
         type: event.type,
         actorId: event.actorId,
@@ -240,7 +281,8 @@ export function registerBottleRoutes(app: FastifyInstance, options: BottleRoutes
       return sendProblem(reply, transportProblem('NOT_FOUND'));
     }
     const rawDuration = request.headers['x-audio-duration-ms'];
-    const durationMs = typeof rawDuration === 'string' && /^[0-9]+$/.test(rawDuration) ? Number(rawDuration) : null;
+    const durationMs =
+      typeof rawDuration === 'string' && /^[0-9]+$/.test(rawDuration) ? Number(rawDuration) : null;
     const rawNote = request.headers['x-segment-note'];
     const noteQuery = (request.query as { note?: string } | undefined)?.note;
     const noteSource = typeof rawNote === 'string' && rawNote.length > 0 ? rawNote : noteQuery;
@@ -275,17 +317,25 @@ export function registerBottleRoutes(app: FastifyInstance, options: BottleRoutes
       return sendProblem(reply, problem);
     }
     const recorded = outcome.events[0];
-    const segmentId = recorded !== undefined && 'segmentId' in recorded ? String(recorded.segmentId) : '';
+    const segmentId =
+      recorded !== undefined && 'segmentId' in recorded ? String(recorded.segmentId) : '';
     const index = recorded !== undefined && 'index' in recorded ? Number(recorded.index) : 0;
     await store.applyOutcome(params.data.id, outcome, {
-      segment: { audio: bytes, audioMime: validation.value.mime, durationMs: validation.value.durationMs },
+      segment: {
+        audio: bytes,
+        audioMime: validation.value.mime,
+        durationMs: validation.value.durationMs,
+      },
     });
     await codesFor(params.data.id, [actor.user.id]);
     const detail = await loadDetail(params.data.id, actor.user.id);
     return reply.code(201).send({
       segmentId,
       index,
-      nextRecordIndex: detail === null || detail.missingSegmentIndexes.length === 0 ? null : detail.missingSegmentIndexes[0],
+      nextRecordIndex:
+        detail === null || detail.missingSegmentIndexes.length === 0
+          ? null
+          : detail.missingSegmentIndexes[0],
       bottle: detail,
     });
   });
@@ -305,7 +355,10 @@ export function registerBottleRoutes(app: FastifyInstance, options: BottleRoutes
       return sendProblem(reply, transportProblem('NOT_FOUND'));
     }
     // 守卫先行：内核返回稳定码 → problem.ts 映射 409/422（路由不判断任何状态）。
-    const violations = canChooseResolution(state, { userId: actor.user.id, resolution: body.data.resolution });
+    const violations = canChooseResolution(state, {
+      userId: actor.user.id,
+      resolution: body.data.resolution,
+    });
     if (violations.length > 0) {
       const problem = problemFromViolations(violations);
       return problem === null ? reply : sendProblem(reply, problem);

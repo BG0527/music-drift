@@ -69,7 +69,10 @@ function toHoldingRow(row: HoldingDbRow): HoldingRow {
 }
 
 /** 原子抢占：正常路径返回 holdingId；唯一（且仅此一种）冲突返回 HOLDING_ALREADY_TAKEN。 */
-export async function claimHolding(db: Queryable, cmd: ClaimHoldingCommand): Promise<ClaimHoldingResult> {
+export async function claimHolding(
+  db: Queryable,
+  cmd: ClaimHoldingCommand,
+): Promise<ClaimHoldingResult> {
   const rows = await db.query<{ id: string }>(
     `insert into holdings (id, bottle_id, holder_id, parent_id, origin, acquired_at)
      values ($1, $2, $3, $4, $5, $6)

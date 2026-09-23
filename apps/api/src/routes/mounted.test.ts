@@ -35,14 +35,38 @@ const KNOWN_FAMILIES: readonly Family[] = [
   { family: 'auth', method: 'POST', path: '/api/auth/logout' },
   { family: 'auth', method: 'GET', path: '/api/auth/me' },
   { family: 'auth-anon-codes', method: 'GET', path: '/api/me/anonymous-codes' },
-  { family: 'segment-audio', method: 'GET', path: '/api/segments/00000000-0000-4000-8000-000000000000/audio' },
+  {
+    family: 'segment-audio',
+    method: 'GET',
+    path: '/api/segments/00000000-0000-4000-8000-000000000000/audio',
+  },
   { family: 'songs', method: 'GET', path: '/api/songs' },
   { family: 'bottles-create', method: 'POST', path: '/api/bottles' },
-  { family: 'bottles-detail', method: 'GET', path: '/api/bottles/00000000-0000-4000-8000-000000000000' },
-  { family: 'bottles-segments', method: 'POST', path: '/api/bottles/00000000-0000-4000-8000-000000000000/segments' },
-  { family: 'bottles-resolution', method: 'POST', path: '/api/bottles/00000000-0000-4000-8000-000000000000/resolution' },
-  { family: 'bottles-put-back', method: 'POST', path: '/api/bottles/00000000-0000-4000-8000-000000000000/put-back' },
-  { family: 'bottles-events', method: 'GET', path: '/api/bottles/00000000-0000-4000-8000-000000000000/events' },
+  {
+    family: 'bottles-detail',
+    method: 'GET',
+    path: '/api/bottles/00000000-0000-4000-8000-000000000000',
+  },
+  {
+    family: 'bottles-segments',
+    method: 'POST',
+    path: '/api/bottles/00000000-0000-4000-8000-000000000000/segments',
+  },
+  {
+    family: 'bottles-resolution',
+    method: 'POST',
+    path: '/api/bottles/00000000-0000-4000-8000-000000000000/resolution',
+  },
+  {
+    family: 'bottles-put-back',
+    method: 'POST',
+    path: '/api/bottles/00000000-0000-4000-8000-000000000000/put-back',
+  },
+  {
+    family: 'bottles-events',
+    method: 'GET',
+    path: '/api/bottles/00000000-0000-4000-8000-000000000000/events',
+  },
   { family: 'river', method: 'POST', path: '/api/river/draw' },
   { family: 'sea', method: 'GET', path: '/api/sea' },
   { family: 'sea-detail', method: 'GET', path: '/api/sea/00000000-0000-4000-8000-000000000000' },
@@ -51,8 +75,16 @@ const KNOWN_FAMILIES: readonly Family[] = [
     method: 'POST',
     path: '/api/sea/00000000-0000-4000-8000-000000000000/targeted-segment',
   },
-  { family: 'votes', method: 'POST', path: '/api/segments/00000000-0000-4000-8000-000000000000/votes' },
-  { family: 'messages', method: 'GET', path: '/api/bottles/00000000-0000-4000-8000-000000000000/messages' },
+  {
+    family: 'votes',
+    method: 'POST',
+    path: '/api/segments/00000000-0000-4000-8000-000000000000/votes',
+  },
+  {
+    family: 'messages',
+    method: 'GET',
+    path: '/api/bottles/00000000-0000-4000-8000-000000000000/messages',
+  },
   { family: 'reports', method: 'POST', path: '/api/reports' },
   { family: 'notifications', method: 'GET', path: '/api/notifications' },
   { family: 'badges', method: 'GET', path: '/api/me/badges' },
@@ -86,7 +118,9 @@ describe('路由注册守卫：所有已知路由族必须同时挂载（防静�
   });
 
   it.each(KNOWN_FAMILIES)('$family 已挂载且被匹配：$method $path', async ({ method, path }) => {
-    const response = await app.inject(method === 'POST' ? { method, url: path, payload: {} } : { method, url: path });
+    const response = await app.inject(
+      method === 'POST' ? { method, url: path, payload: {} } : { method, url: path },
+    );
     // 用文本判定（204 无 body 时 .json() 会抛）；未匹配唯一特征就是 notFound 处理器写的 unmatched 标记。
     expect(response.body, `${path} 未被路由匹配（疑似注册被覆盖）`).not.toContain('unmatched');
   });

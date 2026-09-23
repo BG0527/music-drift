@@ -21,7 +21,10 @@ export interface CollectionRoutesOptions {
   clock: Clock;
 }
 
-export function registerCollectionRoutes(app: FastifyInstance, options: CollectionRoutesOptions): void {
+export function registerCollectionRoutes(
+  app: FastifyInstance,
+  options: CollectionRoutesOptions,
+): void {
   const actors = createActorResolver(options.db, options.clock);
   const { db, store } = options;
 
@@ -34,7 +37,9 @@ export function registerCollectionRoutes(app: FastifyInstance, options: Collecti
       `select bottle_id, created_at from collections where user_id = $1 order by created_at desc limit 100`,
       [actor.user.id],
     );
-    return reply.send(rows.map((row) => ({ bottleId: row.bottle_id, createdAt: row.created_at.toISOString() })));
+    return reply.send(
+      rows.map((row) => ({ bottleId: row.bottle_id, createdAt: row.created_at.toISOString() })),
+    );
   });
 
   app.post('/api/collections/:bottleId', async (request, reply) => {
@@ -55,7 +60,10 @@ export function registerCollectionRoutes(app: FastifyInstance, options: Collecti
       // 注意：不用内核的 `violation()` —— 内核**不认识** API 层码（那正是分层的目的）；
       // 这里直接构造违规条目，经同一个 `problem.ts` 出口映射为 422。
       const problem = problemFromViolations([
-        { code: 'COLLECTION_REQUIRES_FINISHED_WORK', message: '收藏只对已完成并进入公海的作品开放。' },
+        {
+          code: 'COLLECTION_REQUIRES_FINISHED_WORK',
+          message: '收藏只对已完成并进入公海的作品开放。',
+        },
       ]);
       return problem === null ? reply : sendProblem(reply, problem);
     }
@@ -65,7 +73,10 @@ export function registerCollectionRoutes(app: FastifyInstance, options: Collecti
        values (gen_random_uuid(), $1, $2, $3) on conflict (user_id, bottle_id) do nothing`,
       [actor.user.id, params.data.bottleId, new Date(options.clock.now())],
     );
-    return reply.code(201).send({ bottleId: params.data.bottleId, createdAt: new Date(options.clock.now()).toISOString() });
+    return reply.code(201).send({
+      bottleId: params.data.bottleId,
+      createdAt: new Date(options.clock.now()).toISOString(),
+    });
   });
 
   app.delete('/api/collections/:bottleId', async (request, reply) => {

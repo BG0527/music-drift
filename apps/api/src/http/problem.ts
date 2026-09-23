@@ -112,7 +112,9 @@ export function problemFromOutcome(outcome: CommandOutcome): HttpProblem | null 
 export function transportProblem(code: TransportErrorCode): HttpProblem {
   return {
     status: TRANSPORT_STATUS[code],
-    body: ErrorResponseSchema.parse({ error: { message: TRANSPORT_MESSAGES[code], violations: [] } }),
+    body: ErrorResponseSchema.parse({
+      error: { message: TRANSPORT_MESSAGES[code], violations: [] },
+    }),
   };
 }
 

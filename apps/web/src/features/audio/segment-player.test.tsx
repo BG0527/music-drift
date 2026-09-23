@@ -10,7 +10,7 @@
  */
 import { act, fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
-import { SegmentPlayer } from './segment-player';
+import { SegmentPlayer, type SegmentListenSnapshot } from './segment-player';
 
 class FakeAudio {
   src: string;
@@ -169,5 +169,99 @@ describe('SegmentPlayer：点踩门槛', () => {
     });
 
     expect(screen.getByRole('button', { name: /点踩/ })).toBeDisabled();
+  });
+});
+
+describe('SegmentPlayer：把真实已听比例透给消费者（t12 点踩门槛依赖它）', () => {
+  const lastSnapshot = (onProgress: ReturnType<typeof vi.fn>): SegmentListenSnapshot => {
+    const call = onProgress.mock.calls.at(-1);
+    expect(call, 'onProgress 一次都没被调用').toBeDefined();
+    return call?.[0] as SegmentListenSnapshot;
+  };
+
+  it('透出的 ratio 等于 ListenTracker 的覆盖率（组件不自己算第二份）', () => {
+    const onProgress = vi.fn();
+    const { element } = setup({ durationMs: 20_000, onProgress });
+
+    act(() => {
+      element.playThroughTo(10);
+    });
+
+    const snapshot = lastSnapshot(onProgress);
+    expect(snapshot.segmentIndex).toBe(2);
+    expect(snapshot.ratio).toBeCloseTo(0.5, 2);
+    expect(snapshot.coveredMs).toBeGreaterThanOrEqual(9_750);
+    expect(snapshot.dislikeUnlocked).toBe(false);
+  });
+
+  it('拖动进度条（seeking + 大跳跃）不会让比例虚高', () => {
+    const onProgress = vi.fn();
+    const { element } = setup({ durationMs: 20_000, onProgress });
+
+    act(() => {
+      element.playThroughTo(10);
+    });
+    act(() => {
+      element.currentTime = 19; // 跳到接近片尾：这段位移不是"听"
+      element.emit('seeking');
+      element.emit('timeupdate');
+    });
+    act(() => {
+      element.currentTime = 19.5;
+      element.emit('timeupdate');
+    });
+
+    const snapshot = lastSnapshot(onProgress);
+    // 覆盖率 = [0,10]s + [19,19.5]s = 10.5s / 20s = 0.525；
+    // 若把拖动段算进去会得到 ~0.975 —— 这正是"拖动虚高"的失败形态
+    expect(snapshot.ratio).toBeLessThan(0.6);
+    expect(snapshot.ratio).toBeGreaterThanOrEqual(0.52);
+  });
+
+  it('循环重播不叠加：覆盖率封顶 1，但累计播放时长确实增加', () => {
+    const onProgress = vi.fn();
+    const { element } = setup({ durationMs: 20_000, onProgress });
+
+    act(() => {
+      element.playThroughTo(20);
+    });
+    const first = lastSnapshot(onProgress);
+    expect(first.ratio).toBeGreaterThan(0.95);
+
+    act(() => {
+      element.currentTime = 0;
+      element.emit('seeking');
+      element.playThroughTo(20);
+    });
+    const second = lastSnapshot(onProgress);
+
+    expect(second.ratio).toBeLessThanOrEqual(1);
+    expect(second.ratio).toBeGreaterThanOrEqual(first.ratio);
+    expect(second.playedMs).toBeGreaterThan(first.playedMs);
+  });
+
+  it('门槛解锁由内核判定透出：听满阈值即 unlocked（UI 不写死 0.8）', () => {
+    const onProgress = vi.fn();
+    const { element } = setup({ durationMs: 20_000, onProgress });
+
+    act(() => {
+      element.playThroughTo(17);
+    });
+
+    // 17/20 = 0.85 ≥ 内核 DEFAULT_POLICY.dislikeListenRatioThreshold(0.8)
+    expect(lastSnapshot(onProgress).dislikeUnlocked).toBe(true);
+  });
+
+  it('时长不可信时 fail-closed：ratio 恒为 0、门槛永不解锁', () => {
+    const onProgress = vi.fn();
+    const { element } = setup({ durationMs: null, onProgress });
+
+    act(() => {
+      element.playThroughTo(10);
+    });
+
+    const snapshot = lastSnapshot(onProgress);
+    expect(snapshot.ratio).toBe(0);
+    expect(snapshot.dislikeUnlocked).toBe(false);
   });
 });

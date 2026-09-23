@@ -6,7 +6,12 @@
 import type { Clock } from '@music-drift/shared/domain';
 import type { FastifyRequest } from 'fastify';
 import { createAuthRepository, type UserRow } from '../auth/repository.js';
-import { SESSION_COOKIE_NAME, hashSessionToken, isSessionActive, readCookie } from '../auth/session.js';
+import {
+  SESSION_COOKIE_NAME,
+  hashSessionToken,
+  isSessionActive,
+  readCookie,
+} from '../auth/session.js';
 import type { Db } from '../db/client.js';
 
 export interface SessionActor {
@@ -29,6 +34,13 @@ export function createActorResolver(db: Db, clock: Clock): ActorResolver {
       }
       const session = await repo.findSessionByTokenHash(hashSessionToken(token));
       if (session === null || !isSessionActive(session.expiresAt, clock.now())) {
+        return null;
+      }
+      /**
+       * 封禁（t12 审核台）：**在身份解析这一层拦**，而不是在每个路由里记得判断 ——
+       * 结构性覆盖，遗漏在结构上不可能。被封者一律按"无身份"（401）处理。
+       */
+      if (session.user.bannedAt !== null) {
         return null;
       }
       return { user: session.user, isAdmin: session.user.role === 'ADMIN' };

@@ -1,0 +1,2 @@
+ALTER TABLE "reports" DROP CONSTRAINT "reports_action_check";--> statement-breakpoint
+ALTER TABLE "reports" ADD CONSTRAINT "reports_action_check" CHECK ("reports"."action" is null or "reports"."action" in ('NONE', 'REMOVE_SEGMENT', 'RESTORE_SEGMENT', 'REMOVE_BOTTLE', 'BAN_USER'));

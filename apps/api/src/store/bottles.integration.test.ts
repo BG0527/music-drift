@@ -68,15 +68,21 @@ describe('bottleStore：内核命令 ↔ 事件流 ↔ 投影 ↔ 重放', () =>
     const state = await store.loadState(bottleId);
 
     const outcome = recordSegment(state!, { userId: initiatorId, note: '第一段' }, ctx);
-    await store.applyOutcome(bottleId, outcome, { segment: { durationMs: 20_000, audioMime: 'audio/webm' } });
+    await store.applyOutcome(bottleId, outcome, {
+      segment: { durationMs: 20_000, audioMime: 'audio/webm' },
+    });
 
     const segments = await store.listBottleSegments(bottleId);
-    expect(segments.map((segment) => segment.index + ':' + segment.ownerId)).toEqual(['1:' + initiatorId]);
+    expect(segments.map((segment) => segment.index + ':' + segment.ownerId)).toEqual([
+      '1:' + initiatorId,
+    ]);
     expect(segments[0]?.note).toBe('第一段');
     expect(segments[0]?.audioMime).toBe('audio/webm');
 
     expect((await store.findBottle(bottleId))?.revision).toBe(1);
-    expect((await store.loadState(bottleId))?.segments.map((segment) => segment.index)).toEqual([1]);
+    expect((await store.loadState(bottleId))?.segments.map((segment) => segment.index)).toEqual([
+      1,
+    ]);
   });
 
   it('投河 → 捞取 → 接唱：状态、持有者锁、父链三者一致', async () => {
@@ -88,9 +94,15 @@ describe('bottleStore：内核命令 ↔ 事件流 ↔ 投影 ↔ 重放', () =>
     await store.createBottle({ bottleId, songId, initiatorId, ctx });
 
     let state = (await store.loadState(bottleId))!;
-    await store.applyOutcome(bottleId, recordSegment(state, { userId: initiatorId, note: null }, ctx));
+    await store.applyOutcome(
+      bottleId,
+      recordSegment(state, { userId: initiatorId, note: null }, ctx),
+    );
     state = (await store.loadState(bottleId))!;
-    await store.applyOutcome(bottleId, chooseResolution(state, { userId: initiatorId, resolution: 'RIVER' }, ctx));
+    await store.applyOutcome(
+      bottleId,
+      chooseResolution(state, { userId: initiatorId, resolution: 'RIVER' }, ctx),
+    );
 
     expect((await store.findBottle(bottleId))?.status).toBe('IN_RIVER');
     expect((await store.findBottle(bottleId))?.currentCasterId).toBe(initiatorId);
@@ -117,9 +129,15 @@ describe('bottleStore：内核命令 ↔ 事件流 ↔ 投影 ↔ 重放', () =>
     const ctx = ctxAt(3 * HOUR);
     await store.createBottle({ bottleId, songId, initiatorId, ctx });
     let state = (await store.loadState(bottleId))!;
-    await store.applyOutcome(bottleId, recordSegment(state, { userId: initiatorId, note: null }, ctx));
+    await store.applyOutcome(
+      bottleId,
+      recordSegment(state, { userId: initiatorId, note: null }, ctx),
+    );
     state = (await store.loadState(bottleId))!;
-    await store.applyOutcome(bottleId, chooseResolution(state, { userId: initiatorId, resolution: 'RIVER' }, ctx));
+    await store.applyOutcome(
+      bottleId,
+      chooseResolution(state, { userId: initiatorId, resolution: 'RIVER' }, ctx),
+    );
 
     const results = await Promise.all([
       store.drawFromRiver({ bottleId, userId: first, ctx }),
@@ -130,9 +148,14 @@ describe('bottleStore：内核命令 ↔ 事件流 ↔ 投影 ↔ 重放', () =>
     const loser = results.find((result) => result?.ok === false);
     expect(loser?.violations.map((violation) => violation.code)).toEqual(['HOLDING_ALREADY_TAKEN']);
 
-    const events = await db.query<{ type: string }>(`select type from events where bottle_id = $1`, [bottleId]);
+    const events = await db.query<{ type: string }>(
+      `select type from events where bottle_id = $1`,
+      [bottleId],
+    );
     expect(events.filter((event) => event.type === 'BOTTLE_DRAWN')).toHaveLength(1);
-    expect((await store.activeHolding(bottleId))?.holderId).toBe((await store.findBottle(bottleId))?.currentHolderId);
+    expect((await store.activeHolding(bottleId))?.holderId).toBe(
+      (await store.findBottle(bottleId))?.currentHolderId,
+    );
   });
 
   it('入海：bottles 行与重放状态一致，完整作品进公海已完成区', async () => {
@@ -144,15 +167,24 @@ describe('bottleStore：内核命令 ↔ 事件流 ↔ 投影 ↔ 重放', () =>
     await store.createBottle({ bottleId, songId, initiatorId, ctx });
 
     let state = (await store.loadState(bottleId))!;
-    await store.applyOutcome(bottleId, recordSegment(state, { userId: initiatorId, note: null }, ctx));
+    await store.applyOutcome(
+      bottleId,
+      recordSegment(state, { userId: initiatorId, note: null }, ctx),
+    );
     state = (await store.loadState(bottleId))!;
-    await store.applyOutcome(bottleId, chooseResolution(state, { userId: initiatorId, resolution: 'RIVER' }, ctx));
+    await store.applyOutcome(
+      bottleId,
+      chooseResolution(state, { userId: initiatorId, resolution: 'RIVER' }, ctx),
+    );
     await store.drawFromRiver({ bottleId, userId: singerId, ctx });
     state = (await store.loadState(bottleId))!;
     await store.applyOutcome(bottleId, recordSegment(state, { userId: singerId, note: null }, ctx));
     state = (await store.loadState(bottleId))!;
     expect(isComplete(state)).toBe(true);
-    await store.applyOutcome(bottleId, chooseResolution(state, { userId: singerId, resolution: 'SEA' }, ctx));
+    await store.applyOutcome(
+      bottleId,
+      chooseResolution(state, { userId: singerId, resolution: 'SEA' }, ctx),
+    );
 
     const row = await store.findBottle(bottleId);
     const replayed = (await store.loadState(bottleId))!;
@@ -174,20 +206,31 @@ describe('bottleStore：内核命令 ↔ 事件流 ↔ 投影 ↔ 重放', () =>
     await store.createBottle({ bottleId, songId, initiatorId, ctx });
 
     let state = (await store.loadState(bottleId))!;
-    await store.applyOutcome(bottleId, recordSegment(state, { userId: initiatorId, note: null }, ctx));
+    await store.applyOutcome(
+      bottleId,
+      recordSegment(state, { userId: initiatorId, note: null }, ctx),
+    );
     state = (await store.loadState(bottleId))!;
-    await store.applyOutcome(bottleId, chooseResolution(state, { userId: initiatorId, resolution: 'RIVER' }, ctx));
+    await store.applyOutcome(
+      bottleId,
+      chooseResolution(state, { userId: initiatorId, resolution: 'RIVER' }, ctx),
+    );
     await store.drawFromRiver({ bottleId, userId: singerId, ctx });
     state = (await store.loadState(bottleId))!;
     await store.applyOutcome(bottleId, recordSegment(state, { userId: singerId, note: null }, ctx));
     state = (await store.loadState(bottleId))!;
-    await store.applyOutcome(bottleId, chooseResolution(state, { userId: singerId, resolution: 'RIVER' }, ctx));
+    await store.applyOutcome(
+      bottleId,
+      chooseResolution(state, { userId: singerId, resolution: 'RIVER' }, ctx),
+    );
 
     state = (await store.loadState(bottleId))!;
     // 不变式：内核事件里的段 id 必须就是投影行的 id（否则投票外键/音频地址/重放会全部对不上）
     const projected = await store.listBottleSegments(bottleId);
     expect(projected.map((segment) => segment.index)).toEqual([1, 2]);
-    expect(projected.map((segment) => segment.id)).toEqual(state.segments.map((segment) => segment.id));
+    expect(projected.map((segment) => segment.id)).toEqual(
+      state.segments.map((segment) => segment.id),
+    );
     const firstSegmentId = state.segments[0]!.id;
     for (let round = 0; round < 10; round += 1) {
       const voterId = await insertUser(db);

@@ -30,6 +30,7 @@ const TITLES: Record<RouteName, string> = {
   seaDetail: '公海作品',
   profile: '我的',
   settings: '设置',
+  admin: '审核台',
   notFound: '找不到这一页',
 };
 

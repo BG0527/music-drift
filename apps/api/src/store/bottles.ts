@@ -20,6 +20,7 @@ import type { Db, Queryable } from '../db/client.js';
 import { appendDomainEvent, readDomainEvents } from '../db/events.js';
 import { activeHoldingOf, applyDomainEventToHoldings, claimHolding } from '../db/holdings.js';
 import { insertBottleSegment } from '../db/segments.js';
+import { projectNotifications } from './notifications.js';
 
 export interface BottleRow {
   id: string;
@@ -94,11 +95,20 @@ export interface BottleStore {
   findBottle(bottleId: string): Promise<BottleRow | null>;
   /** 事件流重放出的内核状态（不存在返回 null）。 */
   loadState(bottleId: string): Promise<BottleState | null>;
-  createBottle(input: { bottleId: string; songId: string; initiatorId: string; ctx: DomainContext }): Promise<BottleRow | null>;
+  createBottle(input: {
+    bottleId: string;
+    songId: string;
+    initiatorId: string;
+    ctx: DomainContext;
+  }): Promise<BottleRow | null>;
   /** 把命令产出的事件投影进库（事务内）；被拒的命令零副作用。 */
   applyOutcome(bottleId: string, outcome: CommandOutcome, extras?: ApplyExtras): Promise<void>;
   /** 捞取：内核守卫先说话，再原子抢占持有者锁；锁被抢走 → 零副作用返回 409 语义。 */
-  drawFromRiver(input: { bottleId: string; userId: string; ctx: DomainContext }): Promise<CommandOutcome | null>;
+  drawFromRiver(input: {
+    bottleId: string;
+    userId: string;
+    ctx: DomainContext;
+  }): Promise<CommandOutcome | null>;
   releaseHolding(bottleId: string, holderId: string, at: Date): Promise<number>;
   listSongs(): Promise<SongRow[]>;
   listSeaBottles(input: { zone?: 'COMPLETED' | 'INCOMPLETE'; limit: number }): Promise<BottleRow[]>;
@@ -111,7 +121,9 @@ export interface BottleStore {
   listParticipatedBottles(input: { userId: string; limit: number }): Promise<BottleRow[]>;
   listBottleSegments(bottleId: string): Promise<BottleSegmentRow[]>;
   liveSegmentIndexes(bottleId: string): Promise<number[]>;
-  activeHolding(bottleId: string): Promise<{ holderId: string; parentId: string | null; origin: string } | null>;
+  activeHolding(
+    bottleId: string,
+  ): Promise<{ holderId: string; parentId: string | null; origin: string } | null>;
   /**
    * 指定接唱未完成作品（CONTEXT §6.2）：把公海未完成作品交给指定的人接下一段。
    *
@@ -119,11 +131,19 @@ export interface BottleStore {
    * 追加一条 `BOTTLE_DRAWN`（父节点 = 该作品**最后一段的接唱者**，正是 §6.2 原文规定），
    * 并原子抢占持有者锁。状态仍由事件流重放得到，规则不在路由里。
    */
-  takeTargetedSegment(input: { bottleId: string; userId: string; ctx: DomainContext }): Promise<CommandOutcome | null>;
+  takeTargetedSegment(input: {
+    bottleId: string;
+    userId: string;
+    ctx: DomainContext;
+  }): Promise<CommandOutcome | null>;
 }
 
 /** 事件 → 段/票/留言投影（这些表是「查询与媒体」视图，不参与规则判定）。 */
-async function projectMedia(tx: Queryable, event: Record<string, unknown>, extras: ApplyExtras): Promise<void> {
+async function projectMedia(
+  tx: Queryable,
+  event: Record<string, unknown>,
+  extras: ApplyExtras,
+): Promise<void> {
   const type = String(event['type']);
   const stamp = new Date(Number(event['at']));
   const bottleId = String(event['bottleId']);
@@ -142,27 +162,43 @@ async function projectMedia(tx: Queryable, event: Record<string, unknown>, extra
         durationMs: extras.segment?.durationMs ?? null,
         createdAt: stamp,
       });
-      await tx.query(`update bottles set revision = revision + 1, updated_at = $2 where id = $1`, [bottleId, stamp]);
-      return;
-    case 'SEGMENT_CUT':
-      await tx.query(`update bottle_segments set deleted_at = $2 where id = $1 and deleted_at is null`, [
-        String(event['segmentId']),
+      await tx.query(`update bottles set revision = revision + 1, updated_at = $2 where id = $1`, [
+        bottleId,
         stamp,
       ]);
+      return;
+    case 'SEGMENT_CUT':
+      await tx.query(
+        `update bottle_segments set deleted_at = $2 where id = $1 and deleted_at is null`,
+        [String(event['segmentId']), stamp],
+      );
       return;
     case 'VOTE_CAST':
       await tx.query(
         `insert into votes (id, segment_id, user_id, value, listened_ratio, created_at)
          values (gen_random_uuid(), $1, $2, $3, $4, $5)
          on conflict (segment_id, user_id, value) do nothing`,
-        [String(event['segmentId']), actorId, String(event['value']), extras.vote?.listenedRatio ?? 1, stamp],
+        [
+          String(event['segmentId']),
+          actorId,
+          String(event['value']),
+          extras.vote?.listenedRatio ?? 1,
+          stamp,
+        ],
       );
       return;
     case 'MESSAGE_ATTACHED':
       await tx.query(
         `insert into messages (id, bottle_id, from_user_id, to_user_id, content, status, created_at)
          values ($1, $2, $3, $4, $5, 'PENDING', $6)`,
-        [String(event['messageId']), bottleId, actorId, String(event['toUserId']), String(event['content']), stamp],
+        [
+          String(event['messageId']),
+          bottleId,
+          actorId,
+          String(event['toUserId']),
+          String(event['content']),
+          stamp,
+        ],
       );
       return;
     default:
@@ -192,18 +228,16 @@ async function projectBottleRow(tx: Queryable, event: Record<string, unknown>): 
       );
       return;
     case 'BOTTLE_DRAWN':
-      await tx.query(`update bottles set status = 'HELD', current_holder_id = $2, updated_at = $3 where id = $1`, [
-        bottleId,
-        actorId,
-        stamp,
-      ]);
+      await tx.query(
+        `update bottles set status = 'HELD', current_holder_id = $2, updated_at = $3 where id = $1`,
+        [bottleId, actorId, stamp],
+      );
       return;
     case 'BOTTLE_RETURNED':
-      await tx.query(`update bottles set status = 'HELD', current_holder_id = $2, updated_at = $3 where id = $1`, [
-        bottleId,
-        String(event['toUserId']),
-        stamp,
-      ]);
+      await tx.query(
+        `update bottles set status = 'HELD', current_holder_id = $2, updated_at = $3 where id = $1`,
+        [bottleId, String(event['toUserId']), stamp],
+      );
       return;
     case 'BOTTLE_REWOUND':
       await tx.query(
@@ -226,10 +260,10 @@ async function projectBottleRow(tx: Queryable, event: Record<string, unknown>): 
            updated_at = $2 where id = $1`,
         [bottleId, stamp, event['returnCompleted'] === true, event['chainBroken'] === true],
       );
-      await tx.query(`update messages set status = $2 where bottle_id = $1 and status = 'PENDING'`, [
-        bottleId,
-        event['returnCompleted'] === true ? 'DELIVERED' : 'UNDELIVERED',
-      ]);
+      await tx.query(
+        `update messages set status = $2 where bottle_id = $1 and status = 'PENDING'`,
+        [bottleId, event['returnCompleted'] === true ? 'DELIVERED' : 'UNDELIVERED'],
+      );
       return;
     case 'BOTTLE_DAMAGED':
       await tx.query(
@@ -255,7 +289,11 @@ export function createBottleStore(db: Db): BottleStore {
     return row === undefined ? null : toBottleRow(row);
   }
 
-  async function applyOutcome(bottleId: string, outcome: CommandOutcome, extras: ApplyExtras = {}): Promise<void> {
+  async function applyOutcome(
+    bottleId: string,
+    outcome: CommandOutcome,
+    extras: ApplyExtras = {},
+  ): Promise<void> {
     if (!outcome.ok) {
       return; // 被拒命令零副作用（内核语义）：不投影任何东西
     }
@@ -263,6 +301,9 @@ export function createBottleStore(db: Db): BottleStore {
       for (const event of outcome.events) {
         const record = event as unknown as Record<string, unknown>;
         await projectMedia(tx, record, extras);
+        // 通知必须在 projectBottleRow **之前**：后者会把 PENDING 留言一次性改终态，
+        // 而通知要按"改之前"的收件关系决定发给谁（送达→发起者 / 未送达→发送者）。
+        await projectNotifications(tx, record, bottleId, new Date(Number(record['at'])));
         await projectBottleRow(tx, record);
         await applyDomainEventToHoldings(tx, {
           type: String(record['type']),
@@ -282,15 +323,21 @@ export function createBottleStore(db: Db): BottleStore {
     loadState,
 
     async createBottle(input): Promise<BottleRow | null> {
-      const songs = await db.query<{ total_segments: number }>(`select total_segments from songs where id = $1`, [
-        input.songId,
-      ]);
+      const songs = await db.query<{ total_segments: number }>(
+        `select total_segments from songs where id = $1`,
+        [input.songId],
+      );
       const totalSegments = songs[0]?.total_segments;
       if (totalSegments === undefined) {
         return null;
       }
       const outcome = createBottleCommand(
-        { bottleId: input.bottleId, songId: input.songId, initiatorId: input.initiatorId, totalSegments },
+        {
+          bottleId: input.bottleId,
+          songId: input.songId,
+          initiatorId: input.initiatorId,
+          totalSegments,
+        },
         input.ctx,
       );
       await db.withTransaction(async (tx) => {
@@ -334,7 +381,9 @@ export function createBottleStore(db: Db): BottleStore {
           ok: false,
           state,
           events: [],
-          violations: [{ code: 'HOLDING_ALREADY_TAKEN', message: '这个漂流瓶已经被别人拿走了，换一个吧。' }],
+          violations: [
+            { code: 'HOLDING_ALREADY_TAKEN', message: '这个漂流瓶已经被别人拿走了，换一个吧。' },
+          ],
         };
       }
       await applyOutcome(input.bottleId, drawOutcome);
@@ -343,20 +392,27 @@ export function createBottleStore(db: Db): BottleStore {
 
     async releaseHolding(bottleId: string, holderId: string, at: Date): Promise<number> {
       const { releaseHolding } = await import('../db/holdings.js');
-      return db.withTransaction(async (tx) => releaseHolding(tx, { bottleId, holderId, releasedAt: at }));
+      return db.withTransaction(async (tx) =>
+        releaseHolding(tx, { bottleId, holderId, releasedAt: at }),
+      );
     },
 
     async listSongs(): Promise<SongRow[]> {
-      const songs = await db.query<{ id: string; title: string; total_segments: number; licensed_source: string }>(
-        `select id, title, total_segments, licensed_source from songs order by title asc`,
-      );
+      const songs = await db.query<{
+        id: string;
+        title: string;
+        total_segments: number;
+        licensed_source: string;
+      }>(`select id, title, total_segments, licensed_source from songs order by title asc`);
       const segments = await db.query<{
         id: string;
         song_id: string;
         index: number;
         start_ms: number;
         duration_ms: number;
-      }>(`select id, song_id, "index", start_ms, duration_ms from song_segments order by song_id, "index" asc`);
+      }>(
+        `select id, song_id, "index", start_ms, duration_ms from song_segments order by song_id, "index" asc`,
+      );
       return songs.map((song) => ({
         id: song.id,
         title: song.title,
@@ -471,7 +527,9 @@ export function createBottleStore(db: Db): BottleStore {
           ok: false,
           state,
           events: [],
-          violations: [{ code: 'HOLDING_ALREADY_TAKEN', message: '这个漂流瓶已经被别人拿走了，换一个吧。' }],
+          violations: [
+            { code: 'HOLDING_ALREADY_TAKEN', message: '这个漂流瓶已经被别人拿走了，换一个吧。' },
+          ],
         };
       }
       const outcome: CommandOutcome = {

@@ -12,9 +12,11 @@ import { gapNotice, progressLabel } from '../features/bottle/relay-status';
 import { RelayTimeline } from '../features/bottle/relay-timeline';
 import { formatOccurredAt } from '../features/bottle/drift-events';
 import { ConflictNotice } from '../features/bottle/conflict-notice';
+import { ReportDialog } from '../features/bottle/report-dialog';
 import { ApiError } from '../features/api/client';
+import { useCastVote } from '../features/api/mutations';
 import { MixExportPanel, SegmentPlayer } from '../features/audio';
-import { EmptyState, Icon, Skeleton, Toast } from '../design-system';
+import { Button, EmptyState, Icon, Skeleton, Toast } from '../design-system';
 import { AsyncBoundary } from './shell/async-boundary';
 import { Link } from './shell/router';
 import { TEXT_LINK, TEXT_LINK_STRONG } from './shell/link-styles';
@@ -23,6 +25,9 @@ export function SeaDetailPage({ id }: { id: string }) {
   const sea = useSeaBottle(id);
   const bottle = useBottle(id);
   const [note, setNote] = useState<string | null>(null);
+  const [reporting, setReporting] = useState(false);
+  const castVote = useCastVote();
+  const [listenedRatio, setListenedRatio] = useState<Record<string, number>>({});
 
   if (sea.isPending || bottle.isPending) {
     return (
@@ -54,7 +59,8 @@ export function SeaDetailPage({ id }: { id: string }) {
 
   return (
     <div className="flex flex-col gap-6">
-      {note === null ? null : <Toast tone="info" message={note} />}
+      {note === null ? null : <Toast tone={castVote.isError ? 'warning' : 'info'} message={note} />}
+      {castVote.isError ? <ConflictNotice error={castVote.error} /> : null}
 
       <nav aria-label="面包屑" className="flex flex-wrap items-center gap-3 text-[0.875rem]">
         <Link to="/sea" className="inline-flex min-h-11 items-center gap-2 text-peacock underline">
@@ -117,9 +123,31 @@ export function SeaDetailPage({ id }: { id: string }) {
                       segmentIndex={segment.index}
                       durationMs={segment.durationMs}
                       ownerCode={segment.ownerCode}
+                      onProgress={(snapshot) => {
+                        // 跨段快照丢弃：否则切段后会沿用上一段的比例
+                        if (snapshot.segmentIndex !== segment.index) return;
+                        setListenedRatio((previous) => ({
+                          ...previous,
+                          [segment.id]: snapshot.ratio,
+                        }));
+                      }}
                       onCastDislike={() => {
-                        // 投票属次级特性（t12）：明确说明，而不是给一个点了没反应的按钮
-                        setNote('点踩与点赞属于下一片切片：公海这一版只提供试听与成品导出。');
+                        castVote.mutate(
+                          {
+                            segmentId: segment.id,
+                            value: 'DISLIKE',
+                            listenedRatio: listenedRatio[segment.id] ?? 0,
+                          },
+                          {
+                            onSuccess: (result) => {
+                              setNote(
+                                result.segmentCut
+                                  ? '已记录你的点踩；这一段因踩数达到阈值被斩浪删除。'
+                                  : '已记录你的点踩。',
+                              );
+                            },
+                          },
+                        );
                       }}
                     />
                   ))}
@@ -127,6 +155,28 @@ export function SeaDetailPage({ id }: { id: string }) {
               </section>
 
               <MixExportPanel plan={plan} />
+
+              <div className="flex flex-wrap items-center gap-4">
+                <Button
+                  variant="ghost"
+                  icon={<Icon name="Flag" size={18} />}
+                  onClick={() => {
+                    setReporting(true);
+                  }}
+                >
+                  举报这支作品
+                </Button>
+                {reporting ? (
+                  <ReportDialog
+                    open
+                    targetType="BOTTLE"
+                    targetId={detail.id}
+                    onClose={() => {
+                      setReporting(false);
+                    }}
+                  />
+                ) : null}
+              </div>
 
               <div className="flex flex-col gap-1 text-[0.875rem] leading-[1.6] text-slate-current">
                 <Link to={`/bottles/${detail.id}/log`} className={TEXT_LINK}>

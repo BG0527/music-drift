@@ -12,7 +12,6 @@
  */
 import { Client } from 'pg';
 
-
 const BASE_DATABASE = 'music_drift_test';
 const SWEEP_PATTERN = BASE_DATABASE + '_%'; // LIKE 模式：前缀匹配（下划线是通配符，够用）
 /** 只有"嵌入时间戳早于该阈值"的旧库才会被回收；并发的活库不可能被误清。 */
@@ -70,7 +69,10 @@ export function databaseNameOf(testUrl: string): string {
  * 判据不能是"有没有连接"——两次操作之间连接数会瞬时为 0，会把并发运行中的库删掉。
  * 返回值：被清掉的库名（便于测试与诊断）。`nowSeconds` 可注入，便于测试。
  */
-export async function sweepStaleTestDatabases(testUrl: string, nowSeconds = Math.floor(Date.now() / 1000)): Promise<string[]> {
+export async function sweepStaleTestDatabases(
+  testUrl: string,
+  nowSeconds = Math.floor(Date.now() / 1000),
+): Promise<string[]> {
   const current = databaseNameOf(testUrl);
   const client = new Client({ connectionString: adminUrlFor(testUrl) });
   await client.connect();
@@ -80,8 +82,13 @@ export async function sweepStaleTestDatabases(testUrl: string, nowSeconds = Math
       [SWEEP_PATTERN, current],
     );
     const stale = candidates.rows
-      .map((row) => ({ name: row.datname, epoch: Number(/^music_drift_test_(\d+)_/.exec(row.datname)?.[1] ?? '0') }))
-      .filter((candidate) => candidate.epoch > 0 && nowSeconds - candidate.epoch > STALE_AFTER_SECONDS);
+      .map((row) => ({
+        name: row.datname,
+        epoch: Number(/^music_drift_test_(\d+)_/.exec(row.datname)?.[1] ?? '0'),
+      }))
+      .filter(
+        (candidate) => candidate.epoch > 0 && nowSeconds - candidate.epoch > STALE_AFTER_SECONDS,
+      );
     for (const candidate of stale) {
       await client.query(`drop database if exists "${candidate.name}" with (force)`);
     }

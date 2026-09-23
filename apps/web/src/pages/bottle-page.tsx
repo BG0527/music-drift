@@ -13,11 +13,17 @@
  */
 import { useState } from 'react';
 import type { BottleDetail, RecordSegmentResponse, Resolution } from '@music-drift/shared';
-import { useChooseResolution, useInvalidateBottle, usePutBack } from '../features/api/mutations';
+import {
+  useCastVote,
+  useChooseResolution,
+  useInvalidateBottle,
+  usePutBack,
+} from '../features/api/mutations';
 import { useBottle, segmentAudioUrl } from '../features/api/queries';
 import { ApiError } from '../features/api/client';
 import { ConflictNotice } from '../features/bottle/conflict-notice';
 import { RecordStep } from '../features/bottle/record-step';
+import { ReportDialog } from '../features/bottle/report-dialog';
 import { RelayTimeline } from '../features/bottle/relay-timeline';
 import { ResolutionModal } from '../features/bottle/resolution-modal';
 import {
@@ -26,9 +32,13 @@ import {
   relayHeadline,
   BOTTLE_STATUS_LABEL,
 } from '../features/bottle/relay-status';
-import { rememberBottle, browserBottleStorage } from '../features/profile/bottle-index';
 import { useSession } from '../features/session/session-context';
-import { SegmentPlayer, type RecorderEnvironment, type UploadTransport } from '../features/audio';
+import {
+  SegmentPlayer,
+  type AudioElementLike,
+  type RecorderEnvironment,
+  type UploadTransport,
+} from '../features/audio';
 import { Button, Card, EmptyState, Icon, Toast } from '../design-system';
 import { AsyncBoundary } from './shell/async-boundary';
 import { Link } from './shell/router';
@@ -41,6 +51,8 @@ export interface BottlePageProps {
   seams?: {
     recorderEnvironment?: Partial<RecorderEnvironment> | undefined;
     uploadTransport?: UploadTransport | undefined;
+    /** 试听用的音频元素工厂（测试注入：驱动 listening 进度，从而验证点踩上送的是真实比例）。 */
+    segmentElementFactory?: ((src: string) => AudioElementLike) | undefined;
   };
 }
 
@@ -59,9 +71,19 @@ function BottleView({ bottle, seams }: { bottle: BottleDetail; seams?: BottlePag
   const resolution = useChooseResolution(bottle.id);
   const putBack = usePutBack(bottle.id);
   const invalidateBottle = useInvalidateBottle();
+  const castVote = useCastVote();
+  /**
+   * 每段"听了多少"。**只在快照属于同一段时才记录**（`segmentIndex` 守卫）：
+   * 否则切段后会沿用上一段的比例，给新段错误地解锁点踩。
+   */
+  const [listenedRatio, setListenedRatio] = useState<Record<string, number>>({});
   const [modalOpen, setModalOpen] = useState(false);
   const [announcement, setAnnouncement] = useState<string | null>(null);
   const [pendingNote, setPendingNote] = useState<string | null>(null);
+  const [reportTarget, setReportTarget] = useState<{
+    type: 'BOTTLE' | 'SEGMENT';
+    id: string;
+  } | null>(null);
   const me = session.user?.id ?? null;
 
   const liveSegments = bottle.segments.filter((segment) => segment.deletedAt === null);
@@ -103,12 +125,27 @@ function BottleView({ bottle, seams }: { bottle: BottleDetail; seams?: BottlePag
 
       {announcement === null ? null : <Toast tone="success" message={announcement} />}
       {pendingNote === null ? null : <Toast tone="info" message={pendingNote} />}
+      {castVote.isError ? <ConflictNotice error={castVote.error} bottleId={bottle.id} /> : null}
 
       <RelayTimeline
         segments={liveSegments}
         totalSegments={bottle.totalSegments}
         missingSegmentIndexes={bottle.missingSegmentIndexes}
+        onReportSegment={(segmentId) => {
+          setReportTarget({ type: 'SEGMENT', id: segmentId });
+        }}
       />
+
+      {bottle.hiddenLaterSegmentCount === 0 ? null : (
+        <p
+          role="status"
+          className="rounded-base border border-info-border bg-info-tint px-4 py-3 text-[0.875rem] leading-[1.6] text-peacock"
+        >
+          还有 {bottle.hiddenLaterSegmentCount}{' '}
+          段是你现在看不到的：漂流中只能听到自己那一棒之前的部分 （CONTEXT
+          §9.1）。作品入海之后，整条接力链会全部解锁。
+        </p>
+      )}
 
       <section className="flex flex-col gap-4" aria-labelledby="playback-heading">
         <h2 id="playback-heading" className="text-[1.0625rem] font-semibold text-abyss">
@@ -129,12 +166,38 @@ function BottleView({ bottle, seams }: { bottle: BottleDetail; seams?: BottlePag
                 segmentIndex={segment.index}
                 durationMs={segment.durationMs}
                 ownerCode={segment.ownerCode}
+                {...(seams?.segmentElementFactory === undefined
+                  ? {}
+                  : { createElement: seams.segmentElementFactory })}
                 isOwnSegment={me !== null && segment.ownerId === me}
-                onCastDislike={() => {
-                  // 投票属于次级特性（t12）：这一版**明确说明**而不是静默无反应
-                  setPendingNote(
-                    '点踩与点赞属于下一片切片：这一版只做试听与接力，不会提交你的任何评价。',
+                onProgress={(snapshot) => {
+                  if (snapshot.segmentIndex !== segment.index) return; // 跨段快照丢弃
+                  setListenedRatio((previous) => ({
+                    ...previous,
+                    [segment.id]: snapshot.ratio,
+                  }));
+                }}
+                onCastDislike={(index) => {
+                  // 比例原样上送（服务端仍会二次校验 80%）；不在这里自己算、也不写死阈值
+                  const ratio = listenedRatio[segment.id] ?? 0;
+                  setPendingNote(null);
+                  castVote.mutate(
+                    {
+                      segmentId: segment.id,
+                      value: 'DISLIKE',
+                      listenedRatio: ratio,
+                    },
+                    {
+                      onSuccess: (result) => {
+                        setAnnouncement(
+                          result.segmentCut
+                            ? '已记录你的点踩。这一段因为踩数达到阈值被斩浪删除，会留下空缺段位。'
+                            : '已记录你的点踩。',
+                        );
+                      },
+                    },
                   );
+                  void index;
                 }}
               />
             ))}
@@ -247,6 +310,32 @@ function BottleView({ bottle, seams }: { bottle: BottleDetail; seams?: BottlePag
         <p>谁在什么时候捞走、录音、投河、回传或入海，全都记在服务端。</p>
       </div>
 
+      <div className="flex flex-wrap items-center gap-4">
+        <Button
+          variant="ghost"
+          icon={<Icon name="Flag" size={18} />}
+          onClick={() => {
+            setReportTarget({ type: 'BOTTLE', id: bottle.id });
+          }}
+        >
+          举报这支漂流瓶
+        </Button>
+        <span className="text-[0.875rem] text-slate-current">
+          举报进入人工审核队列（CONTEXT §8），不是自动删除。
+        </span>
+      </div>
+
+      {reportTarget === null ? null : (
+        <ReportDialog
+          open
+          targetType={reportTarget.type}
+          targetId={reportTarget.id}
+          onClose={() => {
+            setReportTarget(null);
+          }}
+        />
+      )}
+
       <ResolutionModal
         open={modalOpen}
         bottleId={bottle.id}
@@ -262,7 +351,7 @@ function BottleView({ bottle, seams }: { bottle: BottleDetail; seams?: BottlePag
         onConfirm={(choice: Resolution) => {
           void resolution
             .mutateAsync(choice)
-            .then((updated) => {
+            .then(() => {
               setModalOpen(false);
               setAnnouncement(
                 choice === 'SEA'
@@ -271,12 +360,6 @@ function BottleView({ bottle, seams }: { bottle: BottleDetail; seams?: BottlePag
                     ? '已回传：接下来由上游的传递者决定。'
                     : '已投河：等下一位陌生人捞到它。',
               );
-              rememberBottle(browserBottleStorage(), {
-                id: updated.id,
-                songTitle: updated.songTitle,
-                role: 'RELAY',
-                at: new Date().toISOString(),
-              });
             })
             .catch(() => undefined);
         }}

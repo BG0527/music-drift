@@ -14,6 +14,23 @@ import { DislikeButton } from './dislike-button';
 import { formatClock, formatSeconds } from './format';
 import { Button, Card, Icon, cn } from '../../design-system';
 
+/**
+ * 透给消费者的"当前段已听状态"。语义唯一来源是 `ListenTracker`（覆盖率并集），
+ * 组件**不重算**覆盖率，只转发；`dislikeUnlocked` 的门槛同样来自内核，UI 不写死 0.8。
+ */
+export interface SegmentListenSnapshot {
+  /** 这份进度属于哪一段（与服务端给的 `segmentIndex` 一致）。 */
+  segmentIndex: number;
+  /** 当前段已听比例 = 已覆盖区间并集 / 段时长，0..1；时长不可信时为 0（fail-closed）。 */
+  ratio: number;
+  /** 已覆盖毫秒数（判定"听满"的唯一依据）。 */
+  coveredMs: number;
+  /** 累计播放毫秒数（含重播；仅用于展示，不参与判定）。 */
+  playedMs: number;
+  /** 是否已达点踩门槛（门槛取内核 `DEFAULT_POLICY.dislikeListenRatioThreshold`）。 */
+  dislikeUnlocked: boolean;
+}
+
 export interface SegmentPlayerProps {
   /** 音频地址（服务端 Range 端点）。 */
   src: string;
@@ -26,6 +43,11 @@ export interface SegmentPlayerProps {
   /** 是否是自己录的那一段（自己不能踩自己的段）。 */
   isOwnSegment?: boolean;
   onCastDislike?: (segmentIndex: number) => void;
+  /**
+   * 已听进度回调（每次观察到进度推进/播放状态变化时调用）。
+   * 消费者（点踩按钮/投票）应据此判定与展示，**不要**自己重算覆盖率或写死阈值。
+   */
+  onProgress?: (snapshot: SegmentListenSnapshot) => void;
   castingDislike?: boolean;
   /** 测试/特殊环境注入音频元素工厂。 */
   createElement?: (src: string) => AudioElementLike;
@@ -40,6 +62,7 @@ export function SegmentPlayer({
   isOwnSegment = false,
   onCastDislike,
   castingDislike = false,
+  onProgress,
   createElement,
   className,
 }: SegmentPlayerProps) {
@@ -47,6 +70,16 @@ export function SegmentPlayer({
     src,
     durationMs,
     isOwnSegment,
+    // 只做转发：覆盖率与门槛判定都在内核完成（hook 内部用 ref 保存最新回调，不会重复订阅）
+    onProgress: (progress) => {
+      onProgress?.({
+        segmentIndex,
+        ratio: progress.ratio,
+        coveredMs: progress.coveredMs,
+        playedMs: progress.playedMs,
+        dislikeUnlocked: progress.dislikeUnlocked,
+      });
+    },
     ...(createElement === undefined ? {} : { createElement }),
   });
   const percent = Math.round(player.ratio * 100);

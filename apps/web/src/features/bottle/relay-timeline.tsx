@@ -23,6 +23,8 @@ export interface RelayTimelineProps {
   /** 歌的分段数（来自数据，不写死 4）。 */
   totalSegments: number;
   missingSegmentIndexes: readonly number[];
+  /** 段级举报入口（CONTEXT §8：瓶子 / 唱段 / 留言三类对象都要有入口）。 */
+  onReportSegment?: ((segmentId: string, index: number) => void) | undefined;
   className?: string;
 }
 
@@ -30,6 +32,7 @@ export function RelayTimeline({
   segments,
   totalSegments,
   missingSegmentIndexes,
+  onReportSegment,
   className,
 }: RelayTimelineProps) {
   const live = segments.filter((segment) => segment.deletedAt === null);
@@ -105,6 +108,18 @@ export function RelayTimeline({
                 </div>
                 {segment?.note === null || segment?.note === undefined ? null : (
                   <p className="text-[0.875rem] leading-[1.6] text-slate-current">{segment.note}</p>
+                )}
+                {segment === undefined || onReportSegment === undefined ? null : (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onReportSegment(segment.id, segment.index);
+                    }}
+                    className="inline-flex min-h-11 items-center gap-2 self-start text-[0.875rem] font-medium text-slate-current underline"
+                  >
+                    <Icon name="Flag" size={16} />
+                    举报第 {String(index)} 段
+                  </button>
                 )}
               </div>
             </li>

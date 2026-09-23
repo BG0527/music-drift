@@ -6,7 +6,12 @@
  */
 import { drawFromRiver, type DomainContext } from '@music-drift/shared/domain';
 import type { FastifyInstance } from 'fastify';
-import { problemFromViolations, problemFromOutcome, sendProblem, transportProblem } from '../http/problem.js';
+import {
+  problemFromViolations,
+  problemFromOutcome,
+  sendProblem,
+  transportProblem,
+} from '../http/problem.js';
 import { createActorResolver } from '../http/session.js';
 import type { Clock } from '@music-drift/shared/domain';
 import type { Db } from '../db/client.js';
@@ -37,7 +42,9 @@ export function registerRiverRoutes(app: FastifyInstance, options: RiverRoutesOp
     const ctx: DomainContext = createRequestContext(options.clock);
 
     // 候选 = 河道中的全部瓶子（Demo 规模小，直接取）；过滤与冷却由内核决定。
-    const candidates = await options.db.query<{ id: string }>(`select id from bottles where status = 'IN_RIVER'`);
+    const candidates = await options.db.query<{ id: string }>(
+      `select id from bottles where status = 'IN_RIVER'`,
+    );
     const states = (
       await Promise.all(candidates.map((candidate) => options.store.loadState(candidate.id)))
     ).filter((state): state is NonNullable<typeof state> => state !== null);
@@ -50,7 +57,11 @@ export function registerRiverRoutes(app: FastifyInstance, options: RiverRoutesOp
       // 河道里没有可捞的瓶子：内核已经给出稳定码（NO_BOTTLE_AVAILABLE → 409），照它映射。
       return noBottle === null ? reply.send({ bottle: null }) : sendProblem(reply, noBottle);
     }
-    const drawn = await options.store.drawFromRiver({ bottleId: outcome.bottleId, userId: actor.user.id, ctx });
+    const drawn = await options.store.drawFromRiver({
+      bottleId: outcome.bottleId,
+      userId: actor.user.id,
+      ctx,
+    });
     if (drawn === null) {
       return sendProblem(reply, transportProblem('NOT_FOUND'));
     }
@@ -64,7 +75,10 @@ export function registerRiverRoutes(app: FastifyInstance, options: RiverRoutesOp
       return sendProblem(reply, transportProblem('NOT_FOUND'));
     }
     const segments = await options.store.listBottleSegments(outcome.bottleId);
-    const songs = await options.db.query<{ title: string }>(`select title from songs where id = $1`, [row.songId]);
+    const songs = await options.db.query<{ title: string }>(
+      `select title from songs where id = $1`,
+      [row.songId],
+    );
     return reply.send({
       bottle: toBottleDetail({
         row,

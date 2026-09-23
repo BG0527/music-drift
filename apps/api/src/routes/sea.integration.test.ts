@@ -69,7 +69,11 @@ async function sing(cookie: string, bottleId: string): Promise<void> {
   expect(recorded.statusCode).toBe(201);
 }
 
-async function resolve(cookie: string, bottleId: string, resolution: 'RIVER' | 'RETURN' | 'SEA'): Promise<void> {
+async function resolve(
+  cookie: string,
+  bottleId: string,
+  resolution: 'RIVER' | 'RETURN' | 'SEA',
+): Promise<void> {
   const response = await app.inject({
     method: 'POST',
     url: '/api/bottles/' + bottleId + '/resolution',
@@ -135,7 +139,9 @@ describe('公海列表（CONTEXT §6.1）：默认只看已完成区，未完成
   it('默认列表：只含已完成作品，且每一项都能过契约（曲名非空、分区 COMPLETED）', async () => {
     const response = await app.inject({ method: 'GET', url: '/api/sea' });
     expect(response.statusCode).toBe(200);
-    const items = (response.json() as { items: unknown[] }).items.map((item) => BottleSummarySchema.parse(item));
+    const items = (response.json() as { items: unknown[] }).items.map((item) =>
+      BottleSummarySchema.parse(item),
+    );
 
     expect(items.map((item) => item.id)).toContain(completeId);
     expect(items.map((item) => item.id)).not.toContain(incompleteId); // 未完成品默认不出现
@@ -149,7 +155,9 @@ describe('公海列表（CONTEXT §6.1）：默认只看已完成区，未完成
   it('zone=INCOMPLETE：未完成品在列；缺口与内核一致（第 1 段已录 → 缺 2,3,4）', async () => {
     const response = await app.inject({ method: 'GET', url: '/api/sea?zone=INCOMPLETE' });
     expect(response.statusCode).toBe(200);
-    const items = (response.json() as { items: unknown[] }).items.map((item) => BottleSummarySchema.parse(item));
+    const items = (response.json() as { items: unknown[] }).items.map((item) =>
+      BottleSummarySchema.parse(item),
+    );
     const mine = items.find((item) => item.id === incompleteId);
 
     expect(mine).toBeDefined();
@@ -227,7 +235,10 @@ describe('公海详情与指定接唱（CONTEXT §6.2）', () => {
   });
 
   it('指定接唱：未登录 401；不存在的作品 404', async () => {
-    expect((await app.inject({ method: 'POST', url: '/api/sea/' + incompleteId + '/targeted-segment' })).statusCode).toBe(401);
+    expect(
+      (await app.inject({ method: 'POST', url: '/api/sea/' + incompleteId + '/targeted-segment' }))
+        .statusCode,
+    ).toBe(401);
     expect(await take(takerCookie, '00000000-0000-4000-8000-000000000000')).toBe(404);
   });
 
@@ -280,7 +291,9 @@ describe('公海详情与指定接唱（CONTEXT §6.2）', () => {
       url: '/api/bottles/' + incompleteId,
       headers: { cookie: takerCookie },
     });
-    expect((after.json() as { missingSegmentIndexes: number[] }).missingSegmentIndexes).toEqual([3, 4]);
+    expect((after.json() as { missingSegmentIndexes: number[] }).missingSegmentIndexes).toEqual([
+      3, 4,
+    ]);
     // 父链存在事件的 payload 里（events 表是单一事实来源）：
     // 指定接唱的父节点 = 该作品**最后一段**的接唱者（CONTEXT §6.2）
     const parent = await db.query<{ parent_id: string | null }>(

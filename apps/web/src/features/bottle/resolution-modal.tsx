@@ -59,7 +59,7 @@ export function ResolutionModal({
       onClose={onCancel}
       footer={
         <>
-          <Button variant="ghost" onClick={onCancel}>
+          <Button variant="ghost" className="whitespace-nowrap" onClick={onCancel}>
             取消并返回
           </Button>
           <Button

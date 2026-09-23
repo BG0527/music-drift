@@ -69,7 +69,8 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
     request.log.error({ err: error }, 'unhandled request error');
     const rawStatus = (error as { statusCode?: unknown }).statusCode;
     const status = typeof rawStatus === 'number' ? rawStatus : 500;
-    const problem = status >= 400 && status < 500 ? transportProblem('INVALID_BODY') : internalProblem();
+    const problem =
+      status >= 400 && status < 500 ? transportProblem('INVALID_BODY') : internalProblem();
     reply.code(problem.status).send(problem.body);
   });
 

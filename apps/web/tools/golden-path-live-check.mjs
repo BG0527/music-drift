@@ -8,7 +8,11 @@
  * ## 默认 = hermetic：自己的可抛弃库 + 自己起的 API
  *   node apps/web/tools/golden-path-live-check.mjs
  * 脚本会（复用 `apps/api/src/db/test-database.ts` 的派生机制）建 `music_drift_test_<epoch>_<pid>_<rand>`、
- * 迁移 + 灌种子、在**空闲端口**上起自己的 API、跑完 26 步后删库并回收超龄残留库。
+ * 迁移 + 灌种子、在**空闲端口**上起自己的 API、跑完 27 步后删库并回收超龄残留库。
+ *
+ * ⚠️ **验收证据只认 hermetic 模式**（captain 裁决 ②，2026-09-23）。外部模式（显式 `API_BASE`）
+ * 跑在别人的库上，河道里有别人的瓶子 ⟹ 结论受环境运气影响 ⟹ **不能写进验收口径**，
+ * 它只会被当作调试工具，并且会把非确定性步骤单列成「未复现（数据不受控）」、不计入 pass。
  *
  * **为什么要这样**：旧版本直接用 8787 上的 dev 服务 → 库里漂着别人的瓶子 → 随机捞取会捞到别人的
  * 瓶子 → 第 15 步断链、其后 11 项失败同源；通过与否取决于环境运气（同一份代码，captain 复现失败、
@@ -18,8 +22,9 @@
  *   API_BASE=http://localhost:8787 node apps/web/tools/golden-path-live-check.mjs
  * 对着一个已经起好的服务跑（调试用）。此时结果**取决于那个库里的数据**，不能当验收证据。
  *
- * 覆盖：注册/登录 → 选歌 → 发起 → 录第 1 段 → 投河 → 第二人捞取 → 接唱 → 投河 → … → 末段 →
- * 回传 → 入海 → 公海（完整区）→ 漂流日志 → 匿名代号 → 放回冷却 → 没有可捞的瓶子(409) → 401/409 语义。
+ * 覆盖（27 步）：注册/登录 → 选歌 → 发起 → 录第 1 段 → 投河 → 第二人捞取 → 接唱 → 投河 → … → 末段 →
+ * 回传 → 入海 → 公海（完整区）→ 事件流 → 匿名代号 → 放回冷却 → 没有可捞的瓶子(409) →
+ * **我的漂流日志 `GET /api/me/bottles`（P0 §11.1，含"斩浪后仍算参与过"）** → 401/409 语义。
  * 每一步都打印「步骤 / HTTP 状态 / 关键字段」，失败即 `process.exit(1)`。
  *
  * 说明：这是一个**命令行核查脚本**，输出就是它的产物，因此允许直接 console.log。
@@ -43,13 +48,23 @@ const TSX_CLI = createRequire(fileURLToPath(new URL('../../api/package.json', im
 );
 const IS_WINDOWS = process.platform === 'win32';
 
-/** 外部模式：只有**显式**给 API_BASE 才用别人的服务（默认自建，见文件头）。 */
-let API = process.env.API_BASE ?? null;
+/**
+ * 外部模式：只有**显式**给非空 `API_BASE` 才用别人的服务（默认自建，见文件头）。
+ *
+ * 空字符串必须当"没给"：`API_BASE= node …`（shell/CI 里 `API_BASE=$UNSET_VAR` 很常见）
+ * 若被当成"给了"，脚本会静默进入外部模式、把所有请求打向空 URL —— 配置错误会被伪装成检查失败。
+ */
+const externalBase = process.env.API_BASE;
+let API = externalBase !== undefined && externalBase.length > 0 ? externalBase : null;
 /** hermetic 环境的句柄（外部模式下为 null）。 */
 let hermetic = null;
 const stamp = Date.now().toString(36);
 
 let failures = 0;
+/** 注册计数器：同一 `label` 可注册多次（第 27 步需要 10 个不同的点踩者）。 */
+let registerSeq = 0;
+/** 非确定性步骤单列一类：**与 pass/fail 并列，不计入 pass**（captain 裁决 ②）。 */
+let inconclusive = 0;
 let stepNo = 0;
 
 function log(step, detail) {
@@ -64,6 +79,39 @@ function must(condition, message) {
   failures += 1;
   console.error(`  ✗ ${message}`);
 }
+
+/**
+ * 「这一步在本次环境里复现不出来」——**不算 pass**，但也不在外部模式里硬判失败。
+ *
+ * 为什么不硬失败：外部模式的数据不受控，硬失败会让它按环境随机变红，而**会随机变红的检查会被训练成
+ * 被忽略的检查**（captain 裁决 ②）。但 hermetic 模式下数据完全由本次运行掌控，「复现不出来」
+ * 只能是检查自身的问题 ⟹ 那里必须红。
+ */
+function unreproducible(message) {
+  if (hermetic === null) {
+    inconclusive += 1;
+    console.log(`  ⚠ 未复现（数据不受控，不计入 pass）：${message}`);
+    return;
+  }
+  must(false, `${message}（hermetic 模式下数据受控，这一步必须能复现）`);
+}
+
+/** 外部模式的横幅：**跑检查之前**就打在输出最前面，防止任何人把这份输出当验收证据。 */
+function printExternalBanner() {
+  const rule = '════════════════════════════════════════════════════════════';
+  console.log(rule);
+  console.log('⚠ 外部模式 · 非验收证据（跑在别人的库上：河道里有别人的瓶子，结论受环境运气影响）');
+  console.log('   验收证据只认 hermetic 模式：node apps/web/tools/golden-path-live-check.mjs');
+  console.log('   非确定性步骤会单列「未复现（数据不受控）」，不计入 pass。');
+  console.log(rule);
+  console.log('');
+}
+
+/**
+ * 最近若干次请求的痕迹（**诊断用**）：检查一旦变红，必须能自己说出"哪一步、什么响应"。
+ * 没有这个，红只会告诉你"某处应为 200"，你还得手工重放整条链路去猜。
+ */
+const recentCalls = [];
 
 async function call(session, method, path, options = {}) {
   const headers = { ...(options.headers ?? {}) };
@@ -88,6 +136,13 @@ async function call(session, method, path, options = {}) {
   } catch {
     body = text.slice(0, 200);
   }
+  recentCalls.push({
+    who: session.label,
+    what: `${method} ${path}`,
+    status: response.status,
+    body: text.slice(0, 300),
+  });
+  if (recentCalls.length > 8) recentCalls.shift();
   return { status: response.status, body };
 }
 
@@ -104,8 +159,12 @@ function webmBytes(size = 4_096) {
 
 async function register(label) {
   const session = newSession(label);
-  const handle = `${label}${stamp}`.slice(0, 30);
-  const email = `${label}.${stamp}@example.com`;
+  // 每个账号必须有**唯一** handle/email：`stamp` 只在进程启动时算一次，所以同一 label 注册两次
+  // （第 27 步要造 10 个点踩者）会撞唯一索引 → 409，而 409 的注册会让后面所有断言连锁失败。
+  registerSeq += 1;
+  const unique = `${stamp}${registerSeq}`;
+  const handle = `${label}${unique}`.slice(0, 30);
+  const email = `${label}.${unique}@example.com`;
   const password = 'drift2026';
   const created = await call(session, 'POST', '/api/auth/register', {
     json: { handle, email, password },
@@ -235,13 +294,13 @@ async function startHermetic() {
     env: { ...process.env, DATABASE_URL: info.databaseUrl, PORT: String(port), LOG_LEVEL: 'error' },
   });
   let serverLog = '';
-  child.stdout.on('data', (chunk) => {
+  const collect = (chunk) => {
     serverLog += String(chunk);
-  });
-  child.stderr.on('data', (chunk) => {
-    serverLog += String(chunk);
-  });
-  hermetic = { databaseUrl: info.databaseUrl, databaseName: info.databaseName, child };
+    if (hermetic !== null) hermetic.serverLog = serverLog;
+  };
+  child.stdout.on('data', collect);
+  child.stderr.on('data', collect);
+  hermetic = { databaseUrl: info.databaseUrl, databaseName: info.databaseName, child, serverLog: '' };
 
   if (!(await waitForHealth(API))) {
     console.error(`API 未在 60s 内就绪（${API}）：\n${serverLog}`);
@@ -562,10 +621,10 @@ const runChecks = async () => {
     drained += 1; // 捞到即持有（不选去向）→ 这支瓶子离开河道
   }
   if (emptyDraw === null) {
-    log(
-      '没有可捞的瓶子',
-      `河道里始终有瓶子可捞（持有 ${String(drained)} 支），按"未复现"记录；界面空态由前端测试覆盖`,
+    unreproducible(
+      `河道里始终有瓶子可捞（本次已持有 ${String(drained)} 支），造不出"没有可捞的瓶子"这个空态`,
     );
+    log('没有可捞的瓶子', '未复现（界面空态由前端测试与 API 集成测试分别覆盖）');
   } else {
     must(emptyDraw.status === 409, `没有可捞时应为 409，实际 ${emptyDraw.status}`);
     must(
@@ -578,6 +637,70 @@ const runChecks = async () => {
     );
   }
 
+  // ── 第 27 步：我的漂流日志 `GET /api/me/bottles`（CONTEXT §11.1，P0）──────
+  //
+  // 这条端点最容易写错的两处，这里都钉住：
+  // ① 判据是"我参与过"（我发起 或 我唱过），而不是"我现在还持有/还唱得动"；
+  // ② 段被**斩浪**（软删）之后**仍然算参与过**，只是 `mySegmentIndexes` 变空 —— 所以本步真的造一次斩浪。
+  const ownList = await call(A.session, 'GET', '/api/me/bottles');
+  must(ownList.status === 200, `我的漂流日志应为 200，实际 ${ownList.status}`);
+  const ownItem = ownList.body?.items?.find((item) => item.id === bottleId);
+  must(ownItem !== undefined, 'A 发起并唱过的瓶子应出现在自己的漂流日志里');
+  must(ownItem?.role === 'INITIATOR', `A 的角色应为 INITIATOR，实际 ${ownItem?.role}`);
+  must(
+    JSON.stringify(ownItem?.mySegmentIndexes) === JSON.stringify([1]),
+    `A 的段号应为 [1]，实际 ${JSON.stringify(ownItem?.mySegmentIndexes)}`,
+  );
+
+  const peerList = await call(B.session, 'GET', '/api/me/bottles');
+  const peerItem = peerList.body?.items?.find((item) => item.id === bottleId);
+  must(peerItem?.role === 'SINGER', `B 的角色应为 SINGER，实际 ${peerItem?.role}`);
+  must(
+    JSON.stringify(peerItem?.mySegmentIndexes) === JSON.stringify([2]),
+    `B 的段号应为 [2]，实际 ${JSON.stringify(peerItem?.mySegmentIndexes)}`,
+  );
+
+  const outsider = await register('zz');
+  const outsiderList = await call(outsider.session, 'GET', '/api/me/bottles');
+  must(
+    (outsiderList.body?.items ?? []).every((item) => item.id !== bottleId),
+    '与我无关的人不该在我的作品里看到它（端点只返回自己的）',
+  );
+
+  // 造一次真实的斩浪：10 个不同用户点踩第 1 段（阈值 10）→ 锚被斩 → 整瓶 DAMAGED
+  const doomed = await call(A.session, 'POST', '/api/bottles', { json: { songId: song.id } });
+  const doomedId = doomed.body?.id;
+  const doomedSegment = await recordSegment(A.session, doomedId, 20_000, '等着被斩的一段');
+  const doomedSegmentId = doomedSegment.body?.segmentId;
+  await call(A.session, 'POST', `/api/bottles/${doomedId}/resolution`, { json: { resolution: 'RIVER' } });
+  let cutTriggered = false;
+  for (let index = 0; index < 10; index += 1) {
+    const voter = await register('kv');
+    const vote = await call(voter.session, 'POST', `/api/segments/${doomedSegmentId}/votes`, {
+      json: { value: 'DISLIKE', listenedRatio: 0.9 },
+    });
+    must(vote.status === 200, `点踩应为 200，实际 ${vote.status}`);
+    cutTriggered = vote.body?.segmentCut === true;
+  }
+  must(cutTriggered, '第 10 个点踩应触发斩浪（阈值 10）');
+
+  const afterCut = await call(A.session, 'GET', '/api/me/bottles');
+  const cutItem = afterCut.body?.items?.find((item) => item.id === doomedId);
+  must(
+    cutItem !== undefined,
+    '段被斩浪之后**仍然**要算"参与过"（ADR-015 §16.7），不能从漂流日志里消失',
+  );
+  must(cutItem?.role === 'INITIATOR', `斩浪后角色应仍是 INITIATOR，实际 ${cutItem?.role}`);
+  must(
+    JSON.stringify(cutItem?.mySegmentIndexes) === JSON.stringify([]),
+    `斩浪后 mySegmentIndexes 应为 []（段已软删），实际 ${JSON.stringify(cutItem?.mySegmentIndexes)}`,
+  );
+  must(cutItem?.status === 'DAMAGED', `锚被斩后瓶子应为 DAMAGED，实际 ${cutItem?.status}`);
+  log(
+    '我的漂流日志（/api/me/bottles）',
+    `A=INITIATOR 段[1] · B=SINGER 段[2] · 无关者看不到 · 斩浪后仍列出且段号变空（status=${cutItem?.status}）`,
+  );
+
   // ── 会话隔离：登出后 /me 为 401 ───────────────────────────────
   const loggedOut = await call(C.session, 'POST', '/api/auth/logout');
   must(loggedOut.status === 204, `登出应为 204，实际 ${loggedOut.status}`);
@@ -585,13 +708,42 @@ const runChecks = async () => {
   must(meAfterLogout.status === 401, '登出后 /me 应为 401');
 
   console.log('');
-  if (failures === 0) {
+  if (failures === 0 && inconclusive === 0) {
     console.log(
       `✅ 黄金路径真实链路检查通过（${String(stepNo)} 步，4 个账号，真库 + 真 HTTP + 真音频字节）`,
     );
+    if (hermetic !== null) {
+      console.log('   结论来源：hermetic 模式（自己的库 + 自己的种子 + 自己的进程）⟹ 可作验收证据。');
+    }
     return 0;
   }
-  console.error(`❌ 有 ${String(failures)} 项不符合预期`);
+
+  if (failures === 0) {
+    // 外部模式专属：非确定性步骤单列，不计 pass，也不硬判失败（硬判会随环境随机红）
+    console.log(
+      `⚠ 通过 ${String(stepNo - inconclusive)}/${String(stepNo)} 步；另有 ${String(inconclusive)} 步**未复现（数据不受控）**，不计入 pass。`,
+    );
+    console.error('   外部模式 · 非验收证据：本结论受环境数据影响，不能写进验收口径。');
+    return 0;
+  }
+
+  console.error(
+    `❌ 有 ${String(failures)} 项不符合预期${inconclusive === 0 ? '' : `，另有 ${String(inconclusive)} 步未复现（数据不受控）`}`,
+  );
+  console.error('   —— 最近 8 次请求（诊断用，从早到晚）——');
+  for (const entry of recentCalls) {
+    console.error(`   ${entry.who} ${entry.what} → ${String(entry.status)} ${entry.body}`);
+  }
+  if (hermetic !== null && hermetic.serverLog.trim().length > 0) {
+    // 5xx 只有服务端日志里才有堆栈；没有这段，红就只是一句"应为 200"
+    console.error('   —— API 服务端日志（末 20 行）——');
+    for (const line of hermetic.serverLog.trim().split('\n').slice(-20)) {
+      console.error(`   ${line}`);
+    }
+  }
+  if (hermetic === null) {
+    console.error('   外部模式 · 非验收证据：本结论受环境数据影响，不能写进验收口径。');
+  }
   return 1;
 };
 
@@ -599,9 +751,9 @@ const main = async () => {
   if (API === null) {
     await startHermetic();
   } else {
-    console.log(
-      `[setup] 外部模式：使用 API_BASE=${API}（非 hermetic —— 结果取决于那个库里的数据，不能当验收证据）`,
-    );
+    // 横幅在最前面（跑任何检查之前），因为这份输出**不能**被当验收证据
+    printExternalBanner();
+    console.log(`[setup] 外部模式：使用 API_BASE=${API}`);
   }
 
   // 抛异常时本来就不会走到下面（node 自己给非零退出码），因此不需要"初始值"占位
