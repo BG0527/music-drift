@@ -17,21 +17,45 @@ afterEach(() => {
   vi.useRealTimers();
 });
 
+/**
+ * 测试用的"本段固定时长"（`Immersed` 第 2 段的曲库真实值）。
+ *
+ * t30 起**没有本段时长就不允许录制**（fail-closed，与 t31 服务端一致），
+ * 所以"要真的录一段"的用例都必须显式给出本段时长 —— 这是设计意图，不是噪音。
+ */
+const ANY_PRESET_MS = 20_619;
+
 describe('RecorderPanel：段号来自服务端', () => {
   it('显示"第 N 段 · 共 M 段"，不自行推算段号', () => {
     const { environment } = makeRecorderEnvironment();
-    render(<RecorderPanel segmentIndex={2} totalSegments={4} environment={environment} />);
+    render(
+      <RecorderPanel
+        segmentIndex={2}
+        totalSegments={4}
+        environment={environment}
+        presetDurationMs={ANY_PRESET_MS}
+      />,
+    );
 
     expect(screen.getByText(/第 2 段/)).toBeInTheDocument();
     expect(screen.getByText(/共 4 段/)).toBeInTheDocument();
   });
 
-  it('提示是结构性的（15–30 秒 / 第几段），不放歌词', () => {
+  it('提示是结构性的（本段固定时长 / 第几段），不放歌词', () => {
     const { environment } = makeRecorderEnvironment();
-    render(<RecorderPanel segmentIndex={1} totalSegments={4} environment={environment} />);
+    render(
+      <RecorderPanel
+        segmentIndex={1}
+        totalSegments={4}
+        environment={environment}
+        presetDurationMs={ANY_PRESET_MS}
+      />,
+    );
 
-    expect(screen.getByText(/录一段 15–30 秒/)).toBeInTheDocument();
+    expect(screen.getByTestId('preset-duration').textContent).toContain('本段 20.6 秒');
     expect(document.body.textContent).not.toMatch(/歌词/);
+    // 用户第 4 条：动态区间口径已被本段固定时长取代
+    expect(document.body.textContent).not.toMatch(/15–30 秒/);
   });
 });
 
@@ -41,7 +65,14 @@ describe('RecorderPanel：环境与权限的降级引导', () => {
       isSecureContext: false,
       hostname: '10.0.0.7',
     });
-    render(<RecorderPanel segmentIndex={1} totalSegments={4} environment={environment} />);
+    render(
+      <RecorderPanel
+        segmentIndex={1}
+        totalSegments={4}
+        environment={environment}
+        presetDurationMs={ANY_PRESET_MS}
+      />,
+    );
 
     expect(screen.getByRole('alert').textContent).toContain('localhost');
     expect(screen.getByRole('button', { name: /开始录制/ })).toBeDisabled();
@@ -53,7 +84,14 @@ describe('RecorderPanel：环境与权限的降级引导', () => {
         throw Object.assign(new Error('denied'), { name: 'NotAllowedError' });
       },
     });
-    render(<RecorderPanel segmentIndex={1} totalSegments={4} environment={environment} />);
+    render(
+      <RecorderPanel
+        segmentIndex={1}
+        totalSegments={4}
+        environment={environment}
+        presetDurationMs={ANY_PRESET_MS}
+      />,
+    );
 
     await act(async () => {
       fireEvent.click(screen.getByRole('button', { name: /开始录制/ }));
@@ -69,11 +107,17 @@ describe('RecorderPanel：环境与权限的降级引导', () => {
 });
 
 describe('RecorderPanel：录制中', () => {
-  it('计时文案可读出"录制中 00:12 / 30"，波形柱子数可配置', async () => {
+  it('计时文案可读出"录制中 00:12 / 20.6"（分母是本段固定时长），波形柱子数可配置', async () => {
     vi.useFakeTimers();
     const { environment } = makeRecorderEnvironment();
     render(
-      <RecorderPanel segmentIndex={1} totalSegments={4} environment={environment} bars={24} />,
+      <RecorderPanel
+        segmentIndex={1}
+        totalSegments={4}
+        environment={environment}
+        presetDurationMs={ANY_PRESET_MS}
+        bars={24}
+      />,
     );
 
     await act(async () => {
@@ -83,35 +127,49 @@ describe('RecorderPanel：录制中', () => {
       vi.advanceTimersByTime(12_400);
     });
 
-    expect(screen.getByText(/录制中 00:12 \/ 30/)).toBeInTheDocument();
+    expect(screen.getByText(/录制中 00:12 \/ 20\.6/)).toBeInTheDocument();
     expect(screen.getByTestId('waveform').children).toHaveLength(24);
     expect(screen.getByRole('button', { name: /停止录制/ })).toBeInTheDocument();
   });
 
-  it('28 秒起给"接近上限"警告；30 秒自动停并回到可上传状态', async () => {
+  it('临近本段时长（差 2 秒内）给"快到本段时长"警告；录满自动停并回到可上传状态', async () => {
     vi.useFakeTimers();
     const { environment } = makeRecorderEnvironment();
-    render(<RecorderPanel segmentIndex={1} totalSegments={4} environment={environment} />);
+    render(
+      <RecorderPanel
+        segmentIndex={1}
+        totalSegments={4}
+        environment={environment}
+        presetDurationMs={ANY_PRESET_MS}
+      />,
+    );
 
     await act(async () => {
       fireEvent.click(screen.getByRole('button', { name: /开始录制/ }));
     });
     await act(async () => {
-      vi.advanceTimersByTime(28_500);
+      vi.advanceTimersByTime(18_800);
     });
-    expect(screen.getByText(/接近 30 秒/)).toBeInTheDocument();
+    expect(screen.getByText(/快到本段时长了/)).toBeInTheDocument();
 
     await act(async () => {
       vi.advanceTimersByTime(2_000);
     });
 
-    expect(screen.getByText(/已录 00:30/)).toBeInTheDocument();
+    expect(screen.getByText(/已录 00:20 \/ 20\.6/)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /用这一段/ })).toBeEnabled();
   });
 
   it('波形是装饰性的（aria-hidden），进度不依赖颜色表达', () => {
     const { environment } = makeRecorderEnvironment();
-    render(<RecorderPanel segmentIndex={1} totalSegments={4} environment={environment} />);
+    render(
+      <RecorderPanel
+        segmentIndex={1}
+        totalSegments={4}
+        environment={environment}
+        presetDurationMs={ANY_PRESET_MS}
+      />,
+    );
 
     expect(screen.getByTestId('waveform').getAttribute('aria-hidden')).toBe('true');
     expect(screen.getByText(/尚未开始/)).toBeInTheDocument();
@@ -119,10 +177,17 @@ describe('RecorderPanel：录制中', () => {
 });
 
 describe('RecorderPanel：录完之后的校验与动作', () => {
-  it('不足 15 秒：warning 文案说明区间，且"用这一段"不可用（只能重录）', async () => {
+  it('差太多（超出 ±2 秒）：warning 文案说明本段固定时长与相差多少，"用这一段"不可用', async () => {
     vi.useFakeTimers();
     const { environment } = makeRecorderEnvironment();
-    render(<RecorderPanel segmentIndex={1} totalSegments={4} environment={environment} />);
+    render(
+      <RecorderPanel
+        segmentIndex={1}
+        totalSegments={4}
+        environment={environment}
+        presetDurationMs={ANY_PRESET_MS}
+      />,
+    );
 
     await act(async () => {
       fireEvent.click(screen.getByRole('button', { name: /开始录制/ }));
@@ -135,8 +200,9 @@ describe('RecorderPanel：录完之后的校验与动作', () => {
     });
 
     const warning = screen.getByRole('status');
-    expect(warning.textContent).toContain('15');
-    expect(warning.textContent).toContain('30');
+    expect(warning.textContent).toContain('20.6 秒'); // 本段固定时长
+    expect(warning.textContent).toContain('9.0 秒'); // 实际录到
+    expect(warning.textContent).toContain('相差');
     expect(screen.getByRole('button', { name: /用这一段/ })).toBeDisabled();
     expect(screen.getByRole('button', { name: /重录/ })).toBeEnabled();
   });
@@ -150,6 +216,7 @@ describe('RecorderPanel：录完之后的校验与动作', () => {
         segmentIndex={1}
         totalSegments={4}
         environment={environment}
+        presetDurationMs={ANY_PRESET_MS}
         onRecorded={onRecorded}
       />,
     );
@@ -158,7 +225,7 @@ describe('RecorderPanel：录完之后的校验与动作', () => {
       fireEvent.click(screen.getByRole('button', { name: /开始录制/ }));
     });
     await act(async () => {
-      vi.advanceTimersByTime(18_000);
+      vi.advanceTimersByTime(19_500); // 差 1.1 秒，落在本段 ±2 秒容差内
     });
     await act(async () => {
       fireEvent.click(screen.getByRole('button', { name: /停止录制/ }));
@@ -169,14 +236,21 @@ describe('RecorderPanel：录完之后的校验与动作', () => {
 
     expect(onRecorded).toHaveBeenCalledTimes(1);
     const recording = onRecorded.mock.calls[0]?.[0] as { durationMs: number; mime: string };
-    expect(recording.durationMs).toBe(18_000);
+    expect(recording.durationMs).toBe(19_500);
     expect(recording.mime).toBe('audio/webm');
   });
 
   it('点"重录"清空刚才那一段，回到未开始状态', async () => {
     vi.useFakeTimers();
     const { environment } = makeRecorderEnvironment();
-    render(<RecorderPanel segmentIndex={1} totalSegments={4} environment={environment} />);
+    render(
+      <RecorderPanel
+        segmentIndex={1}
+        totalSegments={4}
+        environment={environment}
+        presetDurationMs={ANY_PRESET_MS}
+      />,
+    );
 
     await act(async () => {
       fireEvent.click(screen.getByRole('button', { name: /开始录制/ }));
@@ -205,6 +279,7 @@ describe('RecorderPanel：上传进度与失败重试', () => {
       <RecorderPanel
         {...base}
         environment={environment}
+        presetDurationMs={ANY_PRESET_MS}
         upload={{ phase: 'uploading', ratio: 0.42, message: null, retryable: false }}
       />,
     );
@@ -220,6 +295,7 @@ describe('RecorderPanel：上传进度与失败重试', () => {
       <RecorderPanel
         {...base}
         environment={environment}
+        presetDurationMs={ANY_PRESET_MS}
         upload={{
           phase: 'failed',
           ratio: null,
@@ -243,6 +319,7 @@ describe('RecorderPanel：上传进度与失败重试', () => {
       <RecorderPanel
         {...base}
         environment={environment}
+        presetDurationMs={ANY_PRESET_MS}
         upload={{
           phase: 'failed',
           ratio: null,
@@ -262,11 +339,319 @@ describe('RecorderPanel：上传进度与失败重试', () => {
       <RecorderPanel
         {...base}
         environment={environment}
+        presetDurationMs={ANY_PRESET_MS}
         upload={{ phase: 'done', ratio: 1, message: '这一句已经接上了。', retryable: false }}
       />,
     );
 
     expect(screen.getByRole('status').textContent).toContain('接上');
     expect(screen.getByRole('status').className).toMatch(/success-tint/);
+  });
+});
+
+describe('RecorderPanel：录完要能试听自己那一段（用户实测需求 ③）', () => {
+  /**
+   * 试听元素替身：状态由 `play` / `pause` / `ended` 事件驱动（与 `use-recorder.test.ts` 同语义），
+   * 从而能复现"播完再点"这条最容易做错的分支。
+   */
+  function makePreviewEnv() {
+    const listeners = new Map<string, Set<() => void>>();
+    const element = {
+      src: '',
+      currentTime: 0,
+      duration: 18,
+      paused: true,
+      play: vi.fn(async () => {
+        element.paused = false;
+        emit('play');
+      }),
+      pause: vi.fn(() => {
+        element.paused = true;
+        emit('pause');
+      }),
+      addEventListener: (type: string, handler: () => void) => {
+        const set = listeners.get(type) ?? new Set<() => void>();
+        set.add(handler);
+        listeners.set(type, set);
+      },
+      removeEventListener: (type: string, handler: () => void) => {
+        listeners.get(type)?.delete(handler);
+      },
+    };
+    function emit(type: string): void {
+      listeners.get(type)?.forEach((handler) => handler());
+    }
+    const harness = makeRecorderEnvironment({
+      createPreviewElement: () => element as never,
+      createObjectURL: () => 'blob:preview-panel',
+      revokeObjectURL: () => undefined,
+    });
+    return { ...harness, element, emit };
+  }
+
+  /** 录满 18 秒后停止（合格时长），返回试听替身。 */
+  async function recordAndStop(harness: ReturnType<typeof makePreviewEnv>) {
+    render(
+      <RecorderPanel
+        segmentIndex={1}
+        totalSegments={4}
+        environment={harness.environment}
+        presetDurationMs={ANY_PRESET_MS}
+      />,
+    );
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: /开始录制/ }));
+    });
+    await act(async () => {
+      vi.advanceTimersByTime(19_500);
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: /停止录制/ }));
+    });
+  }
+
+  it('录完立刻出现「试听本段」，并有可读的状态文字（不是只靠颜色/图标）', async () => {
+    vi.useFakeTimers();
+    const harness = makePreviewEnv();
+    await recordAndStop(harness);
+
+    expect(screen.getByRole('button', { name: /试听本段/ })).toBeEnabled();
+    const state = screen.getByTestId('preview-state');
+    expect(state.getAttribute('aria-live')).toBe('polite');
+    expect(state.textContent).toMatch(/刚录/);
+  });
+
+  it('点「试听本段」→ 正在试听；再点 → 暂停并给出"继续试听"这条路', async () => {
+    vi.useFakeTimers();
+    const harness = makePreviewEnv();
+    await recordAndStop(harness);
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: /试听本段/ }));
+    });
+    expect(harness.element.play).toHaveBeenCalledTimes(1);
+    expect(screen.getByRole('button', { name: /暂停试听/ })).toBeInTheDocument();
+    expect(screen.getByTestId('preview-state').textContent).toMatch(/正在试听/);
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: /暂停试听/ }));
+    });
+    expect(harness.element.pause).toHaveBeenCalled();
+    expect(screen.getByRole('button', { name: /继续试听/ })).toBeInTheDocument();
+    expect(screen.getByTestId('preview-state').textContent).toMatch(/暂停/);
+  });
+
+  it('听完之后再点：按钮变「重听本段」，且从头开始（currentTime 归零）', async () => {
+    vi.useFakeTimers();
+    const harness = makePreviewEnv();
+    await recordAndStop(harness);
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: /试听本段/ }));
+    });
+
+    await act(async () => {
+      harness.element.currentTime = 18;
+      harness.emit('ended');
+    });
+    expect(screen.getByTestId('preview-state').textContent).toMatch(/听完/);
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: /重听本段/ }));
+    });
+    expect(harness.element.currentTime).toBe(0);
+  });
+
+  it('重录会停掉试听并收回按钮（不留下"上一段还在响"）', async () => {
+    vi.useFakeTimers();
+    const harness = makePreviewEnv();
+    await recordAndStop(harness);
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: /试听本段/ }));
+    });
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: /重录/ }));
+    });
+
+    expect(harness.element.pause).toHaveBeenCalled();
+    expect(screen.queryByRole('button', { name: /试听本段/ })).toBeNull();
+    expect(screen.getByText(/尚未开始/)).toBeInTheDocument();
+  });
+
+  it('宿主没有试听元素时：同样不显示试听按钮（绝不给"点了没反应"的按钮）', async () => {
+    vi.useFakeTimers();
+    // 拿得到 objectURL，但拿不到可播放的元素 —— 例如页面只传了部分端口。
+    // 这种情况下如果照常渲染按钮，用户点下去**什么都不会发生**（比没有按钮更糟）。
+    const { environment } = makeRecorderEnvironment({
+      createObjectURL: () => 'blob:preview-panel',
+    });
+    render(
+      <RecorderPanel
+        segmentIndex={1}
+        totalSegments={4}
+        environment={environment}
+        presetDurationMs={ANY_PRESET_MS}
+      />,
+    );
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: /开始录制/ }));
+    });
+    await act(async () => {
+      vi.advanceTimersByTime(19_500);
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: /停止录制/ }));
+    });
+
+    expect(screen.queryByRole('button', { name: /试听本段/ })).toBeNull();
+    expect(screen.queryByTestId('preview-state')).toBeNull();
+    expect(screen.getByRole('button', { name: /用这一段/ })).toBeEnabled();
+  });
+
+  it('宿主不给 objectURL 时安静地不提供试听：主路径（用这一段 / 重录）照常可用', async () => {
+    vi.useFakeTimers();
+    const { environment } = makeRecorderEnvironment({
+      createObjectURL: () => {
+        throw new Error('blocked by policy');
+      },
+    });
+    render(
+      <RecorderPanel
+        segmentIndex={1}
+        totalSegments={4}
+        environment={environment}
+        presetDurationMs={ANY_PRESET_MS}
+      />,
+    );
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: /开始录制/ }));
+    });
+    await act(async () => {
+      vi.advanceTimersByTime(19_500);
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: /停止录制/ }));
+    });
+
+    expect(screen.queryByRole('button', { name: /试听本段/ })).toBeNull();
+    expect(screen.getByRole('button', { name: /用这一段/ })).toBeEnabled();
+    expect(screen.getByRole('button', { name: /重录/ })).toBeEnabled();
+  });
+});
+
+describe('RecorderPanel：本段固定时长（用户第 4 条裁决 —— 取代"15–30 秒"）', () => {
+  const PRESET = 20_619; // Immersed 第 2 段（曲库真实值）
+
+  it('给了本段时长：显示"本段 20.6 秒 / ±2.0 秒"，不再出现动态区间', () => {
+    const { environment } = makeRecorderEnvironment();
+    render(
+      <RecorderPanel
+        segmentIndex={2}
+        totalSegments={4}
+        environment={environment}
+        presetDurationMs={ANY_PRESET_MS}
+        presetDurationMs={PRESET}
+      />,
+    );
+
+    // 用 testid 精确定位那句说明（"尚未开始（本段 20.6 秒）"里也有同样的字样）
+    const presetLine = screen.getByTestId('preset-duration');
+    expect(presetLine.textContent).toContain('本段 20.6 秒');
+    expect(presetLine.textContent).toContain('±2.0 秒');
+    expect(document.body.textContent).not.toMatch(/15–30 秒/);
+    expect(screen.getByText(/尚未开始（本段 20\.6 秒）/)).toBeInTheDocument();
+  });
+
+  it('录制中显示"还差多少"，而不是倒计时恐慌式提示', async () => {
+    vi.useFakeTimers();
+    const { environment } = makeRecorderEnvironment();
+    render(
+      <RecorderPanel
+        segmentIndex={2}
+        totalSegments={4}
+        environment={environment}
+        presetDurationMs={ANY_PRESET_MS}
+        presetDurationMs={PRESET}
+      />,
+    );
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: /开始录制/ }));
+    });
+    await act(async () => {
+      vi.advanceTimersByTime(5_000);
+    });
+
+    expect(screen.getByText(/录制中 00:05 \/ 20\.6/)).toBeInTheDocument();
+    expect(screen.getByText(/还差 15\.6 秒/)).toBeInTheDocument();
+  });
+
+  it('录满自动停：状态变"已录 20.6"，且可以"用这一段"（不需要用户掐秒）', async () => {
+    vi.useFakeTimers();
+    const { environment } = makeRecorderEnvironment();
+    render(
+      <RecorderPanel
+        segmentIndex={2}
+        totalSegments={4}
+        environment={environment}
+        presetDurationMs={ANY_PRESET_MS}
+        presetDurationMs={PRESET}
+      />,
+    );
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: /开始录制/ }));
+    });
+    await act(async () => {
+      vi.advanceTimersByTime(PRESET + 3_000);
+    });
+
+    expect(screen.getByText(/已录 00:20 \/ 20\.6/)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /用这一段/ })).toBeEnabled();
+    expect(screen.queryByText(/还差/)).toBeNull();
+  });
+
+  it('提前停：明确还差多少（含容差），并禁用"用这一段"', async () => {
+    vi.useFakeTimers();
+    const { environment } = makeRecorderEnvironment();
+    render(
+      <RecorderPanel
+        segmentIndex={2}
+        totalSegments={4}
+        environment={environment}
+        presetDurationMs={ANY_PRESET_MS}
+        presetDurationMs={PRESET}
+      />,
+    );
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: /开始录制/ }));
+    });
+    await act(async () => {
+      vi.advanceTimersByTime(16_000);
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: /停止录制/ }));
+    });
+
+    const warning = screen.getByRole('status');
+    expect(warning.textContent).toContain('20.6 秒');
+    expect(warning.textContent).toContain('相差 4.6 秒');
+    expect(screen.getByRole('button', { name: /用这一段/ })).toBeDisabled();
+  });
+
+  it('拿不到本段时长：**不允许录制**（fail-closed，与 t31 服务端一致），并说明原因', () => {
+    const { environment } = makeRecorderEnvironment();
+    render(<RecorderPanel segmentIndex={2} totalSegments={4} environment={environment} />);
+
+    // 不是"退回 15–30 秒也能录"：服务端会直接拒收，所以前端连麦克风都不开
+    const start = screen.getByRole('button', { name: /开始录制/ });
+    expect(start).toBeDisabled();
+    const notice = screen.getByTestId('preset-missing');
+    expect(notice.textContent).toContain('固定时长');
+    expect(notice.textContent).toContain('换一首歌');
+    // 说明挂在按钮上（读屏用户能听到"为什么不能点"）
+    expect(start.getAttribute('aria-describedby')).toBe(notice.getAttribute('id'));
+    expect(document.body.textContent).not.toMatch(/15–30 秒/);
   });
 });

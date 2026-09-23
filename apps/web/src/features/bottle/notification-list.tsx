@@ -8,7 +8,7 @@
  * 与全站同一套口径，避免"这一页转圈、那一页白屏"的漂移。
  * 未读**不只靠颜色**：既有色点也有「未读」文字（DESIGN.md §Accessibility）。
  */
-import { Button, EmptyState, Icon, cn } from '../../design-system';
+import { Button, Icon, cn } from '../../design-system';
 import { useMarkNotificationRead } from '../api/mutations';
 import { useNotifications } from '../api/queries';
 import { AsyncBoundary } from '../../pages/shell/async-boundary';
@@ -44,11 +44,10 @@ export function NotificationList({ className }: NotificationListProps) {
       query={notifications}
       emptyWhen={(page) => page.items.length === 0}
       empty={
-        <EmptyState
-          icon="Info"
-          title="还没有新消息"
-          description="有人接唱你的瓶子、留言送达或作品进公海时，消息会出现在这里。"
-        />
+        <p className="flex flex-wrap items-center gap-x-[12px] rounded-base border border-mist bg-foam px-4 py-[10px] text-[0.9375rem] text-slate-current">
+          <Icon name="Info" size={18} />
+          <span>还没有新消息：有人接唱、留言送达或作品入海时才会出现。</span>
+        </p>
       }
     >
       {(page) => (

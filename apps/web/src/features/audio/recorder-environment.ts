@@ -9,6 +9,7 @@
  * 生产实现在文件末尾（`createBrowserRecorderEnvironment`），消费方通常不需要感知它。
  */
 import { normalizeMimeType } from '@music-drift/shared/audio';
+import type { AudioElementLike } from './use-segment-player';
 
 export interface RecorderTrack {
   stop: () => void;
@@ -33,6 +34,15 @@ export interface AudioLevelMeter {
 }
 
 export interface RecorderEnvironment {
+  /**
+   * 试听"刚录好的那一段"用的音频元素（用户需求 ③：录完要能听到自己唱成什么样）。
+   * 用**类型复用**而不是新造一个接口：试听与分段播放是同一类元素，行为语义也应一致。
+   */
+  createPreviewElement?: () => AudioElementLike;
+  /** 本地 Blob → objectURL（默认 `URL.createObjectURL`）。 */
+  createObjectURL?: (blob: Blob) => string;
+  /** 释放 objectURL（默认 `URL.revokeObjectURL`）：重录/卸载时必须调用，避免 blob 泄漏。 */
+  revokeObjectURL?: (url: string) => void;
   isSecureContext: boolean;
   hostname: string;
   hasGetUserMedia: boolean;
@@ -83,6 +93,15 @@ export function createBrowserRecorderEnvironment(): RecorderEnvironment {
   const MediaRecorderCtor = globals.MediaRecorder;
 
   return {
+    createPreviewElement: () => {
+      const element = new Audio();
+      element.preload = 'metadata';
+      return element;
+    },
+    createObjectURL: (blob) => URL.createObjectURL(blob),
+    revokeObjectURL: (url) => {
+      URL.revokeObjectURL(url);
+    },
     isSecureContext: globals.isSecureContext === true,
     hostname: globals.location?.hostname ?? '',
     hasGetUserMedia: typeof mediaDevices?.getUserMedia === 'function',

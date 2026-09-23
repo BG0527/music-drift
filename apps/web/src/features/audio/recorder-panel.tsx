@@ -15,10 +15,37 @@
  */
 import { useId } from 'react';
 import type { RecorderEnvironment } from './recorder-environment';
-import { useRecorder, type SegmentRecording } from './use-recorder';
-import { formatClock } from './format';
+import { useRecorder, type PreviewState, type SegmentRecording } from './use-recorder';
+import { formatClock, formatSeconds } from './format';
 import { Button, Icon, cn } from '../../design-system';
 import type { UploadPhase } from './upload';
+
+/**
+ * 试听（用户实测需求 ③）的**按钮文案 + 状态文案**表。
+ *
+ * 为什么必须两张文案都写死在一张表里：用户的原话是"录制接唱完成之后要有一个试听按钮"，
+ * 而这里最容易做错的是**播完再点**——如果按钮仍叫"试听本段"，用户点下去只会看到没反应。
+ * 与 `segment-player.tsx` 的 `PLAYBACK_UI` 保持**同一套语义**（idle/playing/paused/ended），
+ * 这样同一个用户在试听和听别人那一段时，看到的行为与文案是一致的。
+ * 状态一律有**文字**表达，不靠颜色或图标变化（DESIGN.md 无障碍条款）。
+ */
+const PREVIEW_UI: Record<
+  PreviewState,
+  { label: string; icon: 'Play' | 'Pause' | 'RotateCcw'; state: string }
+> = {
+  idle: {
+    label: '试听本段',
+    icon: 'Play',
+    state: '还没试听。点「试听本段」听听自己刚录的这一段，不满意可以重录。',
+  },
+  playing: { label: '暂停试听', icon: 'Pause', state: '正在试听你刚录的这一段。' },
+  paused: { label: '继续试听', icon: 'Play', state: '试听已暂停（点「继续试听」接着听）。' },
+  ended: {
+    label: '重听本段',
+    icon: 'RotateCcw',
+    state: '刚录的这一段已经听完，点「重听本段」从头再听一遍。',
+  },
+};
 
 export interface RecorderUploadView {
   phase: UploadPhase;
@@ -35,6 +62,22 @@ export interface RecorderPanelProps {
   /** 歌的总段数（来自数据，不硬编码 4）。 */
   totalSegments: number;
   environment?: RecorderEnvironment;
+  /**
+   * 本段的**固定时长**（ms）——曲库权威值（`song.segments[index].durationMs`，t29 口径）。
+   *
+   * 用户第 4 条裁决："一首歌被切割成四段，它的时长应该是固定的，而用户需要接的就是这段时长。"
+   * 给了它就取代"15–30 秒"动态区间：显示本段时长、**录满自动停**、提前停明确说还差多少。
+   * 拿不到（历史数据、页面还没接线）时为 null/未给 → 退回区间文案，**不假装知道**。
+   */
+  presetDurationMs?: number | null;
+  /**
+   * 允许的偏差（ms）；默认取共享常量的 ±2 秒（与上传/服务端同一值）。
+   *
+   * ⚠️ **`presetDurationMs` 缺失不是"退回 15–30 秒区间"，而是"不能录"**：
+   * t31 起服务端对无预设的段 fail-closed 拒收（`AUDIO_SEGMENT_PRESET_MISSING`），
+   * 前端再给一条"也能录"的路，只会让用户白录一整段然后吃 422。
+   */
+  presetToleranceMs?: number;
   /** 波形柱子数（默认 48）。 */
   bars?: number;
   /** 点"用这一段"时把成品交给上层（上层负责上传与去向选择）。 */
@@ -50,6 +93,8 @@ export function RecorderPanel({
   segmentIndex,
   totalSegments,
   environment,
+  presetDurationMs = null,
+  presetToleranceMs,
   bars = 48,
   onRecorded,
   upload,
@@ -57,12 +102,24 @@ export function RecorderPanel({
   className,
 }: RecorderPanelProps) {
   const headingId = useId();
+  const presetNoticeId = useId();
   const recorder = useRecorder({
     ...(environment === undefined ? {} : { environment }),
+    presetDurationMs,
+    ...(presetToleranceMs === undefined ? {} : { presetToleranceMs }),
     bars,
   });
   const { status, support, error, elapsedMs, levels, nearLimit, recording, durationViolations } =
     recorder;
+
+  /** 本段固定时长的展示口径（拿不到就是 null，一切文案退回区间口径）。 */
+  const preset = recorder.presetDurationMs;
+  const tolerance = recorder.presetToleranceMs;
+  /** 录制中还差多少（只在"有本段时长 + 正在录"时有意义）。 */
+  const remainingMs = preset === null ? null : Math.max(0, preset - elapsedMs);
+
+  /** 计时文案的分母：有本段固定时长就用它（"20.6"），否则退回 30 秒上限。 */
+  const targetLabel = preset === null ? '30' : formatSeconds(preset);
 
   const statusText = ((): string => {
     switch (status) {
@@ -71,17 +128,29 @@ export function RecorderPanel({
       case 'requesting':
         return '正在请求麦克风权限…';
       case 'recording':
-        return `录制中 ${formatClock(elapsedMs)} / 30`;
+        return `录制中 ${formatClock(elapsedMs)} / ${targetLabel}`;
       case 'recorded':
-        return `已录 ${formatClock(recording?.durationMs ?? 0)} / 30`;
+        return `已录 ${formatClock(recording?.durationMs ?? 0)} / ${targetLabel}`;
       default:
-        return '尚未开始（15–30 秒）';
+        return preset === null
+          ? // 没有本段时长时不许录：文案要说清"为什么现在不能录"，而不是给一个假的区间
+            '暂时不能录（这一段还没登记固定时长）'
+          : `尚未开始（本段 ${formatSeconds(preset)} 秒）`;
     }
   })();
 
-  const canRecord = support.ok && !disabled;
+  /** 本段时长缺失 = 不允许录制（与 hook 的 fail-closed 同一判定：按钮与说明同时体现）。 */
+  const presetMissing = recorder.presetMissing;
+  const canRecord = support.ok && !disabled && !presetMissing;
   const tooShort = durationViolations[0]?.message ?? null;
   const canUseRecording = recording !== null && durationViolations.length === 0 && !disabled;
+  /**
+   * 有没有"可试听的成品"：录完 + 拿得到本地地址。
+   * 拿不到地址（宿主不支持 objectURL）时**安静地不给这个按钮**，其余动作照常可用 ——
+   * 试听是附加能力，不能因为它不可用挡住"用这一段"。
+   */
+  const canPreview = status === 'recorded' && recorder.previewUrl !== null;
+  const previewUi = PREVIEW_UI[recorder.previewState];
 
   const uploadTone =
     upload?.phase === 'done' ? 'success' : upload?.phase === 'failed' ? 'warning' : 'info';
@@ -105,9 +174,20 @@ export function RecorderPanel({
         <h2 id={headingId} className="text-[1.25rem] font-semibold">
           第 {segmentIndex} 段 · 共 {totalSegments} 段
         </h2>
-        <p className="text-[0.875rem] leading-[1.6] text-on-dark-muted">
-          录一段 15–30 秒的接唱，投出去之后由陌生人接下一段。到 30 秒会自动停止。
-        </p>
+        {/* 本段固定时长（用户第 4 条）：优先说"这段有多长"，而不是给一个浮动区间 */}
+        {preset === null ? (
+          <p className="text-[0.875rem] leading-[1.6] text-on-dark-muted">
+            这一段的固定时长还没登记，所以现在不能录 —— 换一首歌，或者稍后再来。
+          </p>
+        ) : (
+          <p
+            data-testid="preset-duration"
+            className="text-[0.875rem] leading-[1.6] text-on-dark-muted"
+          >
+            本段 {formatSeconds(preset)} 秒（与这段伴奏等长，允许 ±{formatSeconds(tolerance)} 秒）。
+            录满会自动停止，投出去之后由陌生人接下一段。
+          </p>
+        )}
       </header>
 
       <p aria-live="polite" className="text-[0.9375rem] font-semibold">
@@ -155,11 +235,41 @@ export function RecorderPanel({
       {nearLimit ? (
         <p role="status" className="flex items-center gap-2 text-[0.875rem] text-warning">
           <Icon name="Clock" size={16} />
-          <span>接近 30 秒上限，到点会自动停止。</span>
+          <span>
+            {preset === null
+              ? '接近 30 秒上限，到点会自动停止。'
+              : `快到本段时长了（${formatSeconds(preset)} 秒），到点会自动停止。`}
+          </span>
+        </p>
+      ) : null}
+
+      {/* 录制中：把"还差多少"写在明面上（用户第 4 条要求"提前停也要知道差多少"） */}
+      {status === 'recording' && remainingMs !== null ? (
+        <p
+          data-testid="remaining"
+          aria-live="polite"
+          className="text-[0.875rem] leading-[1.6] text-on-dark-muted"
+        >
+          {remainingMs === 0
+            ? '已录满，正在收尾…'
+            : `还差 ${formatSeconds(remainingMs)} 秒录满本段（允许 ±${formatSeconds(tolerance)} 秒）。`}
         </p>
       ) : null}
 
       {poiStatus(tooShort, status)}
+
+      {/* 本段时长缺失：把"为什么不能录"写在按钮旁边，并用 aria-describedby 挂到按钮上
+          （不用 role="status"，避免与"时长不合格 / 上传进度"那两处状态区互相干扰） */}
+      {presetMissing ? (
+        <p
+          id={presetNoticeId}
+          data-testid="preset-missing"
+          className="flex items-start gap-2 rounded-base border border-warning-border bg-warning-tint px-4 py-3 text-[0.875rem] leading-[1.6] text-warning"
+        >
+          <Icon name="AlertTriangle" size={16} />
+          <span>{recorder.blockedReason}</span>
+        </p>
+      ) : null}
 
       <div className="flex flex-wrap items-center gap-3">
         {status === 'recording' ? (
@@ -170,6 +280,7 @@ export function RecorderPanel({
           <Button
             variant="primary"
             disabled={!canRecord}
+            {...(presetMissing ? { 'aria-describedby': presetNoticeId } : {})}
             onClick={() => {
               void recorder.start();
             }}
@@ -191,6 +302,15 @@ export function RecorderPanel({
             >
               用这一段
             </Button>
+            {canPreview ? (
+              <Button
+                variant="ghost"
+                onClick={recorder.togglePreview}
+                icon={<Icon name={previewUi.icon} size={18} />}
+              >
+                {previewUi.label}
+              </Button>
+            ) : null}
             <Button
               variant="ghost"
               onClick={recorder.reset}
@@ -201,6 +321,19 @@ export function RecorderPanel({
           </>
         ) : null}
       </div>
+
+      {/* 试听状态文字：进度/结果都落到文字上（aria-live 让读屏用户也能听到状态变化）；
+          刻意不用 role="status"，避免与"时长不合格 / 上传进度"那两处状态区混淆。 */}
+      {canPreview ? (
+        <p
+          key={recorder.previewState}
+          data-testid="preview-state"
+          aria-live="polite"
+          className="enter-fade text-[0.875rem] leading-[1.6] text-on-dark-muted"
+        >
+          {previewUi.state}
+        </p>
+      ) : null}
 
       {upload === undefined ? null : (
         <div

@@ -337,85 +337,123 @@ pnpm --filter @music-drift/web test
 
 ---
 
-## 9. F2：实测时长回填点踩门槛的**分母**（t28 前端 / t26 后端）
+## 9. F2（客户端上报实测时长校正门槛分母）——**已作废，代码已删除**（t30，2026-09-24）
 
-### 9.1 缺陷（t20 门禁 finding F2，用户裁决 (c)）
+### 9.1 为什么作废
 
-点踩门槛的**分母**是上传者自报的 `x-audio-duration-ms`（上传时只校验 15–30s 区间 + 4 字节容器嗅探）。
-于是**真实 2s 却声明 30s** 的段：诚实听众最多覆盖 2s ⇒ `ratio ≤ 6.7%` ⇒ **永久点不了踩**，
-上传者可单方面冻结自己那段的斩浪（CONTEXT §16 / §7.1）。用户裁决 **(c)**：播放时用浏览器**实测**真实时长回填分母。
+用户第十一轮第 4 条裁决：
 
-### 9.2 接口（**已与 t26/architect 冻结字段名与单位** —— 2026-09-23，协商记录见 §9.5）
+> "一首歌被切割成四段，它的时长应该是固定的，而用户需要接的就是这段时长。"
 
-```text
-POST /api/segments/:segmentId/duration
-  auth    ：需登录会话（与 /listen 同一套）
-  body    ：{ measuredDurationMs: number,        // round(element.duration * 1000)，整数毫秒
-              coveredMsAtReportMs: number }      // **必填**（t26 改的）：上报那一刻的 coveredMs
-  200     ：{ declaredDurationMs: number | null,
-              measuredDurationMs: number,        // 本次上报原值（审计用）
-              effectiveDurationMs: number,        // 实际生效的分母
-              corrected: boolean,                 // effective !== declared
-              direction: 'LOWER' | 'NONE' | 'PENDING_AGREEMENT',
-              sampleCount: number }               // 该段累计独立测量数
-  422     ：{ error:{ message, violations:[{ code:'MEASURED_DURATION_REJECTED' }] } }
-  404     ：段不存在（与 /listen 一致）
-  幂等    ：**per (user, segment) 一次性**；重复上报返回已有记录（**不覆盖**）
-```
+分母的**权威来源只有一处**：曲库切分（如 `Immersed` = 23870 / 20619 / 22501 / 23010ms）。
+服务端 `presetDurationMsFor(db, {songId, index})` 把它读出来，录制上传时按
+`checkRecordingDurationAgainstPreset(durationMs, presetDurationMs, ±SEGMENT_PRESET_TOLERANCE_MS)`
+校验（t29）。**客户端不再参与任何时长判定**，于是 F2 整条链路失去消费者。
 
-**t26 对我提案改的三处（已按此实现前端）**：
+### 9.2 删了什么（**删除，不是留着**；README 级清单，供 review 核对）
 
-1. `coveredMsAtReportMs` 由"可选"改为**必填** —— 它是"我真的播过"与"我凭空报个数"之间唯一的证据链：
-   服务端已有 `listen_progress`，可校验它与库内 `coveredMs` 一致（容差 ±1s）；
-2. 新增 `direction`：**下调立即生效**（`LOWER`，F2 的诚实场景**一个诚实听众即可修好**）；
-   **上调只记录不生效**（`PENDING_AGREEMENT`，等 ≥2 个不同用户实测值互相接近 ±10%）——
-   因为"抬高别人段的分母"对作者有利，是另一条滥用路径；
-3. `effectiveDurationMs` 下限 = `max(500ms, 该段已记录的最大 coveredMs)`（避免 `ratio > 1` 与"追溯作废已听进度"）。
+| 删除项                                                                                                                | 原因                                                                                                            |
+| --------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
+| `listen-reporter.ts` 的 `checkMeasuredDuration` + `MEASURED_DURATION_BOUNDS`                                          | 分母不再由客户端主张 —— 保留它就是**第二套分母规则**，迟早有人再接线进来                                        |
+| `MeasuredDurationContext` / `MeasuredDurationReport` / `MeasuredDurationDirection` / `state.durationReport`           | 一次性上报状态机整体消失（含 `direction` 白名单与 `RAISED` 枚举守卫）                                           |
+| 传输层 `reportMeasuredDuration` + `use-segment-listen.ts` 里的 `POST /api/segments/:id/duration`                      | 端点调用点消失 ⇒ 每播一段少一次必然 404 的请求（真实浏览器实测：`404 Route not found`）                         |
+| `use-segment-player.ts` 的 `readMeasuredDurationMs` / `measuredDurationMs` / `loadedmetadata` / `durationchange` 监听 | 读 `element.duration` **没有独立价值**：既不参与覆盖率判定（分母是服务端的 `durationMs`），也不再有任何上报出口 |
+| `SegmentPlayer` 快照里的 `measuredDurationMs` / `declaredDurationMs`                                                  | 随上游一起删，避免留下"看起来还能用"的字段                                                                      |
+| 上述能力的 26 条单测                                                                                                  | 测试跟着能力走（删能力不删测试 = 留下一堆假绿）                                                                 |
 
-**前端已实现的保证**（与提案一致，均有单测钉住）：
+**保留了什么、为什么**：
 
-| 保证                        | 实现                                                                                                                                      |
-| --------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
-| 值来自**真实播放**          | 读 `HTMLMediaElement.duration`（`loadedmetadata`/`durationchange`），且**必须 `playedMs > 0`**；不是请求体/元数据里的自报值               |
-| **fail-closed**             | `NaN`/`Infinity`/`≤0`/`<500ms`/`>5min`/`> max(声明×2, 60s)` 一律**不上报**（分母宁可不动，也不能被脏值污染）                              |
-| **一次性**                  | 同一页面会话内同一段最多报一次；**失败不重试**（值不会变好）                                                                              |
-| **与 t21 覆盖上报互不遮蔽** | 独立端点、独立状态（`state.durationReport`）；时长通道**不写**共享 `lastError`（覆盖率成功会清空它，否则会擦掉时长失败）                  |
-| 页面**零改动**              | 实测值与声明值随 `SegmentListenSnapshot`（`measuredDurationMs` / `declaredDurationMs`）一起透出，页面仍只用 `onProgress={listen.observe}` |
+- `state.serverDurationMs` / `serverRatio` 与 `/listen` 响应解析：它们服务的是**本地门槛即时反馈**，与 F2 无关；
+- `ListenProgressSnapshot`（只剩 `coveredMs`）：覆盖率上报是 t20/t21 的防自欺通道，继续存在；
+- 服务端 `presetDurationMsFor` + `checkRecordingDurationAgainstPreset`（t29）：这才是现在的分母权威。
 
-### 9.3 ⚠️ 诚实边界：**这不是安全边界**
+### 9.3 诚实边界（**本文件最有价值的那部分，保留**）
 
-实测值**同样来自客户端**，所以本方案**只修诚实路径**。就当前形状而言它**很容易被直接构造**：
-脚本登录后直接 `POST {measuredDurationMs: 2000}`，请求体**不携带"我真的播过"的证据**。
-前端能提供的"真实播放前置"仅两项：值来自解码器的 `duration`、且此刻 `playedMs > 0`。
-更强的保证必须由**服务端**做（已在提案里给 t26 列出候选）：
-① 要求该 `(user, segment)` 已有 `listen_progress` 行（先报过播放覆盖，才允许报时长）；
-② 一致性：只接受 `measuredDurationMs >= coveredMs`（覆盖不可能超过真实时长）；
-③ **只允许下调分母**（实测更短才是 F2 的诚实场景；升调是对抗方向，恶意者可用它抬高分母、永久冻结斩浪）；
-④ 跨用户聚合（中位数/最小值），单个说谎者搬不动分母。
-
-### 9.4 联调待办（**未伪造通过**）
-
-- t26（F2 后端：接收/校正/审计 + F4）**尚未实现**（architect 明示：t26 的路径正被 t24 占用，等 captain 重划范围后开工）⇒ 端点 `POST /api/segments/:id/duration` **服务端还不存在**。
-- 前端侧已按上述形状实现并有单测（含"时长上报失败不影响覆盖率上报"的互不遮蔽用例）；
-  **真实联通必须等 t26 落地后复核**（若届时改名/改单位，前端只需改 `fetchListenTransport` 一个函数）。
-- 本轮证据是**前端单测 + 请求形状断言（真 fetch mock）**，不是端到端联通 —— 不把它说成"F2 已修好"。
-
-### 9.5 接口协商记录（AGENTS.md §8：结论落文档，口头约定无效）
-
-- **2026-09-23 t28 → t26**：audio-engineer 发出提案（端点/字段/单位/幂等语义 + 前端能提供的"真实播放前置"证据 + 主动指出的弱点）。
-- **2026-09-23 t26 → t28 裁决：选 (B) 改名/定语义**（不推翻形状，改三处并把关键不变量写死）→ 见 §9.2 的三条。
-  architect 明确："**字段名/单位现在冻结**，你按这个形状做前端，我按同一形状做后端，联调不会返工"。
-- 我的 fail-closed band（`≥500ms`、`≤300_000ms`、`≤ max(declared×2, 60_000)`）**由服务端原样镜像**，不满足即 422；
-  前端照旧"不满足就完全不上报"。
-- t26 落地时会把该语义写进 `docs/api.md`，并把新码 `MEASURED_DURATION_REJECTED` 加进 contracts 错误码表。
-
-**architect 的威胁模型结论（原文转达 captain，未经我改写）**：
+"时长来自客户端"这件事的威胁模型没有变，只是结论变了 —— **不再用客户端时长**：
 
 > `measuredDurationMs` 与 `coveredMs` 一样来自客户端 ⇒ 它只修诚实路径，**不是安全边界**。
->
-> - **谎报更小的 duration 能让门槛变低吗？能。** 影响面不是"攻击者自己"而是**被点踩的那个段**：
->   分母变小 ⇒ 门槛(0.8×分母)变小 ⇒ 所有人都更容易踩它。所以"缩小别人段的分母"是一条真实滥用路径。
-> - **谎报更大的 duration** 对段作者有利（分母变大 ⇒ 更难被斩），是另一条自保滥用路径。
-> - 防护（分层，都不构成硬边界）：① 要求先有 `listen_progress` 行 + `coveredMsAtReportMs` 与库内值一致；
->   ② 只允许**下调立即生效**，**上调需要多用户一致**；③ 落库**审计**（谁/何时/报多少/是否生效）；
->   ④ 跨用户取**中位数**而非均值（抗单点离群）。
+> 谎报更小的 duration 会让**被点踩的那个段**的门槛变低（所有人都更容易踩它）；
+> 谎报更大对段作者有利（更难被斩）。防护：要求先有 `listen_progress`、只允许下调立即生效、
+> 上调需多用户一致、落库审计、跨用户取中位数。（architect 2026-09-23，原文见本文件 git 历史）
+
+现在这些**都不需要了**：分母是曲库值，客户端无法主张任何时长。t30 之前那条
+"每播一段打一次 `/duration` 并必然 404"的请求也随之消失。
+
+### 9.4 真实联调待办（**未伪造通过**）
+
+- t29（后端固定段时长）已把权威值落到服务端校验；本轮**前端不再有需要联调的时长通道**。
+- `RecorderPanel` 的 `presetDurationMs` 需要页面传入（见 §10.3），**接线在 `features/bottle/**` 与 `pages/**`（frontend-flow 域）**，
+  我没有越界修改；未接线时录制面板退回"15–30 秒"区间文案（**不假装知道固定时长**）。
+
+---
+
+## 10. t30：播放状态机 / 录制后试听 / 固定段时长 UI（用户第十一轮 #1 #3 #4 前端）
+
+### 10.1 #1 播放完成后再点 = 重播；未播完再点 = 暂停（`segment-player.tsx` + `use-segment-player.ts`）
+
+用户原话：
+
+> "播放完成之后，再次点击播放，应该重新播放一遍，同时UI也有提示。如果没有完成，再次点击就是暂停，需要有体现。"
+
+**状态机**（显式四态，不再用 `isPlaying` 布尔值猜）：`idle`（没播过）→ `playing` → `paused`（中途暂停）→ `ended`（播到结尾）。
+判定优先级：`ended` 事件设 `atEndRef` ⇒ `ended`；否则看元素 `paused` / 是否播过 ⇒ `playing` / `paused` / `idle`。
+
+| 状态    | 按钮文案     | 图标      | 状态文字（`aria-live="polite"`）         |
+| ------- | ------------ | --------- | ---------------------------------------- |
+| idle    | 播放         | Play      | 还没播放                                 |
+| playing | 暂停         | Pause     | 正在播放                                 |
+| paused  | 继续播放     | Play      | 已暂停（再点继续播放）                   |
+| ended   | **重新播放** | RotateCcw | 本段已播完，点击「重新播放」从头再听一遍 |
+
+- `toggle()`：`playing` → 暂停；`ended` → `currentTime = 0` + `tracker.markSeek()`（"回到 0"不算听）+ 播放；其余 → 播放/继续；
+- 反馈是**三重的**：按钮文案与图标变、`aria-live` 状态文字变、状态文字带 DS 动效类 `enter-fade`（`key=playbackState` 让动画重播一次）。
+  只改颜色或只换图标都不算"有体现"；
+- 同上，「播完停在结尾、不假装还在播」由真实音频实测（`currentTime = 19.8 / duration = 19.8`）。
+
+### 10.2 #3 录制完成后可试听自己刚录的那一段（`recorder-panel.tsx` + `use-recorder.ts`）
+
+用户原话：
+
+> "当录制接唱完成之后，我希望有一个试听按钮，让用户可以听到自己现在录下的声音。"
+
+- **不依赖上传**：试听用的是**本地** Blob（`URL.createObjectURL` → 游离的 `new Audio()`），上传失败也照样能听；
+- 按钮文案与状态文字与 §10.1 **同一套语义**（试听本段 / 暂停试听 / 继续试听 / 重听本段），
+  避免"同一个用户在试听和听别人时看到两套行为"；
+- **绝不给"点了没反应"的按钮**：`createPreviewElement` 与 `createObjectURL` **两个都拿到**才暴露 `previewUrl`；
+  拿不到（宿主不支持 / 策略禁用）就安静地不提供试听，其余动作（用这一段 / 重录）不受影响；
+- 生命周期：重录 / 卸载 / 换录都会 `pause()` + `revokeObjectURL()`（不留 blob 泄漏、不留"上一段还在响"）；
+- 守卫：`recorder-environment.test.ts` 用变异证明（临时移除 `createPreviewElement` → 用例转红）守住"生产实现必须提供两个端口"。
+
+### 10.3 #4 录制端固定段时长 UI（`presetDurationMs`）
+
+用户第 4 条裁决的 UI 落点（取代"15–30 秒"动态区间）：
+
+| 场景               | 表现                                                                                           |
+| ------------------ | ---------------------------------------------------------------------------------------------- |
+| 有本段时长         | 「本段 20.6 秒（与这段伴奏等长，允许 ±2.0 秒）」+ 计时分母显示 `20.6`；**不出现**"15–30 秒"    |
+| 录制中             | 「录制中 00:05 / 20.6」+「还差 15.6 秒录满本段（允许 ±2.0 秒）」                               |
+| 录满（到本段时长） | **自动停止**（`autoStopMs = presetDurationMs`），状态「已录 00:20 / 20.6」，「用这一段」可用   |
+| 提前停且超出 ±2 秒 | warning 文案 = 共享函数的原文（含"本段固定时长 / 相差 X 秒 / 允许 ±2.0 秒"），「用这一段」禁用 |
+| **拿不到**本段时长 | 退回「15–30 秒」区间文案（回退口径），**不假装知道固定时长**                                   |
+
+判定与上传客户端、服务端读**同一个函数与同一个容差**（`checkRecordingDurationAgainstPreset` + `SEGMENT_PRESET_TOLERANCE_MS`），
+不会出现"前端说行、后端说不行"。
+
+**⚠️ 联调待办（未伪造通过）**：`presetDurationMs` 由页面传入。**正确来源已有**，无需新契约字段：
+`GET /api/songs` 的 `SongSegmentSchema.durationMs`（曲库切分，t29 的权威值同源）。
+需要 `features/bottle/record-step.tsx` / `pages/bottle-page.tsx`（**frontend-flow 域，我未越界修改**）把
+`song.segments.find((s) => s.index === nextIndex)?.durationMs` 传下来 —— 一行。未接线前录制面板走回退区间。
+
+### 10.4 顺带修掉的一个真实缺陷：`/listen` 请求体是浮点（真实浏览器 400）
+
+**发现方式**：用真实 Chromium 跑"录 20 秒 → 上传 → 投河 → 播放"整条链路时，`POST /api/segments/:id/listen`
+**21 次全部 400**，响应体 `{error:{message:"请求内容不合法，请检查后重试。", violations:[]}}`（连 violations 都是空的，光看响应体查不出原因）。
+
+**根因**：`coveredMs` 来自 `currentTime * 1000`（浮点），而契约 `SubmitListenProgressRequestSchema`
+是 `z.number().int().nonnegative()` ⇒ 服务端按"非法请求"拒掉。后果不是"少报一点"，而是
+**覆盖率永远推不上去 ⇒ 点踩门槛（0.8）永远不满足**（用户点踩只会一直看到"还没听满"）。
+
+**为什么单测没抓住**：`listen-reporter.test.ts` 的假传输层 `Math.floor` 掉了浮点 —— 契约校验只在真服务端发生。
+现在那条新用例**直接拿真实契约 schema 校验实际发出去的请求体**（`SubmitListenProgressRequestSchema.safeParse`），
+修法是 `observe()` 里唯一一处归一化点向下取整（宁少报不多报，覆盖率不能靠四舍五入凑门槛）。
+修复后真实浏览器复测：**21 次 /listen 全部 200**。

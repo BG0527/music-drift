@@ -9,15 +9,21 @@
  */
 import { useState } from 'react';
 import type { BottleSummary } from '@music-drift/shared';
-import { useSeaList } from '../features/api/queries';
+import { useSeaPages } from '../features/api/queries';
 import { progressLabel, BOTTLE_STATUS_LABEL } from '../features/bottle/relay-status';
-import { Card, EmptyState, Icon, Skeleton, Tabs } from '../design-system';
+import { Button, Card, EmptyState, Icon, Skeleton, Tabs } from '../design-system';
 import { AsyncBoundary } from './shell/async-boundary';
 import { Link } from './shell/router';
 import { TEXT_LINK, TEXT_LINK_STRONG } from './shell/link-styles';
 import { formatOccurredAt } from '../features/bottle/drift-events';
 
 type Zone = 'COMPLETED' | 'INCOMPLETE';
+
+/**
+ * 首屏一页多少支（§46.3）：6 支 = 2 行 × 3 列，加上标题/分区列仍在一屏内；
+ * 更多的靠服务端游标（`cursor` 进 / `nextCursor` 出）逐页拿。
+ */
+const SEA_PAGE_SIZE = 6;
 
 export function SeaPage() {
   const [zone, setZone] = useState<Zone>('COMPLETED');
@@ -54,11 +60,20 @@ export function SeaPage() {
 }
 
 function SeaZoneList({ zone }: { zone: Zone }) {
-  const sea = useSeaList(zone);
+  // **真分页**：游标由服务端给，前端只做"追加"。「加载更多」只在
+  // `nextCursor !== null` 时出现 —— 没有下一页就不摆一个点了没反应的按钮（禁止假分页）。
+  const sea = useSeaPages(zone, SEA_PAGE_SIZE);
+  const items = (sea.data?.pages ?? []).flatMap((page) => page.items);
 
   return (
     <AsyncBoundary
-      query={sea}
+      query={{
+        isPending: sea.isPending,
+        isError: sea.isError,
+        error: sea.error,
+        data: sea.isPending ? undefined : items,
+        refetch: sea.refetch,
+      }}
       skeleton={
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3" aria-busy="true">
           <Skeleton height="9rem" width="100%" />
@@ -66,7 +81,7 @@ function SeaZoneList({ zone }: { zone: Zone }) {
           <Skeleton height="9rem" width="100%" />
         </div>
       }
-      emptyWhen={(page) => page.items.length === 0}
+      emptyWhen={(list) => list.length === 0}
       empty={
         zone === 'COMPLETED' ? (
           <EmptyState
@@ -93,17 +108,39 @@ function SeaZoneList({ zone }: { zone: Zone }) {
         )
       }
     >
-      {(page) => (
-        <ul className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-          {page.items.map((bottle, index) => (
-            <li
-              key={bottle.id}
-              className={index < 4 ? `enter-rise stagger-${String(index + 1)}` : undefined}
-            >
-              <SeaBottleCard bottle={bottle} />
-            </li>
-          ))}
-        </ul>
+      {(list) => (
+        <div className="flex flex-col gap-4" data-anchor="sea-list">
+          <ul className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+            {list.map((bottle, index) => (
+              <li
+                key={bottle.id}
+                className={index < 4 ? `enter-rise stagger-${String(index + 1)}` : undefined}
+              >
+                <SeaBottleCard bottle={bottle} />
+              </li>
+            ))}
+          </ul>
+          {sea.hasNextPage ? (
+            <div className="flex flex-wrap items-center gap-4">
+              <Button
+                variant="ghost"
+                loading={sea.isFetchingNextPage}
+                onClick={() => {
+                  void sea.fetchNextPage();
+                }}
+              >
+                加载更多作品
+              </Button>
+              <p className="text-[0.875rem] text-slate-current">
+                已经看了 {list.length} 支，公海里还有更多。
+              </p>
+            </div>
+          ) : (
+            <p className="text-[0.875rem] text-slate-current">
+              一共 {list.length} 支，这就是全部了。
+            </p>
+          )}
+        </div>
       )}
     </AsyncBoundary>
   );

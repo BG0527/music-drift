@@ -171,48 +171,6 @@ describe('useSegmentListen：接线与顺序', () => {
 });
 
 describe('useSegmentListen：默认 fetch 传输层的请求形状（可执行证据）', () => {
-  it('实测时长走**独立端点** `/duration`，body 只有实测值 + 上报时的覆盖量（t28 / F2）', async () => {
-    vi.useFakeTimers();
-    const calls: Array<{ url: string; body: unknown }> = [];
-    vi.stubGlobal(
-      'fetch',
-      vi.fn(async (url: string, init?: RequestInit) => {
-        calls.push({ url, body: JSON.parse(String(init?.body ?? '{}')) as unknown });
-        return new Response(
-          JSON.stringify(
-            url.includes('/duration')
-              ? {
-                  declaredDurationMs: 20_000,
-                  measuredDurationMs: 2_000,
-                  effectiveDurationMs: 2_000,
-                  corrected: true,
-                  sampleCount: 1,
-                }
-              : { coveredMs: 2_000, durationMs: 20_000, ratio: 0.1, threshold: 0.8 },
-          ),
-          { status: 200, headers: { 'content-type': 'application/json' } },
-        );
-      }),
-    );
-
-    const { result } = renderHook(() => useSegmentListen({ segmentId: 'seg-1', periodMs: 60_000 }));
-    // 真实播放过（playedMs>0）+ 元素报出真实时长 2s
-    result.current.observe({ coveredMs: 2_000, playedMs: 2_000, measuredDurationMs: 2_000 });
-    await act(async () => {
-      await Promise.resolve();
-      await Promise.resolve();
-    });
-
-    const durationCall = calls.find((call) => call.url.includes('/duration'));
-    expect(durationCall?.url).toBe('/api/segments/seg-1/duration');
-    expect(durationCall?.body).toEqual({ measuredDurationMs: 2_000, coveredMsAtReportMs: 2_000 });
-    // 声明时长不由客户端转述（服务端自己读段行）
-    expect(JSON.stringify(durationCall?.body)).not.toContain('declaredDurationMs');
-    expect(JSON.stringify(durationCall?.body)).not.toContain('listenedRatio');
-    expect(result.current.state.durationReport?.status).toBe('reported');
-    expect(result.current.state.durationReport?.corrected).toBe(true);
-  });
-
   it('/listen 只带 coveredMs；/votes 只带 value（**绝不出现 listenedRatio**）', async () => {
     vi.useFakeTimers();
     const calls: Array<{ url: string; body: unknown }> = [];

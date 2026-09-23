@@ -172,6 +172,96 @@ describe('SegmentPlayer：点踩门槛', () => {
   });
 });
 
+describe('SegmentPlayer：播放状态可见（用户实测需求 ①）', () => {
+  /*
+   * 用户原话级要求：**播完后再点要重新播一遍且有提示；没播完再点是暂停，也要有体现。**
+   * a11y 要求（DESIGN.md §Accessibility）：状态变化不能只靠图标/颜色 ⇒ 必须有**文字**，
+   * 且用 `aria-live="polite"` 播报。
+   */
+  it('初始：按钮「播放」+ 状态文字「还没播放」', () => {
+    setup();
+
+    expect(screen.getByRole('button', { name: '播放' })).toBeInTheDocument();
+    expect(screen.getByTestId('playback-state').textContent).toContain('还没播放');
+  });
+
+  it('播放中：按钮变「暂停」+ 状态文字「正在播放」', async () => {
+    const { element } = setup();
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: '播放' }));
+      await Promise.resolve();
+    });
+    element.playThroughTo(3);
+
+    expect(screen.getByRole('button', { name: '暂停' })).toBeInTheDocument();
+    expect(screen.getByTestId('playback-state').textContent).toContain('正在播放');
+  });
+
+  it('未播完就暂停：按钮变「继续播放」+ 状态文字「已暂停」，且能从当前位置继续', async () => {
+    const { element } = setup();
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: '播放' }));
+      await Promise.resolve();
+    });
+    act(() => {
+      element.playThroughTo(6);
+      fireEvent.click(screen.getByRole('button', { name: '暂停' }));
+    });
+
+    expect(screen.getByRole('button', { name: '继续播放' })).toBeInTheDocument();
+    expect(screen.getByTestId('playback-state').textContent).toContain('已暂停');
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: '继续播放' }));
+      await Promise.resolve();
+    });
+    expect(element.play).toHaveBeenCalledTimes(2);
+    expect(element.currentTime).toBeCloseTo(6, 3); // 继续，不是回到开头
+  });
+
+  it('播完：按钮变「重新播放」+ 状态文字说明已播完（不是静默变回「播放」）', () => {
+    const { element } = setup();
+    act(() => {
+      element.playThroughTo(20);
+      element.currentTime = 20;
+      element.emit('ended');
+    });
+
+    expect(screen.getByRole('button', { name: '重新播放' })).toBeInTheDocument();
+    const state = screen.getByTestId('playback-state').textContent ?? '';
+    expect(state).toContain('播完');
+    expect(state).toContain('重新播放');
+  });
+
+  it('**播完后再点 = 从头重新播放**（位置归零 + 真的再播一次）', async () => {
+    const { element } = setup();
+    act(() => {
+      element.playThroughTo(20);
+      element.currentTime = 20;
+      element.emit('ended');
+    });
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: '重新播放' }));
+      await Promise.resolve();
+    });
+
+    expect(element.currentTime).toBe(0);
+    expect(element.play).toHaveBeenCalledTimes(1);
+    expect(screen.getByRole('button', { name: '暂停' })).toBeInTheDocument();
+  });
+
+  it('状态文字是 aria-live="polite" 的独立节点（读屏能播报，不靠颜色）', () => {
+    setup();
+
+    const state = screen.getByTestId('playback-state');
+    expect(state.getAttribute('aria-live')).toBe('polite');
+    // 四种状态的文字互不相同（文字本身承载状态，不是只有图标颜色）
+    expect(state.textContent).not.toBe('');
+  });
+});
+
 describe('SegmentPlayer：showDislike（页面自建赞/踩控件时关掉内置踩按钮）', () => {
   /*
    * 背景（用户裁决 + t12）：页面上是「赞 / 踩」一对小按钮，由 `features/bottle/VoteControls` 渲染。
@@ -316,5 +406,24 @@ describe('SegmentPlayer：把真实已听比例透给消费者（t12 点踩门�
     const snapshot = lastSnapshot(onProgress);
     expect(snapshot.ratio).toBe(0);
     expect(snapshot.dislikeUnlocked).toBe(false);
+  });
+});
+
+describe('SegmentPlayer：状态反馈是"看得见 + 听得见"的（不靠颜色/图标自说自话）', () => {
+  it('状态文字带 DS 动效类 enter-fade（只动 opacity，reduced-motion 由 DS 全局关闭）', async () => {
+    const { element } = setup();
+
+    const state = (): HTMLElement => screen.getByTestId('playback-state');
+    expect(state().className).toMatch(/enter-fade/);
+    expect(state().getAttribute('aria-live')).toBe('polite');
+    expect(state().textContent).toMatch(/还没播放/);
+
+    // 真点播放（用户手势）→ 文案必须跟着状态变（动效只是辅助，语义落在文字上）
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: '播放' }));
+      await Promise.resolve();
+    });
+    expect(state().textContent).toMatch(/正在播放/);
+    expect(element.paused).toBe(false);
   });
 });

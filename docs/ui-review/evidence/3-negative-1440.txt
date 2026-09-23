@@ -1,0 +1,19 @@
+[setup] 建一次性数据库（复用 apps/api 的派生 / 迁移 / 种子机制）…
+[setup] 库 music_drift_test_1790140978_50828_dhwzz2（种子 3 首）· API http://127.0.0.1:52361 · web http://127.0.0.1:55057
+[preflight] 浏览器会话有效：layoutmudnpwze
+viewport=1440x900 口径=desktop(整页高度) threshold=900 negativeControl=true hermetic
+FAIL /                                    height=2900 home-pick=2383 ← 锚点 home-pick 下沿 2383 > 900；整页高 2900 > 900
+FAIL /river                               height=2900 river-draw=2654 river-drop=2654 ← 锚点 river-draw 下沿 2654 > 900；锚点 river-drop 下沿 2654 > 900；整页高 2900 > 900
+FAIL /sea                                 height=2900 sea-list=2445 ← 锚点 sea-list 下沿 2445 > 900；整页高 2900 > 900
+FAIL /new                                 height=2900 new-catalog=2444 ← 锚点 new-catalog 下沿 2444 > 900；整页高 2900 > 900
+FAIL /sea/b116462e-97c3-4ae3-b0d7-78a478cff580 height=2900 sea-play=2522 ← 锚点 sea-play 下沿 2522 > 900；整页高 2900 > 900
+FAIL /me                                  height=2900 me-bottles=2541 ← 锚点 me-bottles 下沿 2541 > 900；整页高 2900 > 900
+FAIL /settings                            height=2900 settings-attribution=2553 ← 锚点 settings-attribution 下沿 2553 > 900；整页高 2900 > 900
+FAIL /bottles/0f1e3314-d9ef-45da-8881-c26a45dd12e6 height=2900 bottle-play=2668 bottle-action=2668 ← 锚点 bottle-play 下沿 2668 > 900；锚点 bottle-action 下沿 2668 > 900；整页高 2900 > 900
+FAIL /bottles/948c8840-2b5b-4aed-b123-221d551112af height=2900 bottle-play=2640 bottle-action=2640 ← 锚点 bottle-play 下沿 2640 > 900；锚点 bottle-action 下沿 2640 > 900；整页高 2900 > 900
+FAIL /bottles/6ce3abdd-14b8-4952-a903-ad6f67702b0d height=2900 bottle-record=2615 ← 锚点 bottle-record 下沿 2615 > 900；整页高 2900 > 900
+FAIL /bottles/0f1e3314-d9ef-45da-8881-c26a45dd12e6/log height=2900  ← 整页高 2900 > 900
+FAIL /nope-does-not-exist                 height=2900  ← 整页高 2900 > 900
+[teardown] 删库 music_drift_test_1790140978_50828_dhwzz2 → 已删除
+· 这 2 条路由没有关键锚点、手机口径不按锚点判定：/bottles/0f1e3314-d9ef-45da-8881-c26a45dd12e6/log、/nope-does-not-exist
+✅ 反向控制成立（整页高度断言）：注入 2000px 后 12/12 FAIL ⇒ 守卫不是永远点头

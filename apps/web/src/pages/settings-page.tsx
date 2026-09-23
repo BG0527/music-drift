@@ -3,12 +3,13 @@
  *
  * 只做三件事：匿名说明 / 登出 / 关于（契约版本 + 运行环境）。不追求设计稿。
  */
+import { useState } from 'react';
 import { CONTRACT_VERSION } from '@music-drift/shared';
 import { useLibraryMetadata } from '../features/api/queries';
 import { useLogout } from '../features/api/mutations';
 import { LibraryAttribution } from '../features/audio';
 import { useSession } from '../features/session/session-context';
-import { Button, Card, Icon, WaveDivider } from '../design-system';
+import { Button, Card, Icon, Modal, WaveDivider } from '../design-system';
 import { useNavigate } from './shell/router-context';
 
 export function SettingsPage() {
@@ -23,6 +24,7 @@ export function SettingsPage() {
    * （组件会自己说明"曲目列表暂时读不到"），绝不因为接口挂掉而不显示署名。
    */
   const library = useLibraryMetadata();
+  const [attributionOpen, setAttributionOpen] = useState(false);
 
   return (
     <div className="flex flex-col gap-6">
@@ -33,13 +35,12 @@ export function SettingsPage() {
         </p>
       </header>
 
-      <Card className="flex flex-col gap-3">
+      <Card className="flex flex-col gap-[8px]">
         <h2 className="text-[1.0625rem] font-semibold text-abyss">匿名的边界</h2>
-        <ul className="flex flex-col gap-2 text-[0.9375rem] leading-[1.6] text-slate-current">
-          <li>· 每支瓶子生成一个独立代号，同一个瓶子里的所有人看到的是同一个代号。</li>
-          <li>· 别人拿不到你的账号信息，只能看到代号与你的声音。</li>
-          <li>· 你的账号只用于认领自己的漂流瓶与查看漂流日志。</li>
-        </ul>
+        <p className="text-[0.9375rem] leading-[1.6] text-slate-current">
+          每支瓶子一个独立代号（同一瓶里大家看到的是同一个）；别人拿不到你的账号，只能看到代号与你的声音；
+          账号只用于认领你自己的漂流瓶与漂流日志。
+        </p>
       </Card>
 
       <Card className="flex flex-col gap-3">
@@ -73,15 +74,30 @@ export function SettingsPage() {
 
       <WaveDivider />
 
-      <section className="flex flex-col gap-2" aria-labelledby="attribution-heading">
+      <section className="flex flex-wrap items-center gap-[16px]" aria-labelledby="attribution-heading">
         <h2 id="attribution-heading" className="text-[1.0625rem] font-semibold text-abyss">
           伴奏与授权
         </h2>
         <p className="text-[0.875rem] leading-[1.6] text-slate-current">
-          曲库里的伴奏都是 CC BY 4.0 授权的器乐作品：可以再分发、也可以改编，
-          唯一义务是署名。成品在伴奏之上叠加了用户人声，属于改编（remix），署名与许可条款照旧保留。
+          曲库伴奏为 CC BY 4.0 授权（署名义务），点开查看完整署名与许可条款。
         </p>
-        <LibraryAttribution tracks={library.data?.tracks ?? []} />
+        <Button
+          variant="ghost"
+          data-anchor="settings-attribution"
+          className="whitespace-nowrap"
+          onClick={() => { setAttributionOpen(true); }}
+        >
+          查看署名与许可
+        </Button>
+        <Modal
+          open={attributionOpen}
+          title="伴奏与授权"
+          onClose={() => {
+            setAttributionOpen(false);
+          }}
+        >
+          <LibraryAttribution tracks={library.data?.tracks ?? []} />
+        </Modal>
       </section>
 
       <WaveDivider />

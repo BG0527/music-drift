@@ -43,6 +43,13 @@
       "when": 1790140313730,
       "tag": "0005_backfill_segment_duration",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1790140831808,
+      "tag": "0006_placeholder_song_segment_presets",
+      "breakpoints": true
     }
   ]
 }

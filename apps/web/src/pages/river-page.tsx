@@ -35,44 +35,45 @@ export function RiverPage() {
   }
 
   return (
-    <div className="flex flex-col gap-[32px]">
+    <div className="flex flex-col gap-[20px] md:gap-[32px]">
       <header className="flex flex-col gap-[4px]">
         <h1 className="text-[1.5rem] font-semibold text-abyss">暖流河道</h1>
         <p className="text-[0.875rem] text-slate-current">拾起那些搁浅在黑夜里的声线</p>
       </header>
 
-      <div className="grid gap-[24px] lg:grid-cols-2">
+      <div className="grid gap-[16px] md:gap-[24px] lg:grid-cols-2">
         {/* ① 捞起 */}
         <section
           aria-labelledby="draw-heading"
-          className="flex min-h-[440px] flex-col items-center justify-center gap-[24px] rounded-2xl bg-deep-current px-[16px] py-[24px] text-wave-white md:min-h-[517px] md:px-[48px] md:py-[40px]"
+          data-anchor="river-draw"
+          className="flex min-h-[230px] flex-col items-center justify-center gap-[12px] rounded-2xl bg-deep-current px-[16px] py-[20px] text-wave-white md:min-h-[517px] md:gap-[24px] md:px-[48px] md:py-[40px]"
         >
           <h2 id="draw-heading" className="sr-only">
             从河道捞一个漂流瓶
           </h2>
 
-          <div className="relative flex h-[180px] w-[180px] items-center justify-center md:h-[240px] md:w-[240px]">
+          <div className="relative flex h-[140px] w-[140px] items-center justify-center md:h-[240px] md:w-[240px]">
             {/* 静态三层涟漪（240/180/130）保证任何时刻都看得见 + 一层动画做"水面在动" */}
             <span
               aria-hidden="true"
-              className="absolute h-[180px] w-[180px] rounded-full border border-lagoon/35 md:h-[240px] md:w-[240px]"
+              className="absolute h-[140px] w-[140px] rounded-full border border-lagoon/35 md:h-[240px] md:w-[240px]"
             />
             <span
               aria-hidden="true"
-              className="absolute h-[140px] w-[140px] rounded-full border border-lagoon/45 md:h-[180px] md:w-[180px]"
+              className="absolute h-[108px] w-[108px] rounded-full border border-lagoon/45 md:h-[180px] md:w-[180px]"
             />
             <span
               aria-hidden="true"
-              className="absolute h-[100px] w-[100px] rounded-full border border-sea-glass/40 md:h-[130px] md:w-[130px]"
+              className="absolute h-[80px] w-[80px] rounded-full border border-sea-glass/40 md:h-[130px] md:w-[130px]"
             />
-            <RippleRing className="h-[180px] w-[180px] md:h-[240px] md:w-[240px]" />
+            <RippleRing className="h-[140px] w-[140px] md:h-[240px] md:w-[240px]" />
 
             <Button
               variant="primary"
               loading={draw.isPending}
               aria-label="捞一个漂流瓶"
               className={cn(
-                'relative z-10 h-[88px] w-[88px] rounded-full px-0 md:h-[110px] md:w-[110px]',
+                'relative z-10 h-[76px] w-[76px] rounded-full px-0 md:h-[110px] md:w-[110px]',
               )}
               onClick={onDraw}
             >
@@ -107,30 +108,31 @@ export function RiverPage() {
         {/* ② 投下（等权） */}
         <section
           aria-labelledby="cast-heading"
-          className="flex min-h-[440px] flex-col items-center justify-center gap-[24px] rounded-2xl bg-deep-current px-[16px] py-[24px] text-wave-white md:min-h-[517px] md:px-[48px] md:py-[40px]"
+          data-anchor="river-drop"
+          className="flex min-h-[230px] flex-col items-center justify-center gap-[12px] rounded-2xl bg-deep-current px-[16px] py-[20px] text-wave-white md:min-h-[517px] md:gap-[24px] md:px-[48px] md:py-[40px]"
         >
           <h2 id="cast-heading" className="sr-only">
             投下一支漂流瓶
           </h2>
 
-          <div className="relative flex h-[180px] w-[180px] items-center justify-center md:h-[240px] md:w-[240px]">
+          <div className="relative flex h-[140px] w-[140px] items-center justify-center md:h-[240px] md:w-[240px]">
             <span
               aria-hidden="true"
-              className="absolute h-[180px] w-[180px] rounded-full border border-coral/35 md:h-[240px] md:w-[240px]"
+              className="absolute h-[140px] w-[140px] rounded-full border border-coral/35 md:h-[240px] md:w-[240px]"
             />
             <span
               aria-hidden="true"
-              className="absolute h-[140px] w-[140px] rounded-full border border-coral/45 md:h-[180px] md:w-[180px]"
+              className="absolute h-[108px] w-[108px] rounded-full border border-coral/45 md:h-[180px] md:w-[180px]"
             />
             <span
               aria-hidden="true"
-              className="absolute h-[100px] w-[100px] rounded-full border border-coral/55 md:h-[130px] md:w-[130px]"
+              className="absolute h-[80px] w-[80px] rounded-full border border-coral/55 md:h-[130px] md:w-[130px]"
             />
 
             <Link
               to={newHref}
               aria-label="投下一支漂流瓶"
-              className="relative z-10 flex h-[88px] w-[88px] items-center justify-center rounded-full bg-coral text-wave-white transition-transform duration-200 ease-out hover:scale-[1.03] hover:bg-coral-deep focus-visible:ring-2 focus-visible:ring-sea-glass focus-visible:ring-offset-2 focus-visible:ring-offset-deep-current active:translate-y-[-1px] md:h-[110px] md:w-[110px]"
+              className="relative z-10 flex h-[76px] w-[76px] items-center justify-center rounded-full bg-coral text-wave-white transition-transform duration-200 ease-out hover:scale-[1.03] hover:bg-coral-deep focus-visible:ring-2 focus-visible:ring-sea-glass focus-visible:ring-offset-2 focus-visible:ring-offset-deep-current active:translate-y-[-1px] md:h-[110px] md:w-[110px]"
             >
               <span className="flex flex-col items-center gap-[4px]">
                 <Icon name="Music" size={24} />

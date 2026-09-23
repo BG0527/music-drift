@@ -1,0 +1,19 @@
+[setup] 建一次性数据库（复用 apps/api 的派生 / 迁移 / 种子机制）…
+[setup] 库 music_drift_test_1790142504_14240_udsp3y（种子 3 首）· API http://127.0.0.1:53699 · web http://127.0.0.1:53710
+[preflight] 浏览器会话有效：layoutmudommbt
+viewport=1440x900 口径=desktop(整页高度) threshold=900 negativeControl=false hermetic
+OK   /                                    height=900  home-pick=383
+OK   /river                               height=900  river-draw=654 river-drop=654
+OK   /sea                                 height=900  sea-list=445
+OK   /new                                 height=900  new-catalog=444
+OK   /sea/64721f9f-a4ba-47e9-afd8-c981c892505a height=900  sea-play=522
+OK   /me                                  height=900  me-bottles=541
+OK   /settings                            height=900  settings-attribution=553
+OK   /bottles/bf0c2347-6058-4f1b-a093-6d24a2efba0e height=900  bottle-play=668 bottle-action=668
+OK   /bottles/6f231f6f-0610-4970-9a1f-a1bc1fc2c8ab height=900  bottle-play=640 bottle-action=640
+[2m13:48:46[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/design-system/index.css[22m
+OK   /bottles/e6a05f46-a9a9-4fa3-9a97-2c469453d99b height=900  bottle-record=615
+OK   /bottles/bf0c2347-6058-4f1b-a093-6d24a2efba0e/log height=900  
+OK   /nope-does-not-exist                 height=900  
+[teardown] 删库 music_drift_test_1790142504_14240_udsp3y → 已删除
+✅ 全部页面达标（桌面口径：一屏装下）

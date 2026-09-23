@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { screen, within } from '@testing-library/react';
+import { fireEvent, screen, within } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import { LIBRARY_LICENSE, LIBRARY_METADATA_URL } from '@music-drift/shared/audio';
 import { USER_A } from '../../test/fixtures';
@@ -39,6 +39,8 @@ describe('设置页 · 伴奏署名（CC BY 4.0）', () => {
       handlers: handlers(() => ({ body: METADATA })),
     });
 
+    // §46.2：声明式内容不占首屏 → 先点开入口，署名在弹窗里（义务不因收进弹窗而消失）
+    fireEvent.click(await screen.findByRole('button', { name: '查看署名与许可' }));
     const heading = await screen.findByRole('heading', { name: '伴奏音乐署名（CC BY 4.0）' });
     expect(heading).toBeInTheDocument();
 
@@ -71,6 +73,7 @@ describe('设置页 · 伴奏署名（CC BY 4.0）', () => {
       })),
     });
 
+    fireEvent.click(await screen.findByRole('button', { name: '查看署名与许可' }));
     const heading = await screen.findByRole('heading', { name: '伴奏音乐署名（CC BY 4.0）' });
     const section = (heading.closest('section') ?? heading.parentElement) as HTMLElement;
 

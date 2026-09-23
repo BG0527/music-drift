@@ -9,8 +9,8 @@
 import {
   DEFAULT_RECORDING_LIMITS,
   checkAudioFormat,
-  checkRecordingDuration,
   checkRecordingDurationAgainstPreset,
+  AUDIO_RULE_MESSAGES,
   normalizeMimeType,
   type AudioViolation,
 } from '@music-drift/shared/audio';
@@ -33,7 +33,7 @@ export interface ValidatedSegmentAudio {
   byteSize: number;
   /**
    * 时长是否经过核对。
-   * 目前只有"客户端给了合法时长"这一种来源；`requireDuration: false` 时允许缺失，
+   * t31 起：判定只看**曲库预设**；客户端这个值仅作诊断（缺失即判不通过，无开关可放宽）。
    * 但会显式标注 `false`，让调用方（与将来的评审）知道这条数据没有核对过。
    */
   durationVerified: boolean;
@@ -44,25 +44,25 @@ export type SegmentAudioValidation =
 
 export interface ValidateSegmentAudioOptions {
   /**
-   * 是否要求客户端提供 `durationMs`。默认 **true**：
-   * 时长是产品规则（t29 起为"该段曲库预设时长"，缺失即无法核对 → 拒绝（fail-closed））。
-   * 契约 `RecordSegmentRequestSchema.durationMs` 目前是可选字段，若确认要放宽，
-   * 由调用方显式传 `false` 并在响应里承担"时长未核实"的后果（不要静默放宽）。
+   * 该段的**曲库预设时长**（ms）—— **必填**（t31）。
+   *
+   * 为什么必填：它是分母的唯一权威来源，缺了就没有可判定口径。
+   * 旧实现的"未传预设 → 回退 15–30s 区间"分支已**删除**；改成必填是**类型层面**的保证：
+   * 新调用方忘了传就编译期报错，而不是运行时悄悄退回旧规则（那正是要根除的静默降级）。
+   * 预设本身不可用（NaN / ≤0）→ `AUDIO_SEGMENT_PRESET_MISSING`（fail-closed）。
+   *
+   * 已删除的 `requireDuration` 原来守"客户端必须自报时长，否则拒"；现在由**预设规则**接手：
+   * 不报时长 ⇒ `NaN` 进 `checkRecordingDurationAgainstPreset` ⇒ 仍是 `AUDIO_DURATION_OUT_OF_RANGE`
+   *（"没有收到可用的录音时长…"），语义不减、开关更少。
    */
-  requireDuration?: boolean;
+  presetDurationMs: number;
   maxBytes?: number;
-  /**
-   * t29：该段的**曲库预设时长**。传了就按「必须匹配预设 ±容差」判定（权威口径）；
-   * 不传（历史/异常数据）才回退到 15–30 秒区间。
-   */
-  presetDurationMs?: number | undefined;
 }
 
 export function validateSegmentAudioUpload(
   upload: SegmentAudioUpload,
-  options: ValidateSegmentAudioOptions = {},
+  options: ValidateSegmentAudioOptions,
 ): SegmentAudioValidation {
-  const requireDuration = options.requireDuration ?? true;
   const byteSize = upload.bytes.byteLength;
   const violations: AudioViolation[] = [
     ...checkAudioFormat(
@@ -84,21 +84,22 @@ export function validateSegmentAudioUpload(
   const durationUsable =
     typeof durationMs === 'number' && Number.isFinite(durationMs) && durationMs > 0;
   /**
-   * t29：拿到该段曲库预设时长时，判定口径是「**必须匹配预设 ±容差**」；
-   * 拿不到预设（历史/异常数据）才回退到旧的 15–30 秒区间 —— 两条口径共用同一个错误码，
-   * 且**只有预设口径参与分母**（`bottle_segments.duration_ms` 由 `db/segments.ts` 写预设值）。
+   * t31：时长判定**只有一条规则** —— 「必须匹配该段曲库预设时长（±容差）」。
+   * 旧的 15–30s 动态区间分支已删除（它守的是已被用户需求取代的规则）；
+   * 预设必填，缺失/不可用即 fail-closed，不存在"回退到客户端自报值"的分叉。
    */
-  if (options.presetDurationMs !== undefined) {
+  if (!Number.isFinite(options.presetDurationMs) || options.presetDurationMs <= 0) {
+    violations.push({
+      code: 'AUDIO_SEGMENT_PRESET_MISSING',
+      message: AUDIO_RULE_MESSAGES.AUDIO_SEGMENT_PRESET_MISSING,
+    });
+  } else {
     violations.push(
       ...checkRecordingDurationAgainstPreset(
         durationUsable ? durationMs : Number.NaN,
         options.presetDurationMs,
       ),
     );
-  } else if (durationUsable) {
-    violations.push(...checkRecordingDuration(durationMs));
-  } else if (requireDuration) {
-    violations.push(...checkRecordingDuration(Number.NaN));
   }
 
   if (violations.length > 0) return { ok: false, violations };

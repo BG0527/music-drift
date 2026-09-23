@@ -127,3 +127,25 @@ describe('设置页（Figma 无此帧，captain 裁决必须补最简版）', ()
     });
   });
 });
+
+/**
+ * 收藏 / 徽章的入口在「我的」里（§46.2：属于声明式/次要内容 ⇒ 入口 + 弹窗，不摊在首屏）。
+ */
+describe('我的：收藏与徽章入口', () => {
+  it('两个入口都在，点开各自弹出对应面板', async () => {
+    renderWithProviders(<ProfilePage />, {
+      handlers: [
+        ...authedHandlers(),
+        { path: '/api/me/collections', respond: () => ({ body: [] }) },
+        { path: '/api/me/badges', respond: () => ({ body: [] }) },
+        { path: '/api/me/notifications', respond: () => ({ body: { items: [], nextCursor: null } }) },
+        { path: '/api/me/bottles', respond: () => ({ body: { items: [], nextCursor: null } }) },
+      ],
+    });
+
+    fireEvent.click(await screen.findByRole('button', { name: '我的收藏' }));
+    expect(await screen.findByRole('heading', { name: '我的收藏' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '我的徽章' }));
+    expect(await screen.findByRole('heading', { name: '我的徽章' })).toBeInTheDocument();
+  });
+});

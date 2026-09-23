@@ -41,13 +41,6 @@ export interface PlayerProgressSnapshot {
   coveredMs: number;
   playedMs: number;
   dislikeUnlocked: boolean;
-  /**
-   * 浏览器**解码出来的真实时长**（ms）；不可信（NaN/Infinity/≤0）时为 null（fail-closed）。
-   *
-   * 用途（t28 / F2）：点踩门槛的分母是上传者自报的时长，真实 2s 却声明 30s 的段对诚实听众
-   * 永久够不到 80%。这个值就是"播放时实测"的分母来源，**不参与**覆盖率判定。
-   */
-  measuredDurationMs: number | null;
 }
 
 export interface UseSegmentPlayerOptions {
@@ -64,48 +57,47 @@ export interface UseSegmentPlayerOptions {
 
 export interface UseSegmentPlayerResult {
   isPlaying: boolean;
+  /** 显式状态机：UI 据此显示「播放 / 暂停 / 继续播放 / 重新播放」与状态文案。 */
+  playbackState: PlaybackState;
   positionMs: number;
   ratio: number;
   coveredMs: number;
   playedMs: number;
-  /** 真实解码时长（ms）；不可信时 null。 */
-  measuredDurationMs: number | null;
   dislike: DislikeAvailability;
   toggle: () => void;
   seekTo: (positionMs: number) => void;
   replay: () => void;
 }
 
+/**
+ * 显式播放状态（用户实测报的问题：播完后再点行为不明确、未播完点击缺反馈）。
+ * `idle` 没播过 / `playing` 播放中 / `paused` 中途暂停 / `ended` 已播到结尾。
+ */
+export type PlaybackState = 'idle' | 'playing' | 'paused' | 'ended';
+
 interface ProgressView {
   isPlaying: boolean;
+  playbackState: PlaybackState;
   positionMs: number;
   coveredMs: number;
   playedMs: number;
   ratio: number;
   dislikeUnlocked: boolean;
-  measuredDurationMs: number | null;
 }
 
 const EMPTY_PROGRESS: ProgressView = {
   isPlaying: false,
+  playbackState: 'idle',
   positionMs: 0,
   coveredMs: 0,
   playedMs: 0,
   ratio: 0,
   dislikeUnlocked: false,
-  measuredDurationMs: null,
 };
 
 interface ProgressState extends ProgressView {
   /** 这份进度属于哪一段（src + 服务端时长）；不匹配即视为"还没开始听"。 */
   key: string;
-}
-
-/** 元素上报的时长（秒）→ 可用的毫秒数；不可信一律 null（fail-closed）。 */
-function readMeasuredDurationMs(seconds: number | undefined): number | null {
-  if (typeof seconds !== 'number' || !Number.isFinite(seconds) || seconds <= 0) return null;
-  const ms = Math.round(seconds * 1000);
-  return Number.isFinite(ms) && ms > 0 ? ms : null;
 }
 
 function createAudioElement(src: string): AudioElementLike {
@@ -134,8 +126,31 @@ export function useSegmentPlayer(options: UseSegmentPlayerOptions): UseSegmentPl
   const [state, setState] = useState<ProgressState>({ key, ...EMPTY_PROGRESS });
   const elementRef = useRef<AudioElementLike | null>(null);
   const trackerRef = useRef<ListenTracker | null>(null);
+  /**
+   * 是否**曾经播放过**（用于区分"显式暂停在 0"与"从未播放"）。
+   * 只在本段元素的事件处理器里写、在元素创建 effect 里重置 —— 不在 render 期读写。
+   */
+  const hasPlayedRef = useRef(false);
+  /**
+   * 是否已播到结尾。
+   *
+   * **用 `ended` 事件本身作为信号**，而不是比较 `currentTime >= duration`：
+   * ① 流式 mp4 的 `duration` 可能是 `Infinity`（比较永远不成立）；
+   * ② `ended` 是浏览器给出的权威语义（"这一遍播完了"），不需要我们自己推断。
+   * 起点/跳转/重新播放时清除（见 play / seeking 处理器）。
+   */
+  const atEndRef = useRef(false);
 
   const snapshot: ProgressView = state.key === key ? state : EMPTY_PROGRESS;
+
+  /** 由元素状态派生播放状态：暂停 + 位置在结尾（且确有位置）⇒ `ended`。 */
+  const derivePlaybackState = (element: AudioElementLike | null): PlaybackState => {
+    if (element === null) return 'idle';
+    if (!element.paused) return 'playing';
+    if (atEndRef.current) return 'ended';
+    // 播过之后再停 ⇒ 暂停（哪怕停在 0 也如实显示"已暂停"）；从没播过才是 idle
+    return hasPlayedRef.current ? 'paused' : 'idle';
+  };
 
   const publish = useCallback((): void => {
     const tracker = trackerRef.current;
@@ -145,12 +160,12 @@ export function useSegmentPlayer(options: UseSegmentPlayerOptions): UseSegmentPl
     setState({
       key,
       isPlaying: element !== null && !element.paused,
+      playbackState: derivePlaybackState(element),
       positionMs: progress.positionMs,
       coveredMs: progress.coveredMs,
       playedMs: progress.playedMs,
       ratio: progress.ratio,
       dislikeUnlocked: progress.dislikeUnlocked,
-      measuredDurationMs: readMeasuredDurationMs(element?.duration),
       // 注意：不在这里展示 ratio=NaN 之类的中间态，ListenTracker 已保证 0..1
     });
     onProgressRef.current?.({
@@ -158,13 +173,14 @@ export function useSegmentPlayer(options: UseSegmentPlayerOptions): UseSegmentPl
       coveredMs: progress.coveredMs,
       playedMs: progress.playedMs,
       dislikeUnlocked: progress.dislikeUnlocked,
-      measuredDurationMs: readMeasuredDurationMs(element?.duration),
     });
   }, [key]);
 
   useEffect(() => {
     const element = createElement(src);
     elementRef.current = element;
+    hasPlayedRef.current = false; // 换段 = 新的会话：从没播过
+    atEndRef.current = false;
     trackerRef.current = createListenTracker({ durationMs: duration });
 
     const onTimeUpdate = (): void => {
@@ -177,50 +193,59 @@ export function useSegmentPlayer(options: UseSegmentPlayerOptions): UseSegmentPl
     };
     const onEnded = (): void => {
       trackerRef.current?.markEnded();
+      atEndRef.current = true; // 播到结尾：位置留在结尾，状态由 derivePlaybackState 判为 `ended`
       publish();
     };
     // play / pause 也走同一条发布路径（isPlaying 从元素真实状态读取，不用本地推断）
+    const onPlay = (): void => {
+      hasPlayedRef.current = true;
+      atEndRef.current = false; // 开播即不再是"播完"状态（含"重新播放"）
+      publish();
+    };
     const onPlayStateChange = (): void => {
       publish();
     };
 
-    // 真实时长来自解码器：metadata 就绪 / 时长变化时都要重新读（t28）
-    const onDurationChange = (): void => {
-      publish();
-    };
     element.addEventListener('timeupdate', onTimeUpdate);
     element.addEventListener('seeking', onSeeking);
     element.addEventListener('ended', onEnded);
-    element.addEventListener('play', onPlayStateChange);
+    element.addEventListener('play', onPlay);
     element.addEventListener('pause', onPlayStateChange);
-    element.addEventListener('loadedmetadata', onDurationChange);
-    element.addEventListener('durationchange', onDurationChange);
 
     return () => {
       element.removeEventListener('timeupdate', onTimeUpdate);
       element.removeEventListener('seeking', onSeeking);
       element.removeEventListener('ended', onEnded);
-      element.removeEventListener('play', onPlayStateChange);
+      element.removeEventListener('play', onPlay);
       element.removeEventListener('pause', onPlayStateChange);
-      element.removeEventListener('loadedmetadata', onDurationChange);
-      element.removeEventListener('durationchange', onDurationChange);
       element.pause();
       elementRef.current = null;
       trackerRef.current = null;
     };
   }, [createElement, duration, publish, src]);
 
+  /**
+   * 智能切换（用户在"播放按钮"上的直觉）：
+   * - `playing` → 暂停；
+   * - `ended` → **从头重新播放**（把位置归零；这也是用户实测报的缺陷）；
+   * - `idle` / `paused` → 播放/继续。
+   */
   const toggle = useCallback((): void => {
     const element = elementRef.current;
     if (element === null) return;
-    if (element.paused) {
-      // 自动播放策略可能拒绝 play()：吞掉异常并保持"未播放"，不冒未捕获错误
-      void Promise.resolve(element.play()).catch(() => {
-        publish();
-      });
+    if (!element.paused) {
+      element.pause();
       return;
     }
-    element.pause();
+    if (derivePlaybackState(element) === 'ended') {
+      // 从头：位置归零 + 让覆盖率追踪器知道这是一次跳转（不把"回到 0"当成播放）
+      element.currentTime = 0;
+      trackerRef.current?.markSeek();
+    }
+    // 自动播放策略可能拒绝 play()：吞掉异常并保持"未播放"，不冒未捕获错误
+    void Promise.resolve(element.play()).catch(() => {
+      publish();
+    });
   }, [publish]);
 
   const seekTo = useCallback(
@@ -234,10 +259,15 @@ export function useSegmentPlayer(options: UseSegmentPlayerOptions): UseSegmentPl
     [publish],
   );
 
+  /** 无论当前在哪个状态，都从头重新播放（UI 的「重新播放」直接用它）。 */
   const replay = useCallback((): void => {
     seekTo(0);
-    toggle();
-  }, [seekTo, toggle]);
+    const element = elementRef.current;
+    if (element === null) return;
+    void Promise.resolve(element.play()).catch(() => {
+      publish();
+    });
+  }, [publish, seekTo]);
 
   const dislike = useMemo(
     () =>
@@ -251,11 +281,11 @@ export function useSegmentPlayer(options: UseSegmentPlayerOptions): UseSegmentPl
 
   return {
     isPlaying: snapshot.isPlaying,
+    playbackState: snapshot.playbackState,
     positionMs: snapshot.positionMs,
     ratio: snapshot.ratio,
     coveredMs: snapshot.coveredMs,
     playedMs: snapshot.playedMs,
-    measuredDurationMs: snapshot.measuredDurationMs,
     dislike,
     toggle,
     seekTo,

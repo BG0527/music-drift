@@ -72,7 +72,11 @@ async function register(prefix: string): Promise<{ cookie: string; userId: strin
 
 /** 发起 + 录第 1 段（30s）→ 返回瓶子与段 id。 */
 async function createSegment(cookie: string): Promise<{ bottleId: string; segmentId: string }> {
-  const songId = await insertSong(db, 4);
+  /**
+   * t31：本文件上传时固定声明 `SEGMENT_DURATION_MS`（30s），而曲库预设是分母的权威来源，
+   * 偏差超 ±2000ms 会被 fail-closed 正当拒绝 ⇒ 夹具歌的预设必须与之一致（仅夹具对齐，不改测试意图）。
+   */
+  const songId = await insertSong(db, 4, SEGMENT_DURATION_MS);
   const created = await app.inject({
     method: 'POST',
     url: '/api/bottles',

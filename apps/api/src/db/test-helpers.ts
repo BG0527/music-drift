@@ -28,7 +28,9 @@ export async function insertUser(db: Db): Promise<string> {
  * 因此调用方只需在**投踩之前**批量调用一次（多个用户可共用同一次等待）。
  */
 export async function listenUntilThresholdBatch(
-  app: { inject: (options: Record<string, unknown>) => Promise<{ statusCode: number; body: string }> },
+  app: {
+    inject: (options: Record<string, unknown>) => Promise<{ statusCode: number; body: string }>;
+  },
   cookies: readonly string[],
   segmentId: string,
   durationMs: number,
@@ -50,7 +52,8 @@ export async function listenUntilThresholdBatch(
     }
   }
   const neededMs =
-    (DEFAULT_POLICY.dislikeListenRatioThreshold - LISTEN_GROWTH.FIRST_REPORT_MAX_RATIO) * durationMs -
+    (DEFAULT_POLICY.dislikeListenRatioThreshold - LISTEN_GROWTH.FIRST_REPORT_MAX_RATIO) *
+      durationMs -
     LISTEN_GROWTH.RATE_SLACK_MS;
   const waitMs = Math.max(0, Math.ceil(neededMs / LISTEN_GROWTH.RATE_TOLERANCE)) + 400;
   await new Promise((resolve) => setTimeout(resolve, waitMs));
@@ -64,7 +67,9 @@ export async function listenUntilThresholdBatch(
 
 /** 单人版（内部走批量版；多人场景请直接用批量版共用一次等待）。 */
 export async function listenUntilThreshold(
-  app: { inject: (options: Record<string, unknown>) => Promise<{ statusCode: number; body: string }> },
+  app: {
+    inject: (options: Record<string, unknown>) => Promise<{ statusCode: number; body: string }>;
+  },
   cookie: string,
   segmentId: string,
   durationMs: number,
@@ -72,12 +77,31 @@ export async function listenUntilThreshold(
   await listenUntilThresholdBatch(app, [cookie], segmentId, durationMs);
 }
 
-export async function insertSong(db: Db, totalSegments = 4): Promise<string> {
+/**
+ * 建一首夹具歌。
+ *
+ * t31：**同时写入每段预设时长** —— 曲库预设是分母的权威来源，无预设的段现在会被 fail-closed 拒绝，
+ * 因此夹具歌必须像真曲库一样带上 `song_segments`，否则所有走"录制"的集成测试都会断。
+ * 默认每段 20s（与 `db/seed.ts` 的占位曲口径一致）。
+ */
+export async function insertSong(
+  db: Db,
+  totalSegments = 4,
+  segmentDurationMs = 20_000,
+): Promise<string> {
   const songId = randomUUID();
   await db.query(
     `insert into songs (id, title, total_segments, licensed_source) values ($1, $2, $3, $4)`,
     [songId, `song-${songId.slice(0, 8)}`, totalSegments, 'test'],
   );
+  for (let index = 1; index <= totalSegments; index += 1) {
+    await db.query(
+      `insert into song_segments (id, song_id, "index", start_ms, duration_ms, accompaniment_ref)
+       values ($1, $2, $3, $4, $5, null)
+       on conflict (song_id, "index") do nothing`,
+      [randomUUID(), songId, index, (index - 1) * segmentDurationMs, segmentDurationMs],
+    );
+  }
   return songId;
 }
 

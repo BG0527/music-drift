@@ -1,4 +1,4 @@
-import { fireEvent, screen, waitFor } from '@testing-library/react';
+import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import { bottleDetail, song, USER_A } from '../../test/fixtures';
 import { renderWithProviders } from '../../test/harness';
@@ -45,7 +45,7 @@ describe('选歌页', () => {
         },
       ],
     });
-    fireEvent.click(await screen.findByRole('button', { name: /选这首，去录第一段/ }));
+    fireEvent.click(await screen.findByRole('button', { name: /选这首，录第 1 段/ }));
     await waitFor(() => {
       expect(window.location.pathname).toBe('/bottles/8f1d6c2e-0f1a-4a1e-9f2b-aaaaaaaaaaaa');
     });
@@ -67,7 +67,7 @@ describe('选歌页', () => {
         },
       ],
     });
-    fireEvent.click(await screen.findByRole('button', { name: /选这首，去录第一段/ }));
+    fireEvent.click(await screen.findByRole('button', { name: /选这首，录第 1 段/ }));
     expect(await screen.findByRole('alert')).toHaveTextContent('需要先登录');
     expect(screen.getByRole('link', { name: '去登录' })).toHaveAttribute(
       'href',
@@ -81,5 +81,63 @@ describe('选歌页', () => {
     });
     expect(await screen.findByText(/曲库还没准备好/)).toBeInTheDocument();
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  });
+});
+
+/**
+ * 【用户可见缺陷】`user-provided` 的曲子 `song_segments` 是 0 行（没有切分/预设），
+ * 但仍在 `GET /api/songs` 里 —— 选它发起会建出空草稿，然后录制被 fail-closed 拒 ⇒ **卡死在草稿**。
+ * 所以选歌页必须：它**仍然可见**（不静默隐藏）+ **不可发起** + **写明理由**。
+ */
+describe('选歌页：没有切分的曲子', () => {
+  const RAW_ID = '44444444-4444-4444-8444-444444444444';
+
+  function setup() {
+    return renderWithProviders(<SongPickerPage />, {
+      handlers: [
+        {
+          path: '/api/songs',
+          respond: () => ({
+            body: [
+              song(),
+              song({
+                id: RAW_ID,
+                title: '别人写的歌',
+                totalSegments: 4,
+                licensedSource: 'user-provided',
+                segments: [],
+              }),
+            ],
+          }),
+        },
+      ],
+    });
+  }
+
+  it('无切分的曲子仍然在列表里（不静默隐藏）', async () => {
+    setup();
+    expect(await screen.findByText('别人写的歌')).toBeInTheDocument();
+  });
+
+  it('但它不可发起：按钮禁用，且就在行内写明理由', async () => {
+    const { fetchMock } = setup();
+    const title = await screen.findByText('别人写的歌');
+    const row = title.closest('li');
+    expect(row).not.toBeNull();
+    const button = within(row as HTMLElement).getByRole('button');
+    expect(button).toBeDisabled();
+    // 不能只是变灰：按钮文案也不能再叫「选这首，录第 1 段」
+    expect(button).toHaveTextContent('暂不可发起');
+    expect(within(row as HTMLElement).getByText(/还没有切分/)).toBeInTheDocument();
+
+    fireEvent.click(button);
+    expect(fetchMock.calls.some((call) => call.method === 'POST')).toBe(false);
+  });
+
+  it('有切分的曲子照常可发起（别把能用的也禁了）', async () => {
+    setup();
+    const title = await screen.findByText('深海鲸落');
+    const row = title.closest('li') as HTMLElement;
+    expect(within(row).getByRole('button')).toBeEnabled();
   });
 });

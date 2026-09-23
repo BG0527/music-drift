@@ -13,7 +13,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   SEGMENT_MAX_MS,
-  checkRecordingDuration,
+  SEGMENT_PRESET_TOLERANCE_MS,
+  checkRecordingDurationAgainstPreset,
   describeMicrophoneError,
   checkRecordingSupport,
   pickRecorderMime,
@@ -29,6 +30,7 @@ import {
   type RecorderEnvironment,
   type RecorderStream,
 } from './recorder-environment';
+import type { AudioElementLike } from './use-segment-player';
 
 export type RecorderStatus = 'unsupported' | 'idle' | 'requesting' | 'recording' | 'recorded';
 
@@ -43,16 +45,39 @@ export interface UseRecorderOptions {
   environment?: RecorderEnvironment;
   /** 波形柱子数（默认 48）。 */
   bars?: number;
-  /** 自动停止的时间点（默认 30 秒 = 服务端上限）。 */
+  /**
+   * 自动停止的时间点（ms）。
+   * 默认取**本段固定时长**（`presetDurationMs`）；拿不到预设时退回 `SEGMENT_MAX_MS`（30 秒）。
+   */
   autoStopMs?: number;
+  /**
+   * 本段的**固定时长**（曲库权威值，来自 `song.segments[index].durationMs` / t29 的段行）。
+   * 它就是录制端的**唯一**分母：录满自动停、判定走 `checkRecordingDurationAgainstPreset`。
+   *
+   * **缺失（null / 未传）不是"退回旧口径"，而是"不允许录制"**：t31 起服务端对无预设的段
+   * fail-closed 直接拒收（`AUDIO_SEGMENT_PRESET_MISSING`），前端再留一条"也能录"的路，
+   * 唯一效果就是让用户白录一整段、提交时吃 422。所以这里连麦克风都不去要。
+   */
+  presetDurationMs?: number | null;
+  /** 允许的偏差（默认 `SEGMENT_PRESET_TOLERANCE_MS` = ±2 秒，与上传/服务端同一常量）。 */
+  presetToleranceMs?: number;
   /** 从哪里开始提示"接近上限"（默认 28 秒）。 */
   warnFromMs?: number;
   /** 录制完成后的回调（上传由上层负责）。 */
   onRecorded?: (recording: SegmentRecording) => void;
 }
 
+/** 试听状态（与分段播放器同一套语义，便于 UI 文案复用）。 */
+export type PreviewState = 'idle' | 'playing' | 'paused' | 'ended';
+
 export interface UseRecorderResult {
   status: RecorderStatus;
+  /** 刚录好那一段的本地地址（未录/已重录时为 null）。 */
+  previewUrl: string | null;
+  /** 试听状态：`idle` 未试听 / `playing` 试听中 / `paused` 暂停 / `ended` 听完。 */
+  previewState: PreviewState;
+  /** 播放/暂停/继续/从头重听（用户需求 ③：录完要能听到自己唱成什么样）。 */
+  togglePreview: () => void;
   support: RecordingSupport;
   error: MicrophoneErrorDescription | null;
   elapsedMs: number;
@@ -60,6 +85,14 @@ export interface UseRecorderResult {
   nearLimit: boolean;
   recording: SegmentRecording | null;
   durationViolations: AudioViolation[];
+  /** 本段固定时长（曲库权威值）；拿不到时为 null。 */
+  presetDurationMs: number | null;
+  /** 本段时长是否缺失 —— 为 true 时 `start()` 拒绝执行（fail-closed，与 t31 服务端一致）。 */
+  presetMissing: boolean;
+  /** 不可录制的原因（可直接渲染给用户）；可录制时为 null。 */
+  blockedReason: string | null;
+  /** 允许的偏差（ms）——UI 文案要用同一个值，不能自己写 2 秒。 */
+  presetToleranceMs: number;
   start: () => Promise<void>;
   stop: () => void;
   reset: () => void;
@@ -68,14 +101,68 @@ export interface UseRecorderResult {
 const TIMER_INTERVAL_MS = 100;
 const METER_INTERVAL_MS = 40;
 
+/**
+ * 取试听用的 objectURL；拿不到就返回 null，即**放弃试听**，而不是让录制流程失败。
+ *
+ * 为什么必须容错：试听是附加能力，而"停止录制 → 产出成品 → 交给用户"是主路径。
+ * 这一步一旦抛异常，`finalize` 会在 `setRecording` 之前炸掉，用户看不到成品、也点不动重录
+ * （等于附加能力把主能力带崩）。而这并不罕见：`URL.createObjectURL` 在各宿主里对 Blob 的
+ * 实现并不互通（Node 的实现只认自己的 Blob，收到别的 Blob 直接抛），浏览器里也可能被策略禁用。
+ */
+function createPreviewUrl(environment: RecorderEnvironment, blob: Blob): string | null {
+  try {
+    if (environment.createObjectURL !== undefined) return environment.createObjectURL(blob);
+    if (typeof URL.createObjectURL !== 'function') return null;
+    return URL.createObjectURL(blob);
+  } catch {
+    return null;
+  }
+}
+
+/** 释放 objectURL：`revokeObjectURL` 同样可能缺失或抛，回收失败不该影响 UI 重置。 */
+function revokePreviewUrl(environment: RecorderEnvironment, url: string): void {
+  try {
+    if (environment.revokeObjectURL !== undefined) {
+      environment.revokeObjectURL(url);
+      return;
+    }
+    if (typeof URL.revokeObjectURL === 'function') URL.revokeObjectURL(url);
+  } catch {
+    // 回收失败只意味着这块内存要等页面卸载才释放，没有用户可见后果，不必打扰用户。
+  }
+}
+
 export function useRecorder(options: UseRecorderOptions = {}): UseRecorderResult {
   const environment = useMemo(
     () => options.environment ?? createBrowserRecorderEnvironment(),
     [options.environment],
   );
   const bars = options.bars ?? 48;
-  const autoStopMs = options.autoStopMs ?? SEGMENT_MAX_MS;
-  const warnFromMs = options.warnFromMs ?? Math.max(0, autoStopMs - 2_000);
+  const presetToleranceMs = options.presetToleranceMs ?? SEGMENT_PRESET_TOLERANCE_MS;
+  /** 本段固定时长（只认正数/有限值，别的当"没有"）。 */
+  const presetDurationMs =
+    typeof options.presetDurationMs === 'number' &&
+    Number.isFinite(options.presetDurationMs) &&
+    options.presetDurationMs > 0
+      ? Math.round(options.presetDurationMs)
+      : null;
+  /**
+   * 录满就停：拿得到本段时长就停在**本段时长**（多录的部分服务端也会拒），
+   * 拿不到才退回 30 秒上限（回退口径，见 `SEGMENT_MAX_MS` 注释）。
+   */
+  /**
+   * 录满就停的时间点 = **本段固定时长**（不是"最多 30 秒"）。
+   * 末尾的 `SEGMENT_MAX_MS` 只作为类型收敛的兜底：`presetDurationMs` 为 null 时 `start()` 已被拦下，
+   * 根本走不到这里，因此它不会变成"悄悄按 30 秒录"的第二套口径。
+   */
+  const autoStopMs = options.autoStopMs ?? presetDurationMs ?? SEGMENT_MAX_MS;
+  /** 本段时长缺失 = 不许录（fail-closed）。文案要能直接给用户看：说明原因 + 给出路。 */
+  const presetMissing = presetDurationMs === null;
+  const blockedReason = presetMissing
+    ? '这一段还没有登记固定时长（曲库数据缺失），现在不能录 —— 换一首歌，或者稍后再来。'
+    : null;
+  const warnFromMs =
+    options.warnFromMs ?? Math.max(0, autoStopMs - Math.min(2_000, Math.round(autoStopMs * 0.1)));
 
   const support = useMemo(
     () =>
@@ -93,6 +180,8 @@ export function useRecorder(options: UseRecorderOptions = {}): UseRecorderResult
   const [elapsedMs, setElapsedMs] = useState(0);
   const [levels, setLevels] = useState<number[]>([]);
   const [recording, setRecording] = useState<SegmentRecording | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [previewState, setPreviewState] = useState<PreviewState>('idle');
 
   const streamRef = useRef<RecorderStream | null>(null);
   const recorderRef = useRef<MediaRecorderLike | null>(null);
@@ -108,8 +197,77 @@ export function useRecorder(options: UseRecorderOptions = {}): UseRecorderResult
    * 而且第一路永远不被 stop）。ref 的读写只发生在事件处理函数里，不在 render 期。
    */
   const sessionActiveRef = useRef(false);
+  /** 试听元素与 objectURL（不参与渲染的数据放 ref；URL 也必须能被释放）。 */
+  const previewElementRef = useRef<AudioElementLike | null>(null);
+  const previewUrlRef = useRef<string | null>(null);
+  const previewHasPlayedRef = useRef(false);
+  const previewAtEndRef = useRef(false);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const meterTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  /** 释放试听资源（元素停掉 + objectURL 回收）：重录 / 卸载 / 换录时都要调用。 */
+  const releasePreview = useCallback((): void => {
+    previewElementRef.current?.pause();
+    previewElementRef.current = null;
+    const url = previewUrlRef.current;
+    if (url !== null) {
+      revokePreviewUrl(environment, url);
+      previewUrlRef.current = null;
+    }
+    previewHasPlayedRef.current = false;
+    previewAtEndRef.current = false;
+    setPreviewUrl(null);
+    setPreviewState('idle');
+  }, [environment]);
+
+  /** 录完立刻准备好试听：本地 Blob → objectURL → 元素 src。 */
+  const preparePreview = useCallback(
+    (blob: Blob): void => {
+      // 先要元素、再要地址：**两个都拿到才对外暴露 `previewUrl`**。
+      // 少任何一个都会渲染出一个"点了没反应"的试听按钮 —— 那比没有按钮更糟（用户会以为录音坏了）。
+      let element: AudioElementLike | null = null;
+      try {
+        element = environment.createPreviewElement?.() ?? null;
+      } catch {
+        element = null;
+      }
+      const url = element === null ? null : createPreviewUrl(environment, blob);
+      if (element === null || url === null) {
+        // 宿主不支持/被策略禁用：安静地不提供试听，录制成品照常交付，其余动作不受影响。
+        setPreviewUrl(null);
+        setPreviewState('idle');
+        return;
+      }
+      previewUrlRef.current = url;
+      setPreviewUrl(url);
+      element.src = url;
+      const publish = (): void => {
+        // 先看"是否已听完"再看 paused：浏览器在 ended 之后 paused 一定为 true，
+        // 但不能反过来依赖它（替身/流式实现里 ended 与 paused 不一定同步），
+        // 否则听完会显示成"暂停"，用户再点一次的行为与文案就对不上了。
+        if (previewAtEndRef.current) {
+          setPreviewState('ended');
+          return;
+        }
+        setPreviewState(
+          element.paused ? (previewHasPlayedRef.current ? 'paused' : 'idle') : 'playing',
+        );
+      };
+      element.addEventListener('play', () => {
+        previewHasPlayedRef.current = true;
+        previewAtEndRef.current = false;
+        publish();
+      });
+      element.addEventListener('pause', publish);
+      element.addEventListener('ended', () => {
+        previewAtEndRef.current = true;
+        publish();
+      });
+      previewElementRef.current = element;
+      setPreviewState('idle');
+    },
+    [environment],
+  );
 
   const releaseMic = useCallback((): void => {
     streamRef.current?.getTracks().forEach((track) => track.stop());
@@ -147,8 +305,20 @@ export function useRecorder(options: UseRecorderOptions = {}): UseRecorderResult
     const produced: SegmentRecording = { blob, mime, durationMs };
     setRecording(produced);
     setStatus('recorded');
+    // 用户需求 ③：录完就能试听（旧的那一份先释放，避免 blob 泄漏）
+    releasePreview();
+    preparePreview(blob);
     options.onRecorded?.(produced);
-  }, [autoStopMs, environment, options, releaseMic, stopTimers, teardownMeter]);
+  }, [
+    autoStopMs,
+    environment,
+    options,
+    preparePreview,
+    releaseMic,
+    releasePreview,
+    stopTimers,
+    teardownMeter,
+  ]);
 
   const stop = useCallback((): void => {
     const recorder = recorderRef.current;
@@ -157,7 +327,8 @@ export function useRecorder(options: UseRecorderOptions = {}): UseRecorderResult
   }, []);
 
   const start = useCallback(async (): Promise<void> => {
-    if (!support.ok || sessionActiveRef.current) return;
+    // fail-closed：没有本段固定时长就不开录（连麦克风都不要，别让用户以为在录）
+    if (!support.ok || sessionActiveRef.current || presetMissing) return;
     sessionActiveRef.current = true;
 
     setError(null);
@@ -241,6 +412,7 @@ export function useRecorder(options: UseRecorderOptions = {}): UseRecorderResult
     bars,
     environment,
     finalize,
+    presetMissing,
     releaseMic,
     stop,
     stopTimers,
@@ -250,6 +422,7 @@ export function useRecorder(options: UseRecorderOptions = {}): UseRecorderResult
 
   const reset = useCallback((): void => {
     sessionActiveRef.current = false;
+    releasePreview();
     stopTimers();
     teardownMeter();
     releaseMic();
@@ -259,7 +432,7 @@ export function useRecorder(options: UseRecorderOptions = {}): UseRecorderResult
     setElapsedMs(0);
     setError(null);
     setStatus(support.ok ? 'idle' : 'unsupported');
-  }, [releaseMic, stopTimers, support.ok, teardownMeter]);
+  }, [releaseMic, releasePreview, stopTimers, support.ok, teardownMeter]);
 
   // 卸载时释放麦克风与定时器（否则标签页会一直显示"正在录音"）
   useEffect(
@@ -271,17 +444,64 @@ export function useRecorder(options: UseRecorderOptions = {}): UseRecorderResult
       sessionActiveRef.current = false;
       streamRef.current?.getTracks().forEach((track) => track.stop());
       streamRef.current = null;
+      // 卸载：试听元素停掉 + objectURL 回收（离开页面不留泄漏）
+      previewElementRef.current?.pause();
+      previewElementRef.current = null;
+      const url = previewUrlRef.current;
+      if (url !== null) {
+        revokePreviewUrl(environment, url);
+        previewUrlRef.current = null;
+      }
     },
-    [stopTimers],
+    [environment, stopTimers],
   );
 
-  const durationViolations = useMemo(
-    () => (recording === null ? [] : checkRecordingDuration(recording.durationMs)),
-    [recording],
-  );
+  /**
+   * 时长判定：**以曲库预设为分母**，与上传客户端/服务端读同一个函数与同一个容差
+   * （`checkRecordingDurationAgainstPreset`），所以不会出现"前端说行、后端说不行"。
+   * 没有预设时不存在"另一套区间判定"：`start()` 已被拦下，收不到任何录音。
+   */
+  const durationViolations = useMemo(() => {
+    if (recording === null || presetDurationMs === null) return [];
+    return checkRecordingDurationAgainstPreset(
+      recording.durationMs,
+      presetDurationMs,
+      presetToleranceMs,
+    );
+  }, [presetDurationMs, presetToleranceMs, recording]);
+
+  /** 试听切换：播放 / 暂停 / 继续 / 听完再点 = 从头重听（与分段播放器同一条语义）。 */
+  const togglePreview = useCallback((): void => {
+    const element = previewElementRef.current;
+    if (element === null) return;
+    // 先判"已听完"再判"是否在播"：听完之后用户的意图一定是"再听一遍"，
+    // 而不是"暂停一个已经停下来的东西"（后者会让按钮点了没反应）。
+    if (previewAtEndRef.current) {
+      element.currentTime = 0;
+      previewAtEndRef.current = false;
+      void Promise.resolve(element.play()).catch(() => {
+        setPreviewState('paused');
+      });
+      return;
+    }
+    if (!element.paused) {
+      element.pause();
+      return;
+    }
+    void Promise.resolve(element.play()).catch(() => {
+      setPreviewState('paused');
+    });
+  }, []);
 
   return {
     status,
+    presetDurationMs,
+    presetToleranceMs,
+    presetMissing,
+    blockedReason,
+    previewUrl,
+    previewState,
+    togglePreview,
     support,
     error,
     elapsedMs,

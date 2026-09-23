@@ -34,9 +34,10 @@ function iconFor(item: NavItem): IconName {
  * active 用 peacock 指示 + 字重 500（DESIGN.md §Components 导航条）。
  *
  * ⚠️ **几何一律写显式 px，不用 Tailwind 的数字 utility**：
- * `theme.css` 把 `--spacing` 覆盖成 0.5rem（为了让 `p-1` = 8px 符合 DESIGN 的 8px 节奏），
- * 于是 `w-64` = 0.5rem × 64 = **512px**（不是 256px）—— 侧栏因此宽到 512、把导航卡片顶进内容区
- * （captain 在 1440 截图上看到的"选中卡片溢出侧栏"就是这个）。
+ * `theme.css` 曾把 `--spacing` 覆盖成 0.5rem，于是 `w-64` 等于 **512px**（不是 256px），
+ * 侧栏因此宽到 512、把导航卡片顶进内容区（captain 在 1440 截图上看到的"选中卡片溢出侧栏"就是这个）。
+ * 那个覆盖已回滚到默认 0.25rem（基底重取回一份），但这条纪律**不撤**：
+ * 尺度不再挂在一个全局可被改的变量上，就不会因为别人改一行 theme 而整体走样。
  *
  * Figma 契约（`docs/figma/frames/4-43--home-river.md` §1）：
  * sidebar 260×H · padding 40/24 · gap 48；nav-item 212×44 · padding 12/16 · gap 16。

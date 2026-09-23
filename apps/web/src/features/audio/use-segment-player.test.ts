@@ -231,76 +231,118 @@ describe('useSegmentPlayer：已播放时长与覆盖率', () => {
   });
 });
 
-describe('useSegmentPlayer：实测真实时长（t28 / F2 的分母来源）', () => {
+describe('useSegmentPlayer：播放状态机（播完 → 重新播放；未播完 → 暂停）', () => {
   /*
-   * 分母（段时长）是上传者自报的 ⇒ 诚实用户可能永久够不到 80%。
-   * 这里取的是**浏览器解码出来的真实时长**（`HTMLMediaElement.duration`），
-   * 只用于"播放时实测上报"，**不参与**覆盖率判定（覆盖率仍以服务端给的 durationMs 为分母）。
+   * 用户实测报的问题：**播完之后再点播放，行为不明确/不从头**；未播完点击也缺少可感知反馈。
+   * 这里把状态显式化，供 UI 显示（不给"看起来像在播"留空间）：
+   *   idle（没播过）→ playing → paused（中途暂停）→ ended（播到结尾）
    */
-  it('metadata 就绪后读出真实解码时长（秒 → 毫秒）', () => {
-    const { element, view } = setup();
+  it('初始为 idle', () => {
+    const { view } = setup();
 
-    act(() => {
-      element.duration = 2; // 真实只有 2 秒（上传者却声明 20s）
-      element.emit('loadedmetadata');
-    });
-
-    expect(view.result.current.measuredDurationMs).toBe(2_000);
+    expect(view.result.current.playbackState).toBe('idle');
   });
 
-  it('durationchange（流式容器后到）也会更新实测值', () => {
-    const { element, view } = setup();
+  it('播放中 → paused；再点 → 继续 playing', async () => {
+    const { view } = setup();
+
+    await act(async () => {
+      view.result.current.toggle();
+      await Promise.resolve();
+    });
+    expect(view.result.current.playbackState).toBe('playing');
 
     act(() => {
-      element.duration = 19.98;
-      element.emit('durationchange');
+      view.result.current.toggle();
     });
+    expect(view.result.current.playbackState).toBe('paused');
 
-    expect(view.result.current.measuredDurationMs).toBe(19_980);
+    await act(async () => {
+      view.result.current.toggle();
+      await Promise.resolve();
+    });
+    expect(view.result.current.playbackState).toBe('playing');
   });
 
-  it.each([
-    ['NaN', Number.NaN],
-    ['Infinity', Number.POSITIVE_INFINITY],
-    ['0', 0],
-    ['负数', -3],
-  ])('异常 duration（%s）→ 实测值为 null（fail-closed，绝不产生可疑分母）', (_label, value) => {
-    const { element, view } = setup();
-
-    act(() => {
-      element.duration = value as number;
-      element.emit('durationchange');
-    });
-
-    expect(view.result.current.measuredDurationMs).toBeNull();
-  });
-
-  it('实测时长随 onProgress 一起透出（消费者不需要自己读元素）', () => {
-    const onProgress = vi.fn();
-    const { element } = setup({ onProgress });
-
-    act(() => {
-      element.duration = 2;
-      element.emit('loadedmetadata');
-      element.playThrough(0, 1);
-    });
-
-    const last = onProgress.mock.calls.at(-1)?.[0] as { measuredDurationMs: number | null };
-    expect(last.measuredDurationMs).toBe(2_000);
-  });
-
-  it('实测时长**不参与**覆盖率判定：分母仍是服务端给的 durationMs', () => {
+  it('播到结尾 → ended（位置停在结尾，不假装还在播）', () => {
     const { element, view } = setup({ durationMs: 20_000 });
 
     act(() => {
-      element.duration = 2; // 真实 2s
-      element.emit('loadedmetadata');
-      element.playThrough(0, 2); // 把真实音频听完了
+      element.playThrough(0, 20);
+      element.currentTime = 20;
+      element.emit('ended');
     });
 
-    // 覆盖率按"已覆盖 / 服务端时长"算 ⇒ 2s/20s = 10%（这正是 F2 的症状本身）
-    expect(view.result.current.ratio).toBeCloseTo(0.1, 3);
-    expect(view.result.current.measuredDurationMs).toBe(2_000);
+    expect(view.result.current.playbackState).toBe('ended');
+    expect(view.result.current.isPlaying).toBe(false);
+  });
+
+  it('**播完后再次点击 = 从头重新播放**（位置归零 + play），不是"原地重播"', async () => {
+    const { element, view } = setup({ durationMs: 20_000 });
+    act(() => {
+      element.playThrough(0, 20);
+      element.currentTime = 20;
+      element.emit('ended');
+    });
+
+    await act(async () => {
+      view.result.current.toggle();
+      await Promise.resolve();
+    });
+
+    expect(element.currentTime).toBe(0);
+    expect(element.play).toHaveBeenCalledTimes(1);
+    expect(view.result.current.playbackState).toBe('playing');
+  });
+
+  it('中途暂停后点击 = 从当前位置继续（**不**回到开头）', async () => {
+    const { element, view } = setup({ durationMs: 20_000 });
+    act(() => {
+      element.playThrough(0, 8);
+    });
+
+    await act(async () => {
+      view.result.current.toggle();
+      await Promise.resolve();
+    });
+
+    expect(element.currentTime).toBeCloseTo(8, 3);
+    expect(view.result.current.playbackState).toBe('playing');
+  });
+
+  it('replay()：无论当前在哪个状态，都从头重新播放', async () => {
+    const { element, view } = setup({ durationMs: 20_000 });
+    act(() => {
+      element.playThrough(0, 5);
+    });
+
+    await act(async () => {
+      view.result.current.replay();
+      await Promise.resolve();
+    });
+
+    expect(element.currentTime).toBe(0);
+    expect(view.result.current.playbackState).toBe('playing');
+  });
+
+  it('从头重播不会把"重置位置"误记成已听（反作弊仍然成立）', () => {
+    const { element, view } = setup({ durationMs: 20_000 });
+    act(() => {
+      element.playThrough(0, 8);
+    });
+    expect(view.result.current.coveredMs).toBe(8_000);
+
+    act(() => {
+      // 跳到结尾：真实浏览器会先发 seeking（追踪器据此知道这是跳转、不补尾差）
+      element.currentTime = 20;
+      element.emit('seeking');
+      element.emit('ended');
+      element.currentTime = 0;
+      element.emit('seeking');
+    });
+
+    // 覆盖仍是 8s（没被"回到 0"扣掉，也没被"跳到 20"虚增）
+    expect(view.result.current.coveredMs).toBe(8_000);
   });
 });
 

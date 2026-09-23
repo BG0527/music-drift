@@ -4,6 +4,7 @@ import {
   BOTTLE_ID,
   SEGMENT_1,
   SEGMENT_2,
+  USER_A,
   USER_B,
   bottleDetail,
   bottleSummary,
@@ -25,10 +26,18 @@ describe('漂流瓶接唱页', () => {
   it('未登录时不摆出「录制 / 放回」按钮（先请登录，不制造会 401 的假按钮）', async () => {
     renderWithProviders(<BottlePage id={BOTTLE_ID} />, {
       route: `/bottles/${BOTTLE_ID}`,
-      handlers: [{ path: `/api/bottles/${BOTTLE_ID}`, respond: () => ({ body: bottleDetail() }) }],
+      handlers: [
+        {
+          path: `/api/bottles/${BOTTLE_ID}`,
+          respond: () => ({
+            // 未登录观看者拿到的就是这样的 DTO（`toBottleDetail`: viewerId null ⇒ isHolder false、去向为空）
+            body: bottleDetail({ isHolder: false, holderId: USER_A, availableResolutions: [] }),
+          }),
+        },
+      ],
     });
     expect(await screen.findByText(/需要先登录/)).toBeInTheDocument();
-    expect(screen.queryByRole('heading', { name: /第 2 段 · 共 4 段/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '录第 2 段' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /放回海中/ })).not.toBeInTheDocument();
   });
 
@@ -74,6 +83,8 @@ describe('漂流瓶接唱页', () => {
       },
     );
 
+    // §46.3：录制面板收进弹窗（页面本体只留一个按钮），先点开它
+    fireEvent.click(await screen.findByRole('button', { name: '录第 2 段' }));
     fireEvent.click(await screen.findByRole('button', { name: /开始录制/ }));
     await waitFor(() => {
       expect(screen.getByRole('button', { name: /停止录制/ })).toBeInTheDocument();
@@ -97,8 +108,14 @@ describe('漂流瓶接唱页', () => {
         { path: `/api/bottles/${BOTTLE_ID}`, respond: () => ({ body: bottleDetail() }) },
       ],
     });
-    expect(await screen.findByRole('heading', { name: /第 2 段 · 共 4 段/ })).toBeInTheDocument();
+    // 段号来自服务端（`missingSegmentIndexes[0]`）：按钮文案直接是"录第 2 段"
+    expect(await screen.findByRole('button', { name: '录第 2 段' })).toBeInTheDocument();
     expect(screen.getAllByText(/缺第 2、3、4 段/).length).toBeGreaterThan(0);
+    // 弹窗里才是录制面板的完整标题
+    fireEvent.click(screen.getByRole('button', { name: '录第 2 段' }));
+    expect(
+      await screen.findByRole('heading', { name: /第 2 段 · 共 4 段/ }),
+    ).toBeInTheDocument();
   });
 
   it('§9.1：漂流中被裁掉后续时，明确说明"还有 N 段看不到"（不是假装瓶子丢了段）', async () => {
@@ -113,10 +130,10 @@ describe('漂流瓶接唱页', () => {
         },
       ],
     });
-    expect(await screen.findByText(/还有 2 段是你现在看不到的/)).toBeInTheDocument();
+    expect(await screen.findByText(/还有 2 段现在看不到/)).toBeInTheDocument();
   });
 
-  it('点踩上送的是音频层给的真实收听比例（页面不自己算、不写死阈值）', async () => {
+  it('点踩不含 listenedRatio：覆盖率走 /listen 上报，票体只有 value（服务端判定门槛）', async () => {
     // 可控的音频元素：驱动 timeupdate 让覆盖率到 100% → 点踩按钮解禁
     const listeners: Record<string, (() => void)[]> = {};
     const element = {
@@ -153,6 +170,20 @@ describe('漂流瓶接唱页', () => {
           },
           {
             method: 'POST',
+            path: /\/api\/segments\/.+\/listen/,
+            respond: ({ body }) => ({
+              body: {
+                segmentId: SEGMENT_1,
+                coveredMs: (body as { coveredMs: number }).coveredMs,
+                durationMs: 20_000,
+                ratio: 1,
+                threshold: 0.8,
+                reachedThreshold: true,
+              },
+            }),
+          },
+          {
+            method: 'POST',
             path: /\/api\/segments\/.+\/votes/,
             respond: () => ({
               body: {
@@ -161,6 +192,7 @@ describe('漂流瓶接唱页', () => {
                 likeCount: 0,
                 dislikeCount: 1,
                 dislikeThreshold: 10,
+                listenedRatio: 1,
                 segmentCut: false,
               },
             }),
@@ -177,15 +209,120 @@ describe('漂流瓶接唱页', () => {
     }
 
     await waitFor(() => {
-      expect(screen.getByRole('button', { name: '点踩' })).toBeEnabled();
+      expect(screen.getByRole('button', { name: /点踩/ })).toBeEnabled();
     });
-    fireEvent.click(screen.getByRole('button', { name: '点踩' }));
+    fireEvent.click(screen.getByRole('button', { name: /点踩/ }));
 
     await waitFor(() => {
       expect(fetchMock.calls.some((call) => call.url.includes('/votes'))).toBe(true);
     });
+    // ① 听满 20 秒：覆盖率上报只带 coveredMs（时长以服务端为准，前端不喂时长）
+    const listen = fetchMock.calls.find((call) => call.url.includes('/listen'));
+    expect(listen?.body).toEqual({ coveredMs: 20_000 });
+    // ② 票体里没有 listenedRatio（服务端按持久化覆盖率判定，旧字段传什么都不影响）
     const vote = fetchMock.calls.find((call) => call.url.includes('/votes'));
-    expect(vote?.body).toEqual({ segmentId: SEGMENT_1, value: 'DISLIKE', listenedRatio: 1 });
+    expect(vote?.body).toEqual({ value: 'DISLIKE' });
+    expect(JSON.stringify(vote?.body)).not.toContain('listenedRatio');
+  });
+
+  /**
+   * 用户 2026-09-23 实测报的**严重 bug**：发起一支瓶子、点进详情，页面说"不在你手上"，
+   * 于是发起者既录不了第 1 段、也选不了去向 —— 而"发起"本来就是"我来录第 1 段"。
+   *
+   * 根因（服务端事实）：`DRAFT` 瓶子的 `holder` 是 `null`（内核 `BOTTLE_CREATED` 不改 holder），
+   * 所以 `isHolder` 对发起者也是 `false`；而内核 `canRecordSegment` 对 `DRAFT` 只要求
+   * "你是发起者"。前端却只看 `isHolder` ⇒ 把自己人挡在门外。
+   * 判据改用服务端给的**观看者维度**事实：`availableResolutions`（空数组 = 他不能选）。
+   */
+  it('发起后（DRAFT 且非 holder，还没录）：能录第 1 段，不说"不在你手上"', async () => {
+    renderWithProviders(<BottlePage id={BOTTLE_ID} />, {
+      route: `/bottles/${BOTTLE_ID}`,
+      handlers: [
+        { path: '/api/auth/me', respond: () => ({ body: SESSION_B }) },
+        {
+          path: `/api/bottles/${BOTTLE_ID}`,
+          respond: () => ({
+            body: bottleDetail({
+              status: 'DRAFT',
+              isHolder: false,
+              holderId: null,
+              segments: [],
+              recordedCount: 0,
+              missingSegmentIndexes: [1, 2, 3, 4],
+              availableResolutions: ['RIVER', 'SEA'],
+            }),
+          }),
+        },
+      ],
+    });
+
+    expect(await screen.findByRole('button', { name: '录第 1 段' })).toBeInTheDocument();
+    expect(screen.queryByText(/现在不在你手上/)).not.toBeInTheDocument();
+  });
+
+  it('录完第 1 段后（还留在手上）：下一步是"选择去向"，不是再录一段，也不是"不在你手上"', async () => {
+    renderWithProviders(<BottlePage id={BOTTLE_ID} />, {
+      route: `/bottles/${BOTTLE_ID}`,
+      handlers: [
+        { path: '/api/auth/me', respond: () => ({ body: SESSION_B }) },
+        {
+          path: `/api/bottles/${BOTTLE_ID}`,
+          respond: () => ({
+            body: bottleDetail({
+              status: 'DRAFT',
+              isHolder: false,
+              holderId: null,
+              // 第 1 段就是我录的（ownerId = 当前会话用户）⇒ 内核不许再录，只能选去向
+              segments: [
+                {
+                  id: SEGMENT_1,
+                  index: 1,
+                  ownerId: USER_B,
+                  note: '我录的第一棒',
+                  ownerCode: '接棒的人#001',
+                  likeCount: 0,
+                  dislikeCount: 0,
+                  deletedAt: null,
+                  audioMime: 'audio/webm',
+                  durationMs: 20_000,
+                },
+              ],
+              recordedCount: 1,
+              missingSegmentIndexes: [2, 3, 4],
+              availableResolutions: ['RIVER', 'SEA'],
+            }),
+          }),
+        },
+      ],
+    });
+
+    expect(await screen.findByRole('button', { name: /选择去向/ })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /录第 \d 段/ })).not.toBeInTheDocument();
+    expect(screen.queryByText(/现在不在你手上/)).not.toBeInTheDocument();
+  });
+
+  it('别人的瓶子（既不持有也无去向可选）：仍然说"不在你手上"，且不出现录制/去向入口', async () => {
+    renderWithProviders(<BottlePage id={BOTTLE_ID} />, {
+      route: `/bottles/${BOTTLE_ID}`,
+      handlers: [
+        { path: '/api/auth/me', respond: () => ({ body: SESSION_B }) },
+        {
+          path: `/api/bottles/${BOTTLE_ID}`,
+          respond: () => ({
+            body: bottleDetail({
+              status: 'HELD',
+              isHolder: false,
+              holderId: USER_A,
+              availableResolutions: [],
+            }),
+          }),
+        },
+      ],
+    });
+
+    expect(await screen.findByText(/现在不在你手上/)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /录第 \d 段/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /选择去向/ })).not.toBeInTheDocument();
   });
 
   it('非持有者：不出现录制区，说明"不在你手上"并给去河道的出口', async () => {
@@ -199,7 +336,7 @@ describe('漂流瓶接唱页', () => {
       ],
     });
     expect(await screen.findByText(/现在不在你手上/)).toBeInTheDocument();
-    expect(screen.queryByRole('heading', { name: /第 2 段 · 共 4 段/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '录第 2 段' })).not.toBeInTheDocument();
     expect(screen.getByRole('link', { name: /去河道捞一个/ })).toHaveAttribute('href', '/river');
   });
 

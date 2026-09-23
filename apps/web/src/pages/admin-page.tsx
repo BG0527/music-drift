@@ -22,8 +22,8 @@ export function AdminPage() {
   if (session.status === 'loading') {
     return (
       <div className="flex flex-col gap-4" aria-busy="true">
-        <div className="h-9 w-40 rounded-base bg-tide-pool" />
-        <div className="h-24 w-full rounded-base bg-tide-pool" />
+        <div className="h-[36px] w-[160px] rounded-base bg-tide-pool" />
+        <div className="h-[96px] w-full rounded-base bg-tide-pool" />
       </div>
     );
   }

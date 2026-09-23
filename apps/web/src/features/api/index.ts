@@ -30,6 +30,7 @@ export {
   useBottleEvents,
   useMeQuery,
   useSeaBottle,
+  useSeaPages,
   useSeaList,
   useSongs,
 } from './queries';

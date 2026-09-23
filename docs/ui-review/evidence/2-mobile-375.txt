@@ -1,0 +1,18 @@
+[setup] 建一次性数据库（复用 apps/api 的派生 / 迁移 / 种子机制）…
+[setup] 库 music_drift_test_1790140944_41472_p46001（种子 3 首）· API http://127.0.0.1:49826 · web http://127.0.0.1:49834
+[preflight] 浏览器会话有效：layoutmudnp6gi
+viewport=375x812 口径=mobile(锚点+无横向滚动) threshold=812 negativeControl=false hermetic
+OK   /                                    height=816  home-pick=355
+OK   /river                               height=1030 river-draw=470 river-drop=810
+OK   /sea                                 height=812  sea-list=497
+OK   /new                                 height=926  new-catalog=713
+OK   /sea/d97d4432-7ead-4531-8e56-0053c5b762eb height=1325 sea-play=554
+OK   /me                                  height=1204 me-bottles=643
+OK   /settings                            height=1089 settings-attribution=811
+OK   /bottles/3bcfef3d-150b-4208-b89f-84eef198f57b height=1399 bottle-play=770 bottle-action=770
+OK   /bottles/33dcd7ff-7907-4456-91f8-bda94eb8e6bc height=1365 bottle-play=736 bottle-action=736
+OK   /bottles/88d36ed3-9b82-4346-adec-a6de23147b3f height=1359 bottle-record=740
+OK   /bottles/3bcfef3d-150b-4208-b89f-84eef198f57b/log height=812  
+OK   /nope-does-not-exist                 height=812  
+[teardown] 删库 music_drift_test_1790140944_41472_p46001 → 已删除
+✅ 全部页面达标（手机口径：无横向滚动 + 关键锚点在首屏内）

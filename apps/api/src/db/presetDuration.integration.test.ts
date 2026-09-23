@@ -23,11 +23,13 @@ let db: Db;
 
 /** 建一首带**曲库预设**的歌：每段写进 `song_segments`。 */
 async function insertSongWithPresets(presets: readonly number[]): Promise<string> {
+  // `insertSong` 现在会先写默认 20000 预设（t31 夹具要求），这里覆盖为库曲真实值。
   const songId = await insertSong(db, presets.length);
   for (const [offset, durationMs] of presets.entries()) {
     await db.query(
       `insert into song_segments (id, song_id, "index", start_ms, duration_ms, accompaniment_ref)
-       values ($1, $2, $3, $4, $5, null)`,
+       values ($1, $2, $3, $4, $5, null)
+       on conflict (song_id, "index") do update set duration_ms = excluded.duration_ms`,
       [randomUUID(), songId, offset + 1, offset * 25_000, durationMs],
     );
   }
@@ -67,25 +69,29 @@ describe('t29：bottle_segments.duration_ms 以曲库预设为权威', () => {
     expect(rows[0]?.duration_ms).toBe(IMMERSED_PRESETS[2]); // 22501，不是 15000
   });
 
-  it('没有预设行时回退到调用方声明值（历史/异常数据的兜底，且注释写明）', async () => {
-    const songId = await insertSong(db, 4); // 只建歌，不建 song_segments
+  it('t31：没有预设行 → **明确拒绝**（fail-closed），绝不采用调用方（客户端）声明值', async () => {
+    const songId = await insertSong(db, 4);
+    // 真·无预设：夹具歌现在默认会带预设（t31），因此显式删掉它们来构造该前提
+    // （不能建 0 段的歌：`songs_total_segments_check` 不允许）。
+    await db.query(`delete from song_segments where song_id = $1`, [songId]);
     const { bottleId } = await insertBottle(db, { songId, totalSegments: 4 });
     const ownerId = await insertUser(db);
 
-    const { id } = await insertBottleSegment(db, {
-      bottleId,
-      ownerId,
-      index: 1,
-      note: null,
-      durationMs: 18_500,
-    });
+    await expect(
+      insertBottleSegment(db, {
+        bottleId,
+        ownerId,
+        index: 1,
+        note: null,
+        durationMs: 18_500,
+      }),
+    ).rejects.toThrow(/预设/);
 
-    const rows = await db.query<{ duration_ms: number | null }>(
-      `select duration_ms from bottle_segments where id = $1`,
-      [id],
+    const rows = await db.query<{ count: string }>(
+      `select count(*)::text as count from bottle_segments where bottle_id = $1`,
+      [bottleId],
     );
-
-    expect(rows[0]?.duration_ms).toBe(18_500);
+    expect(rows[0]?.count).toBe('0'); // 零副作用：既不写客户端的 18500，也不写别的
   });
 });
 
@@ -95,10 +101,7 @@ describe('t29：上传校验的时长语义 = 「必须匹配该段预设时长�
 
   it('偏差在容差内（±2000ms）→ 通过', () => {
     for (const durationMs of [22_501, 20_501, 24_501]) {
-      const result = validateSegmentAudioUpload(
-        { mime: 'audio/webm', bytes, durationMs },
-        presets,
-      );
+      const result = validateSegmentAudioUpload({ mime: 'audio/webm', bytes, durationMs }, presets);
       expect(result.ok, String(durationMs)).toBe(true);
     }
   });
@@ -114,19 +117,5 @@ describe('t29：上传校验的时长语义 = 「必须匹配该段预设时长�
     expect(result.violations[0]?.code).toBe('AUDIO_DURATION_OUT_OF_RANGE');
     expect(result.violations[0]?.message).toContain('22.5');
     expect(result.violations[0]?.message).toContain('15.0');
-  });
-
-  it('拿不到预设（未传）→ 回退旧区间，行为与 t28 前一致（不破坏现有调用方）', () => {
-    const ok = validateSegmentAudioUpload(
-      { mime: 'audio/webm', bytes, durationMs: 20_000 },
-      {},
-    );
-    const tooShort = validateSegmentAudioUpload(
-      { mime: 'audio/webm', bytes, durationMs: 9_000 },
-      {},
-    );
-
-    expect(ok.ok).toBe(true);
-    expect(tooShort.ok).toBe(false);
   });
 });

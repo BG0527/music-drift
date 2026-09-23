@@ -19,6 +19,8 @@ export const QUERY_KEYS = {
   seaBottle: (id: string) => ['sea', 'detail', id] as const,
   notifications: ['me', 'notifications'] as const,
   myBottles: ['me', 'bottles'] as const,
+  myCollections: ['me', 'collections'] as const,
+  myBadges: ['me', 'badges'] as const,
   adminReports: (status: string) => ['admin', 'reports', status] as const,
   /** 曲库元数据是**构建资产**（static 文件），不是用户数据：单独一条键，长缓存。 */
   libraryMetadata: ['library', 'metadata'] as const,

@@ -5,11 +5,19 @@
  * 页面拿到的是**契约类型**，不是 `any`。段号 / 缺口 / 完成度一律来自服务端字段
  * （ADR-015：前端不得自己推算段号或完成度）。
  */
-import { useQuery, type UseQueryResult } from '@tanstack/react-query';
+import {
+  useInfiniteQuery,
+  useQuery,
+  type UseInfiniteQueryResult,
+  type UseQueryResult,
+} from '@tanstack/react-query';
 import {
   AnonymousCodeSchema,
   MyBottleListSchema,
+  BadgeAwardSchema,
+  CollectionSchema,
   NotificationSchema,
+  PrivateMessageSchema,
   ReportSchema,
   BottleDetailSchema,
   BottleEventSchema,
@@ -18,7 +26,9 @@ import {
   SongSchema,
   type BottleDetail,
   type MyBottle,
+  type BadgeAward,
   type Notification,
+  type PrivateMessage,
   type Report,
   type BottleEvent,
   type BottleSummary,
@@ -102,11 +112,81 @@ export function useSeaList(zone: 'COMPLETED' | 'INCOMPLETE'): UseQueryResult<Pag
 }
 
 /**
+ * 公海分区（**游标分页**，§46.3）。
+ *
+ * 契约：`cursor` 入参（`BottleListQuerySchema` 已声明）、`nextCursor` 出参。
+ * 纪律（captain 明确）：
+ * - **不自造第二套分页规则**：游标由服务端给、原样回传；
+ * - **`nextCursor === null` 时不渲染「加载更多」**，也不做本地切片假装有下一页
+ *   （后端当前确实硬编码 `nextCursor: null` —— 那就是真·只有一页，界面必须如实反映）。
+ */
+export function useSeaPages(
+  zone: 'COMPLETED' | 'INCOMPLETE',
+  limit = 12,
+): UseInfiniteQueryResult<{ pages: Page<BottleSummary>[] }, unknown> {
+  return useInfiniteQuery({
+    queryKey: [...QUERY_KEYS.seaList(zone), 'pages', limit],
+    initialPageParam: null as string | null,
+    queryFn: ({ pageParam }) => {
+      const cursor = pageParam === null ? '' : `&cursor=${encodeURIComponent(pageParam)}`;
+      return apiGet(
+        `/api/sea?zone=${zone}&limit=${String(limit)}${cursor}`,
+        pageOf(BottleSummarySchema),
+      );
+    },
+    // 服务端没说还有下一页，就没有下一页（不猜、不本地续）
+    getNextPageParam: (lastPage) => lastPage.nextCursor,
+  });
+}
+
+/**
  * 我参与过的漂流瓶（`CONTEXT.md` §11.1 的漂流日志入口）。
  *
  * 语义来自服务端：**参与过 = 我发起 或 我在该瓶唱过**；被斩浪的段仍算参与过（§16.7）；
  * 按最近活跃倒序；未登录 401。这里不做任何本地推算（前端算不出"跨设备"这件事）。
  */
+/**
+ * 我收藏的作品（CONTEXT §8）：服务端只回 `bottleId` + `createdAt`（收藏是"关系"，
+ * 曲名得靠 `/api/sea/:id` 逐条取回 —— 前端不自己编标题、也不自己推算它还在不在公海）。
+ */
+type Collection = ReturnType<typeof CollectionSchema.parse>;
+export function useMyCollections(enabled = true): UseQueryResult<Collection[]> {
+  return useQuery({
+    queryKey: QUERY_KEYS.myCollections,
+    queryFn: () => apiGet('/api/me/collections', arrayOf(CollectionSchema)),
+    enabled,
+  });
+}
+
+/**
+ * 我的徽章（CONTEXT §10 / ADR-014 裁决 #1）：**派生不落库** —— 每次都是服务端按事件现算，
+ * 作品被撤下徽章就消失。所以这里既不落缓存策略也不写本地存储。
+ */
+export function useMyBadges(enabled = true): UseQueryResult<BadgeAward[]> {
+  return useQuery({
+    queryKey: QUERY_KEYS.myBadges,
+    queryFn: () => apiGet('/api/me/badges', arrayOf(BadgeAwardSchema)),
+    enabled,
+    // 派生结果不参与 staleTime 优化：每次打开弹窗都要看到当下的真相
+    staleTime: 0,
+  });
+}
+
+/**
+ * 私密留言（CONTEXT §5）：**服务端按可见性过滤后再返回**（发起者只看已送达 / 发送者看自己的 /
+ * 中间传递者拿不到）。所以前端直接渲染即可，不再筛一遍。
+ */
+export function useBottleMessages(
+  bottleId: string,
+  enabled = true,
+): UseQueryResult<PrivateMessage[]> {
+  return useQuery({
+    queryKey: ['bottle', bottleId, 'messages'],
+    queryFn: () => apiGet(`/api/bottles/${bottleId}/messages`, arrayOf(PrivateMessageSchema)),
+    enabled,
+  });
+}
+
 export function useMyBottles(enabled = true): UseQueryResult<Page<MyBottle>> {
   return useQuery({
     queryKey: QUERY_KEYS.myBottles,

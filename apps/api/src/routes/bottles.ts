@@ -21,6 +21,7 @@ import { createAnonCodeService } from '../auth/anonCodeService.js';
 import { createAuthRepository } from '../auth/repository.js';
 import { validateSegmentAudioUpload } from '../audio/ingest.js';
 import { presetDurationMsFor } from '../store/segments.js';
+import { audioViolation } from '@music-drift/shared/audio';
 import { readDomainEvents } from '../db/events.js';
 import {
   problemFromOutcome,
@@ -314,13 +315,22 @@ export function registerBottleRoutes(app: FastifyInstance, options: BottleRoutes
       index: nextRecordIndex(state),
     });
 
+    if (presetDurationMs === null) {
+      /**
+       * t31 fail-closed：该段**没有曲库预设时长** ⇒ 明确拒绝（422 + 稳定码），
+       * **不静默回退到客户端自报值** —— 否则这首歌会在没人注意时失去权威分母。
+       */
+      const problem = problemFromViolations([audioViolation('AUDIO_SEGMENT_PRESET_MISSING')]);
+      return problem === null ? reply : sendProblem(reply, problem);
+    }
+
     const validation = validateSegmentAudioUpload(
       {
         mime: request.headers['content-type'] ?? null,
         bytes: bytes ?? new Uint8Array(0),
         durationMs,
       },
-      presetDurationMs === null ? {} : { presetDurationMs },
+      { presetDurationMs },
     );
     if (!validation.ok) {
       const problem = problemFromViolations(validation.violations);

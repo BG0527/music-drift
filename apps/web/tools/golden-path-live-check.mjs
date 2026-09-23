@@ -43,9 +43,9 @@ const API_DIR = fileURLToPath(new URL('../../api/', import.meta.url));
  *   node tsx --env-file-if-exists=../../.env src/server.ts
  * （`pnpm --filter @music-drift/api start` 这份文档命令本身由 scripts.test.ts + 手工冒烟单独守着。）
  */
-const TSX_CLI = createRequire(fileURLToPath(new URL('../../api/package.json', import.meta.url))).resolve(
-  'tsx/cli',
-);
+const TSX_CLI = createRequire(
+  fileURLToPath(new URL('../../api/package.json', import.meta.url)),
+).resolve('tsx/cli');
 const IS_WINDOWS = process.platform === 'win32';
 
 /**
@@ -332,13 +332,22 @@ async function startHermetic() {
     `[setup] 库 ${info.databaseName}（种子 ${info.seededSongs} 首 / ${info.seededSegments} 段）· API ${API}`,
   );
 
-  const child = spawn(process.execPath, [TSX_CLI, '--env-file-if-exists=../../.env', 'src/server.ts'], {
-    cwd: API_DIR,
-    stdio: ['ignore', 'pipe', 'pipe'],
-    // DATABASE_URL / PORT 由这里显式给：node 的 --env-file-if-exists **不覆盖**已存在的环境变量，
-    // 所以即便 start 脚本加载了根 .env（dev 库），本次运行仍然只碰自建库。
-    env: { ...process.env, DATABASE_URL: info.databaseUrl, PORT: String(port), LOG_LEVEL: 'error' },
-  });
+  const child = spawn(
+    process.execPath,
+    [TSX_CLI, '--env-file-if-exists=../../.env', 'src/server.ts'],
+    {
+      cwd: API_DIR,
+      stdio: ['ignore', 'pipe', 'pipe'],
+      // DATABASE_URL / PORT 由这里显式给：node 的 --env-file-if-exists **不覆盖**已存在的环境变量，
+      // 所以即便 start 脚本加载了根 .env（dev 库），本次运行仍然只碰自建库。
+      env: {
+        ...process.env,
+        DATABASE_URL: info.databaseUrl,
+        PORT: String(port),
+        LOG_LEVEL: 'error',
+      },
+    },
+  );
   let serverLog = '';
   const collect = (chunk) => {
     serverLog += String(chunk);
@@ -346,7 +355,12 @@ async function startHermetic() {
   };
   child.stdout.on('data', collect);
   child.stderr.on('data', collect);
-  hermetic = { databaseUrl: info.databaseUrl, databaseName: info.databaseName, child, serverLog: '' };
+  hermetic = {
+    databaseUrl: info.databaseUrl,
+    databaseName: info.databaseName,
+    child,
+    serverLog: '',
+  };
 
   if (!(await waitForHealth(API))) {
     console.error(`API 未在 60s 内就绪（${API}）：\n${serverLog}`);
@@ -720,7 +734,9 @@ const runChecks = async () => {
   const doomedId = doomed.body?.id;
   const doomedSegment = await recordSegment(A.session, doomedId, 20_000, '等着被斩的一段');
   const doomedSegmentId = doomedSegment.body?.segmentId;
-  await call(A.session, 'POST', `/api/bottles/${doomedId}/resolution`, { json: { resolution: 'RIVER' } });
+  await call(A.session, 'POST', `/api/bottles/${doomedId}/resolution`, {
+    json: { resolution: 'RIVER' },
+  });
   // 负向对照（先做）：单次"塞满"拿不到门槛 —— 证明限速真的在起作用，而不是我们的客户端在放水
   const cheater = await register('cz');
   const oneShot = await call(cheater.session, 'POST', `/api/segments/${doomedSegmentId}/listen`, {
@@ -760,7 +776,10 @@ const runChecks = async () => {
     const vote = await call(voter.session, 'POST', `/api/segments/${doomedSegmentId}/votes`, {
       json: { value: 'DISLIKE' },
     });
-    must(vote.status === 200, `点踩应为 200，实际 ${vote.status}（响应 ${JSON.stringify(vote.body)}）`);
+    must(
+      vote.status === 200,
+      `点踩应为 200，实际 ${vote.status}（响应 ${JSON.stringify(vote.body)}）`,
+    );
     cutTriggered = vote.body?.segmentCut === true;
   }
   must(cutTriggered, '第 10 个点踩应触发斩浪（阈值 10）');
@@ -773,17 +792,17 @@ const runChecks = async () => {
   );
   // 反向对照：同一用户的**其它**参与作品必须还在 —— 没有这条，"列表整个变空"也会假装通过
   const mainStillListed = afterCut.body?.items?.find((item) => item.id === bottleId);
-  must(
-    mainStillListed !== undefined,
-    '同一用户的其它参与作品不应受影响（否则剔除就不是"定向"的）',
-  );
+  must(mainStillListed !== undefined, '同一用户的其它参与作品不应受影响（否则剔除就不是"定向"的）');
   must(
     mainStillListed?.role === 'INITIATOR',
     `主瓶子角色应仍是 INITIATOR，实际 ${mainStillListed?.role}`,
   );
   // 斩浪本身的效果换个端点观测（发起者仍可读详情）：状态与有效段
   const doomedDetail = await call(A.session, 'GET', `/api/bottles/${doomedId}`);
-  must(doomedDetail.status === 200, `瓶子详情应为 200（发起者仍可读），实际 ${doomedDetail.status}`);
+  must(
+    doomedDetail.status === 200,
+    `瓶子详情应为 200（发起者仍可读），实际 ${doomedDetail.status}`,
+  );
   must(
     doomedDetail.body?.status === 'DAMAGED',
     `锚被斩后瓶子应为 DAMAGED，实际 ${doomedDetail.body?.status}`,
@@ -814,7 +833,9 @@ const runChecks = async () => {
       `✅ 黄金路径真实链路检查通过（${String(stepNo)} 步，4 个账号，真库 + 真 HTTP + 真音频字节）`,
     );
     if (hermetic !== null) {
-      console.log('   结论来源：hermetic 模式（自己的库 + 自己的种子 + 自己的进程）⟹ 可作验收证据。');
+      console.log(
+        '   结论来源：hermetic 模式（自己的库 + 自己的种子 + 自己的进程）⟹ 可作验收证据。',
+      );
     }
     return 0;
   }

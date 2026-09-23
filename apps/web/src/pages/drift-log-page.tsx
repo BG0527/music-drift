@@ -44,7 +44,10 @@ export function DriftLogPage({ id }: { id: string }) {
       </nav>
 
       <header className="flex flex-col gap-2">
-        <h1 className="text-[1.75rem] font-bold text-abyss">{bottle.data.songTitle} · 漂流日志</h1>
+        <h1 className="text-[1.5rem] font-semibold text-abyss">
+          {bottle.data.songTitle}
+          <span className="ml-[12px] text-[1rem] font-normal text-slate-current">漂流日志</span>
+        </h1>
         <p className="max-w-[46rem] text-[1rem] leading-[1.6] text-slate-current">
           这支瓶子从被发起到现在，每一次捞取、录音、投河、回传、入海都会在这里留下一条记录。
           操作者只显示匿名代号 —— 系统行为会标成「系统」。

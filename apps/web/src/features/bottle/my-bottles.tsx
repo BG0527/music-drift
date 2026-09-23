@@ -29,14 +29,17 @@ export function MyBottles({ className }: MyBottlesProps) {
   const mine = useMyBottles();
 
   return (
-    <section className={cn('flex flex-col gap-3', className)} aria-labelledby="my-bottles-heading">
-      <header className="flex flex-col gap-1">
+    <section
+      className={cn('flex flex-col gap-3', className)}
+      aria-labelledby="my-bottles-heading"
+    >
+      {/* 锚点挂在标题上：它必须进首屏（列表有几条由数据决定，把锚点挂在整段上就变成"数据越多人越容易红"） */}
+      <header className="flex flex-col gap-1" data-anchor="me-bottles">
         <h2 id="my-bottles-heading" className="text-[1.0625rem] font-semibold text-abyss">
           我参与过的漂流瓶
         </h2>
-        <p className="text-[0.875rem] leading-[1.6] text-slate-current">
-          我发起的、以及我唱过一段的瓶子都会在这里，按最近活跃排序。 「漂到哪了」点进漂流日志看 ——
-          时间线来自服务端，不是本地推算。
+        <p className="text-[0.875rem] leading-[1.5] text-slate-current">
+          我发起的、以及我唱过一段的瓶子都会在这里（按最近活跃排序，时间线来自服务端）。
         </p>
       </header>
 
@@ -57,7 +60,7 @@ export function MyBottles({ className }: MyBottlesProps) {
         }
       >
         {(page) => (
-          <ul className="flex flex-col gap-3">
+          <ul className="flex flex-col gap-2">
             {page.items.map((bottle) => (
               <MyBottleRow key={bottle.id} bottle={bottle} />
             ))}
@@ -75,43 +78,47 @@ function MyBottleRow({ bottle }: { bottle: MyBottle }) {
       : `缺第 ${bottle.missingSegmentIndexes.join('、')} 段`;
 
   return (
-    <li className="hover-lift flex flex-wrap items-center gap-3 rounded-base border border-mist bg-foam px-4 py-3 shadow-card">
-      <Icon name="Music" size={18} />
-      <span className="text-[1rem] font-semibold text-abyss">{bottle.songTitle}</span>
-      <span className="rounded-pill bg-tide-pool px-3 py-1 text-[0.8125rem] text-abyss">
-        {ROLE_LABEL[bottle.role]}
-      </span>
-
-      <span className="text-[0.875rem] text-slate-current">{progressLabel(bottle)}</span>
-
-      {bottle.mySegmentIndexes.length === 0 ? (
-        <span className="text-[0.875rem] text-warning">我唱的那一段被斩浪删除了（仍算参与过）</span>
-      ) : (
-        <span className="text-[0.875rem] text-slate-current">
-          我唱的：第 {bottle.mySegmentIndexes.join('、')} 段
+    /* 两行结构（§46.3）：第一行"歌名 + 我的角色 + 出口"，第二行"进度 / 我唱的段 / 缺口"。
+       原来全塞一行，窄一点就折成三行，4 条就把 /me 顶出 900。 */
+    <li className="hover-lift flex flex-col gap-[6px] rounded-base border border-mist bg-foam px-4 py-[8px] shadow-card">
+      <div className="flex flex-wrap items-center gap-x-[12px] gap-y-[2px]">
+        <Icon name="Music" size={18} />
+        <span className="text-[1rem] font-semibold text-abyss">{bottle.songTitle}</span>
+        <span className="rounded-pill bg-tide-pool px-3 py-1 text-[0.8125rem] text-abyss">
+          {ROLE_LABEL[bottle.role]}
         </span>
-      )}
 
-      {gap === null ? (
-        <span className="flex items-center gap-2 text-[0.875rem] text-success">
-          <Icon name="CheckCircle2" size={16} />
-          全部段位都有人唱过
+        <span className="ml-auto flex flex-wrap items-center gap-[16px]">
+          <Link to={`/bottles/${bottle.id}`} className={TEXT_LINK}>
+            <span className="whitespace-nowrap">去看这个瓶子</span>
+          </Link>
+          <Link to={`/bottles/${bottle.id}/log`} className={TEXT_LINK}>
+            <span className="whitespace-nowrap">漂流日志</span>
+          </Link>
         </span>
-      ) : (
-        <span className="flex items-center gap-2 text-[0.875rem] text-warning">
-          <Icon name="CircleDashed" size={16} />
-          {gap}
-        </span>
-      )}
+      </div>
 
-      <span className="ml-auto flex flex-wrap items-center gap-4">
-        <Link to={`/bottles/${bottle.id}`} className={TEXT_LINK}>
-          <span className="whitespace-nowrap">去看这个瓶子</span>
-        </Link>
-        <Link to={`/bottles/${bottle.id}/log`} className={TEXT_LINK}>
-          <span className="whitespace-nowrap">漂流日志</span>
-        </Link>
-      </span>
+      <div className="flex flex-wrap items-center gap-x-[12px] gap-y-[2px] text-[0.875rem] text-slate-current">
+        <span>{progressLabel(bottle)}</span>
+
+        {bottle.mySegmentIndexes.length === 0 ? (
+          <span className="text-warning">我唱的那一段被斩浪删除了（仍算参与过）</span>
+        ) : (
+          <span>我唱的：第 {bottle.mySegmentIndexes.join('、')} 段</span>
+        )}
+
+        {gap === null ? (
+          <span className="flex items-center gap-2 text-success">
+            <Icon name="CheckCircle2" size={16} />
+            全部段位都有人唱过
+          </span>
+        ) : (
+          <span className="flex items-center gap-2 text-warning">
+            <Icon name="CircleDashed" size={16} />
+            {gap}
+          </span>
+        )}
+      </div>
     </li>
   );
 }

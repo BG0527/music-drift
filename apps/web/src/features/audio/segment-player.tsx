@@ -9,7 +9,7 @@
  * - 只给**结构性提示**（第几段 / 时长），不显示歌词正文（版权约束，CONTEXT §3.2 的 Demo 口径）。
  */
 import type { AudioElementLike } from './use-segment-player';
-import { useSegmentPlayer } from './use-segment-player';
+import { useSegmentPlayer, type PlaybackState } from './use-segment-player';
 import { DislikeButton } from './dislike-button';
 import { formatClock, formatSeconds } from './format';
 import { Button, Card, Icon, cn } from '../../design-system';
@@ -29,13 +29,6 @@ export interface SegmentListenSnapshot {
   playedMs: number;
   /** 是否已达点踩门槛（门槛取内核 `DEFAULT_POLICY.dislikeListenRatioThreshold`）。 */
   dislikeUnlocked: boolean;
-  /**
-   * 浏览器**解码出来的真实时长**（ms）；不可信时 null（t28 / F2）。
-   * 用途：上报给服务端校正点踩门槛的**分母**（上传者自报的时长可能远大于真实值）。
-   */
-  measuredDurationMs: number | null;
-  /** 段行**声明**时长（ms）——随快照一起给，便于服务端/客户端做宽窄带判断；缺失为 null。 */
-  declaredDurationMs: number | null;
 }
 
 export interface SegmentPlayerProps {
@@ -70,6 +63,26 @@ export interface SegmentPlayerProps {
   className?: string;
 }
 
+/**
+ * 四种播放状态的**按钮文案 / 图标 / 状态文字**（用户实测需求 ①）。
+ *
+ * 为什么做成表：状态变化必须同时有**文字**与**图标**（DESIGN.md §Accessibility：不能只靠颜色/图标表达状态），
+ * 且按钮的 `aria-label` 与可见文案要保持一致，避免"看得见说暂停、读屏说播放"。
+ */
+const PLAYBACK_UI: Record<
+  PlaybackState,
+  { label: string; icon: 'Play' | 'Pause' | 'RotateCcw'; state: string }
+> = {
+  idle: { label: '播放', icon: 'Play', state: '还没播放' },
+  playing: { label: '暂停', icon: 'Pause', state: '正在播放' },
+  paused: { label: '继续播放', icon: 'Play', state: '已暂停（再点继续播放）' },
+  ended: {
+    label: '重新播放',
+    icon: 'RotateCcw',
+    state: '本段已播完，点击「重新播放」从头再听一遍',
+  },
+};
+
 export function SegmentPlayer({
   src,
   segmentIndex,
@@ -95,8 +108,6 @@ export function SegmentPlayer({
         coveredMs: progress.coveredMs,
         playedMs: progress.playedMs,
         dislikeUnlocked: progress.dislikeUnlocked,
-        measuredDurationMs: progress.measuredDurationMs,
-        declaredDurationMs: typeof durationMs === 'number' && durationMs > 0 ? durationMs : null,
       });
     },
     ...(createElement === undefined ? {} : { createElement }),
@@ -122,16 +133,31 @@ export function SegmentPlayer({
 
       <div className="flex items-center gap-3">
         <Button
-          aria-label={player.isPlaying ? '暂停' : '播放'}
+          aria-label={PLAYBACK_UI[player.playbackState].label}
           onClick={player.toggle}
-          icon={<Icon name={player.isPlaying ? 'Pause' : 'Play'} size={18} />}
+          icon={<Icon name={PLAYBACK_UI[player.playbackState].icon} size={18} />}
         >
-          {player.isPlaying ? '暂停' : '播放'}
+          {PLAYBACK_UI[player.playbackState].label}
         </Button>
         <p aria-live="polite" className="text-[0.875rem] text-slate-current">
           已听 {listenedSeconds} 秒 / 共 {totalSeconds} 秒（{percent}%）
         </p>
       </div>
+
+      {/*
+        状态文字：`key` 让状态一变就重新挂载 → DS 的 `.enter-fade`（只动 opacity，300ms ease-out）**重播一次**，
+        于是"状态变了"既看得见（文字变了 + 淡入）又听得见（aria-live 播报）。
+        不自造 keyframes、不动画 width/height（DESIGN.md §动效只允许 transform/opacity；
+        `prefers-reduced-motion` 由 motion.css 全局关闭，组件不必自己判断）。
+      */}
+      <p
+        key={player.playbackState}
+        data-testid="playback-state"
+        aria-live="polite"
+        className="enter-fade text-[0.875rem] leading-[1.6] text-slate-current"
+      >
+        {PLAYBACK_UI[player.playbackState].state}
+      </p>
 
       <div
         role="progressbar"

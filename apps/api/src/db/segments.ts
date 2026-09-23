@@ -54,7 +54,17 @@ export async function insertBottleSegment(
     bottleId: cmd.bottleId,
     index: cmd.index,
   });
-  const durationToStore = presetDurationMs ?? cmd.durationMs ?? null;
+  if (presetDurationMs === null) {
+    /**
+     * t31 fail-closed：**没有预设就没有权威分母**，因此拒绝写入。
+     * 旧实现在这里回退到 `cmd.durationMs`（客户端自报）——那是静默降级：某首歌会在没人注意时
+     * 失去权威分母，且该分支永远走不到（seed 已补预设）⇒ 已彻底移除，不留死分支。
+     */
+    throw new Error(
+      `段落缺少曲库预设时长，拒绝写入（fail-closed）：bottle=${cmd.bottleId} index=${cmd.index}`,
+    );
+  }
+  const durationToStore = presetDurationMs;
 
   const rows = await db.query<{ id: string }>(
     `insert into bottle_segments (id, bottle_id, owner_id, "index", note, audio, audio_mime, duration_ms, created_at)

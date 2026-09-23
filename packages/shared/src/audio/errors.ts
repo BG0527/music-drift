@@ -22,6 +22,12 @@ export const AUDIO_RULE_CODES = [
   'AUDIO_TOO_LARGE',
   /** 没有音频数据（空 body / 字段缺失）。 */
   'AUDIO_MISSING',
+  /**
+   * 该段**没有曲库预设时长**（`song_segments` 无对应行）⇒ 拒绝录制/上传（t31，fail-closed）。
+   * 准入理由：客户端要据此**改选动作**（换一首歌 / 等曲库补齐），与格式、体积类错误不是同一处置；
+   * 且这条**必须显式可见**——静默回退到客户端自报值会让该段悄悄失去权威分母（本会话反复清理的静默降级）。
+   */
+  'AUDIO_SEGMENT_PRESET_MISSING',
 ] as const;
 
 export type AudioRuleCode = (typeof AUDIO_RULE_CODES)[number];
@@ -38,6 +44,8 @@ export const AUDIO_RULE_MESSAGES: Record<AudioRuleCode, string> = {
   AUDIO_CONTAINER_MISMATCH: '音频文件内容与声明的格式不一致，请重新录制。',
   AUDIO_TOO_LARGE: '录音文件超过体积上限，请重新录制。',
   AUDIO_MISSING: '没有收到音频数据，请重新录制。',
+  AUDIO_SEGMENT_PRESET_MISSING:
+    '这一段的段时长还没在曲库里登记，暂时不能录制。请换一首歌，或等曲库补齐后再来。',
 };
 
 /** 音频侧错误一律是"规则违反"（非并发冲突）：422（ADR-004 的错误语义骨架）。 */
