@@ -3524,3 +3524,26 @@ architect 主动报告「**会话上下文已接近上限**（累计约 40 次�
 
 ### 88.5 归档方式
 工具不允许改 inScope ⇒ **披露式归档**（t20 先例）：`changedPaths` 只列声明内路径，`packages/shared/src/domain/**` 的改动在 output 逐条披露 + captain 背书。**不得**为绕过校验而把它塞进 changedPaths（那是事后扩大声明，工具拒绝是对的）。
+
+---
+
+## 89. t41 ① 完成（河道页合并）+ 两个技术判断被确认
+
+### 89.1 ① 河道页合并
+- **canonical = `/river`**：`/` → `/river` 用 `history.replaceState`（**不加历史条目** ⇒ 从登录页进来按"返回"不会在两页之间来回弹）；
+  理由：① 这一页就叫「河道」，`/river` 语义明确、`/` 是旧落地页残留；② **零链接改动**（侧栏 `NAV_ITEMS`、漂流瓶页「回河道」、各空态出口本来就全指 `/river`）⇒ **不留过期链接**；③ 登录后 `next=/` 仍成立（立刻换成 `/river`）；
+- **删除 `pages/home-page.tsx` + 其测试** —— **被取代的机制不留第二份**；`deep-surface-cta.test.ts` 摘掉 home 用例时**说明等价断言仍在 river 两面板上**（不是静默减测）；
+- **心情标签**（`features/bottle/mood-chips.tsx`）：5 个标签、点击切换、`aria-pressed` 表达选中 + **如实文案**「心情标签这一版只作展示：点它只是换个心情，不会筛选下面的作品」⇒ 落实"不得暗示它真的在筛选"；
+- **动效按 `motion-web`**：目的 = feedback（§1）· 只动 `transform`（§3）· **引用契约 token 不内联数值**（§2，写法 `duration-[var(--motion-hover-duration)]`）· reduced-motion 全局兜底（§7）· **可断言契约**（§8）**写进测试**：类名必须出现 `var(--motion-`。
+  ⇒ 这是把 skill 条款**变成可执行断言**的又一例（不是"参考了 skill"）。
+
+### 89.2 证据
+- `river-merge.test.tsx` **4 passed**（**先红后绿**：改前 3 例红 —— `Unable to find role="link" and name "捞一个漂流瓶"`、`expected '/' to be '/river'`）；
+- `mood-chips.test.tsx` **5 passed**；
+- 守卫：1440 **exit 0（12/12）** · 375 **exit 0（12/12）**；且**把 `/` 的锚点从已删除的 `home-pick` 换成河道的 `river-draw`/`river-drop`** ⇒ **不留悬空锚点**（否则守卫会"通过但那一行什么都没测"）；
+- 全仓唯一红 = `features/audio/recorder-panel.test.tsx`（**audio-engineer 的 t40 在途**）⇒ 不在其域，如实标注。
+
+### 89.3 两个技术判断：captain 确认
+- **② 公海页码 ⇒ 映射到已走过的游标链**（`useSeaPages` 缓存 `pages[]`；第 N 页 = 依次 `fetchNextPage()`；回看 = 渲染缓存；页码数 = 已取页数 + `hasNextPage ? 1 : 0`，**不请求 `total`**）⇒ **正确**：复用 cursor/keyset，**未新增第二套分页语义**；
+- **③ 漂流日志 ⇒ 前端过滤**（映射层收口），理由（执行者原话，captain 采纳并升级为职责边界）：
+  > 「接口返回的是**事件流 = 服务端真相**；"**给用户看什么**"是**展示策略**，不该烧进契约。」
