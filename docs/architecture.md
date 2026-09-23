@@ -3183,3 +3183,36 @@ C2 紧贴 `foam` 环（三处 CTA）· 移动端内圈 **+16px**（md 不动）�
 - **代价**：**其他机器 / clone 不会有这些 skill** ⇒ 换环境或部署时需按 §77.1 的记录**重新安装**（清单：`frontend-design` / `afrexai-ui-design-system` / `css-animation-creator` / `motion-web`；位置 `.dsh/skills/<name>/SKILL.md`）；
 - **本会话内无影响**：成员与 captain 共享同一文件系统，能正常 load。
 ⇒ 因此 §77.2 的"captain 可核对条款原文"**依赖本机文件**；引用核对在本机有效 ✓
+
+---
+
+## 78. t30 完成（四项达标）+ ⭐ 真浏览器探针（本会话**最高证据等级**）+ `motion-web` 首次见效
+
+### 78.1 四项交付
+1. **#1 播放/重播/暂停**：显式四态状态机（`idle | playing | paused | ended`，优先级 `ended > paused > idle`）；播完再点＝从头（`currentTime = 0` + `markSeek()` + 播放）、未播完再点＝暂停；**反馈三通道**（文案 + 按钮文案/图标 + `aria-live`）；
+2. **#3 录制后试听**：本地 Blob（不经服务端、与上传状态无关）；两个端口都拿到才给按钮（拿不到就**安静不给**）—— **绝不给"点了没反应"的按钮**；
+3. **#4 固定段时长 UI**：「本段 20.0 秒（±2.0 秒）」+ 录满自动停 + 提前停说清相差多少；页面接线由 frontend-flow 完成（`record-step.tsx:178`）；
+4. **fail-closed 对齐**：无预设时 `start()` 直接返回且**不调用 `getUserMedia`**，面板禁用 + 说明 + `aria-describedby`。
+
+### 78.2 ⭐ 真浏览器探针：本会话**最高证据等级**
+真 Chromium + 假麦克风 + 一次性库，**对着已接线的页面**（ALL PASS / exit 0）：
+- 真实 **19.68s** webm 播完 → 点「重新播放」`currentTime 1.006` **真在播**；
+- 未播完 → 暂停（`paused=true` + 文案「已暂停」）；
+- 试听 `blob:` **真出声**（`duration 3.84`）；
+- **录满自动停**（未手动点停，等到「用这一段」自行出现）；
+- `/listen` **21/21 全 200**；`/duration` **0 次调用**；整轮**无 4xx/5xx**。
+⇒ 这一级证据**只能由真浏览器提供**：本会话正是靠它才抓到"`coveredMs` 浮点 vs 契约整数 ⇒ 21 次全 400 ⇒ 点踩门槛永不满足"这个**所有自动化测试全绿**的缺陷（§73.2）。
+
+### 78.3 探针是否入库：captain 裁决
+`D:/music-rec-probe/probe.mjs`（仓库外）**不入库** —— AGENTS.md §7 规定 E2E 工具属待裁决项；它目前是 `npx playwright` 的一次性用法，不构成项目依赖。
+**但要求把"配方"写进文档**（真 Chromium + 假麦克风 + 一次性库 + 对着已接线页面的断言清单），使任何人**可重建**；并列入交付说明作为"真浏览器证据"的来源。
+⇒ 同时**建议用户考虑**：这类探针是否值得正式入库（它是目前唯一能验证真浏览器行为的工具）。
+
+### 78.4 ⭐ `motion-web` 装完**立刻见效**（用户的直觉是对的）
+audio-engineer 按新装的 `motion-web` 重审动效，**§5「不要靠改 `key` 造成子树重建」直接命中它的原实现** ⇒ 已删掉 key 重播写法；并新增 `motion-usage.test.ts` **静态守卫（含变异验证）**。
+⇒ 三点意义：① 该 skill 的条款**能命中真实问题**（不是空泛建议）；② "不要靠改 key 重播"这种坑**只有明确条款才拦得住**；③ 它同时如实标注"**动效的视觉观感 jsdom 证明不了，需真机录屏**（未做）" —— 与 `motion-web` §8 的口径一致。
+
+### 78.5 三处 captain 处置
+1. **handover 过期信息**（`audio-engineer-t30-unfinished.md` §0/§5 称"F2 仍是 typecheck 红点"）⇒ 由 captain 加**历史标注**（成员按纪律未擅改非 inScope 文件 ✓ 处置正确）；
+2. **提交信息有误**（`1ef0647` 称 `measuredDurationMs` 仍是包级红）⇒ **提交信息不可改**，记入本节并在下个 checkpoint 的提交信息里更正；
+3. **越界披露**（新增 `docs/handover/audio-engineer-t30-unfinished.md`，不在 t30 inScope）⇒ 那是 **captain 13:54 停机令明确要求**的产物 ⇒ 接受 ✓。

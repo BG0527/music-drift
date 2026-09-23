@@ -322,11 +322,16 @@ export function RecorderPanel({
         ) : null}
       </div>
 
-      {/* 试听状态文字：进度/结果都落到文字上（aria-live 让读屏用户也能听到状态变化）；
-          刻意不用 role="status"，避免与"时长不合格 / 上传进度"那两处状态区混淆。 */}
+      {/*
+        试听状态文字：进度/结果都落到文字上，`aria-live` 让读屏用户也能听到状态变化；
+        刻意不用 role="status"，避免与"时长不合格 / 上传进度"那两处状态区混淆。
+
+        节点保持**稳定**（不改 `key` 逼动画重播 —— `motion-web` §5 禁止"靠改 key 造成子树重建"）：
+        状态变化的反馈是三条独立通道 —— 文案变化 + 按钮文案/图标 + `aria-live`；
+        `enter-fade` 只做"区块初次出现的入场"，且只动 opacity（时长/缓动取自 DS token）。
+      */}
       {canPreview ? (
         <p
-          key={recorder.previewState}
           data-testid="preview-state"
           aria-live="polite"
           className="enter-fade text-[0.875rem] leading-[1.6] text-on-dark-muted"

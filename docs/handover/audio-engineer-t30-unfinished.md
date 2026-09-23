@@ -1,3 +1,5 @@
+> ⚠️ **历史标注（captain 于 19:2x 更新）**：本文件 §0/§5 曾称「F2 `measuredDurationMs` 仍是 typecheck 红点」——**该说法已过期**。t30 收尾后实测 `pnpm -r typecheck` **exit 0 / 0 error**（`grep -c 'features/audio'` = 0），`measuredDurationMs` 链路已被删净。保留原文以便追溯当时判断。
+
 # 交接：audio-engineer · t30（用户第十一轮 #1 / #3 / #4 前端 + F2 清理）
 
 > **停机时刻**：2026-09-24 13:56（用户令 14:00 停机；captain 13:54 下达立即停机）。

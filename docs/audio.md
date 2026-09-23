@@ -406,8 +406,12 @@ pnpm --filter @music-drift/web test
 | ended   | **重新播放** | RotateCcw | 本段已播完，点击「重新播放」从头再听一遍 |
 
 - `toggle()`：`playing` → 暂停；`ended` → `currentTime = 0` + `tracker.markSeek()`（"回到 0"不算听）+ 播放；其余 → 播放/继续；
-- 反馈是**三重的**：按钮文案与图标变、`aria-live` 状态文字变、状态文字带 DS 动效类 `enter-fade`（`key=playbackState` 让动画重播一次）。
-  只改颜色或只换图标都不算"有体现"；
+- 反馈是**三条彼此独立的通道**（`motion-web` §7「动效不得是唯一反馈」）：
+  ① 结构/文字：状态文案本身改变；② 按钮：文案与图标同时换（播放 → 暂停 → 继续播放 → 重新播放）；
+  ③ 无障碍：`aria-live="polite"` 播报。只改颜色或只换图标都不算"有体现"；
+- 状态文字节点**保持稳定**：`enter-fade` 只负责区块**入场**（DESIGN.md 的入场动效契约，只动 `opacity`、时长/缓动取自 DS token）。
+  **刻意不**用"改 `key` 逼动画重播"—— `motion-web` §5 明令禁止"靠改 `key` 造成子树重建"（会丢焦点/输入/滚动位置），
+  而且这里不需要：状态变化的可见性由上面三条通道保证；
 - 同上，「播完停在结尾、不假装还在播」由真实音频实测（`currentTime = 19.8 / duration = 19.8`）。
 
 ### 10.2 #3 录制完成后可试听自己刚录的那一段（`recorder-panel.tsx` + `use-recorder.ts`）
@@ -439,10 +443,13 @@ pnpm --filter @music-drift/web test
 判定与上传客户端、服务端读**同一个函数与同一个容差**（`checkRecordingDurationAgainstPreset` + `SEGMENT_PRESET_TOLERANCE_MS`），
 不会出现"前端说行、后端说不行"。
 
-**⚠️ 联调待办（未伪造通过）**：`presetDurationMs` 由页面传入。**正确来源已有**，无需新契约字段：
-`GET /api/songs` 的 `SongSegmentSchema.durationMs`（曲库切分，t29 的权威值同源）。
-需要 `features/bottle/record-step.tsx` / `pages/bottle-page.tsx`（**frontend-flow 域，我未越界修改**）把
-`song.segments.find((s) => s.index === nextIndex)?.durationMs` 传下来 —— 一行。未接线前录制面板走回退区间。
+**接线状态（2026-09-24 19:1x 复核：已接线）**：`presetDurationMs` 由页面传入，正确来源是
+`GET /api/songs` 的 `SongSegmentSchema.durationMs`（与 t29 的服务端权威值同源），**无需新契约字段**。
+frontend-flow 已在 `apps/web/src/features/bottle/record-step.tsx:178` 传入 `presetDurationMs={preset}`，
+并有针对该接线的测试（`record-step.test.tsx` 的「录制步骤：本段固定时长（presetDurationMs）的接线」）。
+**我未越界修改该文件**（它在 frontend-flow 域），此处只记录事实。
+
+**未接线时的行为（fail-closed，供复核）**：录制面板禁用「开始录制」+ 说明原因（不会再"回退 30 秒也能录"）。
 
 ### 10.4 顺带修掉的一个真实缺陷：`/listen` 请求体是浮点（真实浏览器 400）
 
@@ -457,3 +464,22 @@ pnpm --filter @music-drift/web test
 现在那条新用例**直接拿真实契约 schema 校验实际发出去的请求体**（`SubmitListenProgressRequestSchema.safeParse`），
 修法是 `observe()` 里唯一一处归一化点向下取整（宁少报不多报，覆盖率不能靠四舍五入凑门槛）。
 修复后真实浏览器复测：**21 次 /listen 全部 200**。
+
+### 10.5 动效契约与"能证明什么"（`motion-web` §2/§3/§5/§7/§8）
+
+| 自检项（§10 落地前自检）                        | 本实现的答案                                                                                |
+| ----------------------------------------------- | ------------------------------------------------------------------------------------------- |
+| 目的（feedback/guidance/continuity/decoration） | `enter-fade` = **continuity**（区块入场）；**没有** decoration 类常驻/循环动效              |
+| 参数来自哪个契约 token                          | DS `.enter-fade` → `motion.css` 的 `--entry-duration` / `--entry-easing`（只动 `opacity`）  |
+| 是否只动 transform/opacity                      | 是（组件里没有任何内联动效类；`motion-usage.test.ts` 静态扫描把这条钉住）                   |
+| 退场是什么                                      | 状态文字不做出场（它就是常驻的一行）；按钮的按下/悬停反馈由 DS Button 自带的 200ms 过渡承担 |
+| `reduced-motion` 下变成什么                     | `motion.css` 的全局降级把动画变成瞬时（动效消失，**文字与 aria-live 仍在**，信息不丢）      |
+| 还有别的反馈通道吗                              | 有：状态文案 + 按钮文案/图标 + `aria-live`（§7 的"动效不得是唯一反馈"）                     |
+
+**可断言契约**：`apps/web/src/features/audio/motion-usage.test.ts`（静态扫描）断言
+① 状态文字只引用 DS 的 `enter-fade`；② 组件里没有内联动效数值（`duration-[…]` / `cubic-bezier` / `animate-[…]` / `transition-[…]`），
+也不动画布局属性；③ 没有"改 `key` 逼动画重播"的写法（**变异验证**：临时加回 `key={player.playbackState}` → 该用例转红，还原后转绿）。
+
+**哪一层验证不了（如实标注，不含糊）**：jsdom 没有布局与合成器 ⇒ **屏幕上的流畅度/视觉观感本仓库目前无法自动验证**；
+真实浏览器探针证明的是**状态机与真实音频行为**（播完→重播、未播完→暂停、试听真的出声），**不是**动效的视觉平滑度。
+若要证明后者，需要真机录屏或性能采样 —— 目前**没有**，需要时请 captain 派单。

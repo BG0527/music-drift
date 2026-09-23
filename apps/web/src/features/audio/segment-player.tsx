@@ -145,13 +145,16 @@ export function SegmentPlayer({
       </div>
 
       {/*
-        状态文字：`key` 让状态一变就重新挂载 → DS 的 `.enter-fade`（只动 opacity，300ms ease-out）**重播一次**，
-        于是"状态变了"既看得见（文字变了 + 淡入）又听得见（aria-live 播报）。
-        不自造 keyframes、不动画 width/height（DESIGN.md §动效只允许 transform/opacity；
-        `prefers-reduced-motion` 由 motion.css 全局关闭，组件不必自己判断）。
+        状态文字（**节点保持稳定**，不靠改 `key` 逼动画重播 —— `motion-web` §5 明令禁止
+        "靠改 key 造成子树重建"：会丢焦点、丢输入、丢滚动位置，而且这里也根本不需要重建）。
+
+        状态变化的可见性由**三条彼此独立的通道**保证（`motion-web` §7「动效不得是唯一反馈」）：
+        ① 结构/文字：这行文案本身随状态改变；② 按钮：文案与图标同时换（播放→暂停→继续播放→重新播放）；
+        ③ 无障碍：`aria-live="polite"` 播报。
+        这里的 `enter-fade` 只负责"这个区块初次出现时的入场"（DESIGN.md 的入场动效契约），
+        它**只动 opacity**，时长/缓动来自 DS token（不内联新值），reduced-motion 由 motion.css 全局降级。
       */}
       <p
-        key={player.playbackState}
         data-testid="playback-state"
         aria-live="polite"
         className="enter-fade text-[0.875rem] leading-[1.6] text-slate-current"
