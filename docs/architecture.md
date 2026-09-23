@@ -478,6 +478,9 @@ pnpm format:check   → All matched files use Prettier code style!
 - 被斩段作者**永久**不得再参与该瓶子：既不能接唱（`bottle.ts:57`）也不能再捞到（`bottle.ts:101`）。
   两者都检查 `state.segments`（**含软删行**），实现正确 —— 但**必须补测试钉住**，
   因为一旦被重构为 `liveSegments`，防捣乱能力会静默失效。
+- ⚠️ **不要与 §46.1 混淆（captain 补注）**：本条讲的是「被斩段作者**今后**不得再参与该瓶」（接唱 / 捞取），因此**故意**检查含软删行的 `state.segments` —— 这是防捣乱机制本身，**不是**「参与过」的历史判定。§46.1「被斩浪者（含发起者）不算参与过」是**另一维度**（历史计数 / 通知收件人 / 徽章），从**有效段**取。
+  二者并行不冲突。**任何**为了"收敛参与过"而把本条改成 `liveSegments` 的改动，都会**静默删掉防捣乱能力**（被斩者重新可接唱、可捞到同一支瓶）。
+- 另注：`apps/api/src/store/notifications.ts` 旧注释曾引用「ADR-015 §16.7（斩浪不抹掉参与关系）」—— 那是**误引**，本条从未规定过"参与关系"。
 
 ### 16.8 对其它任务的影响
 
@@ -1980,7 +1983,7 @@ TDD 先红（2 例）后绿；桩用**真资产** `public/library/library.json`�
 | --- | --- |
 | `MESSAGE_DELIVERED` | **发起者** |
 | `MESSAGE_UNDELIVERED` | **发送者**（`CONTEXT.md` §5.2） |
-| `BOTTLE_COMPLETED` | **所有参与者（含被斩浪者）** —— 从**事件流**取参与者，不取有效段，故被软删者仍算参与过（§16.7） |
+| `BOTTLE_COMPLETED` | **仅有效段的参与者**（**不含被斩浪者**，发起者一视同仁）—— §46.1 用户裁决：被斩浪者一律不算参与过。判定收敛到内核 `participants(state)`（`packages/shared/src/domain/queries.ts:152`，本就是 `liveSegments`）；**禁止**在投影/通知层另写一份「参与者」SQL 规则 |
 
 ### 42.3 两处成员自加口径（**captain 均批准**，且认为优于字面实现）
 
@@ -2310,3 +2313,11 @@ npx playwright screenshot --viewport-size="1440,900" --wait-for-timeout=4000 <ur
 `Math.max(document.documentElement.scrollHeight, body.scrollHeight) > 900` 视为不达标；且必须满足：
 ① 异步数据/图片**加载完成后**测量；② 375 用对应阈值；③ **必须给反向控制**（造一个超高一屏的页面，确认断言真的会红），否则这是"永远点头"的守卫。
 **禁止**用 `overflow-hidden` 裁掉内容来达标（那是把可访问性问题藏起来）——装不下就改组件大小/位置，或把内容移进弹窗（§46.3）。
+
+### 47.6 in-scope 约定（captain 流程改进 · 两轮归档僵局后定）
+工具限制（已确认多次）：`edit_plan` 的 `update_task` **没有 inScope 字段**，且 running 团队下不允许 add/remove task ⇒ **任务的 in-scope 一旦创建就无法修改**。补漏只能走「changedPaths 只列声明内路径 + 未声明路径在 output 里显式披露 + captain 背书」的模式（t20 由 architect、t22 由 backend-core 验证可行）。
+
+因此往后创建任务时：
+1. **`apps/api/**` 类任务默认带上 `apps/api/drizzle/`**（新表迁移产物，t5 起一直入库；t20 正因漏它而卡归档）。
+2. **「规则收敛 / 跨层一致性」类任务，in-scope 直接写到可能出现同规则副本的整个目录**（`apps/api/src/`、`packages/shared/src/`、`docs/`）—— 这类任务的本质就是**全仓找副本**，声明太窄必然卡住。t22（§46.1）就遇到了第二份「参与过」判定藏在 `store/notifications.ts` 里。
+3. 声明过窄造成的补漏**不能靠扩大声明解决**（改不了），只能**如实披露**——宁可 output 里写清楚，也不假装一切都在声明内。
