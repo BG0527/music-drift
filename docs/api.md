@@ -393,3 +393,20 @@ pnpm --filter @music-drift/api test:integration
    自 t29 起，段时长由**曲库预设**决定（`song_segments.duration_ms`，来源 `library.json` 的切分点）；写入侧由服务端取预设，客户端自报的 `x-audio-duration-ms` **降级为诊断**；历史行由 0005 迁移回填（实测「与预设不一致」**80 → 0** 行）。录制/上传必须匹配该段预设，容差 **±2000ms**（`SEGMENT_PRESET_TOLERANCE_MS`，可注入）；每段要录多久由 `SongSchema.segments[].durationMs` 暴露给前端。
    **但它消除的只是「谎报时长改变分母」这条路径，不等于「音频长度已被证明」** —— 覆盖侧 `covered_ms` 仍由客户端在墙钟限速下上报，服务端**不解码音频**。故预设是**策略分母**，不是音频真实长度的证明。
    **残留**：无预设的曲目此前会回退到调用方声明值（分母仍受客户端影响）；captain 已裁决改为 **fail-closed**（无预设即拒绝录制）并给 seed/占位曲补预设。
+
+---
+
+## 抢占失败的两种结果**必须可分辨**（t39 / qa-e2e F1）
+
+同一支瓶子的指定接唱（`POST /api/sea/:id/targeted-segment`）在**并发窗口**里有两种不同的失败，客户端**必须**能把它们分开处理：
+
+| 结果 | 含义 | 客户端应做什么 |
+| --- | --- | --- |
+| **409 `HOLDING_ALREADY_TAKEN`** | **有人比你更快抢到了**（并发窗口内抢占失败） | 提示「这一段已被别人接走」并给出**出口**（换一段 / 看漂流日志）。**不要**导航到瓶子页当作成功 |
+| **404** | 该作品此刻**不在公海**（不存在 / 已被人接走 / 已入海）—— 防探测口径不变 | 按"作品不在公海"处理 |
+
+⚠️ **反面教材（已于 t39 修复）**：`/api/sea/:id/targeted-segment` 此前**从不检查 store 返回的 `outcome.ok`**，于是并发里输的那一方也拿到 **`200 + 摘要`**（`isHolder=false`）⇒ 前端据此 `navigate()` 到瓶子页，用户只看到「这个瓶子现在不在你手上」，**无解释、无出口**。
+**同模式在 `/api/river/draw` 是写对的** ⇒ 该码为两者共用；`/api/sea/:id/targeted-segment` 的漏检已修（写法对齐 `routes/river.ts` 的 `problemFromOutcome`）。
+
+### 码表补充
+`HOLDING_ALREADY_TAKEN`（409）语义 = 「**同瓶并发抢占失败**」（`/api/river/draw` 与 `/api/sea/:id/targeted-segment` **共用**；后者此前漏检，t39 已修）。
