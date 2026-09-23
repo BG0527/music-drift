@@ -242,6 +242,11 @@ Scale:
 
 - **Grid:** CSS Grid primary. Max-width containment: 1280px centered with 1.5rem side padding.
 - **Spacing rhythm:** Balanced. Base unit: 0.5rem (8px).
+  —— 这里的 Base unit 指**节奏步长**（间距只取 8px 派生档：4/8/12/16/24/32/48/64）。
+  它**不是** Tailwind `--spacing` 的值：后者的语义是「**尺度值 1 的长度**」，本项目取框架默认 `0.25rem`（=4px），
+  因此节奏档用**偶数**表达（`p-2` = 8px、`p-4` = 16px、`p-6` = 24px、`p-8` = 32px、`p-12` = 48px、`p-16` = 64px），
+  4px = `p-1`，44px 触控底线 = `min-h-11`（`--touch-target-min: 44px`）。
+  **禁止覆盖 `--spacing`** —— 覆盖会让**每一个**数字档 utility ×2（`min-h-11` 变 88px、侧栏 `w-64` 变 512px）。
 - **Section vertical gaps:** clamp(4rem, 8vw, 8rem).
 - **Hero layout:** Asymmetric composition.
 - **Feature sections:** Asymmetric grid with varied card sizes. No 3-equal-columns.

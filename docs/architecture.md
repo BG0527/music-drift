@@ -2361,3 +2361,27 @@ frontend-ds 原建议「等 frontend-flow 告一段落再动基准」；captain 
 3. **本次**：`tokens.test.ts` 把一个**实现选择**（`--spacing: 0.5rem`）当成契约守卫下来 ⇒ **错值获得了"测试通过"的背书**，任何修正都会被判红。
 共性：**让错误在自己的判据体系里被认证为正确。** 防御：守卫必须表达**意图与约束**（"不许覆盖"），而不是把当前实现取值固化；以及每次"测试全绿"都要问一句**这条断言凭什么算对**。
 （另附：frontend-ds 主动做了自我归因 —— t2 忠实落地了 `DESIGN.md` 的措辞，但把"节奏步长"误解为 Tailwind `--spacing` 的语义。这类**术语歧义**造成的系统性错误，光靠更严格的执行是防不住的，必须改文档措辞本身。）
+
+### 48.9 执行结果（§48 第一段完成，frontend-ds）
+- **基准回退方式**：`theme.css` **删除** `--spacing` 覆盖声明（而非改成 `0.25rem`）⇒ 回落到 Tailwind v4 默认。**这比显式写 0.25rem 更干净**：不再由本项目维护一个本该由框架拥有的值，将来框架默认变更也不会与本仓冲突。md5 `826cbd98` → `57506fc9`。
+- **决定性证据**：`pnpm --filter @music-drift/web build` **exit 0**，产物实测 **`--spacing:.25rem`**（原 `.5rem`）。
+- `DESIGN.md` 加限定（md5 `8d996812` → `47ed2abc`）：点明**节奏步长 ≠ `--spacing`**、写明禁止覆盖；31 条核心纪律 grep FAIL=0、YAML 可解析、colors=30。
+- `tokens.test.ts` 四段式（含**构建产物负向断言** `not.toMatch(/--spacing:\s*0?\.5rem/)`）。`web test` **52 文件 / 402 例 exit 0**，新增断言**已实际执行非 skip**。
+- **收口进度**：越界代码行 **18 → 6**；341 处数字档 utility 中 **335 处**落在 DESIGN.md 档位或 44px 触控底线。
+- **剩余 6 处全在 captain 划的禁区**（`pages/**`、`features/bottle/**`），frontend-ds **未越界触碰** ⇒ 交 frontend-flow 在几何 pass 中顺手改：`pages/profile-page.tsx:29`（`w-14/h-14` 56）、`pages/admin-page.tsx:25`（`h-9` 36 / `w-40` 160）、`pages/admin-page.tsx:26`（`h-24` 96）、`features/bottle/relay-timeline.tsx:65`（`w-0.5` 2）。
+- 附带清理项：`design-system/nav.tsx` 的注释仍写「`theme.css` 把 `--spacing` 覆盖成 0.5rem（为了让 `p-1`=8px）」—— **依据已不成立**，留着会误导后来者（正是本轮刚消除的那类错断言）⇒ 交 frontend-flow 更新。
+
+### 48.10 ⚠️ 需在收尾前清掉的基线退化：`pnpm lint` exit 1（14 条）
+14 条问题**全部在他人文件**（frontend-ds 所改的 6 个文件 eslint exit 0）：
+- `apps/api/src/store/bottles.integration.test.ts`
+- `apps/web/src/features/audio/use-segment-listen.ts`（t21 新文件）
+- `apps/web/tools/golden-path-live-check.mjs`
+- `apps/web/tools/one-screen-check.mjs`
+其中后三者大概是在飞产物，但**lint 曾是 0 problem 的基线**，若收尾时仍红，则"lint 通过"这条门禁就失真了 ⇒ 要求各 owner 在回报完成时连同 `pnpm lint` exit 0 一起报。
+
+### 48.11 待澄清的脆弱点（captain 提问给 frontend-ds）
+新增的**构建产物负向断言**依赖 `apps/web/dist/` 存在。若在**未 build 的环境**（全新 clone、CI 只跑 test）执行，该断言会红还是 skip？若是红，则 `pnpm -r test` 会变成一个**顺序依赖**的测试（必须先 build）—— 这类"测试之间隐式依赖产物"的结构容易在别人机器上炸。需给出明确答案与兜底方式。
+
+### 48.12 一处 captain 的指令缺陷（自我记录）
+frontend-ds 顺手把 `features/audio/recorder-panel.tsx` 的 `p-5`→`p-6` 收了口，但 `apps/web/src/features/audio/**` 是 **audio-engineer 在 t21 的 in-scope**（他正在该目录新建 `use-segment-listen.ts`）⇒ 存在并发写同一文件的可能。
+根因：**captain 批准"18 处收口"时只划了 `pages/**` 与 `features/bottle/**` 两块禁区，没有覆盖 `features/audio/`**。指令边界不全，不能算调用方违规。处置：告知 audio-engineer 保留该行；今后跨域一行改动**先报备再动**。

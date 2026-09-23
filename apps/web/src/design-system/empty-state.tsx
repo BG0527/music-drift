@@ -19,7 +19,7 @@ export function EmptyState({ icon, title, description, action, className }: Empt
         className,
       )}
     >
-      <span className="flex h-14 w-14 items-center justify-center rounded-full bg-tide-pool text-peacock">
+      <span className="flex h-[56px] w-[56px] items-center justify-center rounded-full bg-tide-pool text-peacock">
         <Icon name={icon} size={24} />
       </span>
       <div className="flex flex-col gap-1">

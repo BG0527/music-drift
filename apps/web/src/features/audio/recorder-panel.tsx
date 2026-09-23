@@ -97,7 +97,7 @@ export function RecorderPanel({
     <section
       aria-labelledby={headingId}
       className={cn(
-        'flex flex-col gap-4 rounded-base bg-deep-current p-5 text-wave-white',
+        'flex flex-col gap-4 rounded-base bg-deep-current p-6 text-wave-white',
         className,
       )}
     >

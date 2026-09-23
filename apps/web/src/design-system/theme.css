@@ -65,8 +65,13 @@
   --font-latin: Quattrocento, 'LXGW WenKai', ui-serif, system-ui, serif;
   --font-mono: 'JetBrains Mono', ui-monospace, 'SFMono-Regular', monospace;
 
-  /* ── 8px 节奏基准（p-1 = 8px，p-0.5 = 4px）────────── */
-  --spacing: 0.5rem;
+  /* ── 8px 节奏步长 —— **不覆盖 Tailwind 的 `--spacing`** ─────────────
+         `--spacing` 的语义是"尺度值 1 的长度"（框架默认 0.25rem = 4px），
+         不是"设计的最小节奏步长"。节奏步长 8px 用**偶数档**表达：
+           p-1 = 4px · p-2 = 8px · p-3 = 12px · p-4 = 16px
+           p-6 = 24px · p-8 = 32px · p-12 = 48px · p-16 = 64px
+         44px 触控底线 = `min-h-11`（覆盖 --spacing 会让它变成 88px，见 ADR §48）。
+         档位全集另由下面的 `--space-*` token 显式声明并受测试守卫。 */
 
   /* ── 圆角（基准 12px）───────────────────────────── */
   --radius-none: 0;

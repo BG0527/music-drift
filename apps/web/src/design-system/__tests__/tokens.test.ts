@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
@@ -91,11 +91,22 @@ describe('DESIGN.md front matter 是色板唯一真相', () => {
 });
 
 describe('布局 / 圆角 / 层级 token 与 DESIGN.md 一致', () => {
-  it('8px 节奏基准与派生档位全部映射', () => {
-    expect(themeCss).toContain('--spacing: 0.5rem');
+  it('8px 节奏：不覆盖 --spacing，节奏档用偶数表达（ADR §48）', () => {
+    // ① 负向守卫：不得声明 --spacing。框架默认 0.25rem（=「尺度值 1 的长度」）才让
+    //    `min-h-11` = 44px、`w-64` = 256px 成立；覆盖它会让**每个数字档 ×2**
+    //    （这正是 2026-09-23 的"前端丑"事故根因，故用负向断言钉死）。
+    expect(themeCss, 'theme.css 不得声明 --spacing（覆盖会让所有数字档 ×2）').not.toMatch(/--spacing\s*:/);
+
+    // ② 真正要守卫的是「档位全集」，由 --space-* token 表达，与基准确认无关
     for (const step of ['4px', '8px', '12px', '16px', '24px', '32px', '48px', '64px']) {
       expect(themeCss, `缺少间距档 ${step}`).toContain(step);
     }
+
+    // ③ 触控底线 44px 必须存在，且在 0.25rem 基准下用标准类 min-h-11 表达
+    expect(themeCss).toContain('--touch-target-min: 44px');
+
+    // ④ 术语澄清必须留在文档里，否则下一个人会重犯同一误解
+    expect(themeCss, 'theme.css 应保留"不覆盖 --spacing"的说明').toContain('不覆盖 Tailwind');
   });
 
   it('容器宽度与侧边距映射正确', () => {
@@ -165,6 +176,19 @@ describe('布局 / 圆角 / 层级 token 与 DESIGN.md 一致', () => {
       expect(themeCss, `theme.css 缺少契约值 ${contract}`).toContain(contract);
       expect(motionCss, `motion.css 缺少工作变量 ${working}`).toContain(working);
     }
+  });
+});
+
+describe('构建产物尺度守卫（需先 build，顺序见 docs/ui-review/spacing-scale-decision.md §7）', () => {
+  const distAssets = resolve(repoRoot, 'apps', 'web', 'dist', 'assets');
+  const builtCss = existsSync(distAssets)
+    ? readdirSync(distAssets).find((name) => name.startsWith('index-') && name.endsWith('.css'))
+    : undefined;
+
+  it.skipIf(builtCss === undefined)('产物里 --spacing 必须是 .25rem 且不得是 .5rem', () => {
+    const css = readFileSync(resolve(distAssets, builtCss as string), 'utf8');
+    // 不覆盖时产物里**不应出现** --spacing 值；若将来有人显式写成 0.25rem 也接受
+    expect(css).not.toMatch(/--spacing:\s*0?\.5rem/);
   });
 });
 

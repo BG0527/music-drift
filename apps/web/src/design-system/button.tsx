@@ -55,7 +55,7 @@ export function Button({
         <span
           data-testid="shimmer"
           aria-hidden="true"
-          className="skeleton-shimmer h-2 w-14 rounded-pill bg-tide-pool"
+          className="skeleton-shimmer h-2 w-[56px] rounded-pill bg-tide-pool"
         />
       ) : null}
     </button>

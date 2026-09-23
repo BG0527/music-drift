@@ -70,7 +70,7 @@ export function Showcase() {
         <SidebarNav items={NAV} current="river" />
         <main
           data-testid="showcase"
-          className="flex w-full max-w-[var(--container-max-width)] flex-col gap-8 p-6 pb-24 md:pb-8"
+          className="flex w-full max-w-[var(--container-max-width)] flex-col gap-8 p-6 pb-16 md:pb-8"
         >
           <header className="flex flex-col gap-2">
             <p className="text-[0.875rem] font-medium tracking-wide text-peacock">
@@ -95,7 +95,7 @@ export function Showcase() {
                   className="flex flex-col gap-2 rounded-base border border-mist bg-foam p-3"
                 >
                   <span
-                    className="h-10 w-full rounded-md border border-mist"
+                    className="h-[40px] w-full rounded-md border border-mist"
                     style={{ backgroundColor: hex }}
                   />
                   <span className="text-[0.8125rem] font-medium">{name}</span>
@@ -122,7 +122,7 @@ export function Showcase() {
             title="表单"
             note="label 在上；focus ring = 2px peacock + offset 2px；错误态给修正动作。"
           >
-            <div className="grid max-w-[36rem] grid-cols-1 gap-5">
+            <div className="grid max-w-[36rem] grid-cols-1 gap-4">
               <Input
                 label="接力代号"
                 defaultValue="午夜歌手#042"
@@ -244,7 +244,7 @@ export function Showcase() {
                   ]}
                 />
               </div>
-              <div className="hidden h-40 items-stretch gap-3 lg:flex">
+              <div className="hidden h-[160px] items-stretch gap-3 lg:flex">
                 <RiverLine progress={0.55} />
                 <div className="flex flex-col justify-between text-[0.8125rem] text-slate-current">
                   {[
