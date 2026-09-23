@@ -10,6 +10,7 @@ import {
   DEFAULT_RECORDING_LIMITS,
   checkAudioFormat,
   checkRecordingDuration,
+  checkRecordingDurationAgainstPreset,
   normalizeMimeType,
   type AudioViolation,
 } from '@music-drift/shared/audio';
@@ -44,12 +45,17 @@ export type SegmentAudioValidation =
 export interface ValidateSegmentAudioOptions {
   /**
    * 是否要求客户端提供 `durationMs`。默认 **true**：
-   * 「每段 15–30 秒」是产品规则（CONTEXT §3.1），缺失即无法核对 → 拒绝（fail-closed）。
+   * 时长是产品规则（t29 起为"该段曲库预设时长"，缺失即无法核对 → 拒绝（fail-closed））。
    * 契约 `RecordSegmentRequestSchema.durationMs` 目前是可选字段，若确认要放宽，
    * 由调用方显式传 `false` 并在响应里承担"时长未核实"的后果（不要静默放宽）。
    */
   requireDuration?: boolean;
   maxBytes?: number;
+  /**
+   * t29：该段的**曲库预设时长**。传了就按「必须匹配预设 ±容差」判定（权威口径）；
+   * 不传（历史/异常数据）才回退到 15–30 秒区间。
+   */
+  presetDurationMs?: number | undefined;
 }
 
 export function validateSegmentAudioUpload(
@@ -77,7 +83,19 @@ export function validateSegmentAudioUpload(
   const durationMs = upload.durationMs ?? null;
   const durationUsable =
     typeof durationMs === 'number' && Number.isFinite(durationMs) && durationMs > 0;
-  if (durationUsable) {
+  /**
+   * t29：拿到该段曲库预设时长时，判定口径是「**必须匹配预设 ±容差**」；
+   * 拿不到预设（历史/异常数据）才回退到旧的 15–30 秒区间 —— 两条口径共用同一个错误码，
+   * 且**只有预设口径参与分母**（`bottle_segments.duration_ms` 由 `db/segments.ts` 写预设值）。
+   */
+  if (options.presetDurationMs !== undefined) {
+    violations.push(
+      ...checkRecordingDurationAgainstPreset(
+        durationUsable ? durationMs : Number.NaN,
+        options.presetDurationMs,
+      ),
+    );
+  } else if (durationUsable) {
     violations.push(...checkRecordingDuration(durationMs));
   } else if (requireDuration) {
     violations.push(...checkRecordingDuration(Number.NaN));

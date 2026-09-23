@@ -12,6 +12,7 @@ import {
   putBack,
   recordSegment,
   type Clock,
+  nextRecordIndex,
 } from '@music-drift/shared/domain';
 import { ChooseResolutionRequestSchema, UuidSchema } from '@music-drift/shared';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
@@ -19,6 +20,7 @@ import { z } from 'zod';
 import { createAnonCodeService } from '../auth/anonCodeService.js';
 import { createAuthRepository } from '../auth/repository.js';
 import { validateSegmentAudioUpload } from '../audio/ingest.js';
+import { presetDurationMsFor } from '../store/segments.js';
 import { readDomainEvents } from '../db/events.js';
 import {
   problemFromOutcome,
@@ -296,19 +298,33 @@ export function registerBottleRoutes(app: FastifyInstance, options: BottleRoutes
     }
     const bytes = Buffer.isBuffer(request.body) ? request.body : null;
 
-    const validation = validateSegmentAudioUpload({
-      mime: request.headers['content-type'] ?? null,
-      bytes: bytes ?? new Uint8Array(0),
-      durationMs,
-    });
-    if (!validation.ok) {
-      const problem = problemFromViolations(validation.violations);
-      return problem === null ? reply : sendProblem(reply, problem);
-    }
-
     const state = await store.loadState(params.data.id);
     if (state === null) {
       return sendProblem(reply, transportProblem('NOT_FOUND'));
+    }
+
+    /**
+     * t29：本段的时长**以曲库预设为权威**（`song_segments.duration_ms`，来自 `library.json`）。
+     * `x-audio-duration-ms` 自本任务起**降级为提示/诊断**：只用来核对"你录的长度对不对"，
+     * 不再进入分母（`db/segments.ts` 写库时用的是预设值）。
+     * 段号用内核的 `nextRecordIndex`（最小缺口段号）——与 `recordSegment` 的判定同源，前端不得自选。
+     */
+    const presetDurationMs = await presetDurationMsFor(db, {
+      songId: state.songId,
+      index: nextRecordIndex(state),
+    });
+
+    const validation = validateSegmentAudioUpload(
+      {
+        mime: request.headers['content-type'] ?? null,
+        bytes: bytes ?? new Uint8Array(0),
+        durationMs,
+      },
+      presetDurationMs === null ? {} : { presetDurationMs },
+    );
+    if (!validation.ok) {
+      const problem = problemFromViolations(validation.violations);
+      return problem === null ? reply : sendProblem(reply, problem);
     }
     const ctx = createRequestContext(clock);
     const outcome = recordSegment(state, { userId: actor.user.id, note }, ctx);

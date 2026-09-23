@@ -12,6 +12,7 @@ import {
   ACCEPTED_AUDIO_MIME_TYPES,
   DEFAULT_RECORDING_LIMITS,
   RECORDER_MIME_PREFERENCES,
+  SEGMENT_PRESET_TOLERANCE_MS,
 } from './constants';
 import { audioViolation, type AudioViolation } from './errors';
 
@@ -41,6 +42,43 @@ export function checkRecordingDuration(
     ];
   }
   return [];
+}
+
+/**
+ * t29：录制时长**必须匹配该段曲库预设时长**（±容差）——曲库是分母的权威来源。
+ *
+ * 为什么不再用「15–30 秒动态区间」：用户第十一轮第 4 条——"一首歌被切割成四段，它的时长应该是固定的，
+ * 而用户需要接的就是这段时长"。段的长度由曲库切分决定（如 `Immersed` = 23870/20619/22501/23010ms），
+ * 客户端自报值不再参与任何判定。
+ */
+export function checkRecordingDurationAgainstPreset(
+  durationMs: number,
+  presetDurationMs: number,
+  toleranceMs: number = SEGMENT_PRESET_TOLERANCE_MS,
+): AudioViolation[] {
+  if (!Number.isFinite(durationMs)) {
+    return [
+      audioViolation(
+        'AUDIO_DURATION_OUT_OF_RANGE',
+        `这一段有固定时长（${describePreset(presetDurationMs)}），但没有收到可用的录音时长，请重新录制。`,
+      ),
+    ];
+  }
+  const deviationMs = Math.abs(durationMs - presetDurationMs);
+  if (deviationMs <= toleranceMs) {
+    return [];
+  }
+  return [
+    audioViolation(
+      'AUDIO_DURATION_OUT_OF_RANGE',
+      `这一段的固定时长是 ${describePreset(presetDurationMs)}，你录的是 ${describeDuration(durationMs)}` +
+        `（相差 ${(deviationMs / 1000).toFixed(1)} 秒，允许 ±${(toleranceMs / 1000).toFixed(1)} 秒），请重新录制。`,
+    ),
+  ];
+}
+
+function describePreset(presetDurationMs: number): string {
+  return `${(presetDurationMs / 1000).toFixed(1)} 秒`;
 }
 
 /**

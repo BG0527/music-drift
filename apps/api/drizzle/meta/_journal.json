@@ -36,6 +36,13 @@
       "when": 1790123777119,
       "tag": "0004_elite_cloak",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1790140313730,
+      "tag": "0005_backfill_segment_duration",
+      "breakpoints": true
     }
   ]
 }

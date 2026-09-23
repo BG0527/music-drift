@@ -7,6 +7,7 @@
  * 「同段号同时至多一个有效段」由 `bottle_segments_active_index_uniq` 部分唯一索引保证。
  */
 import type { Queryable } from './client.js';
+import { presetDurationMsOfBottle } from '../store/segments.js';
 
 export interface InsertBottleSegmentCommand {
   /**
@@ -44,6 +45,17 @@ export async function insertBottleSegment(
     );
   }
 
+  /**
+   * t29：**分母的权威来源是曲库预设时长**，不是上传者自报的 `x-audio-duration-ms`。
+   * 客户端那个值只能当"提示/诊断"，不参与判定 —— 否则谎报时长就能改变点踩门槛（F2 的根因）。
+   * 回退：该段没有预设行（历史/异常数据）时才用调用方声明值，避免写入 NULL 让覆盖率口径整体 fail-closed。
+   */
+  const presetDurationMs = await presetDurationMsOfBottle(db, {
+    bottleId: cmd.bottleId,
+    index: cmd.index,
+  });
+  const durationToStore = presetDurationMs ?? cmd.durationMs ?? null;
+
   const rows = await db.query<{ id: string }>(
     `insert into bottle_segments (id, bottle_id, owner_id, "index", note, audio, audio_mime, duration_ms, created_at)
      values (coalesce($9::uuid, gen_random_uuid()), $1, $2, $3, $4, $5, $6, $7, coalesce($8::timestamptz, now()))
@@ -55,7 +67,7 @@ export async function insertBottleSegment(
       cmd.note,
       cmd.audio ?? null,
       cmd.audioMime ?? null,
-      cmd.durationMs ?? null,
+      durationToStore,
       cmd.createdAt ?? null,
       cmd.id ?? null,
     ],

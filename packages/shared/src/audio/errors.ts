@@ -9,7 +9,10 @@
  * 纪律不变：码给程序判断，文案给人看（ADR-004）；错误码是稳定字符串，改文案不改码。
  */
 export const AUDIO_RULE_CODES = [
-  /** 时长不在 15–30 秒（CONTEXT §3.1）。 */
+  /**
+   * 录制时长与**该段曲库预设时长**不符（超出 ±容差；t29）。
+   * 回退：该段没有预设行时，退化为旧的 15–30 秒区间判定（同一码、文案不同）。
+   */
   'AUDIO_DURATION_OUT_OF_RANGE',
   /** 声明的 MIME 不在白名单（不是浏览器录音会产出的容器）。 */
   'AUDIO_FORMAT_UNSUPPORTED',
@@ -29,7 +32,7 @@ export interface AudioViolation {
 }
 
 export const AUDIO_RULE_MESSAGES: Record<AudioRuleCode, string> = {
-  AUDIO_DURATION_OUT_OF_RANGE: '每段录音需在 15–30 秒之间，请重新录制。',
+  AUDIO_DURATION_OUT_OF_RANGE: '这一段有固定时长，必须录满同样的长度（允许 ±2 秒），请重新录制。',
   AUDIO_FORMAT_UNSUPPORTED:
     '这个音频格式不被支持（支持 webm / mp4 / ogg / wav），请用浏览器直接录制。',
   AUDIO_CONTAINER_MISMATCH: '音频文件内容与声明的格式不一致，请重新录制。',
