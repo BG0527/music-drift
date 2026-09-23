@@ -21,6 +21,7 @@ export {
   RippleRing,
   WaterSheen,
   WaterTexture,
+  WakeLine,
   TideLine,
   type DecorProps,
 } from './wave';

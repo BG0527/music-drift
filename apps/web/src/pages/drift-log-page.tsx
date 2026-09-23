@@ -8,7 +8,7 @@
 import { useBottle, useBottleEvents } from '../features/api/queries';
 import { actorSourceOf, eventTimeline } from '../features/bottle/drift-events';
 import { ConflictNotice } from '../features/bottle/conflict-notice';
-import { Icon, Skeleton } from '../design-system';
+import { BottleMark, Icon, Skeleton, WakeLine } from '../design-system';
 import { Link } from './shell/router';
 
 export function DriftLogPage({ id }: { id: string }) {
@@ -43,7 +43,7 @@ export function DriftLogPage({ id }: { id: string }) {
         <span className="text-slate-current">漂流日志</span>
       </nav>
 
-      <header className="flex flex-col gap-2">
+      <header className="relative flex flex-col gap-2 pb-[12px]">
         <h1 className="text-[1.5rem] font-semibold text-abyss">
           {bottle.data.songTitle}
           <span className="ml-[12px] text-[1rem] font-normal text-slate-current">漂流日志</span>
@@ -51,6 +51,11 @@ export function DriftLogPage({ id }: { id: string }) {
         <p className="max-w-[46rem] text-[1rem] leading-[1.6] text-slate-current">
           这里只记核心操作：发起、接唱、捞取、投河、回传、入海。操作者只显示匿名代号。
         </p>
+        {/* 漂流瓶母题：日志页头也放一只（用户点名）；瓶影随页面移动 ⇒ 记录"这段经过" */}
+        <BottleMark size={52} className="absolute right-0 -bottom-[8px] hidden text-peacock md:block" />
+        <BottleMark size={36} className="absolute right-0 -bottom-[6px] text-peacock md:hidden" />
+        {/* 航迹：这条日志本身就是一段"经过"的水痕（本页头**只留这一条线**，避免与潮线读成双线） */}
+        <WakeLine className="bottom-[-7px] left-[6%] right-[30%]" />
       </header>
 
       <ol data-testid="drift-log" className="flex flex-col gap-3">

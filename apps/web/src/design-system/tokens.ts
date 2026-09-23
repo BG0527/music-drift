@@ -90,10 +90,17 @@ export const motion = {
  */
 export const motif = {
   sheenAlphaDark: 0.1,
-  sheenAlphaLight: 0.05,
+  sheenAlphaLight: 0.09,
   textureAlpha: 0.05,
   textureLineGap: '12px',
   tideLineAlpha: 0.55,
+  // t44 增强
+  textureLineGapAlt: '27px',
+  textureFade: '22%',
+  textureAlphaLight: 0.09,
+  wakeDash: '7px',
+  wakeGap: '11px',
+  wakeAlpha: 0.45,
 } as const;
 
 /** z-index 契约。 */

@@ -138,10 +138,17 @@
      契约在 DESIGN.md 的 `motif:` 块。组件/样式只能引用这里的 --motif-*，
      禁止在 water.css 或页面里内联 alpha / px（守卫：__tests__/water-motif.test.tsx）。 */
   --motif-sheen-alpha-dark: 0.1;
-  --motif-sheen-alpha-light: 0.05;
+  --motif-sheen-alpha-light: 0.09;
   --motif-texture-alpha: 0.05;
   --motif-texture-line-gap: 12px;
   --motif-tide-line-alpha: 0.55;
+  /* t44 增强：水感（双线距干涉 + 左右渐隐）+ 浅底强度上限 + 航迹虚线 */
+  --motif-texture-line-gap-alt: 27px;
+  --motif-texture-fade: 22%;
+  --motif-texture-alpha-light: 0.09;
+  --motif-wake-dash: 7px;
+  --motif-wake-gap: 11px;
+  --motif-wake-alpha: 0.45;
 }
 
 /* ── z-index 契约落成 utilities（Tailwind v4 无 z-index 命名空间）── */

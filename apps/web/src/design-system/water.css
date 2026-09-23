@@ -1,23 +1,31 @@
 /**
- * 水域母题层（water motif，t43）—— 「水面 / 水位线 / 潮线」三个装饰类。
+ * 水域母题层（water motif）—— 「水面 / 水位线 / 潮线 / 航迹」四个装饰类。
+ * t43 建层，t44 增强（水感提升 + 浅底可用）。
  *
  * ## 为什么是「直接元素」而不是 `::before/::after`
- * 三个类都由 `wave.tsx` 的组件（`WaterSheen` / `WaterTexture` / `TideLine`）以
- * `absolute inset-0 z-underlay` 挂在**宿主之下**：宿主需要 `relative`（定位基准）
- * 和 `isolate`（`isolation: isolate`）。
+ * 四个类都由 `wave.tsx` 的组件（`WaterSheen` / `WaterTexture` / `TideLine` / `WakeLine`）以
+ * `absolute inset-0 z-underlay` 挂在**宿主之下**：宿主需要 `relative`（定位基准）与
+ * `isolate`（`isolation: isolate`）。
  * - `isolate` 是必须的：没有它，`z-index: -1` 的装饰层会落到宿主**背景之下**而完全看不见；
  *   有了它，装饰层就精确落在「宿主背景之上、内容之下」——**不会压住任何正文**。
- * - 本文件因此只负责"长什么样"（背景/强度），"放哪里"交给组件。
  *
  * ## 纪律
  * - **参数只来自契约**：颜色只 `var(--color-*)`，强度/周期只 `var(--motif-*)`
  *   （契约在 DESIGN.md 的 `motif:` 块、值在 theme.css）。**本文件不写 hex / rgb / rgba**
  *   —— 守卫 `__tests__/water-motif.test.tsx` 会拒收内联值。
- * - **零布局高度**：三块都是叠加层，不进入文档流 ⇒ 不可能推高整页 ⇒ 不破坏「一屏装下」
+ *   （注：`mask-image` 里的 `black` **不是视觉颜色**，它是遮罩的不透明度通道 ——
+ *   它不参与配色，因此不属于"颜色内联"，但为免歧义在此写明。）
+ * - **零布局高度**：四块都是叠加层，不进入文档流 ⇒ 不可能推高整页 ⇒ 不破坏「一屏装下」
  *   （唯一能证明这一点的层是 `apps/web/tools/one-screen-check.mjs`，1440 / 375 各 12 条路由）。
- * - **不喧宾夺主**（`motion-web` §1 decoration 三条件）：低幅度（alpha 0.05~0.1）、不吃指针事件、
+ * - **浅底强度上限（现行 0.09，有书面依据 + 实测）**：浅底（`wave-white`）上只允许 `textureAlphaLight`（**0.09**）级别的纹理，
+ *   且装饰一律在内容之下（`z-underlay`）。依据 `ui-ux` SKILL.md：
+ *   「| Glass card (light) | `bg-white/80` or higher opacity | `bg-white/10` (too transparent) |」
+ *   注：该条曾把上限定在 0.04；**已被用户裁决推翻**（「要一眼看出来」）⇒ 现行上限 **0.09**（由像素实测把关）。
+ *   与「- `color-contrast` — Minimum 4.5:1 ratio for normal text」
+ *   ⇒ 承载正文的容器必须足够不透明、正文必须保持 4.5:1，所以浅底装饰只能「极淡 + 在内容之下」。
+ * - **不喧宾夺主**（`motion-web` §1 decoration 三条件）：低幅度、不吃指针事件、
  *   `aria-hidden`（组件加）、**完全无动画**（静态绘制）⇒ `reduced-motion` 无需额外降级。
- * - **无图片、无依赖**：全部是 CSS 渐变（`css-animation-creator` 的性能纪律同理：不动布局属性）。
+ * - **无图片、无依赖**：全部是 CSS 渐变 / mask。
  */
 @layer components {
   /* ① 水面光带：从顶部往下淡出的渐变，暗示"从水面往下看"。
@@ -40,17 +48,50 @@
     opacity: var(--motif-sheen-alpha-light);
   }
 
-  /* ② 水位线肌理：横向细线平铺（线距 textureLineGap）。
-     用 repeating-linear-gradient ⇒ 横向无缝、不产生平铺接缝（比 radial 平铺稳）。 */
-  .water-texture {
-    background-image: repeating-linear-gradient(
-      to bottom,
-      color-mix(in srgb, var(--color-sea-glass) 100%, transparent) 0,
-      color-mix(in srgb, var(--color-sea-glass) 100%, transparent) 1px,
-      transparent 1px,
-      transparent var(--motif-texture-line-gap)
+  /* ② 水位线肌理（t44 增强）—— 从「等距直线阵列」改成**双线距干涉纹 + 左右渐隐**：
+     - 两条 repeating-linear-gradient 用**不同线距**（12px 与 27px）⇒ 要 108px 才重复，
+       相邻水线的间距不再相等，读起来是水面而不是账本格线；
+     - `mask-image` 让水线在左右两侧渐隐（`textureFade`）⇒ 不再是一条条顶到边的横线。
+     深底用 `.water-texture`；浅底必须用 `.water-texture-light`（alpha 更低）。 */
+  .water-texture,
+  .water-texture-light {
+    background-image:
+      repeating-linear-gradient(
+        to bottom,
+        color-mix(in srgb, var(--color-sea-glass) 100%, transparent) 0,
+        color-mix(in srgb, var(--color-sea-glass) 100%, transparent) 1px,
+        transparent 1px,
+        transparent var(--motif-texture-line-gap)
+      ),
+      repeating-linear-gradient(
+        to bottom,
+        color-mix(in srgb, var(--color-lagoon) 100%, transparent) 0,
+        color-mix(in srgb, var(--color-lagoon) 100%, transparent) 1px,
+        transparent 1px,
+        transparent var(--motif-texture-line-gap-alt)
+      );
+    mask-image: linear-gradient(
+      to right,
+      transparent 0,
+      black var(--motif-texture-fade),
+      black calc(100% - var(--motif-texture-fade)),
+      transparent 100%
     );
+    -webkit-mask-image: linear-gradient(
+      to right,
+      transparent 0,
+      black var(--motif-texture-fade),
+      black calc(100% - var(--motif-texture-fade)),
+      transparent 100%
+    );
+  }
+
+  .water-texture {
     opacity: var(--motif-texture-alpha);
+  }
+
+  .water-texture-light {
+    opacity: var(--motif-texture-alpha-light);
   }
 
   /* ③ 潮线：一根左右渐隐的细线（sea-glass → 透明），替代区块之间的硬分隔线。
@@ -65,5 +106,20 @@
       transparent 100%
     );
     opacity: var(--motif-tide-line-alpha);
+  }
+
+  /* ④ 航迹虚线（t44 新增）：漂流瓶在水面划过留下的**断续**水痕。
+     与潮线（实线渐隐）区分：航迹是断续的，落在页头与内容之间。
+     同样 1px 高 + 绝对定位 ⇒ 零布局高度。 */
+  .wake-line {
+    height: 1px;
+    background-image: repeating-linear-gradient(
+      to right,
+      color-mix(in srgb, var(--color-lagoon) 100%, transparent) 0,
+      color-mix(in srgb, var(--color-lagoon) 100%, transparent) var(--motif-wake-dash),
+      transparent var(--motif-wake-dash),
+      transparent calc(var(--motif-wake-dash) + var(--motif-wake-gap))
+    );
+    opacity: var(--motif-wake-alpha);
   }
 }

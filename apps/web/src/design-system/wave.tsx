@@ -61,7 +61,7 @@ export function BottleMark({ className, size = 48 }: DecorProps & { size?: numbe
       width={size}
       height={size}
       viewBox="0 0 48 48"
-      className={cn('text-peacock', className)}
+      className={cn('pointer-events-none text-peacock', className)}
     >
       <ellipse cx="24" cy="41" rx="13" ry="3.2" fill="var(--color-lagoon)" opacity="0.28" />
       <path
@@ -112,12 +112,29 @@ export function WaterSheen({ className, tone = 'dark' }: DecorProps & { tone?: '
   );
 }
 
-/** 水位线肌理：横向细线平铺，让大块暗底不再像空白模板（线距取 `textureLineGap`）。 */
-export function WaterTexture({ className }: DecorProps) {
+/**
+ * 水位线肌理：双线距干涉纹（12/27px，108px 才重复）+ 左右渐隐 mask，让大块底色不再像空白模板、
+ * 也不像账本格线。**深底用默认值；浅底必须传 `tone="light"`**（强度更低，正文对比度优先）。
+ */
+export function WaterTexture({ className, tone = 'dark' }: DecorProps & { tone?: 'dark' | 'light' }) {
   return (
     <span
       aria-hidden="true"
-      className={cn('water-texture pointer-events-none absolute inset-0 z-underlay', className)}
+      className={cn(
+        'pointer-events-none absolute inset-0 z-underlay',
+        tone === 'light' ? 'water-texture-light' : 'water-texture',
+        className,
+      )}
+    />
+  );
+}
+
+/** 航迹虚线：漂流瓶划过水面留下的断续水痕（与潮线的实线渐隐区分），1px 高、零布局高度。 */
+export function WakeLine({ className }: DecorProps) {
+  return (
+    <span
+      aria-hidden="true"
+      className={cn('wake-line pointer-events-none absolute inset-x-0 z-underlay', className)}
     />
   );
 }

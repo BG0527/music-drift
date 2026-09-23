@@ -11,7 +11,19 @@ import { useState } from 'react';
 import type { BottleSummary } from '@music-drift/shared';
 import { useSeaPages } from '../features/api/queries';
 import { progressLabel, BOTTLE_STATUS_LABEL } from '../features/bottle/relay-status';
-import { Card, EmptyState, Icon, Skeleton, Tabs, cn } from '../design-system';
+import {
+  BottleMark,
+  WaveDivider,
+  Card,
+  EmptyState,
+  Icon,
+  Skeleton,
+  Tabs,
+  TideLine,
+  WaterSheen,
+  WaterTexture,
+  cn,
+} from '../design-system';
 import { AsyncBoundary } from './shell/async-boundary';
 import { Link } from './shell/router';
 import { TEXT_LINK, TEXT_LINK_STRONG } from './shell/link-styles';
@@ -29,13 +41,33 @@ export function SeaPage() {
   const [zone, setZone] = useState<Zone>('COMPLETED');
 
   return (
-    <div className="flex flex-col gap-6">
-      <header className="flex flex-col gap-2">
+    /* 公海大厅 = 本产品的"海面"。整页加一层极淡的水位线肌理（浅底强度上限 0.04）
+       + 页头右侧一枚"漂在海面上的瓶子"（BottleMark）+ 页头下沿的潮线与航迹虚线。
+       全部绝对定位 ⇒ 零布局高度，不进文档流（一屏是硬门）。 */
+    <div className="relative isolate flex flex-col gap-6">
+      {/* 可见的"海面"：顶部一条水面带（渐隐光 + 水位线），高度固定 220px 且绝对定位 ⇒ 不进文档流 */}
+      <WaterSheen tone="light" className="bottom-auto h-[220px]" />
+      <WaterTexture tone="light" />
+      <header className="relative flex flex-col gap-2 pb-[12px]">
         <h1 className="text-[1.75rem] font-bold text-abyss">公海大厅</h1>
         <p className="max-w-[46rem] text-[1rem] leading-[1.6] text-slate-current">
           聆听那些经历漂流与合唱、完全绽放的终极乐章。作品一旦入海就不再漂流 —— 这里只能听，不能接。
         </p>
+        {/* 漂流瓶母题：瓶子"漂"在页头右侧的水面上（绝对定位，零布局高度） */}
+        <BottleMark
+          size={64}
+          className="absolute right-0 -bottom-[10px] hidden text-peacock md:block"
+        />
+        <BottleMark
+          size={40}
+          className="absolute right-0 -bottom-[6px] text-peacock md:hidden"
+        />
+        {/* 本页头只留潮线（海面边界）；航迹留给"日志"这类路径语义的页面，避免两线叠成"双线" */}
+        <TideLine />
       </header>
+
+      {/* 浪线：让"海"一眼看出来（这是 24px 的流内元素，/sea 首屏有余量，见 t44 实测） */}
+      <WaveDivider className="-my-[10px] text-lagoon/60" />
 
       <Tabs
         items={[
@@ -125,16 +157,23 @@ function SeaZoneList({ zone }: { zone: Zone }) {
       emptyWhen={(list) => list.length === 0}
       empty={
         zone === 'COMPLETED' ? (
-          <EmptyState
-            icon="Ship"
-            title="还没有完整的作品"
-            description="完整作品要等每个段位都有人唱过之后，由持有者送进公海。可以去河道捞一个，自己把它补完。"
-            action={
-              <Link to="/river" className={TEXT_LINK_STRONG}>
-                去河道捞一个
-              </Link>
-            }
-          />
+          <div className="relative isolate">
+            {/* 空状态：一只漂在公海上的瓶子（用户点名"漂流瓶"母题；绝对定位，不压正文） */}
+            <BottleMark
+              size={72}
+              className="absolute left-1/2 top-0 -translate-x-1/2 text-peacock/70"
+            />
+            <EmptyState
+              icon="Ship"
+              title="还没有完整的作品"
+              description="完整作品要等每个段位都有人唱过之后，由持有者送进公海。可以去河道捞一个，自己把它补完。"
+              action={
+                <Link to="/river" className={TEXT_LINK_STRONG}>
+                  去河道捞一个
+                </Link>
+              }
+            />
+          </div>
         ) : (
           <EmptyState
             icon="CircleDashed"

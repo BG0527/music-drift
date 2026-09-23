@@ -11,8 +11,12 @@
  * ## 三条防自欺机制（这一版加的，上一版吃过亏）
  * 1. **在异步数据加载完成后才测**：`waitUntil: 'networkidle'` + 额外等一帧 rAF；
  * 2. **反向控制**：`--negative-control` 往 `body` **最前面**插一个 2000px 高的元素
- *    （整页下移 ⇒ 高度与锚点两条断言都会红），要求**全部路由 FAIL** 且 `exit 1`；
- *    若仍有通过项 ⇒ 这条守卫是"永远点头"的，直接判守卫自身不成立；
+ *    （整页下移 ⇒ 高度与锚点两条断言都会红），要求**断言确实变红**；
+ *    **退出码口径（t44 修正，此前注释与实现矛盾）**：命令的退出码表达的是「**反向控制本身成立不成立**」，
+ *    不是「路由达标不达标」——
+ *    · `exit 0` = 成功证明了守卫**会红**（桌面：注入后全部路由 FAIL；手机：**有锚点**的路由全 FAIL）；
+ *    · `exit 1` = 反向控制**失败**（注入后仍有路由通过 ⇒ 这条守卫是"永远点头"的，判守卫自身不成立）。
+ *    实现见文件末尾 `process.exit(provedRed ? 0 : 1)`。
  * 3. **hermetic 数据**：默认自建一次性库 + 自起 API + 自起 vite（proxy 指过去），跑完删库。
  *    理由不是洁癖：共享开发库被反复灌数据会**反过来决定判据**（`/new` 曾因库里 17 首测试残留
  *    而红，而那与布局无关）；同时也避免守卫自己变成"污染共享库的人"。
@@ -21,8 +25,8 @@
  * ```bash
  * node apps/web/tools/one-screen-check.mjs --viewport=1440x900 --shot=docs/ui-review/after
  * node apps/web/tools/one-screen-check.mjs --viewport=375x812  --shot=docs/ui-review/after-375
- * node apps/web/tools/one-screen-check.mjs --viewport=1440x900 --negative-control   # 必须 exit 1
- * node apps/web/tools/one-screen-check.mjs --viewport=375x812  --negative-control   # 必须 exit 1
+ * node apps/web/tools/one-screen-check.mjs --viewport=1440x900 --negative-control   # 期望：全路由 FAIL 且 **exit 0**
+ * node apps/web/tools/one-screen-check.mjs --viewport=375x812  --negative-control   # 期望：有锚点的路由全 FAIL 且 **exit 0**
  * node apps/web/tools/one-screen-check.mjs --external   # 对着已起的 5173/8787 跑（调试用，不作证据）
  * ```
  *

@@ -110,10 +110,17 @@ motion:
 # 组件只能引用 --motif-*，禁止内联 alpha / px（守卫：__tests__/water-motif.test.tsx）。
 motif:
   sheenAlphaDark: 0.1      # 深水暗底上的水面光带（deep-current / trench）
-  sheenAlphaLight: 0.05    # 浅底上的水面光带（wave-white / foam）
+  sheenAlphaLight: 0.09    # 浅底水面光带（与 textureAlphaLight 同步，避免叠加压住正文）
   textureAlpha: 0.05       # 水位线肌理（横向细线）的强度
   textureLineGap: 12px     # 水位线的线距（repeating-linear-gradient 的周期）
   tideLineAlpha: 0.55      # 潮线（sea-glass → 透明 的渐隐细线）
+  # ── t44 增强（水感 + 浅底可用）────────────────────────────────────────
+  textureLineGapAlt: 27px  # 第二条线距：与 12px 形成干涉纹（108px 才重复）⇒ 不再是等距直线阵列
+  textureFade: 22%         # 水位线左右渐隐的边距比例（mask）⇒ 水线不再顶到边
+  textureAlphaLight: 0.09  # 浅底强度上限（旧值 0.04 已被用户裁决推翻）；0.12 解析最坏≈4.75:1 但未做像素复核，取 0.09 留余量
+  wakeDash: 7px            # 航迹虚线的实线段长度
+  wakeGap: 11px            # 航迹虚线的空隙长度
+  wakeAlpha: 0.45          # 航迹虚线强度
 zIndex:
   underlay: -1   # 装饰层：在宿主背景**之上**、内容**之下**（宿主必须 isolate，否则会被背景盖住）
   base: 0
@@ -311,6 +318,10 @@ Water contours, tide lines, river-channel guides, ripples, drift-bottle silhouet
   3. **潮线（tide line）**：`sea-glass → 透明` 的渐隐细线，替代区块之间的硬分隔线（母题见 Overview 的 tide lines）。
   - **产品理由**：这本就是一个关于"水面之上与深海之下"的产品；这三层让页面有**地点感**，而不是"任何 App 都能用的背景"。
   - **不许喧宾夺主（硬约束，三条同时成立）**：① 一律 `aria-hidden="true"` + `pointer-events-none` + **绝对定位**（零布局高度，因此不会破坏"一屏装下"）；② 只出现在**深水暗底与区块边缘**，不进入内容区、不压在正文之下 —— 浅底上若要用，强度必须降到 `sheenAlphaLight` 并实测文字对比度不退化；③ 本层**不含任何动画**（静态纹理），因此 `reduced-motion` 下无需额外降级（若将来加漂移，必须走 `motion-web` §1 decoration 三条件并引用 `motion` 契约）。
+- **漂流瓶母题（bottle motif，t44 补）**：用户点名的第三类母题。已有内联 SVG `BottleMark`（瓶身 + 瓶塞 + 一道水线 + 底部椭圆水影）本批**首次落到页面上**：公海大厅与漂流日志的页头右侧各一枚，骑在潮线上、与标题同高（绝对定位，零布局高度）。产品理由：**公海就是瓶子入海之后的去处**，页头出现"漂着的瓶子"是这个页面最该有的那一件事。
+- **航迹虚线（wake line，t44 补）**：漂流瓶划过水面留下的**断续**水痕（与潮线的"实线渐隐"区分）。落在页头与内容之间，1px 高、绝对定位。产品理由：接力是**一条路径**（河道），航迹把这个"经过"的语义画出来，而不是再加一层静态底纹。
+- **浅底装饰强度上限（t44 定，先定后用）**：浅底（wave-white）上**只允许** `textureAlphaLight`（**0.09**）级别的纹理/光带，且装饰一律在内容**之下**（`z-underlay`），不得压住正文。
+  依据（两处，均来自 `ui-ux` SKILL.md）：① 「| Glass card (light) | `bg-white/80` or higher opacity | `bg-white/10` (too transparent) |」——承载正文的容器必须足够不透明；② 「- `color-contrast` — Minimum 4.5:1 ratio for normal text」——正文必须保持 4.5:1。两条合起来 ⇒ 浅底上"重装饰"没有空间，只能极淡且在内容之下。
 - **Performance:** Only transform and opacity animated. No layout-triggering properties.
 
 深度层级（形态语言）:

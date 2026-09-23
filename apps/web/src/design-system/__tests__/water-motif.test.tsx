@@ -16,13 +16,15 @@ import { existsSync, readFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { render } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
-import { TideLine, WaterSheen, WaterTexture } from '../index';
+import { BottleMark, TideLine, WakeLine, WaterSheen, WaterTexture } from '../index';
 
 const SRC_DIR = join(process.cwd(), 'src');
 const DS_DIR = join(SRC_DIR, 'design-system');
 const REPO_ROOT = resolve(process.cwd(), '../..');
 
 const readIfPresent = (path: string): string => (existsSync(path) ? readFileSync(path, 'utf8') : '');
+/** 读某个页面源码（跨 describe 共用，故放在模块作用域）。 */
+const pageSource = (name: string): string => readIfPresent(join(SRC_DIR, 'pages', name));
 const designMd = readFileSync(resolve(REPO_ROOT, 'DESIGN.md'), 'utf8');
 const themeCss = readFileSync(join(DS_DIR, 'theme.css'), 'utf8');
 const waterCss = readIfPresent(join(DS_DIR, 'water.css'));
@@ -35,6 +37,13 @@ const MOTIF_TOKENS = [
   'textureAlpha',
   'textureLineGap',
   'tideLineAlpha',
+  // t44 增强
+  'textureLineGapAlt',
+  'textureFade',
+  'textureAlphaLight',
+  'wakeDash',
+  'wakeGap',
+  'wakeAlpha',
 ] as const;
 
 const kebab = (name: string): string =>
@@ -93,7 +102,6 @@ describe('水域母题：装饰层的基本纪律（不喧宾夺主）', () => {
 });
 
 describe('水域母题：页面确实接入了（不是写了组件没人用）', () => {
-  const pageSource = (name: string): string => readIfPresent(join(SRC_DIR, 'pages', name));
 
   it('河道页的两个深水面板都加了水面光带与水纹', () => {
     const river = pageSource('river-page.tsx');
@@ -104,6 +112,105 @@ describe('水域母题：页面确实接入了（不是写了组件没人用）'
   it('公海作品页的深底页头加了水面光带', () => {
     expect(pageSource('sea-detail-page.tsx'), 'sea-detail-page 未接入 WaterSheen').toContain(
       '<WaterSheen',
+    );
+  });
+});
+
+describe('t44 水感增强：不再是等距直线阵列', () => {
+  it('水位线用**双线距干涉纹**（两个不同线距都在用）', () => {
+    expect(waterCss).toContain('var(--motif-texture-line-gap)');
+    expect(waterCss).toContain('var(--motif-texture-line-gap-alt)');
+  });
+
+  it('水位线用 **mask-image 左右渐隐**（水线不再顶到边）', () => {
+    expect(waterCss, '缺少 mask-image 渐隐').toMatch(/mask-image:\s*linear-gradient/);
+    expect(waterCss, 'mask 的渐隐边距必须取契约 token').toContain('var(--motif-texture-fade)');
+  });
+
+  it('两个线距必须**不相等**（相等就还是等距直线阵列 —— 反向控制点）', () => {
+    const gaps = [...frontMatter.matchAll(/textureLineGap(?:Alt)?:\s*(\d+)px/g)].map((m) =>
+      Number(m[1]),
+    );
+    expect(gaps).toHaveLength(2);
+    expect(gaps[0], '两条线距相等 ⇒ 干涉纹不成立').not.toBe(gaps[1]);
+  });
+});
+
+describe('t44 浅底强度上限（先定后用，机器可检）', () => {
+  /**
+   * 上限口径的来龙去脉（别退回旧值）：
+   * 1. 起初按 `ui-ux` SKILL.md「Glass card (light) | `bg-white/80` or higher opacity」定为 0.04；
+   * 2. **用户当场裁决：「水、河流、海洋、漂流瓶都要能一眼看出来」** ⇒ 可见性优先于内部 skill 的克制条款
+   *    （同 AGENTS.md §4 与 t34-B1 的先例：用户直接指令优先于内部契约）；
+   * 3. 因此把可调区间上限抬到 **0.12**（约束从"靠 alpha 猜"改成"靠实测"），最终定为 **0.09**：
+   *    `docs/ui-review/theme-pass-2.md` §2 用 PIL 对真实截图做像素测量，要求正文与其实际背景 ≥4.5:1。
+   * 4. **⚠️ 一次已被撤回的读数（别把它当依据）**：最初的结论是"0.12 → 4.29:1 < 4.5 ⇒ 否决"，
+   *    但那次采样带落到了 `mist` 描边而不是水线（更正过程见 `theme-pass-2.md` §2.3 的自我更正）。
+   *    更正后的口径：**水线的合成色比 `mist` 浅**，最坏候选 4.58:1 仍达标 ⇒ **0.09 是"够可见且有余量"
+   *    的选择，而**不是**"0.12 违规所以降下来"。任何引用 4.29:1 的推断一律作废。
+   * 注：浅底 alpha 必然要**高于**深底（0.05）才等效可见 —— 感知对比取决于底色，同一个 alpha 用在
+   *   近白底与深蓝底上完全不是一个东西（这也是为什么"照抄一个数字"是错的）。
+   */
+  it('浅底强度必须有独立 token，且 **≤ 0.09**（这个数字由像素实测把关，不是拍出来的）', () => {
+    const m = /textureAlphaLight:\s*([\d.]+)/.exec(frontMatter);
+    expect(m, 'DESIGN.md 缺少 textureAlphaLight').not.toBeNull();
+    // 依据 = theme-pass-2.md §2.3 更正后的口径（最坏水线合成 4.58:1 ≥ 4.5，留余量）。
+    // 已撤回的 4.29:1 读数不作为依据 —— 那是把 mist 描边误当水线的误测。
+    expect(Number(m?.[1])).toBeLessThanOrEqual(0.09);
+  });
+
+  it('浅底纹理类必须引用**浅底**强度 token（不得复用深底的 0.05 以上强度）', () => {
+    const light = /\.water-texture-light\s*\{[^}]*opacity[^}]*\}/.exec(waterCss)?.[0] ?? '';
+    expect(light, '缺少 .water-texture-light 规则').not.toBe('');
+    expect(light).toContain('var(--motif-texture-alpha-light)');
+  });
+});
+
+describe('t44 漂流瓶与航迹母题', () => {
+  it('WakeLine：aria-hidden + pointer-events-none + 绝对定位（零布局高度）', () => {
+    const { container } = render(<WakeLine />);
+    const node = container.firstElementChild;
+    expect(node?.getAttribute('aria-hidden')).toBe('true');
+    expect(node?.className).toMatch(/pointer-events-none/);
+    expect(node?.className).toMatch(/absolute/);
+  });
+
+  it('BottleMark 不吃指针事件（母题是装饰，不得挡住页头链接）', () => {
+    const { container } = render(<BottleMark />);
+    // 注意：SVG 元素的 `className` 是 SVGAnimatedString（不是字符串）⇒ 必须读属性
+    expect(container.firstElementChild?.getAttribute('class')).toMatch(/pointer-events-none/);
+  });
+
+  it('公海大厅：整页水位线（浅底）+ 水面光带 + 页头瓶子 + 潮线', () => {
+    const sea = pageSource('sea-page.tsx');
+    expect(sea, '公海大厅缺浅底水位线').toMatch(/<WaterTexture\s+tone="light"/);
+    expect(sea, '公海大厅缺水面光带').toMatch(/<WaterSheen\s+tone="light"/);
+    expect(sea, '公海大厅缺漂流瓶母题（用户点名）').toContain('<BottleMark');
+    expect(sea, '公海大厅缺潮线').toContain('<TideLine');
+    expect(sea, '母题宿主必须是 isolate 容器（否则 z-underlay 看不见）').toMatch(
+      /relative isolate/,
+    );
+  });
+
+  it('漂流日志：页头瓶子 + 航迹（瓶子是用户点名的母题，日志页也该有）', () => {
+    const log = pageSource('drift-log-page.tsx');
+    expect(log, '漂流日志页头缺漂流瓶母题').toContain('<BottleMark');
+    expect(log, '漂流日志缺航迹').toContain('<WakeLine');
+    expect(log).toMatch(/relative/);
+  });
+
+  /**
+   * 每个页头**只留一条细线**（captain 观感反馈：潮线与航迹只差约 10px，叠在一起读成"双线"、显噪）。
+   * 语义分工 → 各自留一条：公海大厅留下「潮线」（海面边界），漂流日志留下「航迹」（这段"经过"）。
+   */
+  it('同一页头不得同时出现潮线与航迹（否则读成双线、显噪）', () => {
+    const sea = pageSource('sea-page.tsx');
+    const log = pageSource('drift-log-page.tsx');
+    expect(sea.includes('<TideLine') && sea.includes('<WakeLine'), '公海大厅页头同时有两线').toBe(
+      false,
+    );
+    expect(log.includes('<TideLine') && log.includes('<WakeLine'), '漂流日志页头同时有两线').toBe(
+      false,
     );
   });
 });
