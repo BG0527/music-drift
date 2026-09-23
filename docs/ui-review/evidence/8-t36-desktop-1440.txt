@@ -1,0 +1,18 @@
+[setup] 建一次性数据库（复用 apps/api 的派生 / 迁移 / 种子机制）…
+[setup] 库 music_drift_test_1790164625_16580_fiao0r（种子 3 首）· API http://127.0.0.1:56143 · web http://127.0.0.1:56151
+[preflight] 浏览器会话有效：layoutmue1sz07
+viewport=1440x900 口径=desktop(整页高度) threshold=900 negativeControl=false hermetic
+OK   /                                    height=900  home-pick=383
+OK   /river                               height=900  river-draw=654 river-drop=654
+OK   /sea                                 height=900  sea-list=445
+OK   /new                                 height=900  new-catalog=444
+OK   /sea/0e687b30-37cb-4afa-a27b-3774a31485f0 height=900  sea-play=522
+OK   /me                                  height=900  me-bottles=541
+OK   /settings                            height=900  settings-attribution=553
+OK   /bottles/5001df5a-8150-4a26-933b-1889bf43d135 height=900  bottle-play=668 bottle-action=668
+OK   /bottles/71c16651-568f-49ed-ac7f-f1aaab7aecfb height=900  bottle-play=640 bottle-action=640
+OK   /bottles/1f726ea2-ff0c-45e2-a171-9aaca426c095 height=900  bottle-record=638
+OK   /bottles/5001df5a-8150-4a26-933b-1889bf43d135/log height=900  
+OK   /nope-does-not-exist                 height=900  
+[teardown] 删库 music_drift_test_1790164625_16580_fiao0r → 已删除
+✅ 全部页面达标（桌面口径：一屏装下）
