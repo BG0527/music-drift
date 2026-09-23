@@ -2756,3 +2756,26 @@ frontend-flow 把 `one-screen-check.mjs` 改为 hermetic 后**立刻**发现：*
 ### 60.4 本轮派单
 - **t29（architect）**：领域规则 —— 每段录制时长固定（曲库权威）+ 服务端校验语义改写（`SEGMENT_MIN_MS/MAX_MS` 与 `AUDIO_DURATION_OUT_OF_RANGE` 改为「必须匹配该段预设时长 ±容差」）。验收含一条硬要求：**必须明确回答** F2 是"从根上消失"还是"仍然存在（因为 X）" —— **不接受只写"已解决"**。
 - **t30（audio-engineer）**：用户 #1（播放完成后再点＝重播+提示 / 未完成点击＝暂停+可见）+ #3（录制后试听）+ 清理 F2 作废代码 + #4 的录制端固定时长 UI。
+
+---
+
+## 61. 更正：`song_segments` 早已存在（captain 侦察漏表）+ 批准 t29 两项
+
+### 61.1 ⚠️ 更正（本会话第 4 次）：此前"段时长没有入库"的判断**作废**
+`apps/api/src/db/schema.ts` 里 **`song_segments` 表早已存在**：`song_id / index / start_ms / duration_ms / accompaniment_ref`（+ `(song_id, index)` 唯一索引 + `duration_ms > 0` CHECK），且 `apps/api/src/audio/library-ingest.ts`（t13）**已有幂等入库路径**。
+⇒ **"每段固定时长入库"不需要新表/新列**；`library.json` 的切分数据**早已在库**。**ADR §59.2 中"数据库只存 `songs.total_segments`"一句作废。**
+**错误来源**：captain 的侦察只查了 `songs` 与 `bottle_segments` 两张表的列，**漏查 `song_segments`**，随即下了"库里没有段时长"的结论。
+⇒ 教训：**"某数据不存在"这类结论，必须先证明自己查全了表**（本次是典型的"查询范围不足 ⇒ 事实判断错误"）。architect 独立核对后纠正 —— 这是"不采信履历、自己查码"第二次救场。
+**核对到的真实数字**（与 `library.json` 逐段一致）：`Immersed` 23870/20619/22501/23010 · `On the Shore` 22709/21455/23824/22012 · `Rains Will Fall` 21850/22570/23313/22267。
+
+### 61.2 批准 (i)：扩 `routes/bottles.ts` 的录制处理器（披露式归档）
+调用点 `apps/api/src/routes/bottles.ts:283-305` 从 `x-audio-duration-ms` 读客户端值再调 `validateSegmentAudioUpload`；要让「必须匹配预设（±容差）」在**上传时 422 拒收**，调用方必须把预设传进去。
+- **选 (i)**（授权改该文件约 8 行）；**不选 (ii)** —— 让校验器"支持预设、无预设时回退 15–30s"会留下**旧区间规则与预设规则并存**的中间态（第二套规则必然漂移，且"到底哪条在生效"说不清）。
+- `routes/bottles.ts` 被 **t26（failed 终态，路径无法释放）**占用 ⇒ captain 无法用工具扩 inScope ⇒ 按 **t20 先例**：changedPaths 只列 inScope 内路径，该文件在 output 里**显式披露 + captain 背书**。
+- 实现采纳 architect 方案：① 按 `(songId, nextRecordIndex)` 查预设 → ② 传给校验器；`x-audio-duration-ms` **降级为仅记录/诊断**。
+
+### 61.3 批准 0005 迁移：回填历史行的分母（**DML only**，无 DDL，可重复执行）
+`UPDATE bottle_segments SET duration_ms = s.duration_ms FROM song_segments s WHERE ...`
+- **批准理由**：不回填 ⇒ 历史行的分母仍是上传者自报值 ⇒ F2 对**历史数据仍然存在**，而 demo 用的**正是**这些历史数据；回填后"分母 = 曲库预设"对新旧数据一致成立。
+- 附带要求（可观测性，不接受"应该没问题"）：① 确认读取路径的 `min(covered, duration)` 归一化使回填后 ratio 不 > 1；② **抽查几个历史段**回填前后的 `duration_ms` 与 ratio 变化作为证据。
+- 本条也是**新惯例的第一次实战**：architect 落盘前主动复述「我现在要加一条 0005 迁移…是否仍然批准？」⇒ 惯例生效。
