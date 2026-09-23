@@ -113,9 +113,15 @@
 
 | 方法 | 路径                            | 请求            | 响应                  | 说明                                                                        |
 | ---- | ------------------------------- | --------------- | --------------------- | --------------------------------------------------------------------------- |
-| GET  | `/api/sea`                      | `zone=COMPLETED | INCOMPLETE`、`limit`  | `Page<BottleSummarySchema>`                                                 | **默认只看已完成区**（CONTEXT §6.1），未完成区须显式 `?zone=INCOMPLETE` |
+| GET  | `/api/sea`                      | `BottleListQuerySchema`（`seaZone` / `zone`（旧名）/ `status` / `limit` / `cursor`） | `Page<BottleSummarySchema>`                                                 | **默认只看已完成区**（CONTEXT §6.1）；**真游标分页**（见下） |
 | GET  | `/api/sea/:id`                  | —               | `BottleSummarySchema` | 不在公海的瓶子 → `404`（不是 403，避免探测）                                |
 | POST | `/api/sea/:id/targeted-segment` | —               | `BottleSummarySchema` | 指定接唱未完成作品：抢占持有权；父节点 = 该作品**最后一段**的接唱者（§6.2） |
+
+**分页（§46.2，t24）**：`nextCursor` 是**真实**游标。排序键 = `(updated_at DESC, id DESC)`（`id` 是稳定决胜，
+同一毫秒并列也不漂），游标是**键集**位置（`(updated_at,id) < 游标`），**不是 offset**：
+遍历期间新插入的作品排在游标之前 ⇒ 既不重复、也不会挤掉尚未取到的旧行。`nextCursor === null`
+当且仅当后面没有更多行 ⇒「某页不满 `limit` 却仍有下一页」在实现上不可能。畸形 `cursor` → `400`
+（**不静默忽略**：忽略等于每次悄悄回到第一页）。分区判定由内核 `seaZoneOf` 给出（SQL 的分区子查询只做候选预筛 + 候选超取）。
 
 指定接唱的判定全部来自内核导出，路由不发明规则：已完成 → `422 BOTTLE_ALREADY_COMPLETE`（完成品只能听）；
 在该瓶唱过（含被斩的软删段）→ `422 ALREADY_SANG_IN_BOTTLE`；不在公海 → `404`；未登录 → `401`。
@@ -360,6 +366,7 @@ pnpm --filter @music-drift/api test:integration
 
 | 版本       | 变更                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
 | ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `0.2.0-s1` | **t24 公海真分页（§46.2）**：`/api/sea` 复用契约 `BottleListQuerySchema`（**删掉内联 schema**；旧参数名 `zone` 保留为等价别名，避免"改名后被静默忽略"）；`cursor` 真消费、`nextCursor` 真实（末页 `null`）、排序键 `(updated_at DESC, id DESC)` 键集分页；默认「只看已完成区」的过滤改由 store 交给内核 `seaZoneOf` 判定（SQL 只做候选预筛 + 超取），修掉「先取 limit 再过滤 ⇒ 空页/少给行」的静默损失 |
 | `0.2.0-s1` | **t20 已听覆盖率服务端化**：新增 `POST /api/segments/:id/listen`（`SubmitListenProgressRequestSchema` / `ListenProgressResponseSchema`）与表 `listen_progress`（只增不减、跨会话保留）；点踩门槛改读持久化覆盖率（阈值取内核策略），不足返回 `422 LISTEN_THRESHOLD_NOT_REACHED`；`CastVoteRequest.listenedRatio` 废弃为可选且被忽略，`CastVoteResponse` 新增服务端 `listenedRatio`；集成测试对真响应做 `Schema.parse`。既有字段零破坏（新增字段 + 可选化） |
 | `0.2.0-s1` | **t19 追补（captain 裁决）**：live-check 增加**第 27 步** `GET /api/me/bottles` 端到端检查（覆盖 `role` / `mySegmentIndexes`，含"斩浪后仍算参与过、段号变空"）；外部模式改为**不可能被误当验收证据**（开头醒目横幅 + 非确定性步骤单列「未复现（数据不受控）」不计 pass + 本文 §2.9 写死「验收证据只认 hermetic 模式」）；全文步数口径同步为 **27 步**                                                                                                                                                                                                                                                                                                                                                                                                  |
 | `0.2.0-s1` | **t19 可复现性修复**：新增 **`GET /api/me/bottles`**（`MyBottleSchema` / `MyBottleListSchema`，漂流日志 P0，替换 t11 的 localStorage 书签；契约只**新增**类型，既有字段形状零改动）；`apps/api` 的 `start` / `dev` 补上 `--env-file-if-exists=../../.env`（此前照 README 复制 .env 后起服务会走「未配置 DATABASE_URL」降级、`/api/songs` 404）；`golden-path-live-check.mjs` 改为**自建可抛弃库 + 自起 API**（hermetic），旧的"对着 dev 服务跑"只能靠 `API_BASE` 显式开启                                                                                                                                                                                                                                                                              |
@@ -371,3 +378,17 @@ pnpm --filter @music-drift/api test:integration
 | `0.1.0-s1` | **t6 落地账号体系**：`/api/auth/{register,login,logout,me}` + `/api/me/anonymous-codes`；新增 `AUTH_ERROR_CODES`（6 个稳定码，`AuthErrorResponseSchema` 与 `ErrorResponseSchema` 同形）；§1 错误码口径改为 `RULE_CODES ∪ AUTH_ERROR_CODES`（captain 裁决 A 方案，`docs/architecture.md` §26.4）；登记「登录无限流」「注册可枚举」「会话有状态」三条已知未做项                                                                                                                                                                                                                                                                                                                                                                                          |
 | `0.1.0-s1` | t5 建立：账号 / 曲库 / 瓶中流程 / 公海 / 互动全套契约；`RecordSegmentRequest` 不含 `index`；新增 `missingSegmentIndexes`、`isComplete`、`seaZone`、`replacementContext`、`availableResolutions`；`RuleCodeSchema` 复用内核 `RULE_CODES`；契约版本常量从 `contracts/health.ts` 迁到 `contracts/common.ts`                                                                                                                                                                                                                                                                                                                                                                                                                                               |
 | `0.0.0-s0` | S0 仅 `/healthz`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
+
+---
+
+## 已知限制（Demo 范围 · 显式声明）
+
+> 来源：`docs/architecture.md` §53.2 / §53.4，均由 captain 报用户裁决后落档。**这些是 Demo 的既定边界，不是待修 bug**；要改变需用户重新下令。
+
+1. **点踩门槛满足的是「真实耗费时间」，不是「真的听」**
+   服务端对收听覆盖的增长限速已收紧（零等待连打无法达标，见 §53.1），但**首次预算是一次性白给的**（`floor(duration × 0.5)`）。因此攻击者仍可「**真实等待约 `0.24×D`（30s 段 ≈ 7.2 秒）后再报一次**」达标，而**实际播放 0 秒**；诚实用户需听满 24 秒。
+   **物理上限**：纯 Web 架构下服务端**无法**知道客户端是否真的出声。任何候选方案（播放心跳计费 / 上传播放位置序列）都只能做到「**必须真实耗费 ≥ N 秒墙钟时间**」，无法证明「人耳听到了」。彻底收紧需改契约 —— 用户已知悉并选择本次不修。
+
+2. **点踩门槛的分母可信度上限**
+   段时长本来由上传者自报（`x-audio-duration-ms`；服务端只做 15–30s 区间校验，不核对音频本体）。现行方案是**播放时用浏览器实测时长校正**，但它**同样来自客户端** ⇒ **只修复诚实用户的受损路径**（声明虚高导致该段永久踩不动），**不构成对恶意客户端的安全防护**：谎报更小的 duration 会让**被踩的那一段**门槛变低。
+   校正接口采用了分层防护（库内 `listen_progress` 一致性校验、下调立即生效 / 上调需多用户接近、落库审计、下限约束），但**这些都不构成硬边界**。
