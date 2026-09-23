@@ -2440,3 +2440,34 @@ t21 的第 27 步断言依据的是**工作区里 backend-core 正在写的 t22 
 
 ### 50.5 附带确认
 `eslint` 对 `theme.css` 报的唯一 warning 是「无匹配配置故被忽略」⇒ **CSS 不在 eslint 覆盖范围**。因此 CSS 类文件的守卫只能落在单测里 —— 这正是本节的①（源码级负向断言）承担的职责，闭环成立。
+
+---
+
+## 51. t22 完成（§46.1 落地）+ 交叉依赖闭合（captain 亲验）
+
+### 51.1 规则收敛方式（不新增表、不新增迁移、不写第二份判定）
+- `store/bottles.ts`：新增**唯一判定** `participatedIn(state, userId)`；`listParticipatedBottles` 改为「**SQL 只做候选超集 + 内核筛**」；**整条删掉候选 SQL 里的 `b.initiator_id = $1`** —— 那正是「发起者豁免」本身，未留任何特殊照顾分支。
+- 候选 **`limit×3` 超取后再筛**，避免被筛掉后**静默少给行**。
+- `store/notifications.ts`：`participantsOf()` 从**事件流 SQL**（第二份实现）收敛为 `participants(replayBottle(events))` ⇒ `BOTTLE_COMPLETED` 收件人与 `/api/me/bottles` 共用同一条规则。
+- **未动** `routes/interactions.ts:336`（徽章本就在用内核判定）—— 不为"看起来统一"做无谓改动（正确的 YAGNI）。
+- 四个消费方（`store/bottles.ts:160`、`store/notifications.ts:122`、`store/dto.ts:111`、`routes/interactions.ts:336`）**全部落在内核 `queries.ts:152`**；`SEGMENT_RECORDED` 降级为候选 SQL，不再承担判定。
+
+### 51.2 红→绿与反转方式
+未改实现时 **4 例全红**（`AssertionError: expected [ …(2) ] to not include '81e425bb-…'`），改后 15/15 绿。
+反转采用**就地改写**（未新增平行用例），且**先反假绿**（先断言段确实软删、瓶确实 `DAMAGED`）**再断言列表不含该瓶、且另一支仍在**（证明不误伤）—— 让反转后的断言**具备判别力**，而不是把断言反过来就算完。
+
+### 51.3 §49.2 的交叉依赖警告**已闭合**（captain 亲验，非采信自述）
+t21 第 27 步断言原先依赖 t22 的**在飞实现**（验证污染）。t22 完成后 captain 亲自重跑：
+`node apps/web/tools/golden-path-live-check.mjs` → **exit 0 / 28 步**，含
+`[27] …被斩段作者（含发起者）已从列表剔除（§46.1）· 主瓶不受影响 · 被斩瓶 status=DAMAGED`；
+`[28] 单次塞满→ratio 0.5 被拒 422 · 10 个点踩者按 1× 实时周期上报各自听满（≈17s）→ 全部 200，第 10 票斩浪`。
+⇒ **金路径恢复为稳定基线**，不再是"建在未完成任务上"。
+
+### 51.4 ⚠️ 待澄清（captain 不放行）：`returnHandoff.integration.test.ts` 的 `ROUNDS 12→5`
+该改动把"降低轮数"当作"机器忙导致超时"的解法。captain 要求先明确：**这 12 轮是「同一操作的重复」，还是「并发参与者 / 递进场景的覆盖面」？**
+- 若为**重复**（只为提高撞见 flaky 的概率）⇒ 可接受，但注释须写明真实代价是「**敏感度降低**」，而不是只说"避免超时"；
+- 若为**覆盖面**（如 12 个并发者抢同一段号）⇒ **必须回退轮数**，改用「提高该文件 timeout」或「不让它与其他文件并行」来剥离争用。
+理由：**用缩小场景来消噪声，与"为了绿而削弱检查"是同一件事的两面。** 该文件本轮**未提交**，待澄清后一并处置。
+
+### 51.5 in-scope 声明疏漏（captain 记账，第二轮）
+- t22 的 in-scope 写了 `apps/api/src/routes/myBottles.ts` —— **该文件不存在**（`/api/me/bottles` 在 `routes/bottles.ts`，本轮判定落在 store 层）。根因：captain 拿测试文件名反推了源文件名。已与 §47.6 的约定合并为一句话：**in-scope 里的路径必须是实际存在的文件或目录**，写之前先 `ls`/`glob` 确认。
