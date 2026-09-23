@@ -2927,3 +2927,32 @@ frontend-flow 在"报 findings 但不动别人域"这件事上做得对：它只
 3. 全部截图是 **seed 单一样本** ⇒ **不外推**到多数据场景；
 4. 审计者**没有**任何"好看 / 不好看"的判断。
 ⇒ 与本会话一贯的判据纪律一致：**报告范围，不报告超出证据的结论。**
+
+---
+
+## 67. t31 实现完成（待闭合）+ 两处 typecheck 红的归属
+
+### 67.1 实现（captain 裁定的 (A)③ 已逐条落实）
+- `audio/ingest.ts`：`presetDurationMs` **必填**、函数**去掉默认参 `= {}`**、旧 **15–30s 区间分支删除**、预设不可用（NaN/0/负）→ `AUDIO_SEGMENT_PRESET_MISSING`；
+- `ingest.test.ts` 按 captain 三条要求重写：**四边界全覆盖**（`预设−容差−1` 拒 / `−容差` 过 / `+容差` 过 / `+容差+1` 拒，容差取共享常量不写死）+「预设不可用 → 拒绝」+「缺失时长仍拒」；**用例名读得出新规则**；**不是只删断言换绿**；
+- **`requireDuration` 的交代**：原文守"客户端必须自报时长，否则拒"；现由**预设规则**接手（不报 ⇒ NaN ⇒ 仍 `AUDIO_DURATION_OUT_OF_RANGE`），**语义不减、开关少一个**；
+- 净覆盖变化**如实声明**：单测 179 → **180**、集成 178 → **177**（旧区间用例被预设边界用例替换，数量不同属正常，但已主动写出）。
+
+### 67.2 ⭐ 裁 (A) 而非 (B) 的理由被**现场验证**
+把参数改必填后，编译**立刻报出 `TS2741` / `TS2345` 两处"忘传预设的调用点"**，据此修完。
+⇒ 这正是 §63.2 的论断在实践中的验证：**grep 只会告诉你"今天没有调用者"，类型会告诉你"你漏了一个"。**
+
+### 67.3 验证与唯一失败项
+- api 单测 **rc=0（19 文件/180 例）** · api 集成 **rc=0（22 文件/177 例）** · 该域 eslint **rc=0** · **金路径 rc=0（28 步 hermetic）** · `shared`/`api` typecheck **Done**；
+- **唯一失败 verify**：`pnpm -r typecheck` **rc=2，红点 100% 在 `apps/web`**：
+  - `features/api/{mutations,queries}.ts` 的 `Collection` 未导出 ⇒ **frontend-flow 的 t32 在途**；
+  - `use-segment-player.test.ts` 的 `measuredDurationMs` ⇒ **t28 作废产物残留**，清理归 **audio-engineer 的 t30**。
+
+### 67.4 处置
+**等 t30 / t32 完成 → 在全员 idle 窗口复跑 `pnpm -r typecheck` 转绿 → `reassign_task` 重开 t31 让 architect 复跑确认 → 闭合 completed。**（期间 architect 不需改任何代码）
+
+### 67.5 工具语义 vs 工程判断（本会话第三次同类张力）
+- 工具的硬规则是"**有 verify 失败 ⇒ 任务必须置 failed**"，而工程判断是"红点在**他人包级**、不归因执行者"。两者张力时，captain 的处置原则是：
+  **如实置 failed，不为了让状态好看而伪绿；把闭合留给真正转绿的那个窗口。**
+- 本会话前两次同类张力：① t20 的 inScope 漏写 `drizzle/` ⇒ `update_task` 拒绝归档，而问题只是**声明疏漏**；② `Delivery` 报 "failed without a follow-up repair"，而那两条的实际"follow-up"是**作废与清理**（已发生）。
+⇒ 记录目的：**不要为了让工具满意而修改结论**；把语义缺口写清楚，留痕比"状态好看"重要。
