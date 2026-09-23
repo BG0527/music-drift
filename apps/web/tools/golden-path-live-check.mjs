@@ -208,26 +208,25 @@ async function listenUntilThreshold(session, segmentId, options = {}) {
   const periodMs = options.periodMs ?? 1_000;
   const maxMs = options.maxMs ?? 30_000;
   const startedAt = Date.now();
-  let last = null;
 
   for (;;) {
     await new Promise((resolve) => setTimeout(resolve, periodMs));
     const elapsedMs = Date.now() - startedAt;
     const coveredMs = Math.min(elapsedMs, durationMs);
-    last = await call(session, 'POST', `/api/segments/${segmentId}/listen`, {
+    const response = await call(session, 'POST', `/api/segments/${segmentId}/listen`, {
       json: { coveredMs },
     });
     must(
-      last.status === 200,
-      `上报收听覆盖应为 200，实际 ${last.status}（响应 ${JSON.stringify(last.body)}）`,
+      response.status === 200,
+      `上报收听覆盖应为 200，实际 ${response.status}（响应 ${JSON.stringify(response.body)}）`,
     );
-    const ratio = typeof last.body?.ratio === 'number' ? last.body.ratio : 0;
+    const ratio = typeof response.body?.ratio === 'number' ? response.body.ratio : 0;
     if (ratio >= threshold) {
-      return { ratio, coveredMs: last.body?.coveredMs ?? coveredMs, elapsedMs };
+      return { ratio, coveredMs: response.body?.coveredMs ?? coveredMs, elapsedMs };
     }
     if (elapsedMs > maxMs) {
       throw new Error(
-        `上报 ${String(maxMs)}ms 后仍未达门槛（最后一次响应 = ${JSON.stringify(last.body)}）`,
+        `上报 ${String(maxMs)}ms 后仍未达门槛（最后一次响应 = ${JSON.stringify(response.body)}）`,
       );
     }
   }

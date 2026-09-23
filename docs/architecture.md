@@ -2471,3 +2471,42 @@ t21 第 27 步断言原先依赖 t22 的**在飞实现**（验证污染）。t22
 
 ### 51.5 in-scope 声明疏漏（captain 记账，第二轮）
 - t22 的 in-scope 写了 `apps/api/src/routes/myBottles.ts` —— **该文件不存在**（`/api/me/bottles` 在 `routes/bottles.ts`，本轮判定落在 store 层）。根因：captain 拿测试文件名反推了源文件名。已与 §47.6 的约定合并为一句话：**in-scope 里的路径必须是实际存在的文件或目录**，写之前先 `ls`/`glob` 确认。
+
+---
+
+## 52. t23 评审裁决：t20 **needs_revision**（阻断项 F1 已开 t25）
+
+### 52.1 裁决与处置
+- t23（review，reviewer）→ **failed / verdict = needs_revision**。（reviewer 会话未暴露 `agent_teams_*` 工具，由 captain 按其消息原意代登记，**未改变裁决内容**。）
+- **F1（blocker）→ 开 t25**（repair，architect，sourceFindings F1+F3）。
+- F2（high）→ **待用户裁决**（见 §52.4）。
+- F4（low）→ 记账，待 t24 完成后处置（与 t24 同文件 `store/bottles.ts`）。
+- 四条角度结论：① 覆盖率单一实现 PASS ② 请求体不能污染门槛 PASS（另发现分母通道 F2）③ 增长限速可跨过 **FAIL** ④ 赞/踩与斩浪真解耦 PASS（尝试推翻未成功）。
+
+### 52.2 F1（blocker）：点踩门槛可被 3–4 次即时上报、零播放、~100ms 跨过
+- 证据（真时钟/真 HTTP/真 Postgres）：段长 30s 门槛 24s，4 次请求真实耗时 **115ms**、**播放 0 秒** → `DISLIKE http=200`；段长 15s 门槛 12s → 3 次请求 70ms → 200。
+- 根因：`RATE_SLACK_MS`(3000) **按「请求」发放而非按「时间窗」** —— `elapsed≈0` 时每次上报照样净增 3000ms，而 api 无 rate limit。
+- **测试为何放过它**：`listenProgress.test.ts:40-47` 只测**一次**后续上报（必然成立）、`integration:284-286` 只测**第 2 次**（必然通过）。真正的不变式「**N 次仍不达门槛**」**无人覆盖** —— 那两条守卫的**绿距离失败只差一轮循环**。
+- 文档矛盾：与 `docs/api.md:223-224` 的承诺「想跨过门槛必须真的等够时间」直接冲突 ⇒ `CONTEXT §16` 在服务端事实上未落地。
+- 修法（t25）：宽限改为**锚定首次上报的预算** `cap = firstGrantedMs + floor((now - firstSeenAtMs) × 1.25) + RATE_SLACK_MS`（`firstSeenAt` 落库），验收 = N=10 次即时上报恒不达门槛 + 正常 1×/秒上报不被夹。
+
+### 52.3 ⭐ 新纪律：**「队友在途改动」窗口内 verify 会假红**（两个独立观察者）
+- **captain**：在 frontend-flow 正在写文件的窗口跑 `pnpm -r test` → **exit 1**（2 个 `Failed to start forks worker` / `Timeout waiting for worker`）；全员 idle 后重跑 → **exit 0**（90 文件 790 例）。
+- **reviewer**：12:03 跑 `test:integration` → **exit 1**（4 failed 全在 §46.1 相关文件）；用 `git archive 897a983` 干净副本跑同一命令 → **exit 0 / 160 passed**。归因：那些文件正处于 t22 **在途未提交**状态。
+⇒ 同一现象、两个独立观察者。**结论：取基线 / 跑评审 / 判定红绿，必须选在全员 idle 的窗口**；否则测到的是"正在施工的工地"，不是可判定的状态。
+附注：这暴露了「共享工作区 + 多 agent 并发」的**结构性代价** —— 未提交的在途改动会污染任何共用工作区的测量。只能靠**调度纪律**（停机/串行窗口）规避，**不能**靠更聪明的测量或加自动重试来规避（那只会把假红变成假绿）。
+
+### 52.4 F2 待用户裁决（涉及依赖引入 ⇒ 属 §7 待裁决项）
+门槛的**分母**由上传者自报：`x-audio-duration-ms` 头写库，`ingest.ts` 只做 15–30s 区间校验 + sniff 4 字节容器，`durationVerified` 仅表示"客户端给了合法数字"。
+后果（**诚实用户路径**）：真实 2s 片段最多覆盖 2s ⇒ ratio ≤ 6.7% ⇒ 该段对 UI 用户**永久不可点踩**，上传者能单方面冻结自己段的斩浪。
+归因：**不是 t20 引入的回归**（t7/t9 上传校验原样），但 t20 把这个数提升为安全关键阈值的**分母**。
+两个候选：(a) 补真实音频时长核对（需解析容器 / FFmpeg ⇒ 中间件，须用户批准）；(b) 记为 Demo 已知限制并写进 `CONTEXT.md §17` 范围与 `docs/api.md`。→ captain 报用户。
+
+### 52.5 F3 = 「同源判据错误」第 **4** 例（自证用例）
+用例标题声称「覆盖率语义与内核 `ListenTracker` 一致：拖动不计、循环不叠加（端到端同一条规则）」，但服务端只做 `normalizeInt → min(covered, duration)`、请求体只有一个字段、**根本拿不到 span/seek**；`server.ratio ≈ local.ratio` 是同一个 `listenedRatio()` 喂同一个数 ⇒ **同值断言对任何输入都成立**。
+证伪实验（reviewer 做）：把 tracker 整段换成手写常量 `11_600`，四条断言同形照抄**竟然全绿**（EXIT=0）⇒ 该用例无法区分"服务端实现拖动不计"与"照抄客户端数字"。
+→ 处置：把标题/注释收敛为它**真正证明**的东西（两端复用同一阈值函数），"拖动不计/循环不叠加"的守卫留在客户端单测；**不得**把它当作"服务端防伪造"的证据链一环。（并入 t25）
+
+### 52.6 探针目录污染：`apps/web/dist__no_build_probe/`
+frontend-ds 做"无 `dist` 场景"实测时在工作区建了该目录；**eslint 的 `**/dist/**` ignore 不覆盖这个目录名** ⇒ 探针产物被 lint 扫到，成为此前 14 problem 中的"一大批"（audio-engineer 观察其随后消失）。
+⇒ 纪律：**探针 / 实验产物一律放仓库外（如 `/tmp`）或先写进 `.gitignore`**；否则"临时探针"会变成别人的噪声源与假红源。（reference：reviewer 把全部探针放在 `/tmp/mdb-head`、仓库零改动，做法正确。）
