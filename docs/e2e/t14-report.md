@@ -1,8 +1,8 @@
 # t14 端到端验证报告（qa-e2e · 2026-09-24）
 
 > 任务：t14「端到端验证：黄金路径 + 多浏览器接力 + 并发抢占」（plan.md 切片 6，S4）
-> 结论：**黄金路径与并发不变量全绿；发现 2 个真实缺陷（1 个 P0/HIGH 静默失败，1 个跨引擎回放风险）**。
-> 原始输出：`docs/e2e/t14-browser-run.log`（53 条断言 · 通过 50 · 失败 3）；一次性探针在**仓库外** `D:/music-e2e-probe/`。
+> 结论：**黄金路径、并发不变量、移动端断点回归全绿；发现 3 个问题**（**P0/HIGH** 并发抢占静默失败；**MEDIUM/风险** 跨引擎回放失败；**LOW** 既有工具注释漂移）。
+> 原始输出：`docs/e2e/t14-browser-run.txt`（53 条断言 · 通过 50 · 失败 3）；一次性探针在**仓库外** `D:/music-e2e-probe/`。
 
 ---
 
@@ -106,7 +106,7 @@ DB 唯一索引才是裁决者，所以并发失败的正确文案是 `HOLDING_A
 
 ## 4. 【P0/HIGH】`POST /api/sea/:id/targeted-segment` 抢占失败时返回 **200 + 摘要** ⇒ 前端静默失败
 
-### 4.1 现象（真浏览器，4/4 次复现）
+### 4.1 现象（真浏览器，5/5 次运行均复现）
 
 两个窗口同时点「我来接这一段」。最终这一轮：
 
@@ -262,7 +262,7 @@ FAIL  [webkit] WebKit：点播放后真的在走（两段采样显示 currentTim
 | `frontend-design` | 「Treat failure and emptiness as moments for direction, not mood.」 | 同上：并发失败既没有方向（出口动作），也没有解释 |
 | `afrexai-ui-design-system` | Phase 8 评分表 Interaction design 10%「Hover/active/focus/loading states defined? **Feedback for actions?**」；Quick checklist「**Error states are helpful (not just "Error")**」 | 第 4 节 = "feedback for actions" 缺失；第 4.3 节的 404「找不到这个资源。」= 不 helpful 的错误态 |
 | `afrexai-ui-design-system` | Phase 7 Understandable「Error messages identify the field and **suggest correction**」 | 同上 |
-| `afrexai-ui-design-system` | Phase 6 `breakpoints`（sm 640 / md 768 / lg 1024 / xl 1280） | **本层未验证移动端断点**（t14 原始范围含"移动端断点回归"，本次只跑了 1440×900；375px 由 `docs/ui-review` 的截图证据覆盖）⇒ **明确列为未完成项**，见第 7 节 |
+| `afrexai-ui-design-system` | Phase 6 Responsive Design：`breakpoints`（sm 640 / md 768 / lg 1024 / xl 1280）、`approach: "mobile_first"`；Phase 8 评分表 Responsiveness 10%「Works on mobile/tablet/desktop? Touch-friendly? **No horizontal scroll**?」 | **已按仓库既有判据验完**：375×812 与 1440×900 各 12 条路由全达标（无横向滚动）；见 §6.5。**触控目标尺寸未验**（`44×44px` 那条没有工具覆盖，属未验证项） |
 
 > 说明：`motion-web` §6 的「若动画与音频/媒体同步，**以媒体时间为准**」在黄金路径里被间接验证
 > （`/listen` 上报 3 次全 200、`duration=19.92`、`currentTime` 两段采样持续前进）；
@@ -270,16 +270,88 @@ FAIL  [webkit] WebKit：点播放后真的在走（两段采样显示 currentTim
 
 ---
 
+## 6.5 移动端断点回归（t14 原始范围的另一半）—— 全绿，用**仓库既有判据**，不自造第二套
+
+t14 范围写明含"移动端断点回归"。仓库里**已经有**这件事的唯一判据：`apps/web/tools/one-screen-check.mjs`
+（§46.3，captain 2026-09-23 裁决；自建一次性库 + 自起 API + 自起 vite + **反向控制**）。
+按"不自造第二套规则"的纪律，我**直接跑它**而不是新写一个几何量测（跑完删库；输出在
+`docs/e2e/t14-layout-375.txt` / `-1440.txt` / `-negative-control.txt`，截图在 `docs/e2e/shots/`）。
+
+判据（引自该文件头部）：桌面 `>=1024px`：`Math.max(documentElement.scrollHeight, body.scrollHeight) <= 视口高`；
+手机 `<1024px`：① `documentElement.scrollWidth <= 视口宽 + 1`（不得横向滚动）② 路由声明的锚元素
+`rect.bottom <= 视口高`（关键内容在首屏内）；**锚点缺失 = FAIL，不静默跳过**。
+
+```text
+$ node apps/web/tools/one-screen-check.mjs --viewport=375x812 --shot=docs/e2e/shots/t14-375
+viewport=375x812 口径=mobile(锚点+无横向滚动) threshold=812 negativeControl=false hermetic
+OK   /                                    height=816  home-pick=355
+OK   /river                               height=1014 river-draw=462 river-drop=794
+OK   /sea                                 height=812  sea-list=497
+OK   /new                                 height=926  new-catalog=713
+OK   /sea/57325751-…                      height=1393 sea-play=554
+OK   /me                                  height=1278 me-bottles=718
+OK   /settings                            height=1089 settings-attribution=811
+OK   /bottles/bc4dc529-…                  height=1443 bottle-play=770 bottle-action=770
+OK   /bottles/6210b1de-…                  height=1409 bottle-play=736 bottle-action=736
+OK   /bottles/5189dae8-…                  height=1425 bottle-record=762
+OK   /bottles/bc4dc529-…/log              height=812
+OK   /nope-does-not-exist                 height=812
+✅ 全部页面达标（手机口径：无横向滚动 + 关键锚点在首屏内）        ← 退出码 0
+
+$ node apps/web/tools/one-screen-check.mjs --viewport=1440x900 --shot=docs/e2e/shots/t14-1440
+viewport=1440x900 口径=desktop(整页高度) threshold=900 negativeControl=false hermetic
+OK   / height=900 · /river height=900 · /sea height=900 · /new height=900 · /sea/d209d17b-… height=900
+OK   /me 900 · /settings 900 · /bottles/eb41a941-… 900 · /bottles/7ac0a9f6-… 900 · /bottles/7bdc9c56-… 900
+OK   /bottles/eb41a941-…/log 900 · /nope-does-not-exist 900
+✅ 全部页面达标（桌面口径：一屏装下）                            ← 退出码 0
+```
+
+**反向控制（证明这条守卫不是"永远点头"）**：
+
+```text
+$ node apps/web/tools/one-screen-check.mjs --viewport=375x812 --negative-control
+FAIL / · /river · /sea · /new · /sea/77289207-… · /me · /settings · /bottles/fe89be96-…
+     · /bottles/7d1b77de-… · /bottles/5ab55282-…        （10 条全红，报出锚点下沿 2355…2811 > 812）
+· 这 2 条路由没有关键锚点、手机口径不按锚点判定：/bottles/fe89be96-…/log、/nope-does-not-exist
+✅ 反向控制成立（锚点断言）：注入 2000px 后 10/12 FAIL ⇒ 守卫不是永远点头   ← 退出码 0
+```
+
+### 【LOW】既有工具的**头部注释与实现不一致**（文档漂移，不是守卫坏了）
+
+`apps/web/tools/one-screen-check.mjs` 头部写：
+
+> 2. **反向控制**：`--negative-control` 往 `body` **最前面**插一个 2000px 高的元素
+>    （整页下移 ⇒ 高度与锚点两条断言都会红），要求**全部路由 FAIL** 且 `exit 1`；
+
+而实现（第 549-559 行）是 `const provedRed = mobile ? failures >= withAnchors.length : failures === routes.length;`
+… `process.exit(provedRed ? 0 : 1)` —— **反向控制"成立"时退出码是 0**（0 = 这项元检查通过），
+且手机口径的判据是"**有锚点的路由**全红"（`/log` 与 404 页没有关键锚点，本来就不由锚点判定，
+实现会把它们**打印出来**，这一点是对的）。两处不符：
+① `exit 1` ↔ 实现 `exit 0`（**照注释读会把"通过"当成"守卫坏了"**）；
+② "全部路由 FAIL" 在手机口径下**不可能**（2 条无锚点路由）。
+建议把注释改成与实现一致（一行级）。**我没有改**（该工具归 frontend-ds/architect 域，且不在 t14 范围）。
+
+### 本次断点回归的边界（如实标注）
+
+- 三次运行都落在**安静窗口**内（`find apps/web/src apps/web/tools -newermt '2026-09-23 20:04:55'` 为空 ⇒
+  运行期间没有人改前端源码），且这个工具走 **vite dev server** ⇒ HMR 干扰在本次**没有出现**；
+  但机制上它仍在（与 t14 主探针不同：主探针跑生产构建，机制上就没有 HMR）。
+- 它证明的是**几何**（无横向滚动 + 锚点首屏内），**不证明**触控目标尺寸，也不证明真机观感
+  （真机观感仍需录屏/真机）。
+
+---
+
 ## 7. 未完成 / 未验证（不含糊）
 
 | 项 | 状态 | 原因 |
 | --- | --- | --- |
-| **移动端断点回归（375px 等）** | **未执行** | t14 原始范围包含它；本次真浏览器只跑了 1440×900。仓库另有 `apps/web/tools/one-screen-check.mjs`（几何量测）与 `docs/ui-review` 截图证据覆盖 375/1440 —— 但**不是本探针跑的**，我不把它算成本次的证据 |
+| **移动端断点回归（375×812 / 1440×900）** | **已执行，全绿** | 用仓库既有的 `apps/web/tools/one-screen-check.mjs`（12 路由 × 2 断点全达标 + 反向控制成立），见 §6.5。**边界**：它证明几何，不证明触控目标尺寸与真机观感 |
+| **触控目标 ≥44×44px** | **未验证** | `afrexai-ui-design-system` Phase 6 有这条要求，但仓库**没有**任何工具量它；我不自造第二套判据 ⇒ 如实列为未验证。要验需 captain 派单决定是否新增判据 |
 | **WebKit 真录制** | **未验证** | 本机 Playwright WebKit 构建无 `navigator.mediaDevices`（第 5.1 节）。需真机 Safari |
 | **动效观感 / 流畅度** | **未验证** | 需真机录屏或性能采样；本层只证明状态机与真实音频行为 |
 | **Firefox 引擎** | **未执行** | 本机未安装；`WebKit + Chromium` 已满足"至少两个引擎"，未扩到第三个 |
 | **t12 次级特性（留言 / 斩浪 / 举报 / 收藏 / 徽章 / 通知 / 管理员台）** | **未纳入本次真浏览器** | 其 UI 任务 t12 状态为 `failed`（见 team.json），不在 t14 的黄金路径范围；斩浪/举报的**服务端**规则有集成测试与 28 步脚本覆盖 |
-| **间歇红** | **无** | 本次未观察到间歇失败；第 4、5 节的 3 条红**每次都复现**（race-claim 4/4 次浏览器运行、webkit 回放 2/2 次） |
+| **间歇红** | **无** | 本次未观察到间歇失败；第 4、5 节的 3 条红**每次都复现**（race-claim 5/5 次浏览器运行均复现、webkit 回放 2/2 次均失败） |
 
 **没有加任何自动重试**：探针里没有"失败就重试"的代码；唯一的 `waitForFunction` 是**有界等待一个异步条件**
 （等媒体元数据加载完），超时就判红并报出等了多久 —— 这是观测异步状态机的正确方式，不是掩盖失败。
@@ -310,7 +382,7 @@ node D:/music-e2e-probe/claim-race.mjs
 
 ---
 
-## 9. 给 captain 的三件事（需要裁决 / 派单）
+## 9. 给 captain 的四件事（需要裁决 / 派单）
 
 1. **【P0/HIGH】第 4 节：`POST /api/sea/:id/targeted-segment` 抢占失败返回 200 + 摘要，前端静默失败。**
    store 判对了、码也给了，是**路由丢了 `outcome.ok`**（`sea.ts:124-131`，对照 `river.ts:65-71` 的正确写法）。
@@ -321,6 +393,11 @@ node D:/music-e2e-probe/claim-race.mjs
    且**跨引擎回放实测失败**（`canPlayType` 说 `probably`，实际 `err=4`）。是否派单到真机 Safari 复测，
    以及在复测前这条按"M 级风险"还是"待确认"记账，请定。
 
+4. **【LOW，一行级】第 6.5 节末尾的文档漂移**：`apps/web/tools/one-screen-check.mjs` 头部注释写
+   「反向控制…要求**全部路由 FAIL** 且 `exit 1`」，而实现是"反向控制**成立**时 `exit 0`"，
+   且手机口径下"全部路由 FAIL"不可能（2 条无锚点路由）。**照注释读会把"通过"读成"守卫坏了"。**
+   该工具不在 t14 范围、也不归我改，请派给 owner（frontend-ds 或 architect）改一行注释。
+
 **另外**：本次会话我**没有** `agent_teams_*` 工具（本会话可用工具只有 bash / 文件编辑 / skill），
 因此无法 `claim/in_progress/complete` 更新 t14 的任务状态，也无法用 `agent_teams_send_message` 回报 ——
-任务状态需要 captain 代为更新；本报告与 `docs/e2e/t14-browser-run.log` 即为交付物。
+任务状态需要 captain 代为更新；本报告与 `docs/e2e/t14-browser-run.txt` 即为交付物。

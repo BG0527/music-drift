@@ -1,0 +1,19 @@
+[setup] 建一次性数据库（复用 apps/api 的派生 / 迁移 / 种子机制）…
+[setup] 库 music_drift_test_1790165163_7960_1paiye（种子 3 首）· API http://127.0.0.1:59445 · web http://127.0.0.1:59454
+[preflight] 浏览器会话有效：layoutmue24a4k
+viewport=375x812 口径=mobile(锚点+无横向滚动) threshold=812 negativeControl=true hermetic
+FAIL /                                    height=2816 home-pick=2355 ← 锚点 home-pick 下沿 2355 > 812
+FAIL /river                               height=3014 river-draw=2462 river-drop=2794 ← 锚点 river-draw 下沿 2462 > 812；锚点 river-drop 下沿 2794 > 812
+FAIL /sea                                 height=2812 sea-list=2497 ← 锚点 sea-list 下沿 2497 > 812
+FAIL /new                                 height=2926 new-catalog=2713 ← 锚点 new-catalog 下沿 2713 > 812
+FAIL /sea/77289207-9f77-4bfa-b6e7-ee5e689dea6c height=3393 sea-play=2554 ← 锚点 sea-play 下沿 2554 > 812
+FAIL /me                                  height=3278 me-bottles=2718 ← 锚点 me-bottles 下沿 2718 > 812
+FAIL /settings                            height=3089 settings-attribution=2811 ← 锚点 settings-attribution 下沿 2811 > 812
+FAIL /bottles/fe89be96-12e2-4f12-a4fc-ad4812afc087 height=3443 bottle-play=2770 bottle-action=2770 ← 锚点 bottle-play 下沿 2770 > 812；锚点 bottle-action 下沿 2770 > 812
+FAIL /bottles/7d1b77de-3905-41e0-8cda-dc8088d8b3a0 height=3409 bottle-play=2736 bottle-action=2736 ← 锚点 bottle-play 下沿 2736 > 812；锚点 bottle-action 下沿 2736 > 812
+FAIL /bottles/5ab55282-7949-4be0-82f8-4fa682e9d573 height=3425 bottle-record=2762 ← 锚点 bottle-record 下沿 2762 > 812
+OK   /bottles/fe89be96-12e2-4f12-a4fc-ad4812afc087/log height=2812 
+OK   /nope-does-not-exist                 height=2812 
+[teardown] 删库 music_drift_test_1790165163_7960_1paiye → 已删除
+· 这 2 条路由没有关键锚点、手机口径不按锚点判定：/bottles/fe89be96-12e2-4f12-a4fc-ad4812afc087/log、/nope-does-not-exist
+✅ 反向控制成立（锚点断言）：注入 2000px 后 10/12 FAIL ⇒ 守卫不是永远点头

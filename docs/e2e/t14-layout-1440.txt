@@ -1,0 +1,18 @@
+[setup] 建一次性数据库（复用 apps/api 的派生 / 迁移 / 种子机制）…
+[setup] 库 music_drift_test_1790165130_34224_pysni8（种子 3 首）· API http://127.0.0.1:50316 · web http://127.0.0.1:50323
+[preflight] 浏览器会话有效：layoutmue23ked
+viewport=1440x900 口径=desktop(整页高度) threshold=900 negativeControl=false hermetic
+OK   /                                    height=900  home-pick=383
+OK   /river                               height=900  river-draw=654 river-drop=654
+OK   /sea                                 height=900  sea-list=445
+OK   /new                                 height=900  new-catalog=444
+OK   /sea/d209d17b-2724-4bed-a57e-f7dd36b0c182 height=900  sea-play=522
+OK   /me                                  height=900  me-bottles=541
+OK   /settings                            height=900  settings-attribution=553
+OK   /bottles/eb41a941-0669-4987-a421-aa6992e5a2af height=900  bottle-play=668 bottle-action=668
+OK   /bottles/7ac0a9f6-42fc-4729-928b-67bddc7b23b2 height=900  bottle-play=640 bottle-action=640
+OK   /bottles/7bdc9c56-1333-473d-90ef-e78ffeb97dac height=900  bottle-record=638
+OK   /bottles/eb41a941-0669-4987-a421-aa6992e5a2af/log height=900  
+OK   /nope-does-not-exist                 height=900  
+[teardown] 删库 music_drift_test_1790165130_34224_pysni8 → 已删除
+✅ 全部页面达标（桌面口径：一屏装下）
