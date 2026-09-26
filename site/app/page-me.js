@@ -46,6 +46,10 @@ const MAX_CARDS = 6;
 /** 消息区（`.msgs`）与内袋（`.pocket`）高度固定，行数超了会溢出边框 ⇒ 只画前几行 + 真实余量。 */
 const MAX_MESSAGES = 3;
 const MAX_POCKET_ROWS = 3;
+/** 代号之间的分隔（定稿那一串用的就是它，不新造记号）。 */
+const CODE_SEPARATOR = ' · ';
+/** 量尺量不出来时（框还没布局出来）的**定稿容量**：定稿框 386px 宽、一枚代号约 106px ⇒ 3 枚。 */
+const CODES_FALLBACK_COUNT = 3;
 
 const STATUS_LABEL = {
   DRAFT: '草稿 · 还没投河',
@@ -106,6 +110,42 @@ function layerKinds(item) {
     else kinds.set(index, 'other');
   }
   return kinds;
+}
+
+/**
+ * 代号串：前 `count` 枚按定稿的分隔符连起来，其余折成「+M」（全量在调用处放进 `title`）。
+ */
+function codesText(all, count) {
+  const shown = all.slice(0, count).join(CODE_SEPARATOR);
+  if (count >= all.length) return shown;
+  return `${shown}${CODE_SEPARATOR}+${String(all.length - count)}`;
+}
+
+/**
+ * `.codeslot .field` 是定稿里 30px 高、约 386px 宽的**一格**，而一枚代号（`午夜歌手#042`）约 106px
+ * ⇒ 全部连成一串会溢出到柜格上、压住卡格正文（W5-B 只能在 CSS 里收容成省略号，而收容＝文字仍被裁掉）。
+ * 这里**只画放得下的前 N 枚**，其余用「+M」说清；全量仍在 `title` 里。
+ *
+ * 量尺就是框自己：临时拧成 `nowrap` 逐枚试排，用 `Range` 量这行字的真实宽度（量的是**这一刻真会
+ * 渲染出来的**那份字形，不依赖 overflow 语义），量完立刻还原；量不出来时退回定稿容量，绝不退回"全塞进去"。
+ */
+function fitCodes(field, all) {
+  const available = field.clientWidth;
+  if (available === 0) return codesText(all, Math.min(CODES_FALLBACK_COUNT, all.length));
+  const previous = field.style.whiteSpace;
+  const range = document.createRange();
+  field.style.whiteSpace = 'nowrap';
+  let count = 1;
+  for (let candidate = all.length; candidate >= 1; candidate -= 1) {
+    field.textContent = codesText(all, candidate);
+    range.selectNodeContents(field);
+    if (range.getBoundingClientRect().width <= available) {
+      count = candidate;
+      break;
+    }
+  }
+  field.style.whiteSpace = previous;
+  return codesText(all, count);
 }
 
 async function start() {
@@ -182,7 +222,10 @@ async function start() {
       codeField.textContent = '—';
       codeField.title = '你还没有参与过任何漂流瓶，所以还没有匿名代号。';
     } else {
-      codeField.textContent = codes.map((row) => row.code).join(' · ');
+      // 量之前先等字体就绪：量尺量的就是这一刻的字形，字体没就绪时量出的宽度不是最终宽度。
+      await document.fonts?.ready;
+      const all = codes.map((row) => row.code);
+      codeField.textContent = fitCodes(codeField, all);
       codeField.title = codes.map((row) => `${row.code}（${row.bottleId.slice(0, 8)}）`).join('\n');
     }
   }

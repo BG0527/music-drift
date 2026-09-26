@@ -1110,7 +1110,132 @@ sea 的水线/涟漪/测深线/船队挂同一个 `--wy`；bottle 的四格刻�
 - `pnpm lint`：`✖ 10 problems (0 errors, 10 warnings)`，10 条 warning 全是既有 `no-console`；
   本片只新增 CSS，未改任何 JS（lint 也不扫 CSS）。
 - `node tools/site-guard.mjs` → `✓ 全部通过`（`GUARD_EXIT=0`）；它已经认了 10 个补丁（§27 的机制）。
+- **最后一次 CSS 写入之后的复跑**（`site/patches/*.css` 末次改动 01:29，本节的门在 01:31 之后重跑）：
+
+  | 门 | 结果 |
+  | --- | --- |
+  | `pnpm lint` | `✖ 10 problems (0 errors, 10 warnings)` · `LINT_EXIT=0` |
+  | `node tools/site-guard.mjs` | `✓ 全部通过` · `GUARD_EXIT=0` |
+  | `.tmp-w5b/probe.mjs --mode=patch` | `结论：0 项不达标` · `PATCH_EXIT=0` |
+  | `.tmp-w5b/probe.mjs --mode=real` | `结论：0 项不达标` · `REAL_EXIT=0` |
+  | `node tools/probe-fit.mjs --port=5197` | `✓ 80 / ✗ 0` · `结论：0 项不达标` · `PROBEFIT_EXIT=0` |
+  | `.tmp-w5b/regress.mjs --vp=1440x900` | `0 页与定稿不一致` · `REGRESS_EXIT=0` |
+  | 收工端口 | `listen 5197 = 0` |
+
+- `pnpm -r test`（同刻复跑）：`packages/shared 250/250 ✓`、`apps/api 180/180 ✓`、
+  **`apps/web 21 failed / 770 passed`（`TEST_EXIT=1`）**。那 21 条全部落在 `apps/web`（React 侧）：
+  `water-motif.test.tsx` 报"`sea-page.tsx` / `sea-detail-page.tsx` 没有接水域母题、只有 2 个页面用 drift"，
+  `sea-page.test.tsx` 13 条、`design-discipline.test.ts` 2 条。**与本节无耦合的两条证据**：
+  ① `sea-page.tsx` 的写入时间是 01:34:13、它的测试文件 01:34:26 —— 都在我复跑 `pnpm -r test` 的同一分钟里被改（并发写者）；
+  ② `apps/web/**` 对 `site/patches` / `/patches/` 的引用 **0 命中**（本片交付物是静态站 `site/` 的 CSS，
+  `apps/web` 是另一个 Vite 应用，读不到它）。⇒ 这 21 条是 `apps/web` 水域母题那一波的**在飞半成品**，不是本片的回归。
 - **未验到的部分**：① 浏览器只有 Chromium；② 视口只覆盖宽高比 ≥ 1.6（§20 的五档），
   竖屏/极窄窗（864×1180、1024×1366）只做了推理未实测（`404` 的 `--k` 在宽高比 < 1.6 时会把画布左右各裁一点，
   内容外框仍在视口内，但没跑过）；③ 审核台的"工单态"是用冻结稿结构克隆模拟的，不是真的管理员会话；
   ④ `prefers-reduced-motion`、触屏、缩放 125%/150% 未覆盖。
+
+---
+
+## 29. W11 执行记录：匿名代号格的溢出修掉 + 最终验收（2026-09-27）
+
+> 归属：W11。修的是 §28.6 第 1 条（W5-B 只能收容、留给 captain 派活的真缺陷）。**只写两个文件**
+> （`site/app/page-me.js`、`site/patches/me.css`）+ 本节；`site/*.html`/其它 `site/app/**`/其它补丁/`tools/**` 一字未改。
+
+### 29.1 改动文件与 sha256（LF、无 CRLF、无 emoji：4 字节 UTF-8 起始字节 = 0）
+
+| 文件 | sha256 | 字节 |
+| --- | --- | --- |
+| `site/app/page-me.js` | `5fa7ee4e8f6e5bcc4ceeb540acb27f2e20046838ea1e6223135875b43eb62737` | 26701 |
+| `site/patches/me.css` | `057639c2dfa8842980e617d5c66e12c7caed4f5c93f39f8646d60a466c465c9f` | 8864 |
+
+### 29.2 缺陷、修法与取舍
+
+**缺陷（红跑实测，demo 账号、19 枚代号）**：`.codeslot .field` 盒 `[975,263,1363,293]`（clientWidth=386），
+`page-me.js` 把全部代号连成一串 ⇒ 文字自然排版 **7 行、占高 154px、底部到 y=418**，与柜格
+`li:nth-child(5) p.t` 的正文墨迹**相交 2950px²**（定稿的框没有 `overflow`）。W5-B 的
+`html .codeslot .field { overflow:hidden; white-space:nowrap; text-overflow:ellipsis }` 只是把它
+**收容**成一行省略号 —— 文字仍被裁掉，缺陷没有消失。
+
+**修法**：`page-me.js` 新增 `codesText()` / `fitCodes()`：
+
+- 量尺**就是那个框自己**：临时把它拧成 `nowrap`，用 `Range` 量这一行字的**真实宽度**，从总枚数往下
+  逐枚试排，第一份放得下的就是答案（不依赖 `overflow` 语义、不依赖字体是否已加载 —— 量的是这一刻真会渲染的字形）；
+- 放不下的折成**「+M」**，分隔符沿用定稿那串本来用的 `' · '`；放不下的极端情况保底画 1 枚；
+  框还没布局出来（`clientWidth === 0`）时退回**定稿容量 3 枚**（定稿框 386px、一枚代号实测约 106px），
+  **绝不退回"全塞进去"**；量之前 `await document.fonts?.ready`。
+- 全量可读性：`title` 仍是**全部 N 枚**（`代号（bottleId 前 8 位）`，逐行）。不用 `innerHTML`，全走 `textContent`。
+- 为什么不做滚动/展开：这框定稿只有 30px 高，滚动条比省略号更难看，而且要动 `site/me.html`（不许改）；
+  为什么不换更窄的分隔符或缩字号：那会自造视觉，违背 §20 的"字号留 px"与 §28 的既有 token。
+
+**收容撤掉**：`me.css` 里那三条收容规则**删除**，原地留一条注释写明"W11 已由 JS 修掉
+（`page-me.js` 的 `fitCodes()`），这里不再收容，免得两处互相掩盖"。⇒ 现在 `.field` 的
+`overflow/white-space/text-overflow` 回到定稿的 `visible/visible/clip`（实测）。
+
+**N 的实测值**：demo 现在有 19 枚 ⇒ 画前 **2** 枚 + 「+17」（墨迹 `[976,264,1243,286]`，右沿 1243 ≤ 框右沿 1363）。
+
+### 29.3 红 → 绿
+
+判据件 `.tmp-w11/codeslot-check.mjs`（真登录 `demo/SeaDrift2026` → 等 `pageReady=me`；判据与"收容是否生效"无关）：
+A1 `scrollWidth<=clientWidth` · A1b 自然排版 1 行且墨迹右沿不出框 · A2 `scrollHeight<=clientHeight` ·
+A3 与柜格正文墨迹相交=0 · A4 显示数+M=总数且文本形状=`code( · code)* · +M` · A5 `title` 是全量 · A6 画的是接口给的**前 N 枚**。
+
+**红（改前，`.tmp-w11/red.log`，`EXIT=1`）**：
+
+```
+✗ A1 横向放得下 scrollWidth=2248 <= clientWidth=386
+✓ A2 纵向放得下 scrollHeight=28 <= clientHeight=28
+✓ A3 不压第一格正文 相交面积=0
+✓ A4 记账：显示 + 「+M」== 总数 形状=true 显示=19 +0 总=19
+诊断（临时中和 W5-B 收容）：文字占高=154px、行盒=7 行、墨迹=[976,264,1350,418] ⇒ 与柜格正文相交=2950px²（li:nth-child(5) p.t）
+结论：5/6 通过（✗ A1 横向放得下）
+```
+
+**绿（改后，`.tmp-w11/green-final.log`，`EXIT=0`）**：
+
+```
+✓ A1 横向放得下 scrollWidth=386 <= clientWidth=386
+✓ A1b 自然排版就是一行且不出框 行盒=1 墨迹右沿=1243 <= 框右沿=1363
+✓ A2 纵向放得下 scrollHeight=28 <= clientHeight=28
+✓ A3 不压第一格正文 相交面积=0
+✓ A4 记账：显示 + 「+M」== 总数 形状=true 显示=2 +17 总=19 text="星河摆渡#797 · 灯塔守望#929 · +17"
+✓ A5 title 里是全量 title 行数=19 含全部代号=true
+✓ A6 画的是接口给的**前 N 枚** 显示顺序=["星河摆渡#797","灯塔守望#929"]
+2560x1400：client=386x28 scroll=386x28 text="星河摆渡#797 · 灯塔守望#929 · +17" 与第一格相交=0
+结论：7/7 通过
+```
+
+### 29.4 最终验收（冻结字节）
+
+**写者边界**：`site/app/**` + `site/patches/**` 共 28 个文件的 `sha256 + mtime` 快照存
+`.tmp-w11/freeze-before.txt` / `freeze-after.txt`，验收七条跑完逐个字节相同（`FREEZE_OK`）⇒
+本节的数字跑在**同一份字节**上。除本片改的两个文件外，其余文件 mtime 全部早于本片开工
+（最晚是 `settings.css` 01:29:17）；`Get-CimInstance Win32_Process` 里没有 `sync-site.mjs` 之类的站点写者
+（只有 5 个 23:0x 留下的旧站点服务器与 01:36 另一个 agent 的 `eslint` 进程）⇒ 验收期间**无人改站点**。
+
+| # | 命令 | 原始输出（截） | 退出码 |
+| --- | --- | --- | --- |
+| 1 | `node tools/site-guard.mjs` | `· 发布版补丁：10 个（…）`／`✓ 全部通过` | `GUARD_EXIT=0` |
+| 2 | `node tools/probe-fit.mjs --port=5198` | `✓` 80 行 / `✗` 0 行；`结论：0 项不达标`；含 `me mode=流体 不滚动=是 被裁内容=0 铺满=div.platter`（8 档全绿） | `PROBEFIT_EXIT=0` |
+| 3 | `node tools/walkthrough.mjs --port=5198` | `PASS=32 FAIL=0`；`结论：0 项不达标` | `WALKTHROUGH_EXIT=0` |
+| 4 | `pnpm lint` | `✖ 10 problems (0 errors, 10 warnings)`（10 条全是既有 `no-console`；无 `apps/web` 红） | `LINT_EXIT=0` |
+| 5 | `pnpm -r typecheck` | `packages/shared typecheck: Done` / `apps/api typecheck: Done` / `apps/web typecheck: Done` | `TYPECHECK_EXIT=0` |
+| 6 | `pnpm -r test` | `packages/shared 22 files / 250 tests passed`、`apps/api 19 files / 180 tests passed`、`apps/web 68 files / 789 passed \| 1 skipped` | `TEST_EXIT=0` |
+| 7 | 真账号 `demo` 打开 `/me.html`，`read_image` 亲看 1440×900 与 2560×1400（`.tmp-w11/shots/`） | 代号格一行、框内不出格、页面无异常 | — |
+
+`pnpm -r test` 里的 `apps/web` **本次是绿的**：§28.7 记录的那 21 条红是 01:34 那位并发写者
+（`sea-page.tsx` 水域母题那一波）的**在飞半成品**，01:38 本片复跑时他已经改完 ⇒ 与 `site/**` 无关
+（`apps/web/**` 对 `/patches/` 0 命中；它是另一个 Vite 应用，读不到静态站的补丁）。**apps/web 仍归那位写者**，本片未碰。
+
+### 29.5 残留与自评（本片的弱点）
+
+1. **N 是"这一刻字形"的实测值**：字体没就绪已用 `document.fonts.ready` 兜住，但"加载完之后字体被
+   回退替换"（系统字体缺失/缩放）没验；那种情况下文字可能多出/少占几个像素。
+2. **只验了 Chromium**；宽度档覆盖 `probe-fit` 的 8 档（含 dpr1.5/2），**竖屏/极窄窗没跑**
+   （逻辑上框变窄只会让 N 掉到 1 枚并继续配「+M」，不会溢出，但没实测过）。
+3. **A3 的墨迹判据只看文字行盒**：代号格与柜格的**装饰件**（柱管、环形、压暗层）是否相交没判
+   （它们的 z-index 在文字之下，且定稿里这两块本来就叠在一起）。
+4. **红绿件依赖别人的脚手架**：`.tmp-w11/codeslot-check.mjs` `import` 了 `.tmp-w5b/lib.mjs`
+   （`loadPlaywright`/`signIn`/`waitReady`）；若那份被删，判据不可直接复跑（判据本身很短，可照抄重建）。
+5. **`prettier --check` 对 `site/**` 本来就红**（未改动的 `site/app/dom.js`、`site/patches/404.css` 同样红）
+   ⇒ 本片沿用周边风格，没做全仓格式化（那是一个与缺陷无关的大 diff）。`pnpm lint`（eslint）是本仓的门，为 0 error。
+6. 代号**标题里带 `#`**（`午夜歌手#042`），所以「+M」的 M 是"没画出来的枚数"，不是"第 M 枚"。

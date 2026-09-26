@@ -101,15 +101,11 @@ html .codeslot {
   top: clamp(172px, calc(224 * var(--u)), 224px);
 }
 
-/* 匿名代号那一栏：page-me.js 会把**全部**代号连成一串塞进这 30px 的框里（实测 17 枚 = 132px 高），
- * 定稿的框没有 overflow，于是文字溢到柜格上、压住第一格卡片的正文（1440×900 下就能看到）。
- * 补丁把它收回自己的框内（单行 + 省略号；全量仍在 title 属性里）—— 这是**收容**不是修源，
- * 源在 site/app/page-me.js（本片不许改 JS），已作为发现上报。 */
-html .codeslot .field {
-  overflow: hidden;
-  white-space: nowrap;
-  text-overflow: ellipsis;
-}
+/* 匿名代号那一栏（`.codeslot .field`）：W5-B 曾在这里用 `overflow:hidden; white-space:nowrap;
+ * text-overflow:ellipsis` **收容** page-me.js 把全部代号连成一串塞进这 30px 框造成的溢出
+ * （定稿的框没有 overflow ⇒ 文字会溢到柜格上、压住卡格正文；1440×900 下就看得见）。
+ * W11 已由 JS 修掉（`page-me.js` 的 `fitCodes()`：只画放得下的前 N 枚 + 「+M」，全量仍在 title 里）
+ * ⇒ 这里**不再收容**：留着它就会掩盖 JS 的回归（哪天又"全塞进去"也看不出来）。 */
 
 /* ── 柜：回到文档流 ─────────────────────────────────────────────────────── */
 html .crate {
