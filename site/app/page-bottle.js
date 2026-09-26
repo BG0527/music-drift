@@ -21,10 +21,11 @@
  *   GET /api/songs              → 第 N 段的**曲库预设时长**（t29：录音时长以它为准，±2s）。
  *                                 前端不许写死 20 秒，也不该猜：曲库是唯一权威来源。
  */
-import { ApiError, get, post } from './api.js';
+import { ApiError, get, post, postAudio } from './api.js';
 import { clearState, el, hide, on, q, qa, show, showError, showLoading, showRequestFailure } from './dom.js';
 import { currentUser } from './session.js';
 import { definePage } from './page.js';
+import { countdown, startRecordingSession } from './recorder.js';
 
 /** 三条水路：文案取自冻结 HTML，这里只做「标签 ↔ 服务端枚举」定位。 */
 const RESOLUTION_ROWS = [
@@ -40,12 +41,6 @@ const STATUS_LABELS = {
   SEA: '已在公海',
   DAMAGED: '接力链已断',
 };
-
-/**
- * 与 `@music-drift/shared/audio` 的 `RECORDER_MIME_PREFERENCES` 同序。
- * 浏览器不能 import TS，所以这是本页唯一一份本地副本；契约改了要同步这里（已写进汇报）。
- */
-const RECORDER_MIME_PREFERENCES = ['audio/webm;codecs=opus', 'audio/webm', 'audio/mp4', 'audio/ogg;codecs=opus'];
 
 /** 点踩门槛的兜底（内核 `DEFAULT_POLICY.dislikeListenRatioThreshold`）；正常路径一律用服务端返回值。 */
 const DISLIKE_THRESHOLD_FALLBACK = 0.8;
@@ -74,9 +69,9 @@ const state = {
   /** 段号 → 该段在瓶身上的 `.cap` 节点（投票后就地改数字）。 */
   capNodes: new Map(),
   reportTimer: null,
-  recorder: null,
+  /** 正在进行的录音会话（`recorder.js` 的 `startRecordingSession` 句柄）；不在录音时为 null。 */
+  session: null,
   recordTimer: null,
-  mediaStream: null,
 };
 
 // ------------------------------------------------------------------ 渲染小工具
@@ -715,116 +710,52 @@ function presetDurationFor(index) {
   return typeof duration === 'number' && duration > 0 ? duration : null;
 }
 
-function recordingSupport() {
-  const secure =
-    window.isSecureContext === true || ['localhost', '127.0.0.1', '[::1]', '::1'].includes(location.hostname);
-  if (!secure) {
-    return '录音只在 https:// 或 localhost 下可用（http 页面里浏览器不开放麦克风）。请用 http://localhost:5182 打开本页。';
-  }
-  if (navigator.mediaDevices?.getUserMedia === undefined) {
-    return '这个浏览器没有麦克风接口（getUserMedia），请换较新的 Chrome / Edge / Safari。';
-  }
-  if (window.MediaRecorder === undefined) {
-    return '这个浏览器不支持 MediaRecorder，录不了音，请换较新的 Chrome / Edge / Safari。';
-  }
-  return null;
-}
-
-function pickRecorderMime() {
-  for (const candidate of RECORDER_MIME_PREFERENCES) {
-    try {
-      if (MediaRecorder.isTypeSupported(candidate)) return candidate;
-    } catch {
-      // 探测失败按不支持处理，继续试下一个候选
-    }
-  }
-  return null;
-}
-
-function describeMicrophoneError(error) {
-  switch (error?.name) {
-    case 'NotAllowedError':
-    case 'PermissionDeniedError':
-    case 'SecurityError':
-      return '麦克风权限被拒绝：点地址栏左侧的锁形图标 → 网站设置 → 麦克风改为「允许」，然后重试。';
-    case 'NotFoundError':
-    case 'DevicesNotFoundError':
-      return '没有检测到可用的麦克风：接上或启用麦克风后重试。';
-    case 'NotReadableError':
-    case 'TrackStartError':
-      return '麦克风被其他程序占用了：关掉正在用麦克风的程序（会议 / 录音工具）再重试。';
-    default:
-      return '麦克风启动失败：检查系统权限与设备后重试。';
-  }
-}
-
 async function startRecording() {
   const gapIndex = state.detail?.missingSegmentIndexes[0] ?? null;
   if (gapIndex === null) return;
-  const unsupported = recordingSupport();
-  if (unsupported !== null) {
-    announce(unsupported);
-    showError(unsupported);
-    return;
-  }
-  const mime = pickRecorderMime();
-  if (mime === null) {
-    const message = '这个浏览器不支持任何可用的录音容器（webm / mp4 / ogg），录不了音。';
-    announce(message);
-    showError(message);
-    return;
-  }
-
-  let stream;
-  try {
-    stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-  } catch (error) {
-    const message = describeMicrophoneError(error);
-    announce(`录音失败：${message}`);
-    showError(message);
-    return;
-  }
-
-  state.mediaStream = stream;
-  const chunks = [];
-  const recorder = new MediaRecorder(stream, { mimeType: mime });
-  state.recorder = recorder;
-  const startedAt = performance.now();
-  const targetMs = presetDurationFor(gapIndex) ?? 20_000;
+  /** 这一段该录多久：唯一来源是曲库（`GET /api/songs`）；拿不到权威预设就只报已录时长、不自动停。 */
+  const targetMs = presetDurationFor(gapIndex);
   const cta = q('.gapBox .cta');
 
-  recorder.ondataavailable = (event) => {
-    if (event.data.size > 0) chunks.push(event.data);
-  };
-  recorder.onstop = () => {
-    if (state.recordTimer !== null) {
-      window.clearInterval(state.recordTimer);
-      state.recordTimer = null;
-    }
-    for (const track of stream.getTracks()) track.stop();
-    state.mediaStream = null;
-    state.recorder = null;
-    void uploadRecording({
-      blob: new Blob(chunks, { type: mime }),
-      elapsedMs: Math.round(performance.now() - startedAt),
-      gapIndex,
-    });
-  };
+  const started = await startRecordingSession({
+    onStop: ({ blob, durationMs }) => {
+      if (state.recordTimer !== null) {
+        window.clearInterval(state.recordTimer);
+        state.recordTimer = null;
+      }
+      state.session = null;
+      void uploadRecording({ blob, elapsedMs: durationMs, gapIndex });
+    },
+  });
+  if (!started.ok) {
+    announce(started.message);
+    showError(started.message);
+    return;
+  }
 
-  recorder.start(1000);
+  state.session = started.session;
   state.recordTimer = window.setInterval(() => {
-    const elapsed = performance.now() - startedAt;
-    const left = Math.max(0, Math.round((targetMs - elapsed) / 1000));
-    announce(`正在录音…已录 ${formatClock(elapsed)}，还剩 ${left} 秒（录满自动停）。`);
-    if (cta !== null) cta.textContent = `停止上传（还剩 ${left} 秒）`;
-    if (elapsed >= targetMs) recorder.stop();
+    const progress = countdown(targetMs, started.session.elapsedMs());
+    const elapsed = formatClock(progress.elapsedMs);
+    if (progress.remainingSeconds === null) {
+      announce(`正在录音…已录 ${elapsed}（这一段没有曲库预设，不会自动停）。`);
+    } else {
+      announce(`正在录音…已录 ${elapsed}，还剩 ${progress.remainingSeconds} 秒（录满自动停）。`);
+      if (cta !== null) cta.textContent = `停止上传（还剩 ${progress.remainingSeconds} 秒）`;
+    }
+    if (progress.reached) started.session.stop();
   }, 250);
 }
 
 function stopRecording() {
-  if (state.recorder !== null && state.recorder.state === 'recording') state.recorder.stop();
+  state.session?.stop();
 }
 
+/**
+ * 上传这一段：走共享层 `api.postAudio`（**原始二进制协议**：Content-Type = 音频 MIME、
+ * body = 字节流、时长走 `x-audio-duration-ms`）。页内自写 `fetch` 会绕过共享层的
+ * 401 统一处置（跳登录页）与错误信封解析，所以这里不再自己拼头、不再自己解析。
+ */
 async function uploadRecording({ blob, elapsedMs, gapIndex }) {
   announce('正在上传这一段…');
   const cta = q('.gapBox .cta');
@@ -833,7 +764,9 @@ async function uploadRecording({ blob, elapsedMs, gapIndex }) {
     cta.textContent = '正在上传…';
   }
   try {
-    const response = await postSegmentAudio(blob, elapsedMs);
+    const response = await postAudio(`/api/bottles/${encodeURIComponent(state.id)}/segments`, blob, {
+      durationMs: elapsedMs,
+    });
     clearState();
     state.detail = response.bottle;
     render();
@@ -852,49 +785,6 @@ async function uploadRecording({ blob, elapsedMs, gapIndex }) {
       again.textContent = `重录第 ${gapIndex} 段`;
     }
   }
-}
-
-/**
- * 录音上传是**原始二进制协议**（Content-Type = 音频 MIME、时长走 `x-audio-duration-ms`、
- * 附言走 `?note=`），而共享层 `api.js` 的 `post()` 会把 body 做 JSON 序列化
- * ⇒ 这一处只能直接用 `fetch`（同源、带 cookie），错误照旧按契约信封抛 `ApiError`。
- * 共享层缺 `postBinary()` —— 已写进汇报，等 captain 决定是否补。
- */
-async function postSegmentAudio(blob, durationMs) {
-  const headers = {
-    'content-type': blob.type === '' ? 'application/octet-stream' : blob.type,
-    'x-audio-duration-ms': String(Math.round(durationMs)),
-  };
-  const response = await fetch(`/api/bottles/${encodeURIComponent(state.id)}/segments`, {
-    method: 'POST',
-    credentials: 'same-origin',
-    headers,
-    body: blob,
-  });
-  const text = await response.text();
-  let parsed = null;
-  try {
-    parsed = text === '' ? null : JSON.parse(text);
-  } catch {
-    parsed = null;
-  }
-  if (!response.ok) {
-    const envelope = parsed !== null && typeof parsed === 'object' ? parsed.error : null;
-    const violations = Array.isArray(envelope?.violations) ? envelope.violations : [];
-    throw new ApiError(
-      typeof envelope?.message === 'string' && envelope.message !== ''
-        ? envelope.message
-        : `上传失败（HTTP ${response.status}）。`,
-      {
-        status: response.status,
-        code: typeof violations[0]?.code === 'string' ? violations[0].code : null,
-        violations,
-        body: parsed ?? text,
-      },
-    );
-  }
-  if (parsed === null) throw new ApiError('服务返回的不是 JSON。', { status: response.status, kind: 'parse' });
-  return parsed;
 }
 
 // ------------------------------------------------------------------ 运行时面板（留言 / 举报）
@@ -1104,7 +994,7 @@ function wire() {
   const cta = q('.gapBox .cta');
   if (cta !== null) {
     on(cta, 'click', () => {
-      if (state.recorder !== null) stopRecording();
+      if (state.session !== null) stopRecording();
       else void startRecording();
     });
   }
