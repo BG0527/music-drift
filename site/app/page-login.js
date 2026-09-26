@@ -4,7 +4,7 @@
  * 端点（`docs/deploy-plan-html.md` §7.3）：`POST /api/auth/login`（**200**）、
  * `POST /api/auth/register`（**201**，注册即登录）、`POST /api/auth/logout`、`GET /api/auth/me`。
  *
- * ★ 本页最重要的一处偏离（captain 已裁决，见 `docs/impl-plan-record-v1.md` §4「方案 C」）：
+ * 重要：本页最重要的一处偏离（captain 已裁决，见 `docs/impl-plan-record-v1.md` §4「方案 C」）：
  *   设计稿与 `_LANGUAGE.md` §3 要求「账号 · 密码」两项，但**冻结的后端**是
  *   `LoginRequestSchema = { email, password }`、`RegisterRequestSchema = { handle, email, password }`
  *   （`packages/shared/src/contracts/auth.ts`），且 `POST /api/auth/login` 只按 email 查用户
