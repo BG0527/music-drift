@@ -19,6 +19,7 @@
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 
+const FINAL = process.argv.includes('--final');
 const DIR = 'docs/ui-review/design-explore';
 const IMPORTS = [
   'lxgwwenkai-regular.css',
@@ -130,15 +131,22 @@ for (const name of files) {
   const png = html.replace(/\.html$/, '.png');
   let pngNote = '无 png';
   let pngOk;
+  let sizeOk = false; // 只看像素尺寸
   try {
     const size = pngSize(png);
     const fresh = statSync(png).mtimeMs >= statSync(html).mtimeMs;
-    pngOk = size?.width === 2880 && size?.height === 1800 && fresh;
-    pngNote = `${String(size?.width)}x${String(size?.height)}${fresh ? '' : ' 但比 html 旧（未重画）'}`;
+    sizeOk = size?.width === 2880 && size?.height === 1800;
+    pngOk = sizeOk && fresh;
+    pngNote = `${String(size?.width)}x${String(size?.height)}${fresh ? '' : '（比 html 旧）'}`;
   } catch {
     pngOk = false;
   }
-  checks.push(['png 2880x1800 且不旧于 html', pngOk, pngNote]);
+  // 并发期间"png 比 html 旧"是竞态而非缺陷（渲染 11 个文件约 90s，队友随时会保存 html），
+  // 所以默认只警告；收工后跑 --final 才把它当失败。
+  const freshOk = !pngNote.includes('比 html 旧');
+  checks.push(['png 尺寸 2880x1800', sizeOk, pngNote]);
+  if (FINAL || freshOk) checks.push(['png 不旧于 html（--final 强制）', pngOk, pngNote]);
+  else console.log(`   ⚠ ${name} 的 png 比 html 旧（并发期间视为待重画，不计失败；--final 会强制）`);
 
   const debts = KNOWN_DEBTS.get(name) ?? [];
   const bads = checks.filter(([label, ok]) => !ok && !debts.includes(label));
