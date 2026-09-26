@@ -2,7 +2,7 @@
 <html lang="zh-CN">
   <head>
     <meta charset="utf-8" />
-    <title>F1 · 手记河道 Field Notebook</title>
+    <title>F1b · 手记河道 v2（斜向 · 拓宽 · 双引导线）</title>
     <style>
       @import url('/node_modules/.pnpm/lxgw-wenkai-webfont@1.7.0/node_modules/lxgw-wenkai-webfont/lxgwwenkai-regular.css');
       @import url('/node_modules/.pnpm/lxgw-wenkai-webfont@1.7.0/node_modules/lxgw-wenkai-webfont/lxgwwenkai-bold.css');
@@ -14,28 +14,25 @@
       body { position:relative; overflow:hidden; background:var(--ink); color:var(--paper);
         font-family:'LXGW WenKai',serif; -webkit-font-smoothing:antialiased; }
       svg.canvas { position:absolute; inset:0; width:1440px; height:900px; }
-
-      /* 覆盖层：与 SVG 同一坐标系（1440×900，1:1），所以坐标可以直接对得上 */
       .ov { position:absolute; }
-      h1 { font-size:86px; font-weight:700; line-height:1; transform:rotate(-1.6deg); letter-spacing:.01em; }
-      .sub { margin-top:16px; font-size:16px; line-height:1.9; color:var(--muted); }
-      .note { font-size:13px; line-height:1.85; color:rgba(243,249,250,.72); }
+      h1 { font-size:82px; font-weight:700; line-height:1; transform:rotate(-1.4deg); }
+      .sub { margin-top:14px; font-size:15.5px; line-height:1.9; color:var(--muted); }
+      .note { font-size:13px; line-height:1.85; color:rgba(243,249,250,.74); }
       .note b { color:var(--glass); font-weight:400; }
-  .cat { font-family:Quattrocento,serif; font-size:11px; letter-spacing:.24em; color:rgba(243,249,250,.5); }
-      .mono { font-family:ui-monospace,Consolas,monospace; }
+      .cat { font-family:Quattrocento,serif; font-size:11px; letter-spacing:.24em; color:rgba(243,249,250,.5); }
 
-      /* 圆形主按钮（保留既有形态：圆 + 三圈涟漪环），只是现在骑在河上 */
       .port { position:absolute; display:grid; place-items:center; cursor:pointer; }
       .port i { position:absolute; border-radius:50%; }
-      .port .r1 { inset:0; border:1px solid rgba(127,209,217,.42); }
-      .port .r2 { inset:22px; border:1px solid rgba(127,209,217,.5); }
-      .port .r3 { inset:44px; border:1px solid rgba(224,246,249,.55); }
-      .port .core { position:relative; width:96px; height:96px; border-radius:50%; display:grid; place-items:center; gap:2px;
-        font-family:inherit; font-size:15px; font-weight:700; letter-spacing:.14em; color:#fff; }
-      .port .core span { font-size:9.5px; letter-spacing:.28em; opacity:.75; font-weight:400; }
-      .draw .core { background:linear-gradient(180deg,#12798d,#0b4e5b); box-shadow:0 0 0 7px rgba(6,28,37,.85), 0 10px 30px rgba(0,0,0,.45); }
-      .cast .core { background:linear-gradient(180deg,#d2502f,#9d4125); box-shadow:0 0 0 7px rgba(6,28,37,.85), 0 10px 30px rgba(0,0,0,.45); }
-      .port .cap { position:absolute; top:calc(100% + 10px); width:260px; text-align:center; font-size:12.5px; color:var(--muted); line-height:1.7; }
+      .port .r1 { inset:0; border:1px solid rgba(127,209,217,.4); }
+      .port .r2 { inset:24px; border:1px solid rgba(127,209,217,.48); }
+      .port .r3 { inset:48px; border:1px solid rgba(224,246,249,.55); }
+      .port .core { position:relative; width:104px; height:104px; border-radius:50%; display:grid; place-items:center; gap:2px;
+        font-family:inherit; font-size:16px; font-weight:700; letter-spacing:.14em; color:#fff; }
+      .port .core span { font-size:10px; letter-spacing:.28em; opacity:.75; font-weight:400; }
+      .draw .core { background:linear-gradient(180deg,#12798d,#0b4e5b); box-shadow:0 0 0 8px rgba(6,28,37,.8), 0 12px 34px rgba(0,0,0,.45); }
+      .cast .core { background:linear-gradient(180deg,#d2502f,#9d4125); box-shadow:0 0 0 8px rgba(6,28,37,.8), 0 12px 34px rgba(0,0,0,.45); }
+      .port .cap { position:absolute; width:280px; font-size:12.5px; line-height:1.75; color:var(--muted);
+        text-shadow:0 1px 8px rgba(3,20,26,.95); }
       .port .cap b { display:block; color:var(--paper); font-size:15px; margin-bottom:3px; }
 
       footer { position:absolute; left:76px; right:76px; bottom:30px; display:flex; align-items:center; gap:10px; }
@@ -49,149 +46,133 @@
     <svg class="canvas" viewBox="0 0 1440 900">
       <defs>
         <pattern id="ruled" width="1440" height="30" patternUnits="userSpaceOnUse">
-          <line x1="0" y1="29.5" x2="1440" y2="29.5" stroke="rgba(127,209,217,.07)" stroke-width="1" />
+          <line x1="0" y1="29.5" x2="1440" y2="29.5" stroke="rgba(127,209,217,.06)" stroke-width="1" />
         </pattern>
         <linearGradient id="riverG" x1="0" y1="0" x2="1" y2="0">
-          <stop offset="0" stop-color="#0b3a4a" stop-opacity=".85" />
-          <stop offset=".28" stop-color="#2a9db1" stop-opacity=".55" />
-          <stop offset=".5" stop-color="#8fe0e8" stop-opacity=".38" />
-          <stop offset=".72" stop-color="#2a9db1" stop-opacity=".55" />
-          <stop offset="1" stop-color="#0b3a4a" stop-opacity=".85" />
+          <stop offset="0" stop-color="#0a3242" stop-opacity=".8" />
+          <stop offset=".3" stop-color="#2a9db1" stop-opacity=".5" />
+          <stop offset=".5" stop-color="#9fe6ed" stop-opacity=".34" />
+          <stop offset=".72" stop-color="#2a9db1" stop-opacity=".5" />
+          <stop offset="1" stop-color="#0a3242" stop-opacity=".8" />
         </linearGradient>
-        <linearGradient id="fade" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0" stop-color="#061c25" stop-opacity=".85" />
-          <stop offset=".22" stop-color="#061c25" stop-opacity=".1" />
-          <stop offset=".8" stop-color="#061c25" stop-opacity="0" />
-          <stop offset="1" stop-color="#03131a" stop-opacity=".7" />
+        <linearGradient id="fade" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0" stop-color="#061c25" stop-opacity=".7" />
+          <stop offset=".35" stop-color="#061c25" stop-opacity="0" />
+          <stop offset="1" stop-color="#03131a" stop-opacity=".55" />
         </linearGradient>
-        <radialGradient id="vig" cx=".5" cy=".42" r=".7">
-          <stop offset=".55" stop-color="#000" stop-opacity="0" />
+        <radialGradient id="vig" cx=".5" cy=".45" r=".72">
+          <stop offset=".5" stop-color="#000" stop-opacity="0" />
           <stop offset="1" stop-color="#000" stop-opacity=".5" />
         </radialGradient>
+        <!-- 河道：自右上流向左下，两条岸各自蜿蜒（拓宽到 ~320–440px，两个按钮都落在水里） -->
         <clipPath id="riverClip">
-          <path d="M895 -20 C 915 130, 826 270, 796 410 C 766 550, 682 672, 642 812 C 626 862, 610 898, 600 920 L 768 920 C 776 908, 788 890, 800 852 C 830 712, 902 584, 924 436 C 946 288, 1020 140, 985 -20 Z" />
+          <path d="M1146 -20 C 1120 90, 1040 150, 946 214 C 852 278, 806 336, 764 402 C 722 468, 646 520, 552 578 C 458 636, 392 712, 344 800 C 314 856, 250 890, 196 920 L 452 920 C 512 884, 566 838, 610 776 C 654 714, 736 654, 830 592 C 924 530, 996 470, 1036 400 C 1076 330, 1108 250, 1160 176 C 1240 66, 1330 -30, 1372 -140 Z" />
         </clipPath>
       </defs>
 
       <rect width="1440" height="900" fill="#061c25" />
       <rect width="1440" height="900" fill="url(#ruled)" />
 
-      <!-- 月光落在水面上：顺着河道拉出的一条细长反光，而不是一坨光斑 -->
-      <ellipse cx="948" cy="180" rx="128" ry="420" fill="rgba(207,233,238,.07)" transform="rotate(13 948 180)" />
-      <ellipse cx="936" cy="70" rx="40" ry="150" fill="rgba(247,242,228,.12)" transform="rotate(13 936 70)" />
+      <!-- 月光顺着河道拉出的一条细长反光（压低强度：原来像第二条河） -->
+      <ellipse cx="1010" cy="230" rx="120" ry="400" fill="rgba(207,233,238,.035)" transform="rotate(-52 1010 230)" />
+      <ellipse cx="1120" cy="90" rx="46" ry="150" fill="rgba(247,242,228,.07)" transform="rotate(-52 1120 90)" />
 
-      <!-- 河道本体：一条自上而下流来的水（单支路 —— 只有这一条） -->
-      <path d="M895 -20 C 915 130, 826 270, 796 410 C 766 550, 682 672, 642 812 C 626 862, 610 898, 600 920 L 768 920 C 776 908, 788 890, 800 852 C 830 712, 902 584, 924 436 C 946 288, 1020 140, 985 -20 Z"
+      <!-- 河道本体 -->
+      <path d="M1146 -20 C 1120 90, 1040 150, 946 214 C 852 278, 806 336, 764 402 C 722 468, 646 520, 552 578 C 458 636, 392 712, 344 800 C 314 856, 250 890, 196 920 L 452 920 C 512 884, 566 838, 610 776 C 654 714, 736 654, 830 592 C 924 530, 996 470, 1036 400 C 1076 330, 1108 250, 1160 176 C 1240 66, 1330 -30, 1372 -140 Z"
         fill="url(#riverG)" />
 
       <g clip-path="url(#riverClip)">
-        <!-- 水面等高线：贴着河岸走，越靠岸越密 -->
+        <!-- 只留三条岸线等高线：水面上不再堆细节 -->
         <g fill="none" stroke="rgba(216,243,246,.2)" stroke-width="1">
-          <path d="M880 40 C 856 210, 792 380, 716 548 C 668 658, 606 780, 528 900" />
-          <path d="M900 60 C 880 214, 822 378, 748 542 C 702 646, 646 768, 574 890" />
-          <path d="M944 90 C 932 232, 880 380, 812 536 C 770 630, 720 752, 656 880" />
-          <path d="M976 130 C 972 258, 928 386, 868 530 C 830 622, 786 744, 730 872" />
+          <path d="M1128 -20 C 1102 88, 1026 148, 932 210 C 838 272, 792 330, 750 396 C 708 462, 632 514, 538 572 C 444 630, 380 706, 332 794 C 304 848, 242 884, 190 914" />
+          <path d="M1160 -20 C 1140 84, 1072 140, 986 202 C 900 264, 856 322, 814 388 C 772 454, 700 508, 606 566 C 512 624, 444 700, 396 788 C 368 842, 306 880, 252 910" />
+          <path d="M1080 -20 C 1060 92, 992 156, 902 220 C 812 284, 768 342, 726 406 C 684 470, 606 522, 514 580 C 422 638, 358 714, 312 802 C 286 856, 226 890, 176 918" />
         </g>
-        <!-- 主流的漂移虚线（水在流） -->
-        <g fill="none" stroke="rgba(243,249,250,.5)" stroke-width="2.4" stroke-linecap="round" stroke-dasharray="18 30">
-          <path d="M930 20 C 908 210, 848 388, 782 552 C 742 650, 690 780, 616 910" />
+        <!-- 一条主流漂移虚线：水在流 -->
+        <path d="M1116 -20 C 1092 96, 1014 156, 922 220 C 830 284, 784 342, 742 406 C 700 470, 626 522, 532 580 C 438 638, 376 714, 330 802 C 304 856, 244 890, 200 916"
+          fill="none" stroke="rgba(243,249,250,.45)" stroke-width="2.4" stroke-linecap="round" stroke-dasharray="20 34" />
+        <!-- 少量水面反光 -->
+        <g fill="rgba(240,252,254,.45)">
+          <circle cx="1090" cy="120" r="2.2" /><circle cx="950" cy="252" r="1.8" /><circle cx="840" cy="380" r="2" />
+          <circle cx="700" cy="480" r="1.7" /><circle cx="596" cy="586" r="2.1" /><circle cx="470" cy="700" r="1.8" />
         </g>
-        <g fill="none" stroke="rgba(243,249,250,.26)" stroke-width="2" stroke-linecap="round" stroke-dasharray="10 44">
-          <path d="M874 40 C 856 200, 800 380, 736 540 C 700 634, 652 764, 584 900" />
-        </g>
-        <!-- 水面反光的碎点 -->
-        <g fill="rgba(240,252,254,.5)">
-          <circle cx="900" cy="150" r="2.2" /><circle cx="946" cy="196" r="1.6" /><circle cx="864" cy="236" r="2" />
-          <circle cx="906" cy="300" r="1.7" /><circle cx="842" cy="352" r="2.4" /><circle cx="880" cy="420" r="1.8" />
-          <circle cx="812" cy="478" r="2.1" /><circle cx="760" cy="540" r="1.6" /><circle cx="800" cy="600" r="2.2" />
-          <circle cx="716" cy="656" r="1.7" /><circle cx="678" cy="726" r="2.3" /><circle cx="640" cy="800" r="1.9" />
-        </g>
-        <!-- 水下的礁石（带一圈浅色晕） -->
-        <g>
-          <ellipse cx="820" cy="470" rx="54" ry="20" fill="rgba(3,19,26,.55)" />
-          <ellipse cx="820" cy="466" rx="40" ry="13" fill="rgba(127,209,217,.22)" />
-          <ellipse cx="700" cy="690" rx="66" ry="24" fill="rgba(3,19,26,.6)" />
-          <ellipse cx="700" cy="684" rx="50" ry="16" fill="rgba(127,209,217,.2)" />
-          <ellipse cx="900" cy="240" rx="34" ry="12" fill="rgba(3,19,26,.45)" />
-        </g>
-        <!-- 一片沙洲 -->
-        <path d="M846 356 C 892 344, 936 356, 950 374 C 934 392, 878 396, 846 384 Z" fill="rgba(207,233,238,.16)" />
-        <!-- 浮叶 -->
-        <g fill="rgba(199,69,44,.55)">
-          <path d="M742 520 c 10 -6 20 0 18 8 c -2 8 -16 10 -22 2 z" />
-          <path d="M812 640 c 9 -5 18 0 16 7 c -2 7 -14 9 -20 2 z" />
-        </g>
-        <g fill="rgba(127,209,217,.4)">
-          <path d="M880 560 c 8 -5 16 0 15 6 c -2 7 -13 9 -18 2 z" />
-        </g>
+        <!-- 两块礁石（压低对比：原来读成一个"洞"） -->
+        <ellipse cx="880" cy="352" rx="48" ry="17" fill="rgba(3,19,26,.3)" />
+        <ellipse cx="880" cy="348" rx="34" ry="11" fill="rgba(127,209,217,.14)" />
+        <ellipse cx="560" cy="672" rx="58" ry="20" fill="rgba(3,19,26,.32)" />
+        <ellipse cx="560" cy="666" rx="42" ry="13" fill="rgba(127,209,217,.13)" />
       </g>
 
-      <!-- 两条岸线 + 岸上的手刻感知细节 -->
-      <path d="M895 -20 C 915 130, 826 270, 796 410 C 766 550, 682 672, 642 812 C 626 862, 610 898, 600 920" fill="none" stroke="rgba(216,243,246,.5)" stroke-width="1.8" />
-      <path d="M985 -20 C 1020 140, 946 288, 924 436 C 902 584, 830 712, 800 852 C 788 890, 776 908, 768 920" fill="none" stroke="rgba(216,243,246,.42)" stroke-width="1.8" />
-      <!-- 岸线外侧的短刻线（像手绘的晕线） -->
-      <g stroke="rgba(127,209,217,.28)" stroke-width="1.2" stroke-linecap="round">
-        <path d="M866 40 l-16 -6" /><path d="M846 130 l-17 -5" /><path d="M820 226 l-17 -4" /><path d="M790 322 l-18 -3" />
-        <path d="M756 420 l-18 -2" /><path d="M716 520 l-18 -1" /><path d="M676 616 l-18 0" /><path d="M630 716 l-18 2" />
-        <path d="M582 812 l-18 4" /><path d="M976 60 l17 -6" /><path d="M968 156 l18 -5" /><path d="M950 254 l18 -4" />
-        <path d="M930 350 l18 -3" /><path d="M920 450 l18 -2" /><path d="M930 548 l18 -1" /><path d="M952 646 l18 1" />
-        <path d="M976 744 l18 3" /><path d="M998 840 l18 5" />
+      <!-- 两条岸线 -->
+      <path d="M1146 -20 C 1120 90, 1040 150, 946 214 C 852 278, 806 336, 764 402 C 722 468, 646 520, 552 578 C 458 636, 392 712, 344 800 C 314 856, 250 890, 196 920"
+        fill="none" stroke="rgba(216,243,246,.46)" stroke-width="1.8" />
+      <path d="M1372 -140 C 1330 -30, 1240 66, 1160 176 C 1108 250, 1076 330, 1036 400 C 996 470, 924 530, 830 592 C 736 654, 654 714, 610 776 C 566 838, 512 884, 452 920"
+        fill="none" stroke="rgba(216,243,246,.38)" stroke-width="1.8" />
+      <!-- 岸线外侧的手绘短刻线 -->
+      <g stroke="rgba(127,209,217,.24)" stroke-width="1.2" stroke-linecap="round">
+        <path d="M1128 40 l-18 -8" /><path d="M1052 122 l-19 -6" /><path d="M958 194 l-20 -4" />
+        <path d="M860 282 l-20 -2" /><path d="M778 372 l-20 -1" /><path d="M700 448 l-20 1" />
+        <path d="M606 530 l-20 2" /><path d="M512 606 l-20 3" /><path d="M418 692 l-20 5" />
+        <path d="M340 790 l-20 6" /><path d="M1196 210 l17 -12" /><path d="M1108 318 l18 -10" />
+        <path d="M1010 412 l18 -8" /><path d="M912 506 l18 -6" /><path d="M812 596 l18 -4" />
+        <path d="M706 686 l18 -2" /><path d="M618 782 l18 0" /><path d="M520 872 l18 2" />
       </g>
-      <!-- 右岸：小树剪影（左岸的芦苇与木桩曾落在水面上，已删） -->
-      <g fill="#03131a" opacity=".92">
-        <path d="M1044 250 l14 -34 l14 34 z" /><path d="M1048 250 h20 v6 h-20 z" />
-        <path d="M1104 384 l12 -28 l12 28 z" /><path d="M1108 384 h16 v5 h-16 z" />
-        <path d="M1010 704 l16 -40 l16 40 z" /><path d="M1014 704 h24 v7 h-24 z" />
+      <!-- 右岸岸上：小树剪影 -->
+      <g fill="#03131a" opacity=".9">
+        <path d="M1216 84 l15 -38 l15 38 z" /><path d="M1220 84 h22 v6 h-22 z" />
+        <path d="M1290 236 l13 -32 l13 32 z" /><path d="M1294 236 h18 v5 h-18 z" />
+        <path d="M764 726 l16 -40 l16 40 z" /><path d="M768 726 h24 v7 h-24 z" />
       </g>
-      <!-- 河上的一只小舟（远景，佐证"河在被人用"） -->
-      <g transform="translate(878 226) rotate(-8)" opacity=".8">
-        <path d="M-26 0 C -12 10, 12 10, 26 0 C 16 14, -16 14, -26 0 Z" fill="#03131a" />
-        <path d="M0 -16 L 0 2" stroke="#03131a" stroke-width="2" />
-        <path d="M0 -16 L 16 -6 L 0 -2 Z" fill="rgba(243,249,250,.5)" />
+      <!-- 河上远处一只小舟 -->
+      <g transform="translate(1150 130) rotate(-46)" opacity=".75">
+        <path d="M-24 0 C -11 9, 11 9, 24 0 C 15 13, -15 13, -24 0 Z" fill="#03131a" />
+        <path d="M0 -15 L 0 2" stroke="#03131a" stroke-width="2" />
+        <path d="M0 -15 L 15 -6 L 0 -2 Z" fill="rgba(243,249,250,.45)" />
       </g>
 
       <rect width="1440" height="900" fill="url(#fade)" />
       <rect width="1440" height="900" fill="url(#vig)" />
     </svg>
 
-    <!-- ── 覆盖层 ── -->
-    <div class="ov" style="left:76px; top:96px; width:560px">
+    <!-- 两条手绘引导线：一条指向捞取，一条指向投下（上一条被删掉了，这版都留着） -->
+    <svg class="ov" style="left:0; top:0" width="1440" height="900" viewBox="0 0 1440 900">
+      <path d="M416 706 C 470 700, 520 686, 566 668" fill="none" stroke="rgba(243,249,250,.42)" stroke-width="1.6" />
+      <path d="M556 660 L 572 664 L 560 678" fill="none" stroke="rgba(243,249,250,.55)" stroke-width="1.6" stroke-linecap="round" />
+      <path d="M948 214 C 990 218, 1020 226, 1052 238" fill="none" stroke="rgba(243,249,250,.42)" stroke-width="1.6" />
+      <path d="M1040 232 L 1056 240 L 1042 252" fill="none" stroke="rgba(243,249,250,.55)" stroke-width="1.6" stroke-linecap="round" />
+    </svg>
+
+    <!-- 覆盖层 -->
+    <div class="ov" style="left:76px; top:92px; width:520px">
       <div class="cat">MDB—0001 · 河道观测手记</div>
-      <h1 style="margin-top:14px">暖流河道</h1>
+      <h1 style="margin-top:12px">暖流河道</h1>
       <p class="sub">河只有一条。瓶子顺水往下，一次只在一个人的手里 ——<br />谁捞到，谁就接下一句。</p>
     </div>
 
-    <!-- 手写旁注：故意歪着放、故意不跟标题对齐 -->
-    <div class="note ov" style="left:96px; top:352px; width:250px; transform:rotate(-2.4deg)">
+    <div class="note ov" style="left:120px; top:672px; width:270px; transform:rotate(-2.2deg)">
       <b>① 捞取</b><br />河里漂着别人的半句歌。点一下，它顺水到你手上。
     </div>
-    <div class="note ov" style="left:120px; top:530px; width:250px; transform:rotate(1.8deg)">
-      <b>② 投下</b><br />你录一段，封进瓶子，放进上游 —— 交给下一个陌生人。
+    <div class="note ov" style="left:700px; top:150px; width:230px; transform:rotate(1.6deg)">
+      <b>② 投下</b><br />你录一段，封进瓶子，放进上游。
     </div>
-    <!-- 手绘标识：只留一条短引导线（长箭头会变成乱线；红笔圈太随意，已删） -->
-    <svg class="ov" style="left:0; top:0" width="1440" height="900" viewBox="0 0 1440 900">
-      <path d="M352 372 C 430 388, 500 452, 556 520" fill="none" stroke="rgba(243,249,250,.42)" stroke-width="1.6" />
-      <path d="M548 508 L 562 524 L 542 522" fill="none" stroke="rgba(243,249,250,.55)" stroke-width="1.6" stroke-linecap="round" />
-    </svg>
 
-    <!-- 圆形主按钮：捞（下游，近处）/ 投（上游，远处），等大等权 -->
-    <div class="port draw ov" style="left:640px; top:504px; width:144px; height:144px" role="button" aria-label="捞一个漂流瓶">
+    <!-- 圆形主按钮：两个都在河道里 -->
+    <div class="port draw ov" style="left:508px; top:590px; width:156px; height:156px" role="button" aria-label="捞一个漂流瓶">
       <i class="r1"></i><i class="r2"></i><i class="r3"></i>
       <span class="core">捞取<span>DRAW</span></span>
-      <span class="cap" style="top:calc(100% + 76px)"><b>捞一个漂流瓶</b>捞到即持有：同一时刻，同一条河道上只有你拿着它。</span>
+      <span class="cap" style="left:-108px; top:172px"><b>捞一个漂流瓶</b>捞到即持有：同一时刻，同一条河道上只有你拿着它。</span>
     </div>
-    <div class="port cast ov" style="left:928px; top:248px; width:144px; height:144px" role="button" aria-label="投下一支漂流瓶">
+    <div class="port cast ov" style="left:962px; top:158px; width:156px; height:156px" role="button" aria-label="投下一支漂流瓶">
       <i class="r1"></i><i class="r2"></i><i class="r3"></i>
       <span class="core">投下<span>CAST</span></span>
-      <span class="cap" style="top:calc(100% + 16px)"><b>投下一支漂流瓶</b>选一首歌，录下第 1 段，然后放进上游等一个陌生人接下一棒。</span>
+      <span class="cap" style="left:184px; top:6px"><b>投下一支漂流瓶</b>选一首歌，录下第 1 段，然后放进上游等一个陌生人接下一棒。</span>
     </div>
 
-    <!-- 手记的落款：印 + 编号 -->
-    <div class="ov" style="right:76px; top:150px; text-align:right">
+    <div class="ov" style="right:76px; top:96px; text-align:right">
       <div class="cat" style="letter-spacing:.18em">观测者 · layoutmui6k36v</div>
       <div class="cat" style="margin-top:6px; letter-spacing:.18em">河道只能随机打捞，没有搜索</div>
-      <svg width="74" height="74" viewBox="0 0 74 74" style="margin-top:16px; transform:rotate(6deg)">
-        <circle cx="37" cy="37" r="34" fill="none" stroke="rgba(199,69,44,.85)" stroke-width="2.4" />
+      <svg width="70" height="70" viewBox="0 0 74 74" style="margin-top:16px; transform:rotate(6deg)">
+        <circle cx="37" cy="37" r="33" fill="none" stroke="rgba(199,69,44,.85)" stroke-width="2.4" />
         <path d="M16 32c6-7 12-7 18 0s12 7 18 0" fill="none" stroke="rgba(199,69,44,.9)" stroke-width="3" stroke-linecap="round" />
         <path d="M16 44c6-7 12-7 18 0s12 7 18 0" fill="none" stroke="rgba(199,69,44,.9)" stroke-width="3" stroke-linecap="round" />
       </svg>
