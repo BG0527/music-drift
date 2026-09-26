@@ -136,7 +136,7 @@ for (const name of files) {
   checks.push(['png 2880x1800 且不旧于 html', pngOk, pngNote]);
 
   const bads = checks.filter(([, ok]) => !ok);
-  if (ARCHIVE.has(name)) {
+  if (ARCHIVE.has(name) || name.startsWith('_hist-')) {
     console.log(
       `· ${name.padEnd(30)} 历史稿（已淘汰/被取代，仅存档）${
         bads.length > 0 ? ` · 遗留 ${bads.map(([label]) => label).join(' / ')}` : ''

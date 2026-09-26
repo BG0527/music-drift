@@ -2,7 +2,7 @@
 <html lang="zh-CN">
   <head>
     <meta charset="utf-8" />
-    <title>404 · 划伤跳针（唱片语言）</title>
+    <title>404 · 断流（唱片语言）</title>
     <style>
       @import url('/node_modules/.pnpm/lxgw-wenkai-webfont@1.7.0/node_modules/lxgw-wenkai-webfont/lxgwwenkai-regular.css');
       @import url('/node_modules/.pnpm/lxgw-wenkai-webfont@1.7.0/node_modules/lxgw-wenkai-webfont/lxgwwenkai-bold.css');
@@ -24,15 +24,43 @@
       .glint { position:absolute; inset:0; mix-blend-mode:screen;
         background:linear-gradient(101deg, transparent 28%, rgba(228,247,252,.045) 45%, rgba(228,247,252,.065) 50%, rgba(228,247,252,.028) 55%, transparent 72%); }
       .art { position:absolute; inset:0; }
-      /* 划伤之上是唱片表面：密沟槽整片被这一道划伤横切，所以到伤口处整齐断掉 */
+
+      /* 划伤之上是水路：水在沟槽里流，越接近那道断口越亮 —— 光是在水面上攒起来的 */
       .groove { position:absolute; left:0; right:0; top:0; height:365px;
         background:repeating-radial-gradient(circle at 1500px 1400px, rgba(216,243,246,.1) 0 1px, transparent 1px 15px);
         -webkit-mask-image:radial-gradient(1150px 820px at 1180px 180px, rgba(255,255,255,.95), rgba(255,255,255,.3) 72%);
         mask-image:radial-gradient(1150px 820px at 1180px 180px, rgba(255,255,255,.95), rgba(255,255,255,.3) 72%); }
+      .water { position:absolute; left:0; right:0; top:0; height:365px;
+        background:linear-gradient(180deg, rgba(127,209,217,.04) 0%, rgba(127,209,217,.075) 46%,
+          rgba(160,226,236,.15) 88%, rgba(160,226,236,.2) 100%); }
+      /* 顺槽的水流：短横向划痕，密在断口那一侧 */
+      .flows span { position:absolute; height:1px; background:rgba(203,238,246,.16); }
       /* 沟槽临近伤口处压暗：母版被划开时边缘翘起投下的影 */
       .edge { position:absolute; left:0; right:0; top:327px; height:38px;
         background:linear-gradient(180deg, transparent, rgba(2,8,11,.88)); }
       .wrap { position:absolute; inset:0; z-index:2; }
+
+      /* 水走到这里到头：一条亮线，0 到 878 就没了（878 之后是那道豁口） */
+      .surface { position:absolute; left:0; top:357px; width:880px; height:1px;
+        background:linear-gradient(90deg, rgba(203,238,246,.22) 0%, rgba(203,238,246,.12) 34%,
+          rgba(203,238,246,.3) 62%, rgba(203,238,246,.52) 92%, rgba(203,238,246,.62) 100%); }
+
+      /* 断口往下漏的水：几道细流落进干河床，越落越淡 */
+      .drips span { position:absolute; width:1px;
+        background:linear-gradient(180deg, rgba(203,238,246,.36), rgba(203,238,246,0)); }
+
+      /* 断口以下是干河床：沟槽只剩 150px 的残影，再往下什么都没有 */
+      .ghost { position:absolute; left:0; right:0; top:365px; height:150px;
+        background:repeating-radial-gradient(circle at 1500px 1400px, rgba(216,243,246,.055) 0 1px, transparent 1px 15px);
+        -webkit-mask-image:linear-gradient(180deg, rgba(255,255,255,.5), rgba(255,255,255,0));
+        mask-image:linear-gradient(180deg, rgba(255,255,255,.5), rgba(255,255,255,0)); }
+      /* 干裂的水位痕：曾经有水的地方，现在只剩一道晒干的白印 */
+      .tidewater { position:absolute; left:0; right:0; top:452px; height:1px;
+        background:linear-gradient(90deg, transparent 0%, rgba(246,215,154,.09) 18%, rgba(246,215,154,.05) 58%, transparent 96%); }
+      .bed { position:absolute; left:0; right:0; top:365px; height:420px;
+        background:linear-gradient(180deg, rgba(246,215,154,.035), rgba(5,15,20,0) 58%); }
+      /* 干河床上的裂：只在右半边（左边留给字） */
+      .crack { position:absolute; height:1px; background:rgba(216,243,246,.1); }
 
       .tl { position:absolute; left:76px; top:64px; }
       .status { position:absolute; right:76px; top:58px; font-size:34px; line-height:1; color:rgba(169,199,207,.85); }
@@ -56,15 +84,37 @@
       .links a { font-size:15px; color:var(--glass); text-decoration:underline; text-underline-offset:5px; }
       .links i { display:block; width:1px; height:12px; background:rgba(127,209,217,.45); }
       .pair { display:flex; align-items:center; gap:9px; }
+      /* 那只漂出画外的瓶子底下的一句话 */
+      .drift { position:absolute; left:1128px; top:196px; font-size:12.5px; letter-spacing:.06em; color:var(--muted); }
     </style>
   </head>
   <body>
     <div class="clip">
       <div class="platter"></div>
       <div class="groove"></div>
+      <div class="water"></div>
+
+      <!-- 顺槽的水流：一束束贴着沟槽走的水纹，越靠断口越密 -->
+      <div class="flows">
+        <span style="left:64px; top:96px; width:196px"></span>
+        <span style="left:300px; top:150px; width:132px"></span>
+        <span style="left:96px; top:212px; width:238px"></span>
+        <span style="left:420px; top:238px; width:164px"></span>
+        <span style="left:246px; top:280px; width:288px"></span>
+        <span style="left:600px; top:196px; width:120px"></span>
+        <span style="left:660px; top:268px; width:206px"></span>
+        <span style="left:520px; top:322px; width:150px"></span>
+        <span style="left:760px; top:300px; width:280px; background:rgba(203,238,246,.22)"></span>
+        <span style="left:872px; top:334px; width:300px; background:rgba(203,238,246,.24)"></span>
+        <span style="left:1060px; top:224px; width:212px"></span>
+        <span style="left:928px; top:158px; width:150px"></span>
+        <span style="left:1180px; top:300px; width:240px; background:rgba(203,238,246,.2)"></span>
+        <span style="left:1268px; top:112px; width:172px"></span>
+      </div>
+
       <div class="edge"></div>
 
-      <!-- 划伤：沟槽从画外盘面斜切下来，在这一段被豁开；唱针停在豁口里，后面的沟槽整条往下错了一格 -->
+      <!-- 划伤：沟槽从画外盘面斜切下来，在这一段被豁开；唱针停在豁口里；右边那只瓶已经顺水漂出画外 -->
       <svg class="art" width="1440" height="900" viewBox="0 0 1440 900" fill="none" aria-hidden="true">
         <!-- 划伤本体：细口横穿整页，从画外进来、从画外出去 -->
         <path d="M 0 369 C 160 365, 320 372, 470 367 C 620 362, 760 371, 878 367"
@@ -100,7 +150,45 @@
         <path d="M 1164 387 L 1170 397" stroke="rgba(203,238,246,.6)" stroke-width="1.6" />
         <circle cx="1355" cy="866" r="9" stroke="rgba(228,249,252,.3)" />
         <circle cx="1355" cy="866" r="3.5" fill="rgba(3,17,23,.95)" stroke="rgba(228,249,252,.3)" />
+
+        <!-- 已经被人接走的那只瓶子：正顺水漂出右上角，身后只剩尾迹与两圈散开的涟漪 -->
+        <path d="M 872 338 C 1010 332, 1140 316, 1288 298" stroke="rgba(203,238,246,.2)"
+          stroke-dasharray="7 9" />
+        <ellipse cx="1188" cy="304" rx="46" ry="11" stroke="rgba(203,238,246,.24)" />
+        <ellipse cx="1188" cy="304" rx="78" ry="19" stroke="rgba(203,238,246,.13)" />
+        <ellipse cx="1092" cy="318" rx="30" ry="7.5" stroke="rgba(203,238,246,.15)" />
+        <g transform="rotate(-13 1362 282)">
+          <path d="M 1306 262 L 1382 262 L 1382 272 L 1408 272 L 1408 292 L 1382 292 L 1382 302 L 1306 302 Z"
+            fill="rgba(127,209,217,.1)" stroke="rgba(203,238,246,.4)" />
+          <path d="M 1316 268 L 1316 296" stroke="rgba(228,247,252,.22)" />
+          <rect x="1406" y="269" width="6" height="26" rx="1" fill="rgba(203,238,246,.34)" />
+          <rect x="1412" y="271" width="13" height="22" rx="2" fill="rgba(246,215,154,.46)"
+            stroke="rgba(246,215,154,.66)" />
+        </g>
+        <path d="M 1276 232 L 1302 250" stroke="rgba(203,238,246,.3)" />
       </svg>
+
+      <div class="surface"></div>
+
+      <!-- 断口以下是干河床：沟槽只剩一段残影，再往下什么都没有 -->
+      <div class="ghost"></div>
+      <div class="bed"></div>
+      <span class="tidewater"></span>
+      <div class="crack" style="left:902px; top:506px; width:214px; transform:rotate(-1.6deg)"></div>
+      <div class="crack" style="left:1064px; top:544px; width:236px; transform:rotate(1.4deg)"></div>
+      <div class="crack" style="left:938px; top:596px; width:160px; transform:rotate(-1deg)"></div>
+      <div class="crack" style="left:1156px; top:638px; width:196px; transform:rotate(1.1deg)"></div>
+
+      <!-- 断口往下漏的水：落到干床上的那几道细流 -->
+      <div class="drips">
+        <span style="left:196px; top:370px; height:48px"></span>
+        <span style="left:430px; top:372px; height:34px"></span>
+        <span style="left:566px; top:370px; height:62px"></span>
+        <span style="left:706px; top:372px; height:40px"></span>
+        <span style="left:832px; top:372px; height:28px"></span>
+        <span style="left:1012px; top:372px; height:54px"></span>
+        <span style="left:1252px; top:374px; height:38px"></span>
+      </div>
       <div class="glint"></div>
     </div>
 
@@ -115,6 +203,8 @@
 
       <p class="hurt">这条水路不存在</p>
       <span class="cat skip">跳针</span>
+
+      <p class="drift">瓶子已经被别人接走</p>
 
       <p class="sub">这个地址可能是旧的，或者瓶子已经被别人接走、链接失效了。</p>
       <a class="back" href="#">回首页</a>
