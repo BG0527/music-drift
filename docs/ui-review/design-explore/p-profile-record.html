@@ -2,7 +2,7 @@
 <html lang="zh-CN">
   <head>
     <meta charset="utf-8" />
-    <title>我的 · 唱片柜（record-v1）</title>
+    <title>我的 · 沉积剖面（record-v1）</title>
     <style>
       @import url('/node_modules/.pnpm/lxgw-wenkai-webfont@1.7.0/node_modules/lxgw-wenkai-webfont/lxgwwenkai-regular.css');
       @import url('/node_modules/.pnpm/lxgw-wenkai-webfont@1.7.0/node_modules/lxgw-wenkai-webfont/lxgwwenkai-bold.css');
@@ -39,31 +39,64 @@
       h1 { margin-top:14px; font-size:58px; font-weight:700; line-height:1; letter-spacing:.02em; }
       .sub { margin-top:14px; font-size:15px; line-height:1.85; color:var(--muted); max-width:740px; }
 
-      /* ── 唱片柜：只看得到内袋的上半截，下半截沉在柜里 ──── */
+      /* ── 沉积剖面：五支瓶子各是一根竖直的沉积柱（柜里＝水下的海底剖面）。
+             层位自下而上＝第 1 段到第 4 段（越老越靠下、越暗）。
+             写满了的段位＝实心的沉积层（层上刻着段号；我唱的那一层右侧一道珊瑚刻记）；
+             还没人唱的段位＝柱子上头还没落下来的水腔（冷色＋气泡＋一只还漂着的瓶子）；
+             被斩浪删掉的那一段＝层位还在、内容被挖走（虚线的珊瑚边）。
+             **整页没有一条横贯的水线**：水只在柱子里，而且五根柱子各自不同高。 ─────── */
       .crate { position:absolute; left:76px; right:76px; top:250px; }
       .chead { display:flex; align-items:baseline; }
       .chead h2 { font-size:17px; font-weight:700; }
       .chead .cat { margin-left:auto; }
       .csub { margin-top:8px; font-size:13px; line-height:1.6; color:var(--muted); max-width:660px; }
-      /* 柜口就是一道水面：作品已完整的被抬到水线之上（靠岸），
-         还缺段的半沉在水里（还在漂）。水位线因此是一条可读的判据，不是纹理。 */
       .window { position:relative; margin-top:20px; height:260px; overflow:hidden;
         border:1px solid rgba(243,249,250,.16); border-radius:2px; background:rgba(3,17,23,.42);
-        display:flex; align-items:flex-end; }
-      .window ul { list-style:none; display:flex; width:100%; height:320px; }
-      .window li { position:relative; flex:1; height:320px; display:flex; flex-direction:column; justify-content:flex-end;
-        padding:46px 18px 36px; background:rgba(243,249,250,.035); border-right:1px solid rgba(243,249,250,.1); }
+        display:flex; }
+      .window ul { list-style:none; display:flex; width:100%; }
+      .window li { position:relative; flex:1; overflow:hidden;
+        padding:16px 12px 14px 68px; border-right:1px solid rgba(243,249,250,.1); }
       .window li:last-child { border-right:0; }
-      .window li.landed { height:286px; }
-      .water { position:absolute; left:0; right:0; bottom:0; height:24px; z-index:2; pointer-events:none;
-        background:linear-gradient(180deg, rgba(127,209,217,.13), rgba(127,209,217,.035));
-        border-top:1px solid rgba(203,238,246,.34); }
-      .water i { position:absolute; border-radius:50%; border-top:1px solid rgba(203,238,246,.16); }
-      .water i:nth-child(1) { left:72px; right:46%; top:7px; height:7px; }
-      .water i:nth-child(2) { left:40%; right:86px; top:14px; height:6px; }
-      .bottle { position:absolute; right:18px; bottom:20px; z-index:3; transform:rotate(-12deg); }
-      .rip { position:absolute; right:8px; bottom:18px; width:58px; height:8px; border-radius:50%;
-        border-top:1px solid rgba(203,238,246,.22); z-index:3; }
+
+      /* 柱：50px 宽的沉积管，四条层位各 65px */
+      .lay { position:absolute; left:1px; top:0; width:50px; height:260px; }
+      .lay i { position:absolute; left:0; width:50px; display:block; }
+      .b1 { bottom:0; height:65px; }
+      .b2 { bottom:65px; height:65px; }
+      .b3 { bottom:130px; height:65px; }
+      .b4 { bottom:195px; height:65px; }
+      .sd { border-top:1px solid rgba(243,249,250,.16); }
+      .sd.b1 { background:linear-gradient(180deg, rgba(246,215,154,.10), rgba(243,249,250,.02)); }
+      .sd.b2 { background:linear-gradient(180deg, rgba(246,215,154,.13), rgba(243,249,250,.035)); }
+      .sd.b3 { background:linear-gradient(180deg, rgba(246,215,154,.17), rgba(243,249,250,.05)); }
+      .sd.b4 { background:linear-gradient(180deg, rgba(246,215,154,.21), rgba(243,249,250,.065)); }
+      .sd::before { content:''; position:absolute; left:6px; right:6px; bottom:13px; height:1px; background:rgba(243,249,250,.09); }
+      .sd.mine::after { content:''; position:absolute; right:3px; top:6px; bottom:6px; width:2px; background:rgba(212,85,58,.78); }
+      /* 水腔：还没落下来的段位（段号还刻着，只是那一层是空的） */
+      .wt { background:linear-gradient(180deg, rgba(127,209,217,.20), rgba(127,209,217,.07)); }
+      .wt.b4 { border-top:1px solid rgba(203,238,246,.20); }
+      .wt::before { content:''; position:absolute; left:12px; bottom:14px; width:5px; height:5px; border-radius:50%; border:1px solid rgba(203,238,246,.6); }
+      .wt::after { content:''; position:absolute; left:30px; bottom:34px; width:3px; height:3px; border-radius:50%; border:1px solid rgba(203,238,246,.46); }
+      /* 被斩浪删掉的那一段：段号还刻着，内容被挖走了 */
+      .cut { border-top:1px dashed rgba(212,85,58,.68); background:rgba(212,85,58,.06); }
+      .cut::before { content:''; position:absolute; left:6px; right:6px; top:17px; height:1px; background:rgba(212,85,58,.3); }
+      /* 沉积面：水下的那一面，是一道弧，不是直线 */
+      .iface { position:absolute; left:1px; width:50px; height:10px; border-radius:50%; border-top:1px solid rgba(203,238,246,.44); }
+      .iface::before { content:''; position:absolute; left:4px; right:4px; top:4px; height:10px; border-radius:50%; border-top:1px solid rgba(203,238,246,.18); }
+      .if130 { bottom:130px; }
+      .if195 { bottom:195px; }
+      .no { position:absolute; left:6px; top:24px; font-family:Quattrocento,serif; font-size:10px; color:rgba(243,249,250,.55); }
+      .no.ghost { color:rgba(203,238,246,.4); }
+      .cut .no { color:rgba(212,85,58,.85); }
+      .float { position:absolute; left:14px; z-index:3; }
+      .f200 { bottom:192px; }
+      .f133 { bottom:124px; }
+      /* 文字压在暗色渐变上：柱子在左，文字在右，互不打架 */
+      .veil { position:absolute; left:52px; right:0; top:0; bottom:0; border-left:1px solid rgba(243,249,250,.13);
+        background:linear-gradient(90deg, rgba(3,17,23,.86), rgba(3,17,23,.93)); }
+      .txt { position:relative; z-index:2; }
+      .flask { display:block; transform:rotate(-16deg); }
+
       .r1 { display:flex; align-items:center; gap:9px; }
       .slot { font-family:Quattrocento,serif; font-size:10.5px; letter-spacing:.1em; color:rgba(243,249,250,.5); }
       .role { padding:2px 8px; border-radius:2px; font-size:11.5px; letter-spacing:.04em;
@@ -78,7 +111,7 @@
       /* ── 内袋：从柜里抽出来，压在柜口上。中心孔是纸被挖掉的一块，
             透出来的标签盘还没印字 —— 这张唱片上不存在"你的代号" ─────── */
       .bleed { position:absolute; inset:0; overflow:hidden; z-index:5; pointer-events:none; }
-      .sleeve { position:absolute; right:26px; top:16px; width:470px; height:336px; border-radius:2px;
+      .sleeve { position:absolute; right:26px; top:8px; width:470px; height:296px; border-radius:2px;
         border:1px solid rgba(243,249,250,.18);
         background:linear-gradient(158deg, rgba(243,249,250,.085), rgba(243,249,250,.022) 62%, rgba(243,249,250,.055)); }
       .sleeve .stop { position:absolute; left:30px; top:16px; }
@@ -100,7 +133,7 @@
       .codeslot { position:absolute; left:30px; right:50px; top:224px; }
       .codeslot .field { margin-top:8px; height:30px; border:1px solid rgba(243,249,250,.2); border-radius:2px; }
 
-      /* ── 柜下：左边消息条，右边两个内袋口（收藏 / 徽章） ────── */
+      /* ── 剖面下：左边消息条，右边两个内袋口（收藏 / 徽章） ────── */
       .bottom { position:absolute; left:76px; right:76px; top:596px; height:288px; }
       .msgs { position:absolute; left:0; top:0; width:624px; }
       .msgs h2 { font-size:17px; font-weight:700; }
@@ -168,54 +201,96 @@
         <p class="csub">我发起的、以及我唱过一段的瓶子都会在这里（按最近活跃排序，时间线来自服务端）。</p>
         <div class="window">
           <ul>
-            <li class="landed">
-              <div class="r1"><span class="slot">01</span><span class="role mine">我发起的</span></div>
-              <p class="t">占位曲目 · 一</p>
-              <p class="d">已录 4 / 4 段</p>
-              <p class="d">我唱的：第 1 段</p>
-              <p class="d ok">全部段位都有人唱过</p>
-              <p class="lk"><span>去看这个瓶子</span><span>漂流日志</span></p>
+            <li>
+              <span class="lay" aria-hidden="true">
+                <i class="b1 sd mine"><b class="no">1</b></i>
+                <i class="b2 sd"><b class="no">2</b></i>
+                <i class="b3 sd"><b class="no">3</b></i>
+                <i class="b4 sd"><b class="no">4</b></i>
+              </span>
+              <span class="veil" aria-hidden="true"></span>
+              <div class="txt">
+                <div class="r1"><span class="slot">01</span><span class="role mine">我发起的</span></div>
+                <p class="t">占位曲目 · 一</p>
+                <p class="d">已录 4 / 4 段</p>
+                <p class="d">我唱的：第 1 段</p>
+                <p class="d ok">全部段位都有人唱过</p>
+                <p class="lk"><span>去看这个瓶子</span><span>漂流日志</span></p>
+              </div>
             </li>
             <li>
-              <div class="r1"><span class="slot">02</span><span class="role">我接唱的</span></div>
-              <p class="t">占位曲目 · 二</p>
-              <p class="d">已录 3 / 4 段</p>
-              <p class="d">我唱的：第 2 段</p>
-              <p class="d warn">缺第 4 段</p>
-              <p class="lk"><span>去看这个瓶子</span><span>漂流日志</span></p>
-              <svg class="bottle" width="22" height="34" viewBox="0 0 22 34" fill="none" aria-hidden="true"><rect x="7.2" y="1.2" width="7.6" height="5" rx="2" fill="rgba(246,215,154,.5)"/><path d="M8.4 6.4v4.4M13.6 6.4v4.4" stroke="rgba(203,238,246,.5)" stroke-width="1.1"/><rect x="4.2" y="10.8" width="13.6" height="21.4" rx="4" fill="rgba(127,209,217,.1)" stroke="rgba(203,238,246,.58)" stroke-width="1.2"/><rect x="7.4" y="14.6" width="7.2" height="13.6" rx="2" fill="rgba(246,215,154,.2)" stroke="rgba(246,215,154,.45)" stroke-width="1"/></svg>
-              <i class="rip"></i>
+              <span class="lay" aria-hidden="true">
+                <i class="b1 sd mine"><b class="no">1</b></i>
+                <i class="b2 sd"><b class="no">2</b></i>
+                <i class="b3 sd"><b class="no">3</b></i>
+                <i class="b4 wt"><b class="no ghost">4</b></i>
+                <i class="iface if195"></i>
+              </span>
+              <svg class="float flask f200" width="18" height="28" viewBox="0 0 22 34" fill="none" aria-hidden="true"><rect x="7.2" y="1.2" width="7.6" height="5" rx="2" fill="rgba(246,215,154,.62)"/><path d="M8.4 6.4v4.4M13.6 6.4v4.4" stroke="rgba(203,238,246,.62)" stroke-width="1.1"/><rect x="4.2" y="10.8" width="13.6" height="21.4" rx="4" fill="rgba(127,209,217,.16)" stroke="rgba(203,238,246,.72)" stroke-width="1.2"/><rect x="7.4" y="14.6" width="7.2" height="13.6" rx="2" fill="rgba(246,215,154,.24)" stroke="rgba(246,215,154,.55)" stroke-width="1"/></svg>
+              <span class="veil" aria-hidden="true"></span>
+              <div class="txt">
+                <div class="r1"><span class="slot">02</span><span class="role">我接唱的</span></div>
+                <p class="t">占位曲目 · 二</p>
+                <p class="d">已录 3 / 4 段</p>
+                <p class="d">我唱的：第 2 段</p>
+                <p class="d warn">缺第 4 段</p>
+                <p class="lk"><span>去看这个瓶子</span><span>漂流日志</span></p>
+              </div>
             </li>
             <li>
-              <div class="r1"><span class="slot">03</span><span class="role">我接唱的</span></div>
-              <p class="t">占位曲目 · 三</p>
-              <p class="d">已录 2 / 4 段</p>
-              <p class="d">我唱的：第 2 段</p>
-              <p class="d warn">缺第 3、4 段</p>
-              <p class="lk"><span>去看这个瓶子</span><span>漂流日志</span></p>
-              <svg class="bottle" width="22" height="34" viewBox="0 0 22 34" fill="none" aria-hidden="true"><rect x="7.2" y="1.2" width="7.6" height="5" rx="2" fill="rgba(246,215,154,.5)"/><path d="M8.4 6.4v4.4M13.6 6.4v4.4" stroke="rgba(203,238,246,.5)" stroke-width="1.1"/><rect x="4.2" y="10.8" width="13.6" height="21.4" rx="4" fill="rgba(127,209,217,.1)" stroke="rgba(203,238,246,.58)" stroke-width="1.2"/><rect x="7.4" y="14.6" width="7.2" height="13.6" rx="2" fill="rgba(246,215,154,.2)" stroke="rgba(246,215,154,.45)" stroke-width="1"/></svg>
-              <i class="rip"></i>
-            </li>
-            <li class="landed">
-              <div class="r1"><span class="slot">04</span><span class="role">我接唱的</span></div>
-              <p class="t">夜航</p>
-              <p class="d">已录 4 / 4 段</p>
-              <p class="d">我唱的：第 4 段</p>
-              <p class="d ok">全部段位都有人唱过</p>
-              <p class="lk"><span>去看这个瓶子</span><span>漂流日志</span></p>
+              <span class="lay" aria-hidden="true">
+                <i class="b1 sd"><b class="no">1</b></i>
+                <i class="b2 sd mine"><b class="no">2</b></i>
+                <i class="b3 wt"><b class="no ghost">3</b></i>
+                <i class="b4 wt"><b class="no ghost">4</b></i>
+                <i class="iface if130"></i>
+              </span>
+              <svg class="float flask f133" width="18" height="28" viewBox="0 0 22 34" fill="none" aria-hidden="true"><rect x="7.2" y="1.2" width="7.6" height="5" rx="2" fill="rgba(246,215,154,.62)"/><path d="M8.4 6.4v4.4M13.6 6.4v4.4" stroke="rgba(203,238,246,.62)" stroke-width="1.1"/><rect x="4.2" y="10.8" width="13.6" height="21.4" rx="4" fill="rgba(127,209,217,.16)" stroke="rgba(203,238,246,.72)" stroke-width="1.2"/><rect x="7.4" y="14.6" width="7.2" height="13.6" rx="2" fill="rgba(246,215,154,.24)" stroke="rgba(246,215,154,.55)" stroke-width="1"/></svg>
+              <span class="veil" aria-hidden="true"></span>
+              <div class="txt">
+                <div class="r1"><span class="slot">03</span><span class="role">我接唱的</span></div>
+                <p class="t">占位曲目 · 三</p>
+                <p class="d">已录 2 / 4 段</p>
+                <p class="d">我唱的：第 2 段</p>
+                <p class="d warn">缺第 3、4 段</p>
+                <p class="lk"><span>去看这个瓶子</span><span>漂流日志</span></p>
+              </div>
             </li>
             <li>
-              <div class="r1"><span class="slot">05</span><span class="role">我接唱的</span></div>
-              <p class="t">占位曲目 · 四</p>
-              <p class="d">已录 3 / 4 段</p>
-              <p class="d warn">我唱的那一段被斩浪删除了（仍算参与过）</p>
-              <p class="d warn">缺第 2 段</p>
-              <p class="lk"><span>去看这个瓶子</span><span>漂流日志</span></p>
-              <svg class="bottle" width="22" height="34" viewBox="0 0 22 34" fill="none" aria-hidden="true"><rect x="7.2" y="1.2" width="7.6" height="5" rx="2" fill="rgba(246,215,154,.5)"/><path d="M8.4 6.4v4.4M13.6 6.4v4.4" stroke="rgba(203,238,246,.5)" stroke-width="1.1"/><rect x="4.2" y="10.8" width="13.6" height="21.4" rx="4" fill="rgba(127,209,217,.1)" stroke="rgba(203,238,246,.58)" stroke-width="1.2"/><rect x="7.4" y="14.6" width="7.2" height="13.6" rx="2" fill="rgba(246,215,154,.2)" stroke="rgba(246,215,154,.45)" stroke-width="1"/></svg>
-              <i class="rip"></i>
+              <span class="lay" aria-hidden="true">
+                <i class="b1 sd"><b class="no">1</b></i>
+                <i class="b2 sd"><b class="no">2</b></i>
+                <i class="b3 sd"><b class="no">3</b></i>
+                <i class="b4 sd mine"><b class="no">4</b></i>
+              </span>
+              <span class="veil" aria-hidden="true"></span>
+              <div class="txt">
+                <div class="r1"><span class="slot">04</span><span class="role">我接唱的</span></div>
+                <p class="t">夜航</p>
+                <p class="d">已录 4 / 4 段</p>
+                <p class="d">我唱的：第 4 段</p>
+                <p class="d ok">全部段位都有人唱过</p>
+                <p class="lk"><span>去看这个瓶子</span><span>漂流日志</span></p>
+              </div>
+            </li>
+            <li>
+              <span class="lay" aria-hidden="true">
+                <i class="b1 sd"><b class="no">1</b></i>
+                <i class="b2 cut"><b class="no">2</b></i>
+                <i class="b3 sd"><b class="no">3</b></i>
+                <i class="b4 sd"><b class="no">4</b></i>
+              </span>
+              <span class="veil" aria-hidden="true"></span>
+              <div class="txt">
+                <div class="r1"><span class="slot">05</span><span class="role">我接唱的</span></div>
+                <p class="t">占位曲目 · 四</p>
+                <p class="d">已录 3 / 4 段</p>
+                <p class="d warn">我唱的那一段被斩浪删除了（仍算参与过）</p>
+                <p class="d warn">缺第 2 段</p>
+                <p class="lk"><span>去看这个瓶子</span><span>漂流日志</span></p>
+              </div>
             </li>
           </ul>
-          <div class="water" aria-hidden="true"><i></i><i></i></div>
         </div>
       </section>
 

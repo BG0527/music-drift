@@ -2,7 +2,7 @@
 <html lang="zh-CN">
   <head>
     <meta charset="utf-8" />
-    <title>选一首歌 · 水位差（唱片落在水里）</title>
+    <title>选一首歌 · 五只浅盆（水线只留在盆里）</title>
     <style>
       @import url('/node_modules/.pnpm/lxgw-wenkai-webfont@1.7.0/node_modules/lxgw-wenkai-webfont/lxgwwenkai-regular.css');
       @import url('/node_modules/.pnpm/lxgw-wenkai-webfont@1.7.0/node_modules/lxgw-wenkai-webfont/lxgwwenkai-bold.css');
@@ -25,6 +25,9 @@
       .glint { position:absolute; inset:0; mix-blend-mode:screen;
         background:linear-gradient(101deg, transparent 28%, rgba(228,247,252,.045) 45%, rgba(228,247,252,.065) 50%, rgba(228,247,252,.028) 55%, transparent 72%); }
       .art { position:absolute; inset:0; }
+      /* 底部一层暗：五只盆沉进"深处"。用渐变收尾，不留硬边（硬边就会读成又一条横线） */
+      .deep { position:absolute; left:0; right:0; bottom:0; height:200px;
+        background:linear-gradient(180deg, rgba(3,17,23,0) 0%, rgba(3,17,23,.38) 70%, rgba(3,17,23,.6) 100%); }
 
       header { position:absolute; left:76px; top:56px; z-index:2; }
       h1 { margin-top:22px; font-size:56px; font-weight:700; line-height:1; }
@@ -52,10 +55,20 @@
       .st.st2 { margin-top:5px; }
       .st .cat { flex:none; }
 
-      /* 翻页箱：五格，每格一张立在水里的母版 —— 卡沿只在上沿交代一次 */
+      /* 五格翻页箱：一格一道槽，槽里搁着一只浅盆 —— 盆里的水位＝这首已切好的段位。
+         水完全闭合在盆壁与盆底之间：水面只够在盆里画一道弧，出水即被盆壁裁断，
+         页面上再没有一条横贯的水线，也没有一处出血。 */
       .rack { position:absolute; inset:0; z-index:3; list-style:none; }
-      .bay { position:absolute; top:366px; width:246px; height:534px; }
-      .edge { position:absolute; left:0; top:0; width:246px; height:58px;
+      .bay { position:absolute; top:366px; width:246px; height:430px; }
+      .slot { position:absolute; left:0; top:0; width:100%; height:100%;
+        background-image:
+          linear-gradient(180deg, rgba(243,249,250,.11), rgba(243,249,250,0) 76%),
+          linear-gradient(180deg, rgba(243,249,250,.11), rgba(243,249,250,0) 76%),
+          linear-gradient(180deg, rgba(243,249,250,.045), rgba(3,17,23,0) 86%);
+        background-size:1px 100%, 1px 100%, 100% 100%;
+        background-position:0 0, 100% 0, 0 0;
+        background-repeat:no-repeat; }
+      .edge { position:absolute; left:0; top:0; width:100%; height:58px;
         background:
           linear-gradient(90deg, rgba(243,249,250,.34), rgba(243,249,250,.05)) 0 0 / 100% 1px no-repeat,
           linear-gradient(180deg, rgba(243,249,250,.075), rgba(243,249,250,0)); }
@@ -71,8 +84,8 @@
       .act[disabled] { border-color:rgba(243,249,250,.14); border-style:dashed; color:rgba(169,199,207,.7); }
       .bay:hover .act:not([disabled]) { border-color:rgba(127,209,217,.55); color:var(--glass); }
       .act svg { display:block; }
-      /* 干槽：那句话写在"本该有水"的位置上 */
-      .note { position:absolute; left:14px; top:392px; width:218px; font-size:12.5px; line-height:1.5; color:var(--warm); }
+      /* 干盆：理由写在盆沿上方 —— 盆里一滴水都没有，得先说明为什么 */
+      .note { position:absolute; left:14px; top:132px; width:218px; font-size:12.5px; line-height:1.5; color:var(--warm); }
 
       footer { position:absolute; right:76px; bottom:22px; z-index:2; text-align:right; }
       .foot { font-size:12.5px; color:var(--muted); }
@@ -82,112 +95,175 @@
     <div class="clip">
       <div class="platter"></div>
 
-      <!-- 水面横过五张立着的母版：水面之上是清晰的盘面，水面之下是折射过的一层。
-           第 2 格的水位塌到见底 —— 这首还没切分，所以它一格水都没有。 -->
+      <!-- 每一格是一只独立的浅盆（盆沿 / 盆壁 / 盆底都看得见）。
+           盆里的水位＝这首已经切好的段位：4 段都切好了 → 水里浮着这张母版；
+           还没有切分 → 盆是干的、看得见盆底，那条虚线就是水位本该到的地方。 -->
       <svg class="art" width="1440" height="900" viewBox="0 0 1440 900" fill="none" aria-hidden="true">
         <defs>
           <radialGradient id="lacquer" cx="34%" cy="26%" r="76%">
-            <stop offset="0" stop-color="#0a303c" stop-opacity=".5" />
-            <stop offset="1" stop-color="#031117" stop-opacity=".78" />
+            <stop offset="0" stop-color="#0a303c" stop-opacity=".62" />
+            <stop offset="1" stop-color="#031117" stop-opacity=".84" />
           </radialGradient>
-          <linearGradient id="water" x1="0" y1="552" x2="0" y2="900" gradientUnits="userSpaceOnUse">
-            <stop offset="0" stop-color="#7fd1d9" stop-opacity=".3" />
-            <stop offset=".18" stop-color="#7fd1d9" stop-opacity=".15" />
-            <stop offset=".45" stop-color="#0a3a48" stop-opacity=".26" />
-            <stop offset=".72" stop-color="#031117" stop-opacity=".52" />
-            <stop offset="1" stop-color="#031117" stop-opacity=".85" />
+          <radialGradient id="blank" cx="36%" cy="28%" r="76%">
+            <stop offset="0" stop-color="#16404d" stop-opacity=".56" />
+            <stop offset="1" stop-color="#031117" stop-opacity=".8" />
+          </radialGradient>
+          <!-- 外壁：横向渐变＝柱面的转折（左中受光，两侧沉下去） -->
+          <linearGradient id="wallOut" x1="0" y1="0" x2="1" y2="0">
+            <stop offset="0" stop-color="#031117" stop-opacity=".5" />
+            <stop offset=".17" stop-color="#cbeef6" stop-opacity=".09" />
+            <stop offset=".46" stop-color="#cbeef6" stop-opacity=".17" />
+            <stop offset=".78" stop-color="#7fd1d9" stop-opacity=".05" />
+            <stop offset="1" stop-color="#031117" stop-opacity=".5" />
           </linearGradient>
-          <linearGradient id="shallow" x1="0" y1="830" x2="0" y2="900" gradientUnits="userSpaceOnUse">
-            <stop offset="0" stop-color="#7fd1d9" stop-opacity=".11" />
-            <stop offset="1" stop-color="#031117" stop-opacity=".56" />
+          <linearGradient id="rimTop" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stop-color="#dff3f7" stop-opacity=".13" />
+            <stop offset="1" stop-color="#7fd1d9" stop-opacity=".05" />
           </linearGradient>
-          <linearGradient id="skin" x1="0" y1="552" x2="0" y2="660" gradientUnits="userSpaceOnUse">
-            <stop offset="0" stop-color="#cbeef6" stop-opacity=".05" />
+          <!-- 盆口内：光从上方落进盆里，远端内壁最暗、盆底稍亮 -->
+          <linearGradient id="dishInner" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stop-color="#031117" stop-opacity=".74" />
+            <stop offset=".55" stop-color="#07242e" stop-opacity=".56" />
+            <stop offset="1" stop-color="#0d3b49" stop-opacity=".4" />
+          </linearGradient>
+          <radialGradient id="dishFloor" cx="46%" cy="38%" r="78%">
+            <stop offset="0" stop-color="#0d3b49" stop-opacity=".44" />
+            <stop offset="1" stop-color="#031117" stop-opacity=".72" />
+          </radialGradient>
+          <radialGradient id="dryLight" cx="46%" cy="40%" r="66%">
+            <stop offset="0" stop-color="#cbeef6" stop-opacity=".1" />
             <stop offset="1" stop-color="#cbeef6" stop-opacity="0" />
+          </radialGradient>
+          <!-- 水体：有彩度的水，不是一块黑 -->
+          <linearGradient id="waterBody" x1="0" y1="26" x2="0" y2="170" gradientUnits="userSpaceOnUse">
+            <stop offset="0" stop-color="#8ed8e0" stop-opacity=".34" />
+            <stop offset=".22" stop-color="#5fb6c2" stop-opacity=".26" />
+            <stop offset=".62" stop-color="#1d5f70" stop-opacity=".3" />
+            <stop offset="1" stop-color="#0a3a48" stop-opacity=".44" />
           </linearGradient>
-          <linearGradient id="shaft" x1="0" y1="0" x2="1" y2="0">
-            <stop offset="0" stop-color="#cbeef6" stop-opacity="0" />
-            <stop offset=".5" stop-color="#cbeef6" stop-opacity=".06" />
-            <stop offset="1" stop-color="#cbeef6" stop-opacity="0" />
-          </linearGradient>
-          <clipPath id="air"><rect x="0" y="0" width="1440" height="552" /></clipPath>
-          <clipPath id="sunk"><rect x="0" y="552" width="1440" height="348" /></clipPath>
+          <radialGradient id="waterSkin" cx="42%" cy="30%" r="78%">
+            <stop offset="0" stop-color="#cbeef6" stop-opacity=".12" />
+            <stop offset=".55" stop-color="#7fd1d9" stop-opacity=".08" />
+            <stop offset="1" stop-color="#3f8f9c" stop-opacity=".12" />
+          </radialGradient>
 
-          <!-- 一张母版：最外那道沟 = 第 1 段（你先录），往圆心内推 = 后面三段 -->
-          <g id="wax">
-            <circle r="106" fill="url(#lacquer)" stroke="rgba(228,249,252,.34)" />
-            <path d="M-100 -34 A 106 106 0 0 0 -91 55" stroke="rgba(203,238,246,.5)" stroke-width="1.1" />
-            <circle r="96" stroke="rgba(212,85,58,.34)" stroke-width="1.2" />
-            <circle r="80" stroke="rgba(243,249,250,.18)" />
-            <circle r="64" stroke="rgba(243,249,250,.18)" />
-            <circle r="48" stroke="rgba(243,249,250,.18)" />
-            <path d="M-20 -94 A 96 96 0 0 1 20 -94" stroke="rgba(212,85,58,.9)" stroke-width="2" />
-            <circle r="30" fill="rgba(243,249,250,.02)" stroke="rgba(243,249,250,.13)" />
-            <circle r="4" fill="#031117" stroke="rgba(228,249,252,.3)" />
+          <!-- 盆口：一只椭圆。盆的内壁与盆底只在这只椭圆里可见 —— 近侧的外壁就自然挡住了盆底的前半 -->
+          <clipPath id="mouth"><ellipse rx="113" ry="72.7" /></clipPath>
+
+          <!-- 盆：外壁 + 盆沿顶面 + 盆口内（内壁与盆底） -->
+          <g id="dish">
+            <path d="M-118 0 A118 75.9 0 0 0 118 0 L118 61.3 A118 75.9 0 0 1 -118 61.3 Z" fill="url(#wallOut)" />
+            <ellipse rx="118" ry="75.9" fill="url(#rimTop)" />
+            <g clip-path="url(#mouth)">
+              <ellipse rx="113" ry="72.7" fill="url(#dishInner)" />
+              <ellipse cy="61.3" rx="113" ry="72.7" fill="url(#dishFloor)" />
+              <ellipse cy="61.3" rx="113" ry="72.7" fill="none" stroke="rgba(243,249,250,.14)" />
+            </g>
+            <ellipse rx="113" ry="72.7" fill="none" stroke="rgba(228,249,252,.18)" />
+            <path d="M-118 0 A118 75.9 0 0 0 118 0" stroke="rgba(228,247,252,.3)" />
           </g>
-          <g id="waxBlank">
-            <circle r="106" fill="url(#lacquer)" stroke="rgba(228,249,252,.22)" />
-            <path d="M-100 -34 A 106 106 0 0 0 -91 55" stroke="rgba(203,238,246,.3)" stroke-width="1.1" />
-            <circle r="96" stroke="rgba(243,249,250,.16)" stroke-dasharray="5 7" />
-            <circle r="30" stroke="rgba(243,249,250,.1)" stroke-dasharray="4 6" />
-            <circle r="4" fill="#031117" stroke="rgba(228,249,252,.3)" />
+
+          <!-- 水：水体铺满盆口的下半，水面只画"贴住远端盆壁的那道弧"——两端止于盆壁，不是一条直尺 -->
+          <g id="pool">
+            <rect x="-118" y="26" width="236" height="240" fill="url(#waterBody)" />
+            <ellipse cy="26" rx="111" ry="71.4" fill="url(#waterSkin)" />
+            <path d="M-111 26 A111 71.4 0 0 1 111 26" stroke="rgba(228,247,252,.45)" />
+            <path d="M-92 -22 Q-40 -46 18 -38" stroke="rgba(203,238,246,.09)" />
+            <path d="M-74 44 Q-24 62 34 54" stroke="rgba(203,238,246,.07)" />
+            <circle cx="-88" cy="46" r="1.8" fill="rgba(228,247,252,.26)" />
+            <circle cx="-56" cy="62" r="1.4" fill="rgba(228,247,252,.22)" />
+          </g>
+
+          <!-- 母版：浮在水面上（正面朝上，边缘压出一圈水痕） -->
+          <g id="master">
+            <ellipse rx="68" ry="43.7" fill="url(#lacquer)" stroke="rgba(228,249,252,.34)" />
+            <path d="M-57.7 23.2 A68 43.7 0 0 0 -56.4 -24.4" stroke="rgba(203,238,246,.5)" stroke-width="1.1" />
+            <ellipse rx="60" ry="38.6" stroke="rgba(243,249,250,.17)" />
+            <path d="M-13.5 -37.6 A60 38.6 0 0 1 13.5 -37.6" stroke="rgba(212,85,58,.9)" stroke-width="2" />
+            <ellipse rx="51" ry="32.8" stroke="rgba(243,249,250,.15)" />
+            <ellipse rx="39.5" ry="25.4" stroke="rgba(243,249,250,.13)" />
+            <ellipse rx="22" ry="14.1" fill="rgba(243,249,250,.02)" stroke="rgba(243,249,250,.13)" />
+            <ellipse rx="3" ry="1.9" fill="#031117" stroke="rgba(228,249,252,.3)" />
+          </g>
+
+          <!-- 还没切分的母版：一道沟都没有（虚线），盘身也是钝的 -->
+          <g id="masterBlank">
+            <ellipse rx="68" ry="43.7" fill="url(#blank)" stroke="rgba(228,249,252,.3)" />
+            <ellipse rx="60" ry="38.6" stroke="rgba(243,249,250,.2)" stroke-dasharray="5 7" />
+            <ellipse rx="22" ry="14.1" stroke="rgba(243,249,250,.13)" stroke-dasharray="4 6" />
+            <ellipse rx="3" ry="1.9" fill="#031117" stroke="rgba(228,249,252,.28)" />
           </g>
         </defs>
 
-        <!-- 水面之上：盘面是干净的 -->
-        <g clip-path="url(#air)">
-          <use href="#wax" x="199" y="606" />
-          <use href="#wax" x="720" y="612" />
-          <use href="#wax" x="980.5" y="602" />
-          <use href="#wax" x="1241" y="608" />
-        </g>
-        <!-- 水面之下：同一张盘，被水挪了 4px、压暗 —— 这是"落在水里"那句的图形 -->
-        <g clip-path="url(#sunk)" opacity=".72">
-          <g transform="translate(0 4)">
-            <use href="#wax" x="199" y="606" />
-            <use href="#wax" x="720" y="612" />
-            <use href="#wax" x="980.5" y="602" />
-            <use href="#wax" x="1241" y="608" />
+        <!-- 第 1 格 · 已切分：水位在中位，母版浮在水上（水面上留得住一道弧） -->
+        <g transform="translate(199 620)">
+          <use href="#dish" />
+          <g clip-path="url(#mouth)">
+            <use href="#pool" />
+            <g transform="translate(0 9.3)">
+              <ellipse cy="33.4" rx="68" ry="43.7" fill="rgba(203,238,246,.035)" stroke="rgba(203,238,246,.08)" />
+              <ellipse rx="72" ry="46.3" fill="none" stroke="rgba(3,17,23,.45)" />
+              <use href="#master" />
+              <ellipse rx="68" ry="43.7" fill="none" stroke="rgba(228,247,252,.26)" />
+            </g>
           </g>
         </g>
-        <!-- 干槽里那张：完全在水面外，所以它最亮、最清楚 -->
-        <use href="#waxBlank" x="459.5" y="606" />
 
-        <!-- 水：一整片，只在第 2 格塌成 278px 的水位差 -->
-        <path d="M0 552 C90 544 270 560 336.5 556 V900 H582.5 V556 C640 548 760 562 942.5 552 C1032 546 1212 560 1302.5 552 C1350 548 1410 558 1440 554 V900 H0 Z"
-          fill="url(#water)" />
-        <path d="M900 552 L1440 552 L1260 900 L660 900 Z" fill="url(#shaft)" />
-        <path d="M0 552 C90 544 270 560 336.5 556 V900 H1440 V554 C1410 558 1350 548 1302.5 552 C1212 560 1032 546 942.5 552 C760 562 640 548 582.5 556 V900 H0 Z"
-          fill="url(#skin)" opacity=".9" />
+        <!-- 第 2 格 · 还没有切分：盆是干的，看得见盆底；虚线是水位本该到的地方 -->
+        <g transform="translate(459.5 631)">
+          <use href="#dish" />
+          <g clip-path="url(#mouth)">
+            <ellipse cy="30" rx="70" ry="26" fill="url(#dryLight)" />
+            <ellipse cy="26" rx="111" ry="71.4" fill="none" stroke="rgba(228,247,252,.22)" stroke-dasharray="3 7" />
+            <g transform="translate(0 44.6)">
+              <use href="#masterBlank" />
+            </g>
+          </g>
+        </g>
 
-        <!-- 干槽：水位退到见底，墙脚留着水痕 -->
-        <path d="M336.5 830 C400 826 520 834 582.5 830 V900 H336.5 Z" fill="url(#shallow)" />
-        <path d="M336.5 552 V830" stroke="rgba(243,249,250,.26)" />
-        <path d="M582.5 552 V830" stroke="rgba(243,249,250,.26)" />
-        <path d="M344 596 V614" stroke="rgba(203,238,246,.3)" />
-        <path d="M575 646 V662" stroke="rgba(203,238,246,.22)" />
+        <!-- 第 3 格 -->
+        <g transform="translate(720 617)">
+          <use href="#dish" />
+          <g clip-path="url(#mouth)">
+            <use href="#pool" />
+            <g transform="translate(0 9.3)">
+              <ellipse cy="33.4" rx="68" ry="43.7" fill="rgba(203,238,246,.035)" stroke="rgba(203,238,246,.08)" />
+              <ellipse rx="72" ry="46.3" fill="none" stroke="rgba(3,17,23,.45)" />
+              <use href="#master" />
+              <ellipse rx="68" ry="43.7" fill="none" stroke="rgba(228,247,252,.26)" />
+            </g>
+          </g>
+        </g>
 
-        <!-- 水与空气的交线（水波，不是一条直尺） -->
-        <path d="M0 552 C90 544 270 560 336.5 556" stroke="rgba(228,247,252,.55)" stroke-width="1.1" />
-        <path d="M582.5 556 C640 548 760 562 942.5 552 C1032 546 1212 560 1302.5 552 C1350 548 1410 558 1440 554"
-          stroke="rgba(228,247,252,.55)" stroke-width="1.1" />
-        <path d="M336.5 830 C400 826 520 834 582.5 830" stroke="rgba(228,247,252,.32)" />
-        <!-- 干槽口那道虚线：水本该漫到这里 -->
-        <path d="M336.5 556 H582.5" stroke="rgba(243,249,250,.16)" stroke-dasharray="2 6" />
-        <path d="M20 616 Q168 606 316 618" stroke="rgba(203,238,246,.08)" />
-        <path d="M620 700 Q800 688 980 702" stroke="rgba(203,238,246,.07)" />
-        <path d="M120 782 Q260 774 400 784" stroke="rgba(203,238,246,.06)" />
-        <path d="M1040 764 Q1220 752 1400 766" stroke="rgba(203,238,246,.06)" />
+        <!-- 第 4 格 -->
+        <g transform="translate(980.5 634)">
+          <use href="#dish" />
+          <g clip-path="url(#mouth)">
+            <use href="#pool" />
+            <g transform="translate(0 9.3)">
+              <ellipse cy="33.4" rx="68" ry="43.7" fill="rgba(203,238,246,.035)" stroke="rgba(203,238,246,.08)" />
+              <ellipse rx="72" ry="46.3" fill="none" stroke="rgba(3,17,23,.45)" />
+              <use href="#master" />
+              <ellipse rx="68" ry="43.7" fill="none" stroke="rgba(228,247,252,.26)" />
+            </g>
+          </g>
+        </g>
 
-        <!-- 气泡：稀疏，只在水里 -->
-        <circle cx="150" cy="806" r="2.4" fill="rgba(228,247,252,.3)" />
-        <circle cx="264" cy="700" r="1.6" fill="rgba(228,247,252,.26)" />
-        <circle cx="700" cy="820" r="2" fill="rgba(228,247,252,.28)" />
-        <circle cx="774" cy="760" r="1.5" fill="rgba(228,247,252,.24)" />
-        <circle cx="948" cy="836" r="2.6" fill="rgba(228,247,252,.3)" />
-        <circle cx="1178" cy="742" r="1.7" fill="rgba(228,247,252,.26)" />
-        <circle cx="1312" cy="796" r="2.2" fill="rgba(228,247,252,.28)" />
+        <!-- 第 5 格 -->
+        <g transform="translate(1241 625)">
+          <use href="#dish" />
+          <g clip-path="url(#mouth)">
+            <use href="#pool" />
+            <g transform="translate(0 9.3)">
+              <ellipse cy="33.4" rx="68" ry="43.7" fill="rgba(203,238,246,.035)" stroke="rgba(203,238,246,.08)" />
+              <ellipse rx="72" ry="46.3" fill="none" stroke="rgba(3,17,23,.45)" />
+              <use href="#master" />
+              <ellipse rx="68" ry="43.7" fill="none" stroke="rgba(228,247,252,.26)" />
+            </g>
+          </g>
+        </g>
       </svg>
+      <div class="deep"></div>
       <div class="glint"></div>
     </div>
 
@@ -218,6 +294,7 @@
 
     <ul class="rack">
       <li class="bay" style="left:76px">
+        <span class="slot"></span>
         <span class="edge"></span>
         <p class="song">占位曲目 · 一</p>
         <p class="meta m1">4 段<span class="sep"></span>每段约 24 秒</p>
@@ -231,15 +308,17 @@
       </li>
 
       <li class="bay" style="left:336.5px">
+        <span class="slot"></span>
         <span class="edge" style="top:6px"></span>
         <p class="song">占位曲目 · 二</p>
-        <p class="meta m1">未切分</p>
+        <p class="meta m1">4 段</p>
         <p class="meta m2">来源 incompetech-cc-by-4.0</p>
         <button class="act" type="button" disabled>暂不可发起</button>
         <p class="note">这首还没有切分，暂不能发起</p>
       </li>
 
       <li class="bay" style="left:597px">
+        <span class="slot"></span>
         <span class="edge" style="top:2px"></span>
         <p class="song">占位曲目 · 三</p>
         <p class="meta m1">4 段<span class="sep"></span>每段约 18 秒</p>
@@ -253,6 +332,7 @@
       </li>
 
       <li class="bay" style="left:857.5px">
+        <span class="slot"></span>
         <span class="edge" style="top:8px"></span>
         <p class="song">占位曲目 · 四</p>
         <p class="meta m1">4 段<span class="sep"></span>每段约 27 秒</p>
@@ -266,6 +346,7 @@
       </li>
 
       <li class="bay" style="left:1118px">
+        <span class="slot"></span>
         <span class="edge" style="top:4px"></span>
         <p class="song">夜航</p>
         <p class="meta m1">4 段<span class="sep"></span>每段约 21 秒</p>
