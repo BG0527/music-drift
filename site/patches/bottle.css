@@ -1,0 +1,270 @@
+/*
+ * 发布版补丁 · bottle（漂流瓶详情）—— 流体版式（W5-A，见 docs/deploy-plan-html.md §20）。
+ *
+ * 这页的主构图是一张**瓶身剖面矢量图**（`svg.scene`，1440×900，水面在 y=430），
+ * 四格刻度（x=307/538/769）、水位、瓶塞、以及挂在刻度上的段号/段名/署名，必须永远对得上 ——
+ * 对不上就不是"瓶子剖面"，是一堆漂浮的字。
+ * 所以：**场景与它的标注整块按 --u（cover）缩放**，"下层仪器"（试听/去向/底栏）另用 --uv（contain）
+ * 落位，理由是两者的自由度不同：
+ *   --u  = max(100vw/1440, 100dvh/900)：场景要铺满（水面横贯全宽），宽高比 ≥ 16:10 时优先吃宽度。
+ *   --uv = min(100vw/1440, 100dvh/900)：底下的两栏与页脚只需要"装得下"，用 contain 才不会在
+ *         1680×1003 / 2560×1400 这类比例下被顶出视口（实测 cover 会把页脚推出 29px）。
+ *   px   字号；区间与尺寸用 clamp()/min() 收口。
+ *
+ * 另：`page-bottle.js` 会在 210px 处注入一条**时间轴**（`#w7-timeline-style`，内部是逐段内联 px）。
+ * HTML 是源、JS 不许改 ⇒ 那条时间轴用 `transform: scale(无单位 --k)` 整块缩放到 --u 的尺度
+ * （内部几何成比例，等比缩放 = 把每一条 px 换成 --u 的等价物），落点仍按 --u 钉在版面上。
+ */
+
+:root {
+  --u: max(calc(100vw / 1440), calc(100dvh / 900));
+  --uv: min(calc(100vw / 1440), calc(100dvh / 900));
+  /* 无单位比值（atan2(长度,长度) → 角度，tan → 数）：transform:scale 只能吃数 */
+  --k: tan(atan2(var(--u), 1px));
+}
+
+html,
+body {
+  width: 100vw;
+  height: 100dvh;
+  overflow: hidden;
+}
+
+/* 环境层钉在视口上：定稿是画布内的绝对层，短视口下若跟着内容滚，背景会露白 */
+.clip {
+  position: fixed;
+  inset: 0;
+}
+
+/* 水面之上/之下的两条带状层与水面同在 --u 尺度（水面 = 场景里的 y=430） */
+.air {
+  left: calc(-40 * var(--u));
+  right: calc(-40 * var(--u));
+  top: calc(-60 * var(--u));
+  height: calc(560 * var(--u));
+}
+
+.deep,
+.current {
+  top: calc(430 * var(--u));
+}
+
+.platter {
+  background:
+    repeating-radial-gradient(
+      circle at calc(1420 * var(--u)) calc(960 * var(--u)),
+      rgba(216, 243, 246, 0.02) 0 1.2px,
+      rgba(216, 243, 246, 0) 1.2px calc(15 * var(--u))
+    ),
+    radial-gradient(
+      circle at calc(1420 * var(--u)) calc(960 * var(--u)),
+      rgba(127, 209, 217, 0.05) 0 30%,
+      rgba(127, 209, 217, 0) 68%
+    );
+}
+
+/* 场景：与水面/刻度同尺度，一比一落在 (0,0) */
+svg.scene {
+  left: 0;
+  top: 0;
+  right: auto;
+  bottom: auto;
+  width: calc(1440 * var(--u));
+  height: calc(900 * var(--u));
+}
+
+/* ── 挂在场景上的字：横向用百分比（与 --u 在 ≥16:10 时等价），纵向按 --u 落在定稿的位置上 ── */
+.crumb {
+  left: 5.278%;
+  top: calc(30 * var(--u));
+}
+
+h1 {
+  left: 5.278%;
+  top: calc(60 * var(--u));
+  font-size: clamp(34px, 3.89vw, 76px);
+}
+
+.work {
+  left: 5.278%;
+  top: calc(126 * var(--u));
+}
+
+.metaRow {
+  left: 5.278%;
+  top: calc(156 * var(--u));
+}
+
+.note {
+  left: 5.278%;
+  top: calc(184 * var(--u));
+  width: min(55.56%, 62vw);
+}
+
+.maker {
+  right: 5.278%;
+  top: calc(62 * var(--u));
+}
+
+.heroLab {
+  left: 5.278%;
+  top: calc(272 * var(--u));
+}
+
+.segNum {
+  top: calc(320 * var(--u));
+}
+
+.segLab {
+  top: calc(356 * var(--u));
+}
+
+.cap {
+  top: calc(458 * var(--u));
+}
+
+/* 「正在试听」那道珊瑚刻度：落点由 JS 按"选中第几段"算（76 + (n-1)×231 + 85.5）= 161.5/392.5/623.5/854.5。
+ * 同样是内联值 ⇒ 按值选列（否则 2560 下它会留在 161px 处、跟瓶子彻底脱开）。 */
+.selMark[style*='left: 161.5px'],
+.selMark[style*='left:161.5px'] {
+  left: 11.215% !important;
+}
+
+.selMark[style*='left: 392.5px'],
+.selMark[style*='left:392.5px'] {
+  left: 27.257% !important;
+}
+
+.selMark[style*='left: 623.5px'],
+.selMark[style*='left:623.5px'] {
+  left: 43.299% !important;
+}
+
+.selMark[style*='left: 854.5px'],
+.selMark[style*='left:854.5px'] {
+  left: 59.34% !important;
+}
+
+.selMark {
+  top: calc(451 * var(--u));
+  width: calc(60 * var(--u));
+  height: calc(2 * var(--u));
+}
+
+.gapBox {
+  left: 54.097% !important;
+  top: calc(402 * var(--u));
+  width: 14.653% !important;
+}
+
+.callout {
+  left: 77.5%;
+  top: calc(322 * var(--u));
+}
+
+.corkLab {
+  right: 0.972%;
+  top: calc(468 * var(--u));
+}
+
+/* 四格刻度：定稿 76 / 307 / 538 / 769 = 76 + (n-1) × 231。
+ *
+ * 为什么用「内联 left 的值」选列、而不是 `:nth-of-type`：`page-bottle.js` 会把三组格子
+ * **全部删掉再按数据重新 append**（顺序随"有几段有人唱"变化）⇒ 任何按兄弟序号的写法在真数据下都会错位。
+ * 稳定的事实只有一件事：这三组格子的 left 就是 76/307/538/769（JS 与冻结 HTML 都这么写）。
+ * 两种写法的空格不同（HTML `left:76px`、JS 序列化 `left: 76px`），所以各匹配一次。 */
+:is(.segNum, .segLab, .cap)[style*='left:76px'],
+:is(.segNum, .segLab, .cap)[style*='left: 76px'] {
+  left: 5.278% !important;
+}
+
+:is(.segNum, .segLab, .cap)[style*='left:307px'],
+:is(.segNum, .segLab, .cap)[style*='left: 307px'] {
+  left: 21.319% !important;
+}
+
+:is(.segNum, .segLab, .cap)[style*='left:538px'],
+:is(.segNum, .segLab, .cap)[style*='left: 538px'] {
+  left: 37.361% !important;
+}
+
+:is(.segNum, .segLab, .cap)[style*='left:769px'],
+:is(.segNum, .segLab, .cap)[style*='left: 769px'] {
+  left: 53.403% !important;
+}
+
+/* 横向用百分比而不是 calc(N × --u)：在宽高比 ≥ 16:10 时两者等价（--u 就是 100vw/1440），
+ * 但在更"竖"的窗口里百分比不会把格子推出视口。列宽同理（231/1440 = 16.042%）。 */
+.segNum,
+.segLab,
+.cap {
+  width: 16.042% !important;
+}
+
+/* ── 时间轴（page-bottle.js 注入）：内部逐段内联 px ⇒ 整块等比缩放到 --u 的尺度 ── */
+.w7-timeline {
+  left: calc(76 * var(--u)) !important;
+  top: calc(210 * var(--u)) !important;
+  transform-origin: 0 0;
+  transform: scale(var(--k));
+}
+
+/* ── 下层仪器：试听与投票 / 三选一去向 / 底栏 —— 横向按百分比、纵向用 --uv（装得下优先） ── */
+.listenCol {
+  left: 5.278%;
+  top: calc(630 * var(--uv));
+  width: 42.639%;
+}
+
+.destCol {
+  left: 50%;
+  top: calc(630 * var(--uv));
+  width: 44.722%;
+}
+
+.bottomRule {
+  left: 5.278%;
+  top: auto;
+  bottom: calc(48 * var(--uv));
+  width: 89.444%;
+}
+
+.bottom {
+  left: 5.278%;
+  top: auto;
+  bottom: calc(19 * var(--uv));
+  width: 89.444%;
+}
+
+/* 短视口（1280×720 这类 16:9）：两栏的内容是 px 字号撑起来的固定高度，而它们的位置被 --uv
+ * 缩小 ⇒ 只能压**间距**（不动字号、不动按钮高度）把它们塞进"瓶身之下、页脚之上"那条带里。
+ * 阈值的由来：≥ 800px 时定稿的 630/852/864 三个锚点本来就装得下，不需要压。 */
+@media (max-height: 800px) {
+  .transport {
+    margin-top: 4px;
+  }
+
+  .votes {
+    margin-top: 4px;
+  }
+
+  .votesNote {
+    margin-top: 2px;
+  }
+
+  .putBack {
+    margin-top: 2px;
+  }
+
+  .destCol .sub {
+    margin-top: 0;
+  }
+
+  .destRow {
+    height: 42px;
+    margin-top: 3px;
+  }
+}
+
+/* 进度条**故意保持 400px**：`page-bottle.js` 按"整条 400px"算填充宽度与游标位置
+ *（`fill.style.width = round(span × 400)px`）—— 改宽度会让"听过的部分"比例说谎。 */

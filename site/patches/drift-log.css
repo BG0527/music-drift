@@ -1,0 +1,116 @@
+/*
+ * 发布版补丁 · drift-log（漂流日志）—— 流体版式（W5-A，见 docs/deploy-plan-html.md §20）。
+ *
+ * 这页的定稿是「左刻痕盘 + 右时间线」两栏：定稿把两栏写死成 480px 的 SVG 与 left:564px 的列表，
+ * main 高 900px。窄窗下页面靠 html{overflow:hidden} 硬裁，宽屏下右边空一大块。
+ * 补丁把它改成**真正的两栏 flex**：刻痕盘按比例占一栏（SVG 有 viewBox ⇒ 宽度决定高度，比例不丢），
+ * 时间线吃掉剩下的宽度、并在纵向空间不够时**自己内部滚动**（不裁、不丢行）。
+ *
+ * 坐标模型：装饰层（水面光带/盘面沟槽）用 --u（cover，铺满视口不留边）；
+ * 版面骨架（页边距/两栏比例/右栏标题）用 % 与 dvh；字号留 px。
+ */
+
+:root {
+  --u: max(calc(100vw / 1440), calc(100dvh / 900));
+}
+
+html,
+body {
+  width: 100vw;
+  height: 100dvh;
+  overflow: hidden;
+}
+
+/* 盘面沟槽：圆心/半径按 --u 走（与 river 同一套母题，密度不变形） */
+.platter {
+  background:
+    repeating-radial-gradient(
+      circle at calc(1420 * var(--u)) calc(960 * var(--u)),
+      rgba(216, 243, 246, 0.055) 0 1.2px,
+      transparent 1.2px calc(6.5 * var(--u))
+    ),
+    radial-gradient(
+      circle at calc(1420 * var(--u)) calc(960 * var(--u)),
+      rgba(127, 209, 217, 0.05) 0 30%,
+      transparent 68%
+    );
+}
+
+/* 水面光带：定稿是 290px 高的一条，按视口高度给（大屏不至于变成一根细线） */
+.waterlight {
+  top: -4%;
+  height: clamp(180px, 32.2dvh, 420px);
+}
+
+/* ── 版面骨架：页边距跟视口，纵向用 dvh（百分比 padding 会按"宽度"解析，不能用来做上下边距） ──
+ * main 改成**一列 flex**：页头 / 刻痕语法表是固定高度，主体吃掉剩下的高度。
+ * 这样"列表能有多高"不需要我去猜页头占了多少 —— 少一个魔数就少一处失真。 */
+main {
+  display: flex;
+  flex-direction: column;
+  height: 100dvh;
+  padding: clamp(36px, 6.4dvh, 76px) clamp(28px, 5.28vw, 160px) clamp(24px, 3dvh, 48px);
+}
+
+.hright {
+  right: clamp(28px, 5.28vw, 160px);
+  top: clamp(36px, 6.4dvh, 76px);
+}
+
+/* 刻痕语法表：七个小图与字样是固定字号的一行，窄窗下允许换行（定稿一行的排法在 1280 下会顶到边） */
+.key {
+  flex: none;
+  flex-wrap: wrap;
+  row-gap: 12px;
+}
+
+/* ── 主体：两栏 flex（左刻痕盘 / 右时间线），高度 = 视口剩余，列表超出时**内部滚动** ── */
+.body {
+  display: flex;
+  align-items: flex-start;
+  gap: clamp(24px, 4vw, 96px);
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.lathe {
+  position: relative;
+  left: auto;
+  top: auto;
+  flex: 0 0 auto;
+  width: clamp(300px, 33.3%, 480px);
+  height: auto;
+  max-height: 100%;
+}
+
+.roll {
+  position: relative;
+  left: auto;
+  right: auto;
+  top: auto;
+  bottom: auto;
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 0;
+  height: 100%;
+  /* 行数超过可用高度时**内部滚动**（page-drift-log.js 在"拿到真刻痕"时也会自己设同一个值；
+   * 这里补一份是因为演示入口没有瓶子 id ⇒ 走的是静态演示行，那条分支不会执行到）。 */
+  overflow-y: auto;
+}
+
+/* 时间线四列：末两列（谁 / 什么时候）按比例给，窄窗下不至于把"做了什么"挤成一列字 */
+.roll li {
+  grid-template-columns: 52px minmax(0, 1fr) minmax(88px, 126px) minmax(110px, 150px);
+}
+
+/* 长标题（"漂流日志"）与右上曲名在大屏上给一点上限：1440 下正好是定稿值 */
+h1 {
+  font-size: clamp(40px, 3.89vw, 72px);
+}
+
+/* 页头是**块级容器**（不是绝对定位的悬浮块）⇒ 它的盒子横跨整个版心，会把右上角的曲名区
+ * 判成"重叠"。`fit-content` 让它的盒子等于自己内容（.sub 的 max-width 730px）的宽度：
+ * 视觉零变化，量出来才是它自己的范围。 */
+header {
+  width: fit-content;
+}

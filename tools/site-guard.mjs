@@ -8,7 +8,11 @@
  *  4. **禁 emoji / 禁纯黑 / 禁外链**（沿用设计期的三条硬约束）；
  *  5. **禁 HTML 注入通道**（`innerHTML`/`outerHTML`/`insertAdjacentHTML`/`document.write`/`eval(`）——
  *     匿名代号、曲名、留言都是用户输入，vanilla JS 里一次 `innerHTML` 就能被偷会话；
- *  6. **署名**：列曲目的页面必须渲染 `licensedSource`（CC-BY 署名不能丢）。
+ *  6. **署名**：列曲目的页面必须渲染 `licensedSource`（CC-BY 署名不能丢）；
+ *  7. **发布版补丁**（`site/patches/<slug>.css`，W5-A）：**可重放 + 结果确定** ——
+ *     命名与页面一一对应（无孤儿补丁、无补丁指向不存在的页）、可解析（括号/注释配平、LF、非空）、
+ *     只用 `DESIGN.md` 既有色板（hex 必须来自 front matter，与 `tokens.test.ts` 同口径）、
+ *     自包含（禁 `@import`、禁外部资源、禁引用 `#fit-stage`、禁改共享层两个前缀）。
  *
  * 用法：node tools/site-guard.mjs
  */
@@ -21,6 +25,7 @@ import { fileURLToPath } from 'node:url';
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const SITE = join(ROOT, 'site');
 const APP = join(SITE, 'app');
+const PATCHES = join(SITE, 'patches');
 
 /** 与 tools/sync-site.mjs 的 PAGES 一一对应（发布名单）。 */
 const PAGES = [
@@ -148,7 +153,115 @@ for (const [slug, why] of [
   }
 }
 
-// ── 7. site/ 里不该有临时产物 ──────────────────────────────────────
+// ── 7. 发布版补丁：可重放 + 结果确定（W5-A）─────────────────────────
+/**
+ * 色板唯一真相 = `DESIGN.md` front matter 的 `colors:` 块（与 `tokens.test.ts` 同口径截取）。
+ * 解析失败（拿不到色板）时**不能静默通过**：那会让"禁新色值"这条守卫整体失效。
+ *
+ * 注意两个计数不是一回事：色 token 有 30+ **个名字**，但其中若干别名指向同一个 hex
+ * （`wave-white` == `ink`、`foam` == `water-light` …）⇒ 去重后的**色值**个数更少。
+ * 判"解析成功"要用**名字数**（`tokens.test.ts` 的口径），判色值要用去重后的集合。
+ */
+function designPalette() {
+  const md = readFileSync(join(ROOT, 'DESIGN.md'), 'utf8');
+  const front = md.split('---\n')[1] ?? '';
+  const hexes = new Set();
+  const names = new Set();
+  let inColors = false;
+  for (const line of front.split('\n')) {
+    if (/^colors:\s*$/.test(line)) {
+      inColors = true;
+      continue;
+    }
+    if (!inColors) continue;
+    if (/^\S/.test(line)) break;
+    const m = /^\s{2}([a-z0-9-]+):\s*"(#[0-9A-Fa-f]{6})"\s*$/.exec(line);
+    if (m?.[1] === undefined || m[2] === undefined) continue;
+    names.add(m[1]);
+    hexes.add(m[2].toUpperCase());
+  }
+  return { hexes, names };
+}
+const PALETTE = designPalette();
+if (PALETTE.names.size < 30) {
+  fail(
+    `没能从 DESIGN.md front matter 解析出色板（解析到 ${String(PALETTE.names.size)} 个名字 / ` +
+      `${String(PALETTE.hexes.size)} 个色值，预期 >= 30 个名字）`,
+  );
+}
+
+/** 补丁名 = 页 slug（`site/<slug>.html`）。 */
+const SLUGS = PAGES.map((name) => name.replace(/\.html$/, ''));
+const patchFiles = existsSync(PATCHES)
+  ? readdirSync(PATCHES)
+      .filter((n) => n.endsWith('.css'))
+      .sort()
+  : [];
+for (const name of existsSync(PATCHES) ? readdirSync(PATCHES) : []) {
+  if (!name.endsWith('.css')) fail(`site/patches/${name} 不是 .css（补丁目录只许放 <页面名>.css）`);
+}
+for (const name of patchFiles) {
+  const slug = name.replace(/\.css$/, '');
+  const path = join(PATCHES, name);
+  const rel = `site/patches/${name}`;
+  if (!SLUGS.includes(slug)) {
+    fail(`${rel} 是孤儿补丁（没有对应页面 site/${slug}.html）`);
+    continue;
+  }
+  if (!existsSync(join(SITE, `${slug}.html`))) fail(`${rel} 指向不存在的页面`);
+  const raw = readFileSync(path, 'utf8');
+  const code = raw.replace(/\/\*[\s\S]*?\*\//g, '');
+  const text = code.replace(/(^|[^:])\/\/[^\n]*/g, '$1');
+
+  // ① 可重放：字节级自洽（LF、非空、补丁文件必须真的声明了东西）
+  if (raw.trim() === '') fail(`${rel} 是空文件（存在即生效 ⇒ 空补丁会关掉缩放却不给版式）`);
+  if (raw.includes('\r')) fail(`${rel} 含 CR（本仓库统一 LF）`);
+  if (!raw.endsWith('\n')) fail(`${rel} 结尾不是换行（LF 纪律）`);
+
+  // ② 可解析：注释与括号配平
+  const comments = raw.match(/\/\*[\s\S]*?\*\//g) ?? [];
+  if (raw.split('/*').length !== raw.split('*/').length) fail(`${rel} 注释块没有配平`);
+  let depth = 0;
+  let paren = 0;
+  for (const ch of code.replace(/\/\*[\s\S]*?\*\//g, '')) {
+    if (ch === '{') depth += 1;
+    else if (ch === '}') depth -= 1;
+    else if (ch === '(') paren += 1;
+    else if (ch === ')') paren -= 1;
+    if (depth < 0 || paren < 0) break;
+  }
+  if (depth !== 0) fail(`${rel} 花括号不配平（${String(depth)}）`);
+  if (paren !== 0) fail(`${rel} 圆括号不配平（${String(paren)}）`);
+  if (comments.length === 0) fail(`${rel} 没有说明性注释（补丁必须写清它为什么这么改）`);
+
+  // ③ 自包含 + 结果确定
+  if (/@import/.test(text)) fail(`${rel} 用了 @import（补丁必须自包含，加载次序不得影响结果）`);
+  if (EXTERNAL_LOAD.test(raw)) fail(`${rel} 引用了外部资源（禁 CDN）`);
+  if (/fit-stage/.test(text)) {
+    fail(`${rel} 引用了 #fit-stage（补丁页根本不装缩放 ⇒ 这里的规则永远不会命中，是死代码）`);
+  }
+  if (/\.demo-nav|\.app-state/.test(text)) {
+    fail(`${rel} 改了共享层浮层（.demo-nav/.app-state 归 base.css，补丁不许碰）`);
+  }
+
+  // ④ 只用既有 token：hex 必须来自 DESIGN.md 色板
+  for (const hex of text.match(/#[0-9A-Fa-f]{6}(?![0-9A-Fa-f])/g) ?? []) {
+    if (!PALETTE.hexes.has(hex.toUpperCase())) {
+      fail(`${rel} 出现 DESIGN.md 色板外的色值 ${hex}（禁止发明新颜色）`);
+    }
+  }
+  if (hasEmoji(text)) fail(`${rel} 含 emoji`);
+  if (PURE_BLACK.test(visibleInk(text))) fail(`${rel} 用了纯黑`);
+
+  // ⑤ 缩放逃生开关必须真的由共享层打开（这条由 page.js 保证，这里只确认页面脚本在场）
+  const script = join(APP, `page-${slug}.js`);
+  if (!existsSync(script)) fail(`${rel} 的页面没有 site/app/page-${slug}.js（补丁永远不会被加载）`);
+}
+notes.push(
+  `发布版补丁：${String(patchFiles.length)} 个（流体页 ${patchFiles.map((n) => n.replace(/\.css$/, '')).join('、') || '无'}）`,
+);
+
+// ── 8. site/ 里不该有临时产物 ──────────────────────────────────────
 for (const name of readdirSync(SITE)) {
   if (/^\.tmp|^_tmp|\.tmp-/.test(name)) fail(`site/${name} 是临时产物（不该进发布目录）`);
 }

@@ -1,0 +1,220 @@
+/*
+ * 发布版补丁 · river（河道）—— 流体版式（W5-A，见 docs/deploy-plan-html.md §20）。
+ *
+ * 为什么需要补丁：这份定稿是 1440×900 的固定画布 + 绝对定位，靠 site/app/fit.js 整体等比缩放
+ * 一屏适配。缩放能让"一屏永远完整"，但任何窗口比例都只是把同一张画布放大/裁掉，
+ * 不是"随视口重排"。补丁把这页的版式改成视口派生：**存在即生效**（page.js 探测到它就不再装缩放）。
+ *
+ * 三层坐标模型（全页只有这三个自由度，别再加第四个）：
+ *   --u  一个"设计 px" = max(100vw/1440, 100dvh/900)（**cover**）。
+ *        只给**贴在水体上的东西**用：五条沟槽层的圆心/半径/沟距、svg.canvas 的尺寸。
+ *        cover 保证水体永远铺满视口、不留边；圆心 (1420,960) 按同一比例外移 ⇒ 宽高比 ≥ 16:10 时
+ *        盘缘那条弧落在相对位置几乎不变的地方（"盘子还是那个盘子"）。
+ *   %    视口比例。给**属于外框**的东西用：标题区 / 右上 RPM 区 / 页脚 / 两个泊位的落点。
+ *        这些本来就是"贴着版心边缘"的，百分比让它们贴着视口边缘。
+ *   px   字号一律留 px（h1 84px 就还是 84px）—— 大屏不变胖、小窗不糊，这是 §20 的硬要求。
+ *        只有泊位半径用 clamp()：它是图形的一部分、又是可点区域，不能无限放大或缩到点不到。
+ *
+ * 装饰母题（水线/沟槽/掠光）**一起流体化**：所有圆心的 px 都换成 calc(N * var(--u))，
+ * 沟距（11px / 4.4px）同比例缩放 ⇒ 两个半径档之间的沟数恒定，读数不变形。
+ */
+
+:root {
+  --u: max(calc(100vw / 1440), calc(100dvh / 900));
+}
+
+/* 画布 → 视口：定稿的 html,body{width:1440px;height:900px} 换成铺满视口的一屏 */
+html,
+body {
+  width: 100vw;
+  height: 100dvh;
+  overflow: hidden;
+}
+
+/* ── 水体五层：圆心/半径/沟距全部按 --u 走（铺满视口，不留边） ───────────── */
+.platter {
+  background:
+    radial-gradient(
+      circle at calc(1420 * var(--u)) calc(960 * var(--u)),
+      rgba(2, 9, 13, 0) 0 calc(1276 * var(--u)),
+      rgba(2, 9, 13, 0.52) calc(1285 * var(--u)),
+      rgba(2, 9, 13, 0) calc(1366 * var(--u))
+    ),
+    rgba(127, 209, 217, 0.022);
+}
+
+.body {
+  background: radial-gradient(
+    circle at calc(1420 * var(--u)) calc(960 * var(--u)),
+    rgba(127, 209, 217, 0.055) 0 calc(1210 * var(--u)),
+    rgba(127, 209, 217, 0) calc(1330 * var(--u))
+  );
+}
+
+.field {
+  -webkit-mask-image: radial-gradient(
+    circle at calc(1420 * var(--u)) calc(960 * var(--u)),
+    transparent 0 calc(930 * var(--u)),
+    #fff calc(990 * var(--u)),
+    #fff calc(1258 * var(--u)),
+    transparent calc(1300 * var(--u))
+  );
+  mask-image: radial-gradient(
+    circle at calc(1420 * var(--u)) calc(960 * var(--u)),
+    transparent 0 calc(930 * var(--u)),
+    #fff calc(990 * var(--u)),
+    #fff calc(1258 * var(--u)),
+    transparent calc(1300 * var(--u))
+  );
+}
+
+.field i {
+  background: repeating-radial-gradient(
+    circle at calc(1420 * var(--u)) calc(960 * var(--u)),
+    rgba(214, 241, 247, 0.03) 0 1px,
+    rgba(214, 241, 247, 0) 1px calc(4.4 * var(--u))
+  );
+  -webkit-mask-image: radial-gradient(
+    circle at 0 0,
+    transparent 0 calc(340 * var(--u)),
+    #fff calc(820 * var(--u))
+  );
+  mask-image: radial-gradient(circle at 0 0, transparent 0 calc(340 * var(--u)), #fff calc(820 * var(--u)));
+}
+
+.center {
+  background: repeating-radial-gradient(
+    circle at calc(1420 * var(--u)) calc(960 * var(--u)),
+    rgba(216, 243, 246, 0.07) 0 1.25px,
+    rgba(216, 243, 246, 0) 1.25px calc(11 * var(--u))
+  );
+  -webkit-mask-image: radial-gradient(
+    circle at calc(1420 * var(--u)) calc(960 * var(--u)),
+    transparent 0 calc(340 * var(--u)),
+    #fff calc(400 * var(--u)),
+    #fff calc(790 * var(--u)),
+    transparent calc(880 * var(--u))
+  );
+  mask-image: radial-gradient(
+    circle at calc(1420 * var(--u)) calc(960 * var(--u)),
+    transparent 0 calc(340 * var(--u)),
+    #fff calc(400 * var(--u)),
+    #fff calc(790 * var(--u)),
+    transparent calc(880 * var(--u))
+  );
+}
+
+.light {
+  background:
+    radial-gradient(
+      circle at calc(1420 * var(--u)) calc(960 * var(--u)),
+      rgba(210, 240, 246, 0) calc(980 * var(--u)),
+      rgba(210, 240, 246, 0.034) calc(1060 * var(--u)),
+      rgba(210, 240, 246, 0) calc(1140 * var(--u))
+    ),
+    linear-gradient(
+      101deg,
+      rgba(206, 238, 245, 0) 26%,
+      rgba(206, 238, 245, 0.03) 40%,
+      rgba(228, 247, 252, 0.058) 50%,
+      rgba(206, 238, 245, 0.05) 53%,
+      rgba(206, 238, 245, 0.012) 55%,
+      rgba(206, 238, 245, 0.006) 62%,
+      rgba(206, 238, 245, 0) 74%
+    );
+  -webkit-mask-image: radial-gradient(
+    circle at calc(1420 * var(--u)) calc(960 * var(--u)),
+    #fff 0 calc(1258 * var(--u)),
+    transparent calc(1300 * var(--u))
+  );
+  mask-image: radial-gradient(
+    circle at calc(1420 * var(--u)) calc(960 * var(--u)),
+    #fff 0 calc(1258 * var(--u)),
+    transparent calc(1300 * var(--u))
+  );
+}
+
+/* 矢量层（标签盘 / 四条擦痕 / 单支路箭头）与水体同尺度：整块按 --u 放大，viewBox 一比一落地 */
+svg.canvas {
+  left: 0;
+  top: 0;
+  right: auto;
+  bottom: auto;
+  width: calc(1440 * var(--u));
+  height: calc(900 * var(--u));
+}
+
+/* ── 外框：标题区 / 右上 RPM 区 / 页脚 —— 贴视口，不跟水体缩放 ──────────────
+ * `!important` 是**必需**的：这两个区块的落点写在 HTML 的 style 属性里（§8「HTML 是源、不许改」），
+ * 只有 !important 的样式表声明才压得住内联声明。`:has()` 用来选中它们而不改 HTML：
+ * 标题区 = 含 h1 的覆盖层，RPM 区 = 含 .rpm 的那个。 */
+.ov:has(h1) {
+  left: 5.28% !important;
+  top: 10.67% !important;
+  width: 36.1% !important;
+}
+
+.ov:has(.rpm) {
+  left: 79.86% !important;
+  top: 12.44% !important;
+  width: 18.5% !important;
+}
+
+footer {
+  left: 5.28%;
+  right: 5.28%;
+  bottom: 3.33%;
+}
+
+/* ── 两个泊位：落点跟视口（百分比），半径用 clamp（可点区域不能缩没、也不无限放大） ── */
+.port.draw {
+  left: 4.17% !important;
+  top: 44.44% !important;
+  width: clamp(120px, 13.2vw, 210px) !important;
+  height: clamp(120px, 13.2vw, 210px) !important;
+}
+
+.port.cast {
+  left: 26.39% !important;
+  top: 60% !important;
+  width: clamp(96px, 10.4vw, 168px) !important;
+  height: clamp(96px, 10.4vw, 168px) !important;
+}
+
+/* 泊位上的字随半径走：它是图形的一部分，固定 px 在大屏会读成"点了颗痣" */
+.port .core {
+  font-size: clamp(14px, 1.39vw, 21px);
+  letter-spacing: 0.12em;
+}
+
+.port .core span {
+  font-size: clamp(8px, 0.7vw, 11px);
+}
+
+/* 说明文字的落点跟着自己那颗泊位走（121%/21% 就是定稿的 230/190 与 40/190），宽度 px + clamp */
+.port .cap {
+  font-size: 12.5px;
+}
+
+.port.draw .cap {
+  left: 121% !important;
+  top: 21% !important;
+  width: clamp(210px, 16.7vw, 270px) !important;
+}
+
+.port.cast .cap {
+  left: -120% !important;
+  top: 110% !important;
+  width: clamp(240px, 20.8vw, 320px) !important;
+}
+
+/* 页脚：标签按钮保持 px 内边距；右端的"去公海"链接限宽，免得窄窗里把标签挤成两行 */
+footer .go {
+  max-width: 46%;
+}
+
+/* 大标题是全页唯一的"尺度锚"：留 px 会在大屏上被水体的尺度压住，所以给一个上限很紧的 clamp
+ *（1440 下正好 84px = 定稿值 ⇒ 基准尺寸下与定稿逐像素一致） */
+h1 {
+  font-size: clamp(72px, 5.83vw, 112px);
+}

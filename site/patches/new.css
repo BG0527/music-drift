@@ -1,0 +1,149 @@
+/*
+ * 发布版补丁 · new（选歌 · 五只浅盆）—— 流体版式（W5-A，见 docs/deploy-plan-html.md §20）。
+ *
+ * 这页的骨架是**五格盆架**：HTML 里五只 `.bay` 写死在 left:76/336.5/597/857.5/1118px，
+ * 而盆本身画在 `svg.art` 里（五个 `<g transform="translate(...)">`），两套坐标必须一起动，
+ * 否则"文字在盆外、盆在别处"。所以这里**不改成 flex**：盆架的几何（盆心、盆距 260.5px、
+ * 盆口椭圆）是一张图，按 --u 整块缩放；文字留在盆的框里，字号留 px。
+ *   --u  一个"设计 px" = max(100vw/1440, 100dvh/900)（cover）：铺满视口、不留边，
+ *        圆心 (1420,960) 与盆心一起外移 ⇒ 盘子/盆的读数不变形。
+ *   %    只给"仪器面板之上的外框"用：标题区 / 右上计数区 / 页脚（它们本来就贴着版心边缘）。
+ *   px   字号；容器尺寸用 clamp() 收口，免得大屏上一条 44px 的搜索条被拉成 78px 的空带。
+ */
+
+:root {
+  --u: max(calc(100vw / 1440), calc(100dvh / 900));
+}
+
+html,
+body {
+  width: 100vw;
+  height: 100dvh;
+  overflow: hidden;
+}
+
+/* 盘面沟槽：圆心/沟距按 --u（与 river 同一套母题） */
+.platter {
+  background:
+    repeating-radial-gradient(
+      circle at calc(1420 * var(--u)) calc(960 * var(--u)),
+      rgba(216, 243, 246, 0.055) 0 1.2px,
+      transparent 1.2px calc(6.5 * var(--u))
+    ),
+    radial-gradient(
+      circle at calc(1420 * var(--u)) calc(960 * var(--u)),
+      rgba(127, 209, 217, 0.05) 0 30%,
+      transparent 68%
+    );
+}
+
+/* 盆沉进"深处"的那一层暗：定稿是 200px，按视口高度给（大屏不至于只剩一条边） */
+.deep {
+  height: clamp(120px, 22dvh, 340px);
+}
+
+/* ── 外框：标题区 / 右上计数 / 页脚 ───────────────────────────────────── */
+header {
+  left: 5.28%;
+  top: clamp(28px, 7.8dvh, 88px);
+}
+
+.tally {
+  right: 5.28%;
+  top: clamp(28px, 7.8dvh, 88px);
+}
+
+footer {
+  right: 5.28%;
+  bottom: 2.44%;
+}
+
+/* ── 仪器面板：搜索条 / 状态说明 —— 横向按视口比例，纵向跟盆架同一尺度（--u） ────── */
+.plate {
+  left: 5.28% !important;
+  top: calc(236 * var(--u)) !important;
+  width: 58.61% !important;
+  height: clamp(38px, 3.06vw, 58px) !important;
+}
+
+.states {
+  left: 5.28% !important;
+  top: calc(292 * var(--u)) !important;
+  width: 58.61% !important;
+}
+
+/* ── 盆架：五格与 `svg.art` 用同一个 --u ⇒ 文字与盆永远对得上 ─────────────── */
+svg.art {
+  left: 0;
+  top: 0;
+  right: auto;
+  bottom: auto;
+  width: calc(1440 * var(--u));
+  height: calc(900 * var(--u));
+}
+
+.bay {
+  top: calc(366 * var(--u)) !important;
+  width: calc(246 * var(--u)) !important;
+  /* 格高（= 盆槽那条竖线的长度）取"定稿 430 设计 px"与"到页脚上方为止"两者的较小值：
+   * 短视口下页脚被钉在视口底边，而格底是缩放出来的 —— 两者会在 1280×720 撞上（实测重叠 46%）。 */
+  height: min(calc(430 * var(--u)), calc(100dvh - calc(366 * var(--u)) - 11dvh)) !important;
+}
+
+/* 五格的落点 = 定稿的 76 + (n-1) × 260.5（盆心在格心，盆距就是格距）；
+ * HTML 的 style 属性由 page-new.js 原样克隆 ⇒ 必须 !important 才压得住。 */
+.bay:nth-child(1) {
+  left: calc(76 * var(--u)) !important;
+}
+
+.bay:nth-child(2) {
+  left: calc(336.5 * var(--u)) !important;
+}
+
+.bay:nth-child(3) {
+  left: calc(597 * var(--u)) !important;
+}
+
+.bay:nth-child(4) {
+  left: calc(857.5 * var(--u)) !important;
+}
+
+.bay:nth-child(5) {
+  left: calc(1118 * var(--u)) !important;
+}
+
+/* 盆沿那两条线的高度差是每格自己的（定稿内联 0/6/2/8/4px）：一起按 --u 走，别让它跑出盆口 */
+.bay:nth-child(2) .edge {
+  top: calc(6 * var(--u)) !important;
+}
+
+.bay:nth-child(3) .edge {
+  top: calc(2 * var(--u)) !important;
+}
+
+.bay:nth-child(4) .edge {
+  top: calc(8 * var(--u)) !important;
+}
+
+.bay:nth-child(5) .edge {
+  top: calc(4 * var(--u)) !important;
+}
+
+.edge {
+  height: calc(58 * var(--u)) !important;
+}
+
+/* 干盆的说明文字：宽度跟着格子走（定稿 218px 是按 246px 的格宽写的） */
+.note {
+  width: calc(218 * var(--u)) !important;
+}
+
+/* 大标题：1440 下正好是定稿的 56px */
+h1 {
+  font-size: clamp(34px, 3.89vw, 72px);
+}
+
+/* 导语：定稿 820px 是按 1440 版心写的，大屏给一点余量、小窗收窄 */
+.sub {
+  max-width: clamp(420px, 57vw, 900px);
+}

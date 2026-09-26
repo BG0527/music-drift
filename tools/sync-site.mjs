@@ -112,7 +112,7 @@ if (missing > 0) {
   );
 }
 
-// 反向检查：site/ 里不该有不在名单内的 .html（防"手写的第 12 页"）
+// 反向检查一：site/ 里不该有不在名单内的 .html（防"手写的第 12 页"）
 const strays = readdirSync(OUT_DIR)
   .filter((n) => n.endsWith('.html'))
   .filter((n) => !PAGES.some(([, target]) => target === n));
@@ -120,3 +120,26 @@ if (strays.length > 0) {
   console.error(`✗ site/ 里有名单外的页面：${strays.join(', ')}（发布副本必须全部来自设计稿）`);
   process.exitCode = 1;
 }
+
+/**
+ * 反向检查二：**发布版补丁**（`site/patches/<slug>.css`，见 `docs/deploy-plan-html.md` §20）。
+ *
+ * 口径与上面的"名单外页面/孤儿脚本"一致：**目录本身是合法的（不是"多出来的文件"）**，
+ * 但里面的每一个补丁都必须指向名单内的页面；名单内页面没有补丁也合法（还没流体化，走等比缩放兜底）。
+ * 这里只查"有没有对不上号"，补丁内容由 `tools/site-guard.mjs` 第 7 类管。
+ */
+const patchDir = join(OUT_DIR, 'patches');
+const patchNames = existsSync(patchDir) ? readdirSync(patchDir).sort() : [];
+const slugs = new Set(PAGES.map(([, target]) => target.replace(/\.html$/, '')));
+const strayPatches = patchNames.filter((n) => !n.endsWith('.css') || !slugs.has(n.replace(/\.css$/, '')));
+if (strayPatches.length > 0) {
+  console.error(
+    `✗ site/patches/ 里有对不上页面的条目：${strayPatches.join(', ')}（补丁名必须等于页面名，如 river.css）`,
+  );
+  process.exitCode = 1;
+}
+const patched = patchNames.filter((n) => n.endsWith('.css')).map((n) => n.replace(/\.css$/, ''));
+console.log(
+  `\n发布版补丁：${String(patched.length)} 个${patched.length === 0 ? '' : `（${patched.join('、')}）`}` +
+    `；未流体化的页面继续走 site/app/fit.js 等比缩放`,
+);
