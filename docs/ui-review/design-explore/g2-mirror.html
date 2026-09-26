@@ -1,0 +1,354 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <title>G2 · 倒影 Mirror — 一条河与它的影子</title>
+    <style>
+      @import url('/node_modules/.pnpm/lxgw-wenkai-webfont@1.7.0/node_modules/lxgw-wenkai-webfont/lxgwwenkai-regular.css');
+      @import url('/node_modules/.pnpm/lxgw-wenkai-webfont@1.7.0/node_modules/lxgw-wenkai-webfont/lxgwwenkai-bold.css');
+      @import url('/node_modules/.pnpm/@fontsource+quattrocento@5.3.0/node_modules/@fontsource/quattrocento/400.css');
+      @import url('/node_modules/.pnpm/@fontsource+quattrocento@5.3.0/node_modules/@fontsource/quattrocento/700.css');
+
+      :root {
+        --deep: #03131b;
+        --pale: #e2f1f4;
+        --mist: #93b6c1;
+        --dim: #6d97a5;
+        --glow: #7ed4de;
+        --warm: #dcae72;
+      }
+      * { box-sizing: border-box; margin: 0; padding: 0; }
+      html, body { width: 1440px; height: 900px; overflow: hidden; }
+      body {
+        background: var(--deep);
+        color: var(--pale);
+        font-family: 'LXGW WenKai', serif;
+        -webkit-font-smoothing: antialiased;
+      }
+      .canvas { position: relative; width: 1440px; height: 900px; overflow: hidden; }
+      .bg { position: absolute; inset: 0; width: 1440px; height: 900px; }
+
+      /* ── 页眉：只做归属，不抢画 ── */
+      .bar {
+        position: absolute; left: 0; right: 0; top: 0; height: 58px; z-index: 6;
+        display: flex; align-items: center; gap: 40px; padding: 0 44px;
+        border-bottom: 1px solid rgba(147, 182, 193, .14);
+      }
+      .brand { display: flex; align-items: center; gap: 9px; font-size: 15px; font-weight: 700; }
+      .bar nav { display: flex; gap: 26px; margin-left: 22px; }
+      .bar nav a { color: var(--dim); text-decoration: none; font-size: 14px; }
+      .bar nav a[aria-current] { color: var(--pale); }
+      .bar .me { margin-left: auto; display: flex; align-items: center; gap: 9px; font-size: 13px; color: var(--dim); }
+      .bar .me i { display: block; width: 24px; height: 24px; border-radius: 50%; border: 1px solid rgba(126, 212, 222, .5); background: rgba(126, 212, 222, .1); }
+
+      /* ── 标题：落在岸上那半的空档里，不与任何一条河相碰 ── */
+      .title-block { position: absolute; left: 104px; top: 194px; width: 470px; z-index: 5; }
+      h1 { font-size: 74px; font-weight: 700; line-height: 1; letter-spacing: .02em; }
+      .sub { margin-top: 22px; font-size: 16px; line-height: 1.75; color: var(--mist); max-width: 340px; }
+
+      /* ── 两枚等权圆形按钮：圆 + 同心环，骑在水线上 ── */
+      .act {
+        position: absolute; width: 96px; height: 96px; z-index: 7;
+        display: flex; align-items: center; justify-content: center;
+        background: none; border: 0; padding: 0;
+        font-family: inherit; font-size: 22px; font-weight: 700; letter-spacing: .16em;
+        color: var(--pale); cursor: pointer;
+      }
+      .act.draw { left: 482px; top: 402px; }
+      .act.cast { left: 602px; top: 402px; }
+      .act span { transform: translateX(.08em); }
+
+      /* ── 说明：左右分置，落在画面最下面一带 ── */
+      .desc { position: absolute; z-index: 5; font-size: 13.5px; line-height: 1.85; color: var(--mist); }
+      .desc.draw { left: 150px; top: 748px; width: 420px; text-align: right; }
+      .desc.cast { left: 920px; top: 772px; width: 410px; }
+
+      /* 水线读数：一段平常中文，不用「·」串元信息 */
+      .readout { position: absolute; top: 400px; z-index: 6; font-size: 13px; color: var(--dim); }
+      .readout.up { left: 104px; }
+      .readout.down { right: 104px; text-align: right; }
+
+      /* ── 页脚：一行标签 + 那个链接 ── */
+      .foot {
+        position: absolute; left: 0; right: 0; bottom: 0; height: 58px; z-index: 8;
+        display: flex; align-items: center; gap: 10px; padding: 0 44px;
+        border-top: 1px solid rgba(147, 182, 193, .14);
+        background: linear-gradient(180deg, rgba(3, 19, 27, 0), rgba(3, 19, 27, .94) 46%);
+      }
+      .tag {
+        font-family: inherit; font-size: 13px; color: var(--mist); cursor: pointer;
+        padding: 6px 17px; border-radius: 999px; border: 1px solid rgba(147, 182, 193, .26);
+        background: rgba(255, 255, 255, .02);
+      }
+      .tag[aria-pressed='true'] { color: var(--pale); border-color: rgba(126, 212, 222, .62); background: rgba(126, 212, 222, .1); }
+      .foot a { margin-left: 26px; font-size: 13.5px; color: var(--glow); text-decoration: none; border-bottom: 1px solid rgba(126, 212, 222, .34); padding-bottom: 2px; }
+
+      @media (prefers-reduced-motion: reduce) { * { animation: none !important; } }
+    </style>
+  </head>
+  <body>
+    <div class="canvas">
+      <!--
+        构图机制只有一个：一条水平镜轴（y = 450）。
+        岸上那两条河与水里那两条不是"画得像" —— 它们是同一批 <path>，
+        水里那两条由 transform="translate(0,900) scale(1,-1)" 生成，连控制点都对得上。
+        四条带子交错排布，上下各留一段空档放字：
+          岸上 76-170 / 284-364  ‖  水里 536-616 / 740-824
+        水里被换掉了东西：天上漂的是声线、星子与「接住这句」；水里沉着一只瓶、一条半句、一声心跳。
+      -->
+      <svg class="bg" viewBox="0 0 1440 900" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+        <defs>
+          <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stop-color="#020f18" />
+            <stop offset=".4" stop-color="#072a3b" />
+            <stop offset=".78" stop-color="#0d4356" />
+            <stop offset="1" stop-color="#136678" />
+          </linearGradient>
+          <linearGradient id="water" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stop-color="#1b7887" />
+            <stop offset=".11" stop-color="#0e5468" />
+            <stop offset=".5" stop-color="#072e3d" />
+            <stop offset="1" stop-color="#021017" />
+          </linearGradient>
+          <radialGradient id="moon" cx=".5" cy=".5" r=".5">
+            <stop offset="0" stop-color="#d9f2f6" stop-opacity=".44" />
+            <stop offset=".5" stop-color="#8fdce6" stop-opacity=".11" />
+            <stop offset="1" stop-color="#8fdce6" stop-opacity="0" />
+          </radialGradient>
+          <radialGradient id="halo" cx=".5" cy=".5" r=".5">
+            <stop offset="0" stop-color="#a8ecf3" stop-opacity=".46" />
+            <stop offset=".6" stop-color="#a8ecf3" stop-opacity=".1" />
+            <stop offset="1" stop-color="#a8ecf3" stop-opacity="0" />
+          </radialGradient>
+          <radialGradient id="glow" cx=".5" cy=".5" r=".5">
+            <stop offset="0" stop-color="#8fe4ee" stop-opacity=".34" />
+            <stop offset="1" stop-color="#8fe4ee" stop-opacity="0" />
+          </radialGradient>
+          <linearGradient id="glass" x1="0" y1="0" x2="1" y2="0">
+            <stop offset="0" stop-color="#cdeff4" stop-opacity=".36" />
+            <stop offset=".4" stop-color="#4fb6c6" stop-opacity=".16" />
+            <stop offset="1" stop-color="#a8ecf3" stop-opacity=".3" />
+          </linearGradient>
+          <linearGradient id="caustic" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stop-color="#9fe8ef" stop-opacity="0" />
+            <stop offset=".3" stop-color="#bdeef6" stop-opacity=".24" />
+            <stop offset=".62" stop-color="#dcae72" stop-opacity=".24" />
+            <stop offset="1" stop-color="#dcae72" stop-opacity="0" />
+          </linearGradient>
+          <linearGradient id="shaft" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stop-color="#cdeff4" stop-opacity=".3" />
+            <stop offset="1" stop-color="#cdeff4" stop-opacity="0" />
+          </linearGradient>
+
+          <!-- 水波：把倒影交给湍流揉碎，再留一条横向的错位重影 -->
+          <filter id="watery" x="-10%" y="-10%" width="120%" height="120%" color-interpolation-filters="sRGB">
+            <feTurbulence type="fractalNoise" baseFrequency="0.004 0.026" numOctaves="3" seed="6" result="n">
+              <animate attributeName="seed" values="6;13;20;6" dur="24s" repeatCount="indefinite" />
+            </feTurbulence>
+            <feDisplacementMap in="SourceGraphic" in2="n" scale="17" xChannelSelector="R" yChannelSelector="G" result="w" />
+            <feGaussianBlur in="w" stdDeviation="0.7" />
+          </filter>
+
+          <clipPath id="waterClip"><rect x="0" y="450" width="1440" height="450" /></clipPath>
+          <clipPath id="drawClip"><circle cx="530" cy="450" r="46" /></clipPath>
+          <clipPath id="castClip"><circle cx="650" cy="450" r="46" /></clipPath>
+
+          <!-- 岸上的两条河：每对控制点上下间隔都是 80，镜像后绝不会叠在一起 -->
+          <path id="riverUp" d="M-40 46 Q 430 126 720 114 Q 1010 102 1480 90" fill="none" />
+          <path id="riverLow" d="M-40 238 Q 430 200 720 220 Q 1010 244 1480 208" fill="none" />
+
+          <!-- 天上漂的一张八分音符：它只属于岸上，水里会换成别的东西 -->
+          <g id="note">
+            <ellipse cx="7" cy="16" rx="6.6" ry="5" transform="rotate(-22 7 16)" />
+            <path d="M12.8 16 V0 q 7.6 1.6 8.8 7.8" fill="none" stroke-width="1.8" />
+          </g>
+
+          <!-- 水里的瓶：窄颈、厚肩、圆底 -->
+          <g id="bottle">
+            <path d="M-38 -74 h76 v20 c0 14 9 19 17 29 c 9 11 15 20 15 34 v134 c0 20 -12 28 -30 28 h-80 c-18 0 -30 -8 -30 -28 v-134 c0 -14 6 -23 15 -34 c 8 -10 17 -15 17 -29 z"
+                  fill="url(#glass)" stroke="rgba(220,246,250,.8)" stroke-width="2.4" />
+            <rect x="-32" y="-96" width="64" height="24" rx="8" fill="rgba(220,246,250,.2)" stroke="rgba(220,246,250,.66)" stroke-width="2" />
+            <rect x="-24" y="-108" width="48" height="15" rx="5" fill="#c08a4e" opacity=".88" />
+          </g>
+        </defs>
+
+        <!-- ═══ 岸上 / 天上：y < 450 ═══ -->
+        <rect x="0" y="0" width="1440" height="450" fill="url(#sky)" />
+        <circle cx="1118" cy="96" r="210" fill="url(#moon)" />
+
+        <!-- 河一（远，在上）：河床 / 两道岸 / 中央流线 / 错位虚线与重影 -->
+        <use href="#riverUp" stroke="#a9d6de" stroke-opacity=".16" stroke-width="48" fill="none" />
+        <use href="#riverUp" stroke="#cdeff4" stroke-opacity=".44" stroke-width="1.7" fill="none" />
+        <use href="#riverUp" stroke="#dff3f7" stroke-opacity=".66" stroke-width="1.3" fill="none" transform="translate(0 21)" />
+        <use href="#riverUp" stroke="#9fe8ef" stroke-opacity=".28" stroke-width="1" stroke-dasharray="7 13" fill="none" transform="translate(0 42)" />
+        <use href="#riverUp" stroke="#9fe8ef" stroke-opacity=".15" stroke-width="1" fill="none" transform="translate(-13 0)" />
+
+        <!-- 河二（近，在下）：更粗、更亮 -->
+        <use href="#riverLow" stroke="#a9d6de" stroke-opacity=".13" stroke-width="44" fill="none" />
+        <use href="#riverLow" stroke="#dff3f7" stroke-opacity=".54" stroke-width="1.9" fill="none" />
+        <use href="#riverLow" stroke="#9fe8ef" stroke-opacity=".24" stroke-width="1.1" fill="none" transform="translate(0 -20)" />
+        <use href="#riverLow" stroke="#dff3f7" stroke-opacity=".18" stroke-width="1" stroke-dasharray="5 12" fill="none" transform="translate(0 22)" />
+
+        <!-- 天上漂着的东西 -->
+        <g stroke="rgba(214,242,246,.62)" stroke-width="1.8" stroke-linecap="round" fill="none">
+          <use href="#note" transform="translate(452,64) rotate(-16)" />
+          <use href="#note" transform="translate(596,58) rotate(7)" />
+          <use href="#note" transform="translate(978,74) rotate(15)" />
+          <use href="#note" transform="translate(1284,56) rotate(27)" />
+          <use href="#note" transform="translate(170,50) rotate(-30)" />
+          <use href="#note" transform="translate(300,164) rotate(-21)" />
+          <use href="#note" transform="translate(1130,176) rotate(-6)" />
+          <use href="#note" transform="translate(1372,146) rotate(19)" />
+        </g>
+        <text x="1290" y="222" fill="#dff3f7" fill-opacity=".62" font-size="20" letter-spacing="4" text-anchor="middle">接住这句</text>
+
+        <!-- ═══ 水线（镜轴）：画面里唯一一条绝对水平、亮得发白的线 ═══ -->
+        <ellipse cx="958" cy="451" rx="150" ry="15" fill="url(#halo)" />
+        <rect x="0" y="428" width="1440" height="30" fill="url(#caustic)" />
+        <path d="M0 450 H1440" stroke="#eafcfe" stroke-opacity=".48" stroke-width="1.1" />
+
+        <!-- ═══ 水里：y > 450，全部是岸上那半的镜像 ═══ -->
+        <g clip-path="url(#waterClip)">
+          <rect x="0" y="450" width="1440" height="450" fill="url(#water)" />
+
+          <!-- 水下光柱：水里自己的一层，天上没有 -->
+          <g fill="url(#shaft)" filter="url(#watery)">
+            <path d="M152 450 h74 l 44 358 h -128 z" opacity=".34" />
+            <path d="M906 450 h64 l 32 396 h -112 z" opacity=".3" />
+            <path d="M1256 450 h46 l 20 300 h -82 z" opacity=".26" />
+          </g>
+
+          <!-- 水面被揉出来的碎光：横向短笔触，靠近轴心最亮 -->
+          <g filter="url(#watery)" stroke="#dff3f7" stroke-linecap="round">
+            <path d="M96 470 H214" stroke-opacity=".4" stroke-width="1.7" />
+            <path d="M330 464 H430" stroke-opacity=".44" stroke-width="1.5" />
+            <path d="M760 476 H872" stroke-opacity=".34" stroke-width="1.7" />
+            <path d="M980 464 H1086" stroke-opacity=".4" stroke-width="1.5" />
+            <path d="M1220 472 H1352" stroke-opacity=".32" stroke-width="1.7" />
+            <path d="M1330 492 H1438" stroke-opacity=".26" stroke-width="1.5" />
+            <path d="M180 500 H300" stroke-opacity=".24" stroke-width="1.3" />
+            <path d="M680 498 H784" stroke-opacity=".22" stroke-width="1.3" />
+            <path d="M1100 494 H1222" stroke-opacity=".24" stroke-width="1.3" />
+            <path d="M360 540 H500" stroke-opacity=".15" stroke-width="1.2" />
+            <path d="M1268 536 H1392" stroke-opacity=".15" stroke-width="1.2" />
+          </g>
+
+          <!-- 镜像的河一：落在 536-616，正对岸上那两条带子之间的空档 -->
+          <g filter="url(#watery)" transform="translate(0,900) scale(1,-1)" fill="none">
+            <use href="#riverUp" stroke="#8ecbd6" stroke-opacity=".16" stroke-width="48" />
+            <use href="#riverUp" stroke="#bfe6ec" stroke-opacity=".32" stroke-width="1.7" />
+            <use href="#riverUp" stroke="#dff3f7" stroke-opacity=".46" stroke-width="1.3" transform="translate(0 21)" />
+            <use href="#riverUp" stroke="#9fe8ef" stroke-opacity=".22" stroke-width="1" stroke-dasharray="7 13" transform="translate(0 42)" />
+            <use href="#riverUp" stroke="#9fe8ef" stroke-opacity=".12" stroke-width="1" transform="translate(-13 0)" />
+          </g>
+
+          <!-- 镜像的河二：落在 682-736 -->
+          <g filter="url(#watery)" transform="translate(0,900) scale(1,-1)" fill="none">
+            <use href="#riverLow" stroke="#8ecbd6" stroke-opacity=".13" stroke-width="44" />
+            <use href="#riverLow" stroke="#bfe6ec" stroke-opacity=".36" stroke-width="1.9" />
+            <use href="#riverLow" stroke="#9fe8ef" stroke-opacity=".2" stroke-width="1.1" transform="translate(0 -20)" />
+            <use href="#riverLow" stroke="#cdeff4" stroke-opacity=".16" stroke-width="1" stroke-dasharray="5 12" transform="translate(0 22)" />
+          </g>
+
+          <!-- 水里换掉的东西①：那只瓶（落在左侧空档，与自己的倒影带、与说明文字都错开） -->
+          <g filter="url(#watery)" transform="translate(744,0)">
+            <ellipse cx="214" cy="550" rx="132" ry="106" fill="url(#halo)" />
+            <g transform="translate(214,520) rotate(-10)">
+              <g transform="scale(1,-1)">
+                <use href="#bottle" />
+              </g>
+              <g transform="scale(1,-1)">
+                <g transform="rotate(-14)" opacity=".95">
+                  <rect x="-21" y="-28" width="42" height="54" rx="5" fill="#e8dcbe" />
+                  <path d="M-12 -16 h24 M-12 -5 h24 M-12 6 h15" stroke="#a4936f" stroke-width="2" stroke-linecap="round" />
+                </g>
+              </g>
+            </g>
+          </g>
+
+          <!-- 水里换掉的东西②：沉在空档里的半句。天上那半句是「接住这句」 -->
+          <g filter="url(#watery)" fill="#dff3f7" letter-spacing="3" text-anchor="middle">
+            <g transform="translate(1204,506)">
+              <g transform="scale(1,-1)"><text y="0" font-size="20" fill-opacity=".5">留一半给</text></g>
+            </g>
+            <g transform="translate(192,700)">
+              <g transform="scale(1,-1)"><text y="0" font-size="19" fill-opacity=".34">还没说完</text></g>
+            </g>
+          </g>
+
+          <!-- 水里换掉的东西③：游过去的，是水里的一声心跳 -->
+          <g filter="url(#watery)" transform="translate(868,690) rotate(-7)" stroke="#cdeff4" fill="none">
+            <g transform="scale(1,-1)">
+              <path d="M0 0 q 17 -13 34 0 q -17 13 -34 0 z" stroke-opacity=".48" stroke-width="1.7" />
+              <path d="M34 0 l 15 -10 l 0 20 z" stroke-opacity=".44" stroke-width="1.6" />
+              <circle cx="9" cy="-1" r="1.5" fill="#cdeff4" fill-opacity=".5" stroke="none" />
+            </g>
+          </g>
+
+          <rect x="0" y="450" width="1440" height="450" fill="#02121a" opacity=".14" />
+        </g>
+
+        <!-- 镜轴复写在倒影之上：这条线是画面的唯一"绝对" -->
+        <path d="M0 450 H1440" stroke="#eafcfe" stroke-opacity=".48" stroke-width="1" />
+
+        <!-- ═══ 两枚圆：等权、各带一簇同心环，骑在轴上 ═══ -->
+        <g fill="none" clip-path="url(#drawClip)">
+          <circle cx="530" cy="422" r="86" stroke="#bdeef6" stroke-opacity=".22" stroke-width="1" />
+          <circle cx="530" cy="416" r="66" stroke="#bdeef6" stroke-opacity=".15" stroke-width="1" />
+          <circle cx="530" cy="410" r="47" stroke="#bdeef6" stroke-opacity=".1" stroke-width="1" />
+        </g>
+        <circle cx="530" cy="450" r="46" fill="#0b3e50" fill-opacity=".58" stroke="#bdeef6" stroke-opacity=".74" stroke-width="1.6" />
+        <circle cx="530" cy="450" r="46" fill="url(#glow)" />
+        <circle cx="530" cy="450" r="52" stroke="#7ed4de" stroke-opacity=".22" stroke-width="1" fill="none" />
+
+        <g fill="none" clip-path="url(#castClip)">
+          <circle cx="650" cy="478" r="86" stroke="#ffdcac" stroke-opacity=".2" stroke-width="1" />
+          <circle cx="650" cy="484" r="66" stroke="#ffdcac" stroke-opacity=".14" stroke-width="1" />
+          <circle cx="650" cy="490" r="47" stroke="#ffdcac" stroke-opacity=".09" stroke-width="1" />
+        </g>
+        <circle cx="650" cy="450" r="46" fill="#123a49" fill-opacity=".66" stroke="#f3d9b0" stroke-opacity=".66" stroke-width="1.6" />
+        <circle cx="650" cy="450" r="46" fill="url(#glow)" />
+        <circle cx="650" cy="450" r="52" stroke="#dcae72" stroke-opacity=".24" stroke-width="1" fill="none" />
+      </svg>
+
+      <header class="bar">
+        <div class="brand">
+          <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="#7ed4de" stroke-width="2" stroke-linecap="round">
+            <path d="M2 9c2.5-3 5-3 7.5 0s5 3 7.5 0 4.5-2.5 5 0" />
+            <path d="M2 16c2.5-3 5-3 7.5 0s5 3 7.5 0 4.5-2.5 5 0" />
+          </svg>
+          音乐漂流瓶
+        </div>
+        <nav>
+          <a href="#" aria-current="page">河道</a>
+          <a href="#">公海</a>
+          <a href="#">我的</a>
+        </nav>
+        <div class="me"><i></i>layoutmui6k36v</div>
+      </header>
+
+      <div class="title-block">
+        <h1>暖流河道</h1>
+        <p class="sub">河只有一条，瓶子一次只在一个人的手里。</p>
+      </div>
+
+      <div class="readout up">水面之上漂着下一句</div>
+      <div class="readout down">水面之下沉着上一棒</div>
+
+      <button class="act draw" type="button"><span>捞取</span></button>
+      <button class="act cast" type="button"><span>投下</span></button>
+
+      <p class="desc draw">捞取深水里传来的匿名哼唱，接续她的下一句。捞到即持有：同一时刻，同一条河道上只有你拿着它。</p>
+      <p class="desc cast">选一首歌，录下第 1 段，然后放进上游等一个陌生人接下一棒。</p>
+
+      <footer class="foot">
+        <button class="tag" type="button" aria-pressed="true">全部</button>
+        <button class="tag" type="button">深夜</button>
+        <button class="tag" type="button">通勤</button>
+        <button class="tag" type="button">告白</button>
+        <button class="tag" type="button">雨天</button>
+        <a href="#">先去公海听听已经完成的作品</a>
+      </footer>
+    </div>
+  </body>
+</html>
