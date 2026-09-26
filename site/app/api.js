@@ -113,16 +113,22 @@ function readErrorEnvelope(body) {
  *           signal?: AbortSignal, redirectOn401?: boolean }} [options]
  */
 export async function request(method, path, options = {}) {
-  const { body, query, headers, signal, redirectOn401 = true } = options;
-  const hasBody = body !== undefined && body !== null;
+  const { body, rawBody, query, headers, signal, redirectOn401 = true } = options;
+  const hasRaw = rawBody !== undefined && rawBody !== null;
+  const hasBody = !hasRaw && body !== undefined && body !== null;
 
   let response;
   try {
     response = await fetch(buildUrl(path, query), {
       method,
       credentials: 'same-origin',
-      headers: { ...(hasBody ? { 'content-type': JSON_CONTENT_TYPE } : {}), ...(headers ?? {}) },
+      headers: {
+        ...(hasBody ? { 'content-type': JSON_CONTENT_TYPE } : {}),
+        ...(hasRaw ? { 'content-type': rawBody.type || 'application/octet-stream' } : {}),
+        ...(headers ?? {}),
+      },
       ...(hasBody ? { body: JSON.stringify(body) } : {}),
+      ...(hasRaw ? { body: rawBody } : {}),
       ...(signal === undefined ? {} : { signal }),
     });
   } catch (cause) {
@@ -178,4 +184,27 @@ export function post(path, body, options = {}) {
 
 export function del(path, options = {}) {
   return request('DELETE', path, options);
+}
+
+/**
+ * 录音上传（**原始二进制协议**，见 `apps/api/src/routes/bottles.ts:273`）：
+ * `Content-Type` = 音频 MIME、body = 字节流、时长走 `x-audio-duration-ms` 头、附言走 `?note=`。
+ * 为什么单独开一个口子：JSON 通道会把 body `JSON.stringify` 掉，二进制必须原样发。
+ *
+ * @param {string} path 如 `/api/bottles/<id>/segments`
+ * @param {Blob} blob 录音（MediaRecorder 产出的 Blob，`type` 即音频 MIME）
+ * @param {{ durationMs?: number, note?: string, query?: Record<string, unknown>, signal?: AbortSignal,
+ *           redirectOn401?: boolean }} [options]
+ */
+export function postAudio(path, blob, options = {}) {
+  const { durationMs, note, query, signal, redirectOn401 } = options;
+  return request('POST', path, {
+    rawBody: blob,
+    query: { ...(note === undefined || note === '' ? {} : { note }), ...(query ?? {}) },
+    headers: {
+      ...(durationMs === undefined ? {} : { 'x-audio-duration-ms': String(Math.round(durationMs)) }),
+    },
+    ...(signal === undefined ? {} : { signal }),
+    ...(redirectOn401 === undefined ? {} : { redirectOn401 }),
+  });
 }
