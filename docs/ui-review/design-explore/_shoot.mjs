@@ -7,12 +7,16 @@
  * 就不是真实排版，方案对比会失真。
  *
  * 用法：node docs/ui-review/design-explore/_shoot.mjs
+ *
+ * 说明：脚本跑在 Node 里，但 `page.evaluate` 的回调在**页面上下文**执行，所以这里显式声明浏览器全局
+ * （与 `apps/web/tools/one-screen-check.mjs` 同一套写法；`console` 是 CLI 的正当输出，故关掉该规则）。
  */
+/* eslint-disable no-console */
+/* global document, getComputedStyle */
 import { createServer } from 'node:http';
 import { readdirSync, readFileSync, existsSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { extname, join, normalize } from 'node:path';
-import { createRequire } from 'node:module';
 
 const ROOT = normalize('D:/Develop/projects/music');
 const DIR = join(ROOT, 'docs', 'ui-review', 'design-explore');
