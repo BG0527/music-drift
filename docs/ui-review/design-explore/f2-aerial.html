@@ -23,17 +23,17 @@
 
       .port { position:absolute; display:grid; place-items:center; cursor:pointer; }
       .port i { position:absolute; border-radius:50%; }
-      .port .r1 { inset:0; border:1px solid rgba(127,209,217,.4); }
-      .port .r2 { inset:26px; border:1px solid rgba(127,209,217,.5); }
-      .port .r3 { inset:52px; border:1px solid rgba(240,252,254,.6); }
-      .port .core { position:relative; width:118px; height:118px; border-radius:50%; display:grid; place-items:center; gap:3px;
-        font-family:inherit; font-size:19px; font-weight:700; letter-spacing:.14em; color:#fff; }
-      .port .core span { font-size:10px; letter-spacing:.28em; opacity:.75; font-weight:400; }
-      .draw .core { background:linear-gradient(180deg,#12798d,#0b4e5b); box-shadow:0 0 0 8px rgba(4,20,26,.72), 0 0 56px rgba(42,157,177,.6); }
-      .cast .core { background:linear-gradient(180deg,#d2502f,#9d4125); box-shadow:0 0 0 8px rgba(4,20,26,.72), 0 0 56px rgba(199,69,44,.55); }
-      .port .cap { position:absolute; width:280px; font-size:12.5px; line-height:1.7; color:var(--muted);
+      .port .r1 { inset:0; border:1px solid rgba(127,209,217,.42); }
+      .port .r2 { inset:30px; border:1px solid rgba(127,209,217,.52); }
+      .port .r3 { inset:60px; border:1px solid rgba(240,252,254,.62); }
+      .port .core { position:relative; width:142px; height:142px; border-radius:50%; display:grid; place-items:center; gap:3px;
+        font-family:inherit; font-size:22px; font-weight:700; letter-spacing:.14em; color:#fff; }
+      .port .core span { font-size:11px; letter-spacing:.3em; opacity:.75; font-weight:400; }
+      .draw .core { background:linear-gradient(180deg,#12798d,#0b4e5b); box-shadow:0 0 0 9px rgba(4,20,26,.72), 0 0 64px rgba(42,157,177,.62); }
+      .cast .core { background:linear-gradient(180deg,#d2502f,#9d4125); box-shadow:0 0 0 9px rgba(4,20,26,.72), 0 0 64px rgba(199,69,44,.58); }
+      .port .cap { position:absolute; width:290px; font-size:13px; line-height:1.75; color:var(--muted);
         text-shadow:0 1px 8px rgba(2,16,20,.95); }
-      .port .cap b { display:block; color:var(--paper); font-size:15px; margin-bottom:3px; }
+      .port .cap b { display:block; color:var(--paper); font-size:16px; margin-bottom:3px; }
 
       footer { position:absolute; left:64px; right:64px; bottom:28px; display:flex; align-items:center; gap:10px; z-index:5; }
       .tag { background:rgba(4,20,26,.5); border:1px solid var(--line); color:var(--muted); font-family:inherit; font-size:12px;
@@ -111,26 +111,21 @@
       <g clip-path="url(#bandClip)">
         <!-- 月光在水面拉出的光路 -->
         <path d="M1060 430 C 1078 520, 1104 640, 1140 880 L 986 880 C 968 660, 972 520, 980 430 Z" fill="url(#streak)" opacity=".26" />
-        <!-- 水面的波纹：只留三条（原来五条 + 14 个发光点太碎，像噪点） -->
-        <g fill="none" stroke="rgba(216,243,246,.22)" stroke-width="1.5">
-          <path d="M-20 470 C 250 440, 480 508, 740 540 C 1000 572, 1200 600, 1460 640" />
-          <path d="M-20 566 C 265 532, 495 604, 755 636 C 1015 668, 1215 694, 1460 734" />
-          <path d="M-20 690 C 280 654, 510 728, 770 760 C 1030 792, 1230 818, 1460 858" />
+        <!-- 水面的波纹：只留两条 -->
+        <g fill="none" stroke="rgba(216,243,246,.2)" stroke-width="1.5">
+          <path d="M-20 500 C 255 468, 485 540, 745 572 C 1005 604, 1205 630, 1460 670" />
+          <path d="M-20 640 C 275 604, 505 678, 765 710 C 1025 742, 1225 768, 1460 808" />
         </g>
         <!-- 漂移虚线（水在流） -->
-        <g fill="none" stroke="rgba(243,249,250,.42)" stroke-width="2.4" stroke-linecap="round" stroke-dasharray="26 40">
-          <path d="M-20 520 C 250 490, 480 560, 740 592 C 1000 624, 1200 650, 1460 690" />
+        <g fill="none" stroke="rgba(243,249,250,.4)" stroke-width="2.6" stroke-linecap="round" stroke-dasharray="30 46">
+          <path d="M-20 556 C 250 524, 480 596, 740 628 C 1000 660, 1200 686, 1460 726" />
         </g>
-        <!-- 生物发光的碎点：只留六颗，且各自独立（不再连成噪点带） -->
+        <!-- 生物发光的碎点：只留四颗 -->
         <g fill="#eafcff">
-          <circle cx="240" cy="556" r="2.6" opacity=".62" /><circle cx="520" cy="626" r="2.2" opacity=".5" />
-          <circle cx="760" cy="572" r="2.8" opacity=".68" /><circle cx="1010" cy="706" r="2.3" opacity=".55" />
-          <circle cx="1240" cy="654" r="2.5" opacity=".6" /><circle cx="420" cy="700" r="2.1" opacity=".48" />
+          <circle cx="300" cy="600" r="2.4" opacity=".5" /><circle cx="700" cy="640" r="2.6" opacity=".58" />
+          <circle cx="1060" cy="700" r="2.3" opacity=".48" /><circle cx="1300" cy="806" r="2.5" opacity=".52" />
         </g>
-        <!-- 水下礁石 -->
-        <ellipse cx="620" cy="700" rx="90" ry="26" fill="rgba(2,14,18,.5)" />
-        <ellipse cx="620" cy="692" rx="66" ry="17" fill="rgba(127,209,217,.16)" />
-        <!-- 一只亮着灯的小船 -->
+        <!-- 一只亮着灯的小船（岸上唯一的叙事物） -->
         <g transform="translate(1330 726) rotate(-6)">
           <path d="M-30 0 C -14 12, 14 12, 30 0 C 18 16, -18 16, -30 0 Z" fill="#02141a" />
           <path d="M0 -20 L 0 2" stroke="#02141a" stroke-width="2.4" />
@@ -169,17 +164,17 @@
     </div>
 
     <!-- 两个泊位：骑在河面上，等大等权 -->
-    <div class="port draw ov" style="left:354px; top:482px; width:176px; height:176px" role="button" aria-label="捞一个漂流瓶">
+    <div class="port draw ov" style="left:337px; top:465px; width:210px; height:210px" role="button" aria-label="捞一个漂流瓶">
       <i class="r1"></i><i class="r2"></i><i class="r3"></i>
       <span class="core">捞取<span>DRAW</span></span>
-      <span class="cap" style="right:200px; top:52px; text-align:right">
+      <span class="cap" style="right:234px; top:64px; text-align:right">
         <b>捞一个漂流瓶</b>捞取深水里传来的匿名哼唱，接续她的下一句。捞到即持有。
       </span>
     </div>
-    <div class="port cast ov" style="left:948px; top:572px; width:176px; height:176px" role="button" aria-label="投下一支漂流瓶">
+    <div class="port cast ov" style="left:931px; top:555px; width:210px; height:210px" role="button" aria-label="投下一支漂流瓶">
       <i class="r1"></i><i class="r2"></i><i class="r3"></i>
       <span class="core">投下<span>CAST</span></span>
-      <span class="cap" style="left:200px; top:44px">
+      <span class="cap" style="left:234px; top:52px">
         <b>投下一支漂流瓶</b>选一首歌，录下第 1 段，放进上游等一个陌生人接下一棒。
       </span>
     </div>

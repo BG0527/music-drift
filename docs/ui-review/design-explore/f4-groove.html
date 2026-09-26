@@ -2,7 +2,7 @@
 <html lang="zh-CN">
   <head>
     <meta charset="utf-8" />
-    <title>F4 · 沟槽河道 Groove River</title>
+    <title>F4b · 沟槽河道 v2（十字引导线 · 唱片细节层）</title>
     <style>
       @import url('/node_modules/.pnpm/lxgw-wenkai-webfont@1.7.0/node_modules/lxgw-wenkai-webfont/lxgwwenkai-regular.css');
       @import url('/node_modules/.pnpm/lxgw-wenkai-webfont@1.7.0/node_modules/lxgw-wenkai-webfont/lxgwwenkai-bold.css');
@@ -14,21 +14,27 @@
       body { position:relative; overflow:hidden; background:var(--ink); color:var(--paper);
         font-family:'LXGW WenKai',serif; -webkit-font-smoothing:antialiased; }
 
-      /* 沟槽：用 repeating-radial-gradient 一次画出整张唱片（比手写几十个圆更准也更轻） */
+      /* 沟槽：repeating-radial-gradient 一次画出整张唱片 */
       .grooves { position:absolute; inset:0;
+        background: repeating-radial-gradient(circle at 1390px 700px,
+          rgba(243,249,250,.075) 0 1px, transparent 1px 42px);
+      }
+      /* ── 细节层（可整体删除：删掉 .detail 这一条 + svg 里的 g#detail 即可回到上一版） ── */
+      .detail { position:absolute; inset:0;
         background:
-          repeating-radial-gradient(circle at 1420px 960px,
-            rgba(243,249,250,.075) 0 1px, transparent 1px 44px),
-          radial-gradient(circle at 1420px 960px, rgba(127,209,217,.05) 0 26%, transparent 62%);
+          conic-gradient(from 208deg at 1390px 700px,
+            rgba(127,209,217,.055) 0deg 6deg, transparent 6deg 26deg,
+            rgba(199,69,44,.035) 26deg 30deg, transparent 30deg 58deg,
+            rgba(127,209,217,.045) 58deg 64deg, transparent 64deg 360deg);
       }
       svg.canvas { position:absolute; inset:0; width:1440px; height:900px; }
       .ov { position:absolute; }
       h1 { font-size:84px; font-weight:700; line-height:1; }
       .sub { margin-top:14px; font-size:15.5px; line-height:1.9; color:var(--muted); }
       .cat { font-family:Quattrocento,serif; font-size:11px; letter-spacing:.24em; color:rgba(243,249,250,.5); }
-      .note { font-size:13px; line-height:1.85; color:rgba(243,249,250,.72); }
+      .note { font-size:13px; line-height:1.9; color:rgba(243,249,250,.74); }
       .note b { color:var(--glass); font-weight:400; }
-      .rpm { font-family:Quattrocento,serif; font-size:26px; color:var(--glass); }
+      .rpm { font-family:Quattrocento,serif; font-size:28px; color:var(--glass); }
 
       .port { position:absolute; display:grid; place-items:center; cursor:pointer; }
       .port i { position:absolute; border-radius:50%; }
@@ -40,9 +46,6 @@
       .port .core span { font-size:10px; letter-spacing:.28em; opacity:.75; font-weight:400; }
       .draw .core { background:linear-gradient(180deg,#12798d,#0b4e5b); box-shadow:0 0 0 8px rgba(5,15,20,.85), 0 0 46px rgba(42,157,177,.55); }
       .cast .core { background:linear-gradient(180deg,#d2502f,#9d4125); box-shadow:0 0 0 8px rgba(5,15,20,.85), 0 0 46px rgba(199,69,44,.5); }
-      .port .cap { position:absolute; width:290px; font-size:12.5px; line-height:1.75; color:var(--muted);
-        text-shadow:0 1px 8px rgba(2,10,14,.95); }
-      .port .cap b { display:block; color:var(--paper); font-size:15px; margin-bottom:3px; }
 
       footer { position:absolute; left:76px; right:76px; bottom:30px; display:flex; align-items:center; gap:10px; z-index:5; }
       .tag { background:transparent; border:1px solid var(--line); color:var(--muted); font-family:inherit; font-size:12px;
@@ -53,53 +56,58 @@
   </head>
   <body>
     <div class="grooves"></div>
+    <div class="detail"></div>
     <svg class="canvas" viewBox="0 0 1440 900">
       <defs>
-        <radialGradient id="sheen" cx=".99" cy="1" r="1">
-          <stop offset="0" stop-color="#7fd1d9" stop-opacity=".1" />
-          <stop offset=".4" stop-color="#7fd1d9" stop-opacity="0" />
-        </radialGradient>
-        <radialGradient id="label" cx=".5" cy=".5" r=".5">
-          <stop offset=".62" stop-color="#c7452c" stop-opacity=".2" />
-          <stop offset="1" stop-color="#c7452c" stop-opacity="0" />
+        <radialGradient id="sheen" cx=".97" cy=".78" r=".8">
+          <stop offset="0" stop-color="#7fd1d9" stop-opacity=".09" />
+          <stop offset=".5" stop-color="#7fd1d9" stop-opacity="0" />
         </radialGradient>
       </defs>
-
       <rect width="1440" height="900" fill="url(#sheen)" />
-      <circle cx="1420" cy="960" r="300" fill="url(#label)" />
 
-      <!-- 唱片中心（在画布外）：只留一条实的圆心环 + 主轴孔的一点暗示 -->
-      <circle cx="1420" cy="960" r="262" fill="none" stroke="rgba(199,69,44,.35)" stroke-width="1.6" />
-
-      <!-- 分流槽：两条略亮的圈，把"这一面"分成几段 -->
-      <circle cx="1420" cy="960" r="1180" fill="none" stroke="rgba(243,249,250,.13)" stroke-width="1.6" />
-      <circle cx="1420" cy="960" r="700" fill="none" stroke="rgba(243,249,250,.11)" stroke-width="1.4" />
-
-      <!-- ── 河道 = 那条被点亮的沟槽（只有一条，单支路） ── -->
-      <circle cx="1420" cy="960" r="900" fill="none" stroke="rgba(127,209,217,.14)" stroke-width="18" />
-      <circle cx="1420" cy="960" r="900" fill="none" stroke="#7fd1d9" stroke-width="2.4" opacity=".9" />
-      <!-- 水流：沿沟槽走的漂移虚线 -->
-      <circle cx="1420" cy="960" r="900" fill="none" stroke="rgba(243,249,250,.45)" stroke-width="2"
+      <!-- ── 河道 = 那条被点亮的沟槽（只有一条 ⇒ 单支路） ── -->
+      <circle cx="1390" cy="700" r="600" fill="none" stroke="rgba(127,209,217,.13)" stroke-width="20" />
+      <circle cx="1390" cy="700" r="600" fill="none" stroke="#7fd1d9" stroke-width="2.4" opacity=".9" />
+      <circle cx="1390" cy="700" r="600" fill="none" stroke="rgba(243,249,250,.45)" stroke-width="2"
         stroke-dasharray="16 30" stroke-linecap="round" />
-      <!-- 唱针落下的一点微光（暗示"从这里被读出来"） -->
-      <circle cx="943" cy="197" r="34" fill="none" stroke="rgba(199,69,44,.35)" stroke-width="1.4" />
 
-      <!-- 灰尘与划痕：让这张唱片"被用过" -->
-      <g fill="#eafcff">
-        <circle cx="300" cy="640" r="1.6" opacity=".35" /><circle cx="520" cy="330" r="1.3" opacity=".3" />
-        <circle cx="980" cy="540" r="1.5" opacity=".3" /><circle cx="1240" cy="760" r="1.7" opacity=".32" />
-        <circle cx="180" cy="300" r="1.2" opacity=".26" /><circle cx="760" cy="820" r="1.4" opacity=".28" />
-      </g>
-      <path d="M420 120 l 90 60" stroke="rgba(243,249,250,.08)" stroke-width="1" />
-      <path d="M1040 700 l 70 40" stroke="rgba(243,249,250,.07)" stroke-width="1" />
-
-      <!-- 唱臂：从右上角伸进来，只画臂管 + 一枚唱针（原来那块灰色"唱头"读成了一块纸片） -->
-      <g opacity=".92">
-        <path d="M1500 30 L 1198 236" stroke="rgba(207,233,238,.42)" stroke-width="14" stroke-linecap="round" />
-        <path d="M1500 30 L 1198 236" stroke="rgba(5,15,20,.88)" stroke-width="8" stroke-linecap="round" />
-        <path d="M1206 232 l -22 16" stroke="rgba(207,233,238,.7)" stroke-width="6" stroke-linecap="round" />
-        <circle cx="1180" cy="252" r="4.6" fill="#c7452c" />
-        <circle cx="1180" cy="252" r="13" fill="none" stroke="rgba(199,69,44,.35)" stroke-width="1.2" />
+      <!-- ── 细节层（删掉这个 g 即回到上一版）────────────────────────────
+           全部细节都必须是"唱片上真实存在的东西"，不为装饰而装饰：
+           标签盘 / 主轴孔 / 引出槽 / 分轨圈 / 外缘高光 / 灰尘与划痕 / 唱臂与唱针 / 母版号 -->
+      <g id="detail">
+        <!-- 标签盘 + 主轴孔（唱片中心进了画布，所以这三样第一次看得见） -->
+        <circle cx="1390" cy="700" r="112" fill="rgba(199,69,44,.2)" />
+        <circle cx="1390" cy="700" r="112" fill="none" stroke="rgba(199,69,44,.45)" stroke-width="1.6" />
+        <circle cx="1390" cy="700" r="150" fill="none" stroke="rgba(243,249,250,.14)" stroke-width="1.2" />
+        <circle cx="1390" cy="700" r="7" fill="#050f14" stroke="rgba(243,249,250,.45)" stroke-width="1.2" />
+        <text x="1390" y="660" text-anchor="middle" fill="rgba(243,249,250,.45)"
+          font-family="Quattrocento, serif" font-size="11" letter-spacing="2">MDB—0001</text>
+        <text x="1390" y="762" text-anchor="middle" fill="rgba(243,249,250,.38)"
+          font-family="Quattrocento, serif" font-size="10" letter-spacing="2">33⅓ · A</text>
+        <!-- 引出槽：标签盘外侧那一圈密槽 -->
+        <circle cx="1390" cy="700" r="176" fill="none" stroke="rgba(243,249,250,.2)" stroke-width="1" />
+        <circle cx="1390" cy="700" r="182" fill="none" stroke="rgba(243,249,250,.14)" stroke-width="1" />
+        <!-- 分轨圈：把这一面分成几段 -->
+        <circle cx="1390" cy="700" r="980" fill="none" stroke="rgba(243,249,250,.12)" stroke-width="1.6" />
+        <circle cx="1390" cy="700" r="760" fill="none" stroke="rgba(243,249,250,.1)" stroke-width="1.4" />
+        <!-- 外缘高光：唱片边缘被灯照到的一道弧 -->
+        <path d="M1382 78 A 1340 1340 0 0 0 92 636" fill="none" stroke="rgba(207,233,238,.16)" stroke-width="3" />
+        <!-- 灰尘与划痕：让这张唱片"被用过" -->
+        <g fill="#eafcff">
+          <circle cx="300" cy="640" r="1.6" opacity=".32" /><circle cx="520" cy="330" r="1.3" opacity=".28" />
+          <circle cx="980" cy="560" r="1.5" opacity=".28" /><circle cx="1240" cy="866" r="1.7" opacity=".3" />
+          <circle cx="180" cy="300" r="1.2" opacity=".24" /><circle cx="700" cy="820" r="1.4" opacity=".26" />
+          <circle cx="1180" cy="300" r="1.5" opacity=".26" />
+        </g>
+        <path d="M424 118 l 96 62" stroke="rgba(243,249,250,.07)" stroke-width="1" />
+        <path d="M1058 706 l 74 42" stroke="rgba(243,249,250,.06)" stroke-width="1" />
+        <!-- 唱臂 + 唱针：落在被点亮的沟槽上 -->
+        <path d="M1500 24 L 1206 232" stroke="rgba(207,233,238,.4)" stroke-width="14" stroke-linecap="round" />
+        <path d="M1500 24 L 1206 232" stroke="rgba(5,15,20,.88)" stroke-width="8" stroke-linecap="round" />
+        <path d="M1214 228 l -22 16" stroke="rgba(207,233,238,.68)" stroke-width="6" stroke-linecap="round" />
+        <circle cx="1188" cy="248" r="4.6" fill="#c7452c" />
+        <circle cx="1188" cy="248" r="13" fill="none" stroke="rgba(199,69,44,.32)" stroke-width="1.2" />
       </g>
     </svg>
 
@@ -110,28 +118,34 @@
       <p class="sub">一条沟槽就是一条河。瓶子顺槽往下，谁捞到，谁就接下一句。</p>
     </div>
 
-    <div class="note ov" style="left:96px; top:392px; width:260px; transform:rotate(-1.8deg)">
-      <b>① 捞取</b><br />顺着这条沟槽，把别人留下的半句接过来。
+    <div class="note ov" style="left:96px; top:378px; width:236px; transform:rotate(-2.4deg)">
+      <b>① 捞取</b><br />捞取深水里传来的匿名哼唱，接续她的下一句。捞到即持有。
     </div>
-    <div class="note ov" style="left:96px; top:536px; width:260px; transform:rotate(1.4deg)">
-      <b>② 投下</b><br />你录的那一段被刻进槽里，继续往下转。
+    <div class="note ov" style="left:96px; top:600px; width:236px; transform:rotate(1.8deg)">
+      <b>② 投下</b><br />选一首歌，录下第 1 段，然后放进上游等一个陌生人接下一棒。
     </div>
 
-    <div class="ov" style="left:96px; top:686px; width:300px">
+    <div class="ov" style="left:96px; top:760px">
       <div class="rpm">33⅓</div>
-      <div class="cat" style="margin-top:4px">RPM · 单支路 · 同时只一人持有</div>
+      <div class="cat" style="margin-top:2px">RPM · 单支路 · 同时只一人持有</div>
     </div>
 
-    <!-- 圆形按钮：骑在那条被点亮的沟槽上 -->
-    <div class="port draw ov" style="left:496px; top:574px; width:156px; height:156px" role="button" aria-label="捞一个漂流瓶">
+    <!-- 两条手绘引导线：**故意交叉**（①在上、②在下，线各指对方那一侧） -->
+    <svg class="ov" style="left:0; top:0" width="1440" height="900" viewBox="0 0 1440 900">
+      <path d="M322 408 C 470 442, 620 470, 742 486" fill="none" stroke="rgba(243,249,250,.38)" stroke-width="1.6" />
+      <path d="M732 478 L 752 490 L 730 500" fill="none" stroke="rgba(243,249,250,.55)" stroke-width="1.6" stroke-linecap="round" />
+      <path d="M322 632 C 560 566, 830 356, 996 240" fill="none" stroke="rgba(243,249,250,.38)" stroke-width="1.6" stroke-dasharray="6 8" />
+      <path d="M984 234 L 1004 230 L 994 250" fill="none" stroke="rgba(243,249,250,.55)" stroke-width="1.6" stroke-linecap="round" />
+    </svg>
+
+    <!-- 圆形按钮：骑在那条被点亮的沟槽上（圆心在 r=600 上） -->
+    <div class="port draw ov" style="left:748px; top:417px; width:156px; height:156px" role="button" aria-label="捞一个漂流瓶">
       <i class="r1"></i><i class="r2"></i><i class="r3"></i>
       <span class="core">捞取<span>DRAW</span></span>
-      <span class="cap" style="left:-116px; top:172px"><b>捞一个漂流瓶</b>捞到即持有：同一时刻，同一条河道上只有你拿着它。</span>
     </div>
-    <div class="port cast ov" style="left:865px; top:119px; width:156px; height:156px" role="button" aria-label="投下一支漂流瓶">
+    <div class="port cast ov" style="left:994px; top:113px; width:156px; height:156px" role="button" aria-label="投下一支漂流瓶">
       <i class="r1"></i><i class="r2"></i><i class="r3"></i>
       <span class="core">投下<span>CAST</span></span>
-      <span class="cap" style="left:180px; top:34px"><b>投下一支漂流瓶</b>选一首歌，录下第 1 段，然后放进上游等一个陌生人接下一棒。</span>
     </div>
 
     <footer>
