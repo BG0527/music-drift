@@ -1,5 +1,5 @@
 /**
- * 页面模块：`site/sea-detail.html` —— 公海作品详情接真数据（W1-c）
+ * 页面模块：`site/sea-detail.html` —— 公海作品详情接真数据（W1-c / W4-b）
  *
  * 本页 HTML 是设计稿副本（没有 `data-bind`），接线按**页面已有 class 名**定位、`el()` 重建节点。
  * 文本一律 `textContent`（`el({ text })`）。
@@ -11,6 +11,17 @@
  * - `GET /api/segments/:id/audio` → `<audio>` 的 src（D-02：音频存库 + Range 流式）；
  * - `POST /api/sea/:id/targeted-segment`（指定接唱，仅未完成区）、
  *   `POST|DELETE /api/collections/:bottleId`（收藏，仅已完成并进入公海的作品）。
+ *
+ * W4-b 新增两条（用户第 2 轮需求 5 / 6；§13 只给落点、不给形态，形态由本文件按页面语言自定）：
+ * - **试听全部**：把已录的段按 `index` 升序连播，没录的段跳过（后端**没有混音端点**，`§13` 需求 5
+ *   明说"不做导出"）。实现上复用**同一个** `<audio>` 逐段换 `src`：既不会两段叠着响，
+ *   也不需要为每段挂一个元素；"缺口＝静音跳过"。
+ * - **听阶段的赞 / 踩**：接 `POST /api/segments/:id/votes`（§7.3 已登记），就地改计数；
+ *   门槛（听满 80% 才能踩）**只由服务端判定**，前端不复刻规则、只逐字显示服务端的中文 message。
+ *   为了让"点踩"在真实使用中够得着门槛，本页同时按瓶子页的同一口径上报已听覆盖率
+ *   （`POST /api/segments/:id/listen`，§10.1 同类补登：不报就永远跨不过门槛）；
+ *   上报与投票都用 `redirectOn401:false` —— 本页是公开的公海详情，跳登录页会打断试听
+ *   （与 W1-c 的收藏控件同一处置），未登录时服务端的「请先登录再继续。」照样逐字显示。
  *
  * 几何全部**从稿子的 CSS 反推**（不改 HTML、不加 CSS）：`.band` 左右各 -76px ⇒ 沟槽在页面 x=76..1152，
  * 唱针"尖"在稿子里位于 x=720（第 3 段、播放进度 39%）；唱的段与进度都由真数据算。
@@ -38,6 +49,40 @@ const STYLUS_X = 720;
 /** 唱臂：`.arm { left:720px; top:298px; width:678px; rotate(-9.855deg) }` ⇒ 轴承在 (1388, 182)。 */
 const ARM_Y = 298;
 const ARM_PIVOT = { x: 1388, y: 182 };
+
+/**
+ * 新增控件的样式（W4-b）。**为什么只能运行时注入**：本页 CSS 与 `site/*.html` 都禁改
+ * （§8.2「HTML 是源」），而 `:hover` / `[aria-pressed]` 这些**状态**没法用内联 style 表达
+ * （内联样式优先级高于类选择器）。样式只值**本页既有的 token**：`--muted` / `--glass` / `--coral`
+ * / `--line`（`:root` 里那 7 个里的 4 个），细线一律 1px、圆角一律 2px —— 与 `.ctrl` 同一套纪律，
+ * 不自造新视觉、不引入新字号（13px / 14px 就是本页 `.votes` 与 `.ctrl` 的档）。
+ */
+const CONTROL_STYLE_ID = 'w4b-control-style';
+const CONTROL_STYLE = [
+  '.w4b-all{width:96px;height:44px;border:1px solid var(--line);border-radius:2px;background:transparent;',
+  "color:var(--muted);font-family:'LXGW WenKai',serif;font-size:14px;letter-spacing:.06em;",
+  'display:flex;align-items:center;justify-content:center;cursor:pointer;}',
+  '.w4b-all:hover,.w4b-all:focus-visible{border-color:var(--glass);color:var(--glass);}',
+  '.w4b-all[aria-pressed="true"]{border-color:var(--coral);color:var(--coral);}',
+  '.w4b-vote{background:transparent;border:0;padding:0;font-family:inherit;font-size:13px;',
+  'color:var(--muted);cursor:pointer;}',
+  '.w4b-vote:hover:enabled,.w4b-vote:focus-visible{color:var(--glass);}',
+  '.w4b-vote[aria-pressed="true"]{color:var(--glass);}',
+  '.w4b-vote:disabled{color:var(--muted);cursor:default;opacity:.6;}',
+].join('');
+
+/** 每 5 秒上报一次已听覆盖率（服务端按**真实墙上时间**限速，更密没有意义；与瓶子页同口径）。 */
+const LISTEN_REPORT_INTERVAL_MS = 5_000;
+/** `timeupdate` 的单步跳变上限：拖动进度条/倍速播放不算"听过"（与瓶子页同一判据）。 */
+const SEEK_JUMP_MS = 1_200;
+
+function ensureControlStyle() {
+  if (document.getElementById(CONTROL_STYLE_ID) !== null) return;
+  const style = document.createElement('style');
+  style.id = CONTROL_STYLE_ID;
+  style.textContent = CONTROL_STYLE;
+  document.head.append(style);
+}
 
 function pad2(value) {
   return String(value).padStart(2, '0');
@@ -85,6 +130,7 @@ async function start() {
   const nowLine = q('.transport .now .line');
   const timeNode = q('.transport .time');
   const votesNode = q('.transport .votes');
+  const readout = q('.transport .readout');
   const ctrl = q('.transport .ctrl');
   const audio = q('#sea-master');
   const footEtch = q('footer .etch');
@@ -141,6 +187,24 @@ async function start() {
 
   /** 当前播放段（唱针位置＝当前播放段）：默认第一段**有录音的**段。 */
   let current = segments[0]?.index ?? null;
+
+  /**
+   * 连播状态（需求 5）：`playingAll` = 「试听全部」正在跑。
+   * 队列就是 `segments`（已按 index 升序、**没录的段根本不进队列**）⇒「缺口＝跳过」是天然成立的，
+   * 不需要为缺口造静音片段（后端没有混音端点，本阶段也不导出）。
+   */
+  let playingAll = false;
+  /** 客户端累计的已听时长（换段清零）；**判定权在服务端**，这里只是上报的增量输入。 */
+  let coveredMs = 0;
+  let lastAudioMs = 0;
+  let listenTimer = null;
+  /** 当前段最近一次 `POST /api/segments/:id/listen` 的服务端视图：门槛百分比取自它，前端不写死 80%。 */
+  let listenView = null;
+  /** 本次会话我投过的票：segmentId → Set('LIKE'|'DISLIKE')（DTO 不给"我投过吗"，只能本地记状态）。 */
+  const myVotes = new Map();
+  /** 运行时新建的控件：0 段时保持 null ⇒ 一个都不画。 */
+  let playAllButton = null;
+  let voteControls = null;
 
   // ─────────────────────────────────────────────────────────── 标题 / 元信息 / 母版号
   if (title !== null) title.textContent = sea.songTitle;
@@ -333,6 +397,8 @@ async function start() {
             on: {
               click: (event) => {
                 event.preventDefault();
+                // 单段试听 = 退出连播态（否则按钮会一直停在「停止试听」骗人）
+                playingAll = false;
                 selectSegment(segment.index, { autoplay: true });
               },
             },
@@ -373,12 +439,22 @@ async function start() {
       );
     }
     if (votesNode !== null) {
-      votesNode.replaceChildren(
-        el('span', { text: `赞 ${segment?.likeCount ?? 0}` }),
-        el('i'),
-        el('span', { text: `踩 ${segment?.dislikeCount ?? 0}` }),
-      );
+      /**
+       * 赞 / 踩的计数是稿子**本来就有**的读数（`赞 3 ｜ 踩 0`）：W4-b 把这两个读数变成**按钮本体**
+       * （同一行、同一 13px `--muted`、同一 1px 分隔线），所以没投票时这行与稿子逐像素同形，
+       * 只是多了点击面。计数改为就地改写文本（不再 `replaceChildren`）—— 重建节点会让点击/焦点丢失。
+       */
+      if (voteControls === null) {
+        votesNode.replaceChildren(
+          el('span', { text: `赞 ${segment?.likeCount ?? 0}` }),
+          el('i'),
+          el('span', { text: `踩 ${segment?.dislikeCount ?? 0}` }),
+        );
+      } else {
+        paintVotes(segment);
+      }
     }
+    if (playAllButton !== null) paintPlayAll();
     if (ctrl !== null) {
       const playing = audio !== null && audio.paused === false;
       ctrl.replaceChildren(playing ? pauseIcon : playIcon, document.createTextNode(playing ? '暂停' : '播放'));
@@ -393,9 +469,200 @@ async function start() {
     renderTransport();
   }
 
+  // ───────────────────────────── W4-b 需求 5：「试听全部」（连播已录的段，缺口跳过）
+
+  /**
+   * 放置理由：它是**播放动作**，所以住进播放控制簇（`.readout` 里 `.ctrl` 的右侧），
+   * 与「播放/暂停」并排；盒子尺寸/圆角/细线沿用 `.ctrl`（96x44、2px、1px），
+   * 只用 `--line` + `--muted` 表示"次级"，播放中换 `--coral`（本页"当下"的颜色：`aria-current` 的段号也是它）。
+   */
+  function buildPlayAllControl() {
+    ensureControlStyle();
+    const button = el('button', {
+      type: 'button',
+      class: 'w4b-all',
+      'aria-pressed': 'false',
+      text: '试听全部',
+      on: { click: () => togglePlayAll() },
+    });
+    (readout ?? ctrl?.parentNode)?.append(button);
+    return button;
+  }
+
+  function paintPlayAll() {
+    const label = playingAll ? '停止试听' : '试听全部';
+    if (playAllButton.textContent !== label) playAllButton.textContent = label;
+    playAllButton.setAttribute('aria-pressed', playingAll ? 'true' : 'false');
+    playAllButton.title = playingAll
+      ? '再点一次：停下（停在当前这一段）'
+      : `按录制顺序连播已录的 ${segments.length} 段；没录的段跳过，不混音、不导出`;
+  }
+
+  /** 再点一次＝中断（需求 5）：停播并退出连播态。 */
+  function togglePlayAll() {
+    if (audio === null || segments.length === 0) return;
+    if (playingAll) {
+      playingAll = false;
+      audio.pause();
+      renderTransport();
+      return;
+    }
+    // 「全部」＝从头：即使此刻选着第 4 段，也回到第一段开始连播
+    playingAll = true;
+    selectSegment(segments[0].index, { autoplay: true });
+  }
+
+  // ───────────────────────────── W4-b 需求 6：听阶段的赞 / 踩
+
+  /**
+   * 赞 / 踩（`POST /api/segments/:id/votes`）作用于**当前正在听的这一段**——与 `.votes` 里
+   * 那一对读数是同一个主体（读数就是按钮自己的文字）。两个票互相独立（契约 interactions.ts 顶部
+   * 的已接受行为）⇒ 互不清零、互不抵消。
+   */
+  function buildVoteControls() {
+    ensureControlStyle();
+    const like = buildVoteButton('LIKE', '赞');
+    const dislike = buildVoteButton('DISLIKE', '踩');
+    votesNode.replaceChildren(like, el('i'), dislike);
+    return { like, dislike };
+  }
+
+  function buildVoteButton(value, label) {
+    return el('button', {
+      type: 'button',
+      class: 'w4b-vote',
+      text: `${label} 0`,
+      'aria-pressed': 'false',
+      on: { click: () => void castVote(value) },
+    });
+  }
+
+  function paintVotes(segment) {
+    const mine = segment === null ? null : (myVotes.get(segment.id) ?? null);
+    for (const [node, label, count, value] of [
+      [voteControls.like, '赞', segment?.likeCount ?? 0, 'LIKE'],
+      [voteControls.dislike, '踩', segment?.dislikeCount ?? 0, 'DISLIKE'],
+    ]) {
+      node.textContent = `${label} ${count}`;
+      node.disabled = segment === null;
+      node.setAttribute('aria-pressed', mine !== null && mine.has(value) ? 'true' : 'false');
+      node.setAttribute('aria-label', `${segment === null ? '没有可听的段' : `第 ${segment.index} 段`}${label}`);
+    }
+    paintDislikeHint();
+  }
+
+  /** 门槛百分比**只从服务端响应取**；拿不到就说"要先听过这一段"，不杜撰数字。 */
+  function paintDislikeHint() {
+    if (voteControls === null) return;
+    if (listenView === null) {
+      voteControls.dislike.title = '点踩要先听过这一段：服务端按真实聆听时长判定。';
+      return;
+    }
+    const threshold = Math.round((listenView.threshold ?? 0) * 100);
+    const listened = Math.round((listenView.ratio ?? 0) * 100);
+    voteControls.dislike.title =
+      listenView.reachedThreshold === true
+        ? `服务端记录已听 ${listened}%（门槛 ${threshold}%）`
+        : `服务端记录已听 ${listened}%，到 ${threshold}% 才能点踩`;
+  }
+
+  async function castVote(value) {
+    const segment = current === null ? null : byIndex.get(current);
+    if (segment === null || voteControls === null) return;
+    const node = value === 'LIKE' ? voteControls.like : voteControls.dislike;
+    node.disabled = true;
+    try {
+      /**
+       * 门槛（听满 X% 才能踩）、自踩、重复票**全部由服务端判**：前端不问"听了多久"、不写死 80%、
+       * 也不预判自踩 —— 失败就把服务端的中文 `message` 原样显示（`showRequestFailure`）。
+       * `redirectOn401:false`：本页是公开的公海详情，未登录的人照听照点，跳登录页会打断试听
+       * （与 W1-c 的收藏控件同一处置），服务端的「请先登录再继续。」照样逐字显示。
+       */
+      const result = await post(
+        `/api/segments/${encodeURIComponent(segment.id)}/votes`,
+        { value },
+        { redirectOn401: false },
+      );
+      // 就地更新计数（响应里的就是服务端新计数），不整页刷新
+      segment.likeCount = result.likeCount;
+      segment.dislikeCount = result.dislikeCount;
+      const mine = myVotes.get(segment.id);
+      if (mine === undefined) myVotes.set(segment.id, new Set([value]));
+      else mine.add(value);
+      clearState();
+      renderTransport();
+      /** 踩数到顶 ⇒ 这一段已被斩浪移出作品：本地数据整体作废，直接重读服务端真值。 */
+      if (result.segmentCut === true) location.reload();
+    } catch (error) {
+      showRequestFailure(error);
+    } finally {
+      node.disabled = false;
+    }
+  }
+
+  // ───────────────────────────── 已听覆盖率上报（需求 6 能真正够到门槛的前提）
+
+  /** 换段：结账上一段 + 清零重新计。 */
+  function resetListenTracking() {
+    stopListenReporting();
+    coveredMs = 0;
+    lastAudioMs = 0;
+    listenView = null;
+  }
+
+  /** 结账当前这一段（暂停 / 放完 / 换段 / 停止连播都要结一次）。 */
+  function flushListen() {
+    stopListenReporting();
+    if (current === null || coveredMs <= 0) return;
+    void reportListen();
+  }
+
+  function startListenReporting() {
+    stopListenReporting();
+    listenTimer = window.setInterval(() => void reportListen(), LISTEN_REPORT_INTERVAL_MS);
+  }
+
+  function stopListenReporting() {
+    if (listenTimer !== null) {
+      window.clearInterval(listenTimer);
+      listenTimer = null;
+    }
+  }
+
+  /**
+   * 上报已听覆盖率（增量输入，**只增不减由服务端保证**；这里送的是客户端累计的"听过区间并集"）。
+   *
+   * 为什么本页必须报：点踩门槛读的是**服务端持久化**的覆盖率（`store/listenProgress.ts`）——
+   * 不报，这个页面上的「踩」永远够不着门槛，新控件就是个死按钮。
+   * 上报失败（未登录 / 网络抖动）不打断试听：投票时服务端仍会给出真实判定。
+   */
+  async function reportListen() {
+    const segment = current === null ? null : byIndex.get(current);
+    if (segment === null) return;
+    try {
+      const view = await post(
+        `/api/segments/${encodeURIComponent(segment.id)}/listen`,
+        { coveredMs: Math.round(coveredMs) },
+        { redirectOn401: false },
+      );
+      /** 迟到的响应不许盖掉当前段的门槛提示（用户可能已经换段）。 */
+      if (current === segment.index) {
+        listenView = view;
+        paintDislikeHint();
+      }
+    } catch {
+      // 拿不到门槛提示而已
+    }
+  }
+
   function selectSegment(index, options = {}) {
     const segment = byIndex.get(index);
     if (segment === undefined || audio === null) return;
+    const switched = index !== current;
+    if (switched) {
+      flushListen(); // 换 src 之后就报不了上一段了：先结账
+      resetListenTracking();
+    }
     current = index;
     audio.src = `/api/segments/${segment.id}/audio`;
     renderDeck();
@@ -403,22 +670,43 @@ async function start() {
       // 播放失败（自动播放策略等）不该冒泡成页面错误：控件状态本身就是反馈。
       audio.play().catch(() => {});
     }
+    /** 选段即问一次服务端进度（这个端点没有 GET 版本）：门槛提示与"已听多少"都以此为准。 */
+    if (switched) void reportListen();
   }
 
   on(audio, 'timeupdate', () => {
+    if (audio !== null) {
+      const currentMs = audio.currentTime * 1000;
+      const delta = currentMs - lastAudioMs;
+      /** 跳变（拖动进度条、倍速播放）不算"听过"：只移动游标，不记覆盖率（与瓶子页同一判据）。 */
+      if (delta > 0 && delta < SEEK_JUMP_MS) coveredMs += delta;
+      lastAudioMs = currentMs;
+    }
     paintStylus();
     renderTransport();
   });
-  on(audio, 'play', renderTransport);
-  on(audio, 'pause', renderTransport);
+  on(audio, 'seeking', () => {
+    if (audio !== null) lastAudioMs = audio.currentTime * 1000;
+  });
+  on(audio, 'play', () => {
+    if (audio !== null) lastAudioMs = audio.currentTime * 1000;
+    startListenReporting();
+    renderTransport();
+  });
+  on(audio, 'pause', () => {
+    flushListen();
+    renderTransport();
+  });
   on(audio, 'loadedmetadata', () => {
     paintStylus();
     renderTransport();
   });
   on(audio, 'ended', () => {
-    // 一段放完自动走到下一段（真实接力链的听法）；本段是最后一段就停下。
+    flushListen();
+    // 一段放完自动走到下一段（真实接力链的听法）；连播队列＝已录段，缺口天然不在队列里。
     const next = segments.find((segment) => segment.index > (current ?? 0));
     if (next === undefined) {
+      playingAll = false; // 连播到头：按钮自己回到「试听全部」
       renderTransport();
       return;
     }
@@ -499,19 +787,28 @@ async function start() {
     }
   }
 
+  // 新控件一律**运行时创建**（§10.2 的既有模式）：这一段**没有已录的段就一个都不建**
+  // ⇒「试听全部」与赞/踩都不会出现（0 段时页面上一个可点的假控件都不留）。
+  if (segments.length > 0) {
+    playAllButton = buildPlayAllControl();
+    voteControls = buildVoteControls();
+  }
   renderDeck();
   if (segments.length > 0) selectSegment(segments[0].index, { autoplay: false });
 }
 
 export const { init } = definePage({
   name: 'sea-detail',
-  owner: 'W1-c',
+  owner: 'W1-c / W4-b',
   endpoints: [
     'GET /api/sea/:id',
     'GET /api/bottles/:id',
     'GET /api/segments/:id/audio',
     'POST /api/sea/:id/targeted-segment',
     'POST|DELETE /api/collections/:bottleId',
+    'POST /api/segments/:id/votes',
+    'POST /api/segments/:id/listen',
   ],
+  note: 'W4-b 新增控件（试听全部：同址逐段连播、无混音端点；听阶段赞/踩：门槛由服务端判）；listen 用于上报已听覆盖率，否则点踩永远够不到门槛',
   init: start,
 });
