@@ -47,7 +47,7 @@ export function mountDemoNav() {
     type: 'button',
     'aria-expanded': 'false',
     'aria-controls': 'demo-nav-panel',
-    'aria-label': '演示导航（展开 11 页清单）',
+    'aria-label': '演示导航（展开 10 页清单）',
     title: '演示辅助（共享层注入，非设计稿构图）',
     text: '演示导航',
   });
@@ -56,7 +56,7 @@ export function mountDemoNav() {
     'nav',
     { id: 'demo-nav-panel', class: 'demo-nav__panel', hidden: true, 'aria-label': '演示导航' },
     [
-      el('p', { class: 'demo-nav__title', text: '演示导航 · 11 页' }),
+      el('p', { class: 'demo-nav__title', text: '演示导航 · 10 页' }),
       el(
         'ul',
         { class: 'demo-nav__list' },

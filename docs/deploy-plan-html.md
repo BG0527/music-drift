@@ -638,3 +638,38 @@ W8 实测（SQL 按 `octet_length(audio)`）：**合成容器段共 88 个** = 4
 **W8 收不到我对这个问题的回复**（本会话 `send_message` 对 subagent 不可寻址）⇒ 它会按默认只修 seed 的 17 段、把 71 段作为 WARN 报出并附超集 SQL。
 ⇒ **captain 认领：在 W8 交稿后，由我用它给的超集 SQL（或让它重跑）把剩下 71 段一并换掉**，并复跑全库体检。
 **这条不解决，评委翻到公海第二屏就会听到静音。**
+
+---
+
+## 22. 公海详情页删除的收口（§17 执行记录，2026-09-23）
+
+### 22.1 W7 已落地
+公海「听这支作品」→ `/bottle.html?id=…`；**时间轴 + 唱针**（运行时建 DOM）进瓶子详情并**跟着播放走**；
+删除 `site/sea-detail.html` 与 `site/app/page-sea-detail.js`；三个工具的 `PAGES` 名单摘除；
+`sync-site` 缺源口径修好（`比对完成：10 页，0 页不一致，缺源 0 页`；缺源时不再打印"0 页不一致"）；
+`probe-fit` 改为**先登录 demo + 等 `pageReady` + 断言落点＝被探页**（改前实测：350ms 时 `/me`、`/settings`、`/admin` 已在 `/login.html` ⇒ 探针在**白量登录页**还报 0 被裁）；`walkthrough` 30/30。
+
+### 22.2 captain 补的删除面（W7 指出 §17.2 漏了两处，且都不在它的可改清单里）
+| 位置 | 处置 |
+| --- | --- |
+| `site/app/page-me.js` 收藏/徽章两处 `linkify(go, '/sea-detail.html?id=…')` | **captain 已改为 `/bottle.html?id=…`**（2 处） |
+| `site/app/demo-nav.js` 的「公海详情」条目 | **captain 已删除该条目** |
+| `site/app/demo-nav.js` 的「展开 11 页清单」/「演示导航 · 11 页」 | **captain 已改 11 → 10**（页面数变了，字样要跟着变） |
+| `tools/probe-fit.mjs`、`tools/sync-site.mjs`、`tools/site-guard.mjs` 的名单 | W7 已摘除 |
+
+### 22.3 端点映射的更新（§7.3 / §13 的对应行）
+- `GET /api/sea/:id`：**前端不再使用**（公海详情页已删；公海点听直接进瓶子详情，那里用 `GET /api/bottles/:id`）。
+- `POST /api/sea/:id/targeted-segment`：**前端不再使用**（与需求 2「接唱只能唱下一段」一致）。
+- `GET /api/segments/:id/audio`：仍被瓶子详情（试听/试听全部）使用。
+
+### 22.4 W7 顺手修的一处旧债（避免重复派活）
+`tools/walkthrough.mjs` 在 W6 改完登录/注册后**已经断了**（W6 把契约改成 `{account, password}`、登录页不再有「用户名」行，而走查仍按旧形状用邮箱当账号 + 填 `[data-username-row="true"] input` ⇒ 第 1 步 `locator.fill` 超时；实测改前 3 次运行 2 次死在第 1 步/第 5 步）。**W7 已一并修好**（只填两个真实存在的输入框、账号栏填 handle），现 30/30。
+
+### 22.5 captain 执行的全库音频替换（W8 授权扩到全库，见 §21）
+```
+docker cp tools/fixtures/demo-segment.webm music-drift-postgres:/tmp/mdb-demo-segment.webm
+update bottle_segments set audio = pg_read_binary_file(...)
+  where octet_length(audio) in (2048,4096,8192) and encode(audio,'escape') not like '%webm%';
+```
+实测：替换前 4096B×67 + 2048B×12 + 8192B×5 = **84 段** ⇒ `UPDATE 84` ⇒ 复查 **remaining_synthetic = 0**，
+全库真音频段 **191**、公海作品 **27**。⇒ **评委无论点到哪支作品哪一段都能听到声音**（这条漏了就是翻到公海第二屏静音）。
