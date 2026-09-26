@@ -34,7 +34,9 @@ const PAGES = [
   ['p-404-record.html', '404.html', '404'],
 ];
 
-const VIEWPORT = '    <meta name="viewport" content="width=1440">';
+// 不要写 `width=1440`：那会让浏览器把画布**放大到窗口宽**，高度必然溢出、底部被切
+//（用户实测截图正是这个问题）。改成 device-width + 1:1，再由 site/app/fit.js 等比缩放到一屏。
+const VIEWPORT = '    <meta name="viewport" content="width=device-width, initial-scale=1">';
 
 /** 只注入两行：charset 之后插 viewport，</body> 之前插本页脚本。其余字节原样。 */
 function inject(html, slug) {

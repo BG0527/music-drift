@@ -20,6 +20,7 @@
  */
 
 import { ensureBaseStyles } from './dom.js';
+import { installFit } from './fit.js';
 import { mountDemoNav } from './demo-nav.js';
 
 /**
@@ -31,6 +32,9 @@ export function definePage(config) {
   const { name, owner = '', endpoints = [], note = null, init = null } = config;
 
   ensureBaseStyles();
+  // 顺序要紧：先把画布搬进 #fit-stage 并缩放，再挂演示导航
+  //（导航追加到 body、position:fixed ⇒ 留在 stage 外，不被缩放）。
+  installFit();
   mountDemoNav();
 
   async function pageInit() {
