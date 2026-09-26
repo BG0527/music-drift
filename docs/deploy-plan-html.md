@@ -523,6 +523,8 @@ W4-b（`ced717a`）刚给公海详情加了「试听全部」与「赞/踩」。
 - `tools/probe-fit.mjs` → 0 项内容被裁（页数从 11 变 10）；
 - 用 `read_image` 确认瓶子详情页**没有因为多了一条时间轴而变挤/压住原有内容**。
 
+> 执行记录见 **§22**（captain 收口章节：已落地项、captain 补的删除面、端点映射更新、旧债与残差）。
+
 ---
 
 ## 18. 浮层落位的量化对照与「铺满优先」的确切代价（2026-09-23）
@@ -673,3 +675,34 @@ update bottle_segments set audio = pg_read_binary_file(...)
 ```
 实测：替换前 4096B×67 + 2048B×12 + 8192B×5 = **84 段** ⇒ `UPDATE 84` ⇒ 复查 **remaining_synthetic = 0**，
 全库真音频段 **191**、公海作品 **27**。⇒ **评委无论点到哪支作品哪一段都能听到声音**（这条漏了就是翻到公海第二屏静音）。
+
+---
+
+## 23. 两件收口事实（captain，2026-09-23）
+
+### 23.1 `tools/verify-demo-audio.mjs` 的"外部写入"是 captain（同一教训第二次）
+W8 报该文件在 00:32:21 被本会话之外的写入动过（只差 4 字节空白级差异）。**是我**：
+公海详情页删除后，该工具仍打开 `/sea-detail.html?id=…`（会 404）⇒ 我改成 `/bottle.html?id=…`（提交 `8f6c4ac`，改动面 1 行）。
+**教训（第二次记，说明它不是偶然）**：本会话我已两次修改执行者刚交付的文件（第一次 `page-me.js` 的注释 emoji）。
+两次我都在**提交信息**里声明了，但**执行者看不到提交**（本会话 `send_message` 对 subagent 不可寻址）⇒ 在它眼里那就是"被神秘进程改了"。
+**规则（升级版）**：由 captain 修改他人交付物时，除了提交信息，还必须**在该文件内或方案里留下可被读到的一行归属说明**，并在下一次派活的任务书里带上"某人改过你的文件、改了什么"。
+否则执行者会重复排查同一件事（W8 这一轮就为它重跑了一整套）。
+
+### 23.2 W8 等的"再授权"已经不需要了：83 段已由 captain 全库替换完毕
+W8 报：非 seed 探针账号名下仍有 83 段合成容器，分布在 14 支公海已完成作品上，它按约束②没动、等我授权 ——
+**它收不到我的授权**（同上），所以这条在它那边一直是"未决"。而 **captain 已经执行完**（§22.5）：
+```
+docker cp tools/fixtures/demo-segment.webm music-drift-postgres:/tmp/mdb-demo-segment.webm
+update bottle_segments set audio = pg_read_binary_file(...)
+  where octet_length(audio) in (2048,4096,8192) and encode(audio,'escape') not like '%webm%';
+-- 实测：4096B×67 + 2048B×12 + 8192B×5 = 84 段 ⇒ UPDATE 84 ⇒ 复查 remaining_synthetic = 0
+```
+⇒ **全库再无合成容器段**（真音频段 191、公海作品 27），**评委无论点到哪支作品哪一段都能听到声音**。
+W8 的 §2.6.2 修复三步仍然有效，可用于将来 seed 出错时的回滚。
+
+### 23.3 W8 复跑确认（在当前字节上，含 W6 的契约变更）
+- `seed-demo` ×2 幂等、音频自检通过；`verify-demo-audio` EXIT=0（抽样 20 段全可解码、连播跨段仍在前进）；
+- **`pnpm -r test` EXIT=0**（shared 250 / api 180 / web 745+1 skipped）；
+- 库内 seed 范围 **21 段全 real_opus 且每段恰好 321022B**，合成容器 0；
+- 新出现的一支 seed 产作品 `d880d407…` 的 4 段也是真 opus ⇒ **"修好之后 seed 新造的数据也是真音频"的端到端旁证**；
+- `probe-fit` **已恢复绿**（W7 的"先登录 + 等 pageReady"修复生效）；`site-guard` 仅剩 `page-login.js 含 emoji`（W9 处理）。
