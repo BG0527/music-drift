@@ -151,3 +151,54 @@
 - **不改后端**（`apps/api`、`packages/shared` 一行不动）—— 所以"跨域 cookie"只能靠同源部署解决，不能靠改 `SameSite`。
 - **不引新依赖**（AGENTS §7：中间件/存储/部署平台是待裁决项）—— 本方案只用平台能力与原生 ESM，不装任何前端框架。
 - **不部署**（等你说）。部署时也只动平台侧配置与新增的 `site/` 目录，不碰 `apps/web`（React 版留着，将来要回去做也不亏）。
+
+---
+
+## 7. 已裁决与施工图（2026-09-23）
+
+### 7.1 用户裁决
+- **只做 web 端，暂时不做响应式** ⇒ 静态站按 **1440×900 桌面**交付；**375 不进本产物的验收线**（`meta viewport` 仍加，只为避免被缩成豆腐块）。
+- **11 页全部接真数据**（含审核台的处理动作、设置的保存、漂流日志）。
+- **平台先不定**：本阶段只交付**本地前后端联调产物**；D-06 留待联调通过后再选。
+- **部署只在用户明确下令时执行** —— 本阶段不部署、不改后端（`apps/api`、`packages/shared` 一行不动）。
+
+### 7.2 本地栈可行性（已核）
+- Docker `28.3.3` ✓；本地 PG 已在 **5433** 监听 ✓；`.env` 就位 ✓；
+- `apps/api` 已有 `db:migrate` / `db:seed` / `live-check` ✓ —— **演示数据不用从零写**；
+- API 未启动（8787 未监听）⇒ 联调时起即可。
+
+### 7.3 页面 ↔ 端点映射（施工图；路由真值取自 `apps/api/src/routes/*.ts`，共 25 个端点 / 16 张表）
+| 设计稿 | 站点路径 | 用到的端点 |
+| --- | --- | --- |
+| `p-login-record` | `/login.html` | `POST /api/auth/login`、`POST /api/auth/register`、`POST /api/auth/logout`、`GET /api/auth/me` |
+| `f4-groove` | `/river.html` | `POST /api/river/draw`（捞）；投河入口跳 `/new.html` |
+| `p-songpicker-record` | `/new.html` | `GET /api/songs`；选曲后录第 1 段并**发起**（`POST /api/bottles`） |
+| `p-bottle-record` | `/bottle.html` | `GET /api/bottles/:id`、`POST /api/bottles/:id/segments`、`POST /api/segments/:id/listen`、`POST /api/segments/:id/votes`、`GET/POST /api/bottles/:id/messages`、`POST /api/bottles/:id/resolution`、`POST /api/bottles/:id/put-back`、`POST /api/reports` |
+| `p-driftlog-record` | `/drift-log.html` | `GET /api/bottles/:id/events` |
+| `p-sea-hall` | `/sea.html` | `GET /api/sea` |
+| `p-sea-detail-record` | `/sea-detail.html` | `GET /api/sea/:id`、`POST /api/sea/:id/targeted-segment`、`POST /api/collections/:bottleId` |
+| `p-profile-record` | `/me.html` | `GET /api/me/bottles`、`GET /api/notifications`、`POST /api/notifications/:id/read`、`GET /api/me/collections`、`GET /api/me/badges`、`GET /api/me/anonymous-codes` |
+| `p-settings-record` | `/settings.html` | `GET /api/auth/me`、`POST /api/auth/logout` |
+| `s2-admin-record` | `/admin.html` | `GET /api/admin/reports`、`POST /api/admin/reports/:id/decision` |
+| `p-404-record` | `/404.html` | —（纯静态） |
+
+> ⚠️ **演示导航是新增元素**：11 张稿子是**独立页**（只有页内返回链接），没有全站导航 ⇒ 评委无法在页间移动。
+> 因此加一个**默认收起**的「演示导航」（角落一个小触发器，展开列出 11 页），**不改动任何页面的构图**，并在页脚标注它是演示辅助。
+
+### 7.4 波次与文件归属（避免撞车）
+| 波 | 谁 | 独占文件 | 交付 |
+| --- | --- | --- | --- |
+| **W0** | 一个 agent | `site/**`（骨架）、`tools/site-server.mjs`、`site/app/*.js`（**共享层，之后只有 captain 能改**）、`docs/site-runbook.md` | 11 页复制到位 + 共享 JS 层 + 无依赖静态服务器（含 `/api` 同源反代）+ 登录链路能跑通 |
+| **W1-a** | 一个 agent | `site/river.html`、`site/new.html`、`site/app/page-*.js`（这两个） | 捞/投/选曲/发起 接真数据 |
+| **W1-b** | 一个 agent | `site/bottle.html`、`site/drift-log.html` + 各自 page js | 段链/试听/投票/留言/三选一/放回/事件流 接真数据 |
+| **W1-c** | 一个 agent | `site/sea.html`、`site/sea-detail.html`、`site/me.html` + 各自 page js | 公海列表/详情/收藏/通知/徽章/我的瓶子 |
+| **W1-d** | 一个 agent | `site/login.html`、`site/settings.html`、`site/admin.html`、`site/404.html` + 各自 page js | 登录注册/设置/审核台处理动作 |
+| **W2** | captain + 一个 agent | `tools/site-guard.mjs`、契约冒烟 | 静态站守卫（禁 emoji/纯黑/外链/`innerHTML`、必须有 viewport 与 CC-BY 署名、`data-bind` 必须命中契约字段）+ 真实响应过 zod |
+| **W3** | captain | `docs/site-runbook.md` | 一键起全栈 + 走查脚本（登录→选歌→录音→投河→捞起→接唱→投票→回传入海→我的→公海） |
+
+### 7.5 W0 的硬约束（发给执行者）
+- **不许改 `docs/ui-review/design-explore/**`**（设计稿是证据）；只把 11 页**复制**到 `site/`。
+- **不许改后端**（`apps/api`、`packages/shared` 一行不动）；不改 React 版（`apps/web`）。
+- **不许装依赖**：静态服务器用 `node:http` + `fetch` 手写反代（AGENTS §7 禁止擅自引中间件）。
+- **渲染一律 `textContent`**（禁 `innerHTML`）—— 匿名代号/曲名/留言都是用户输入。
+- 每页只**增加**：`<meta viewport>`、`<script type="module" src="/app/page-xxx.js">`、`data-bind` 挂点；**不得改动既有构图与视觉值**（本阶段不做视觉重排）。
