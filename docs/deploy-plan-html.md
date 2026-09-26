@@ -421,3 +421,34 @@ W1-c 报：`site/app/page-me.js` 在 **23:40:53 被本会话之外的进程改�
 - **错误兜底措辞统一**：无 `envelope.message` 时由"上传失败（HTTP N）。"统一为共享层的"请求失败（HTTP N）。"（有 message 时两边逐字一致，422 已逐字验证）。
 - **既有竞态未修**：录音按钮在 `getUserMedia` 等待期间未禁用，连点两次会并发起两个会话（旧代码同病）。
 - **未接 `MediaRecorder.onerror`**（两页原本也没接）；`pickRecorderMime()` 返回 null 的分支未触发。
+
+---
+
+## 15. 环境陷阱：harness 后台作业有寿命上限（会影响任何"起服务再测"的流程）
+
+**实测（收口片 cd6da20b 踩到并定位）**：用 `run_in_background` 起的站点服务被 harness 的后台任务寿命上限**强杀**
+（job 日志：`status=completed detail=exit code: 1`、输出为空、**存活 578.9 秒**；Windows 上被强杀就报 exit 1）⇒
+依赖它的 e2e 在 `waitForURL` 处超时，**看起来像被测代码坏了，其实是被测环境死了**。
+
+### 15.1 正确写法（一键起全栈 / 任何"起服务再测"的脚本都必须这样）
+**在同一个前台命令里起服务 → 跑测试 → 收尾杀掉**，不要依赖常驻的后台进程：
+```powershell
+$srv = Start-Process node -ArgumentList 'tools/site-server.mjs','--port=5186' -PassThru -WindowStyle Hidden
+Start-Sleep -Seconds 2
+node <测试脚本>; "EXIT=$LASTEXITCODE"
+Stop-Process -Id $srv.Id -Force
+```
+⇒ 这条同时是 **W3 的 runbook 要求**：一键脚本自己起、自己收，**不留给下一个人一个可能已经死掉的端口**。
+
+### 15.2 当前端口/进程去向（截至本次记录）
+| 端口 | 谁 | 处置 |
+| --- | --- | --- |
+| **8787** | captain 起的 API（后台作业 `pwsh-1024`，仍在运行、healthz 200） | **W3/W4 都依赖它**；若中途被杀，重启命令＝`pnpm --filter @music-drift/api dev` |
+| 5433 | 本地 Postgres（docker-compose） | 保留 |
+| 5181 / 5182 | W1-a / W1-b 留下的站点服务器 | 待 W4 收工后统一清 |
+| 5185 / 5191 / 5192 | 补丁 agent / W4-a / W4-b 的站点服务器 | 同上 |
+| 5173 / 5183 / 5184 / 5186 / 5189 / 5199 | 已停 | ✓ |
+
+### 15.3 教训（一句话）
+**"测试红了"要先问"被测的东西还活着吗"** —— 一个被杀掉的服务器会让正确实现看起来像坏的，
+而排查成本远高于在脚本里老老实实前台起服务。
