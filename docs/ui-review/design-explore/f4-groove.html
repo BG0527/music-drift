@@ -8,7 +8,7 @@
       @import url('/node_modules/.pnpm/lxgw-wenkai-webfont@1.7.0/node_modules/lxgw-wenkai-webfont/lxgwwenkai-bold.css');
       @import url('/node_modules/.pnpm/@fontsource+quattrocento@5.3.0/node_modules/@fontsource/quattrocento/400.css');
       @import url('/node_modules/.pnpm/@fontsource+quattrocento@5.3.0/node_modules/@fontsource/quattrocento/700.css');
-      :root { --ink:#050f14; --paper:#f3f9fa; --muted:#a9c7cf; --glass:#7fd1d9; --coral:#d4553a; --warm:#f6d79a; --line:rgba(243,249,250,.16); }
+      :root { --ink:#050f14; --paper:#f3f9fa; --muted:#a9c7cf; --glass:#7fd1d9; --coral:#c7452c; --warm:#f6d79a; --line:rgba(243,249,250,.16); }
       * { box-sizing:border-box; margin:0; padding:0; }
       html,body { width:1440px; height:900px; }
       html { overflow:hidden; }
@@ -82,21 +82,17 @@
         mask-image:linear-gradient(180deg, #fff 0%, rgba(255,255,255,.5) 46%, rgba(255,255,255,0) 88%); }
       .shaft.two { left:660px; top:196px; width:118px; height:520px; transform:rotate(-19deg);
         background:linear-gradient(90deg, transparent 0%, rgba(220,248,253,.09) 48%, rgba(220,248,253,.09) 52%, transparent 100%); }
-      .shaft.three { left:986px; top:168px; width:152px; height:660px; transform:rotate(-9deg);
-        background:linear-gradient(90deg, transparent 0%, rgba(220,248,253,.075) 47%, rgba(220,248,253,.075) 53%, transparent 100%); }
-      .shaft.four { left:424px; top:126px; width:96px; height:520px; transform:rotate(-25deg);
-        background:linear-gradient(90deg, transparent 0%, rgba(220,248,253,.055) 48%, rgba(220,248,253,.055) 52%, transparent 100%); }
       .surface { position:absolute; left:560px; top:252px; width:900px; height:2px;
         transform:rotate(-2.4deg); transform-origin:0 50%;
         background:linear-gradient(90deg, rgba(234,252,255,0) 0%, rgba(234,252,255,.28) 20%,
-          rgba(234,252,255,.58) 52%, rgba(234,252,255,.5) 74%, rgba(234,252,255,0) 98%); }
+          rgba(234,252,255,.58) 52%, rgba(234,252,255,.62) 78%, rgba(234,252,255,.16) 100%); }
       .surface::after { content:''; position:absolute; left:0; right:0; top:-12px; height:26px; filter:blur(9px);
         background:linear-gradient(90deg, transparent 4%, rgba(230,251,255,.18) 40%, rgba(230,251,255,.23) 74%, transparent 98%); }
       .surface::before { content:''; position:absolute; left:0; right:0; top:0; height:5px; filter:blur(3px);
         background:linear-gradient(90deg, transparent 6%, rgba(230,251,255,.26) 34%, rgba(230,251,255,.36) 76%, transparent 98%); }
       /* 水面上的光斑：水线附近被揉开的亮片（只贴着水线走，不成星图） */
       .glints { position:absolute; inset:0; }
-      .glints i { position:absolute; height:2.6px; border-radius:50%; background:rgba(236,251,254,.42); transform:rotate(-2.4deg); }
+      .glints i { position:absolute; height:2.6px; border-radius:50%; background:rgba(236,251,254,.42); }
 
       .ov { position:absolute; }
       h1 { font-size:84px; font-weight:700; line-height:1; }
@@ -145,14 +141,14 @@
       <svg class="canvas" viewBox="0 0 1440 900" aria-hidden="true">
         <defs>
           <radialGradient id="label" cx=".5" cy=".5" r=".5">
-            <stop offset="0" stop-color="#d4553a" stop-opacity=".135" />
-            <stop offset=".97" stop-color="#d4553a" stop-opacity=".135" />
-            <stop offset="1" stop-color="#d4553a" stop-opacity="0" />
+            <stop offset="0" stop-color="#c7452c" stop-opacity=".115" />
+            <stop offset=".97" stop-color="#c7452c" stop-opacity=".115" />
+            <stop offset="1" stop-color="#c7452c" stop-opacity="0" />
           </radialGradient>
           <!-- 盘边/水岸线：只在**下面**吃到光（光从右上斜掠），上半段自然隐去，不横穿左上角的标题区 -->
-          <linearGradient id="rim" gradientUnits="userSpaceOnUse" x1="0" y1="770" x2="0" y2="470">
-            <stop offset="0" stop-color="#e6f8fb" stop-opacity=".3" />
-            <stop offset=".45" stop-color="#e6f8fb" stop-opacity=".09" />
+          <linearGradient id="rim" gradientUnits="userSpaceOnUse" x1="0" y1="800" x2="0" y2="330">
+            <stop offset="0" stop-color="#e6f8fb" stop-opacity=".4" />
+            <stop offset=".5" stop-color="#e6f8fb" stop-opacity=".13" />
             <stop offset="1" stop-color="#e6f8fb" stop-opacity="0" />
           </linearGradient>
           <!-- 河床：沙纹越靠近水面越淡（远处的光把细节洗掉） -->
@@ -188,28 +184,26 @@
         <!-- ② 水下光斑：水面把光揉碎了洒在河床上（"光从上打下来"这件事的**落地**那一半）。
              稀疏、模糊、有方向 —— 它们是水存在的直接证据，不是装饰。 -->
         <g filter="url(#soft)" fill="#dff6fb">
-          <ellipse cx="352" cy="656" rx="126" ry="52" opacity=".09" transform="rotate(-22 352 656)" />
-          <ellipse cx="620" cy="812" rx="104" ry="44" opacity=".08" transform="rotate(-16 620 812)" />
-          <ellipse cx="292" cy="332" rx="92" ry="38" opacity=".06" transform="rotate(-26 292 332)" />
-          <ellipse cx="556" cy="540" rx="78" ry="32" opacity=".065" transform="rotate(-20 556 540)" />
-          <ellipse cx="838" cy="700" rx="66" ry="28" opacity=".06" transform="rotate(-12 838 700)" />
-          <ellipse cx="1084" cy="574" rx="118" ry="46" opacity=".07" transform="rotate(-24 1084 574)" />
-          <ellipse cx="948" cy="786" rx="96" ry="40" opacity=".06" transform="rotate(-18 948 786)" />
-          <ellipse cx="1246" cy="466" rx="92" ry="34" opacity=".05" transform="rotate(-28 1246 466)" />
-          <ellipse cx="712" cy="704" rx="74" ry="30" opacity=".055" transform="rotate(-14 712 704)" />
+          <ellipse cx="352" cy="656" rx="126" ry="52" opacity=".07" transform="rotate(-22 352 656)" />
+          <ellipse cx="620" cy="812" rx="104" ry="44" opacity=".062" transform="rotate(-16 620 812)" />
+          <ellipse cx="292" cy="332" rx="92" ry="38" opacity=".045" transform="rotate(-26 292 332)" />
+          <ellipse cx="556" cy="540" rx="78" ry="32" opacity=".05" transform="rotate(-20 556 540)" />
+          <ellipse cx="838" cy="700" rx="66" ry="28" opacity=".042" transform="rotate(-12 838 700)" />
+          <ellipse cx="1084" cy="574" rx="118" ry="46" opacity=".048" transform="rotate(-24 1084 574)" />
+          <ellipse cx="948" cy="786" rx="96" ry="40" opacity=".04" transform="rotate(-18 948 786)" />
         </g>
 
         <!-- ③ 河床沙纹：与沟槽**同一套同心几何**（圆心 1420,960），但更粗、更断续、越远越淡。
              只铺在河槽两侧各四道 —— 水扫出来的纹路本来就平行于流向；铺满全屏会变成"拉丝"。 -->
         <g fill="none" stroke="#d6f1f7" mask="url(#bedMask)" stroke-linecap="butt">
-          <circle cx="1420" cy="960" r="934" stroke-opacity=".075" stroke-width="1.3" stroke-dasharray="46 34" />
-          <circle cx="1420" cy="960" r="962" stroke-opacity=".055" stroke-width="1.4" stroke-dasharray="28 26" />
-          <circle cx="1420" cy="960" r="998" stroke-opacity=".04" stroke-width="1.5" stroke-dasharray="64 40" />
-          <circle cx="1420" cy="960" r="1042" stroke-opacity=".03" stroke-width="1.4" stroke-dasharray="36 32" />
-          <circle cx="1420" cy="960" r="866" stroke-opacity=".07" stroke-width="1.3" stroke-dasharray="52 36" />
-          <circle cx="1420" cy="960" r="836" stroke-opacity=".05" stroke-width="1.4" stroke-dasharray="32 28" />
-          <circle cx="1420" cy="960" r="800" stroke-opacity=".038" stroke-width="1.5" stroke-dasharray="68 44" />
-          <circle cx="1420" cy="960" r="756" stroke-opacity=".028" stroke-width="1.4" stroke-dasharray="40 34" />
+          <circle cx="1420" cy="960" r="934" stroke-opacity=".055" stroke-width="1.3" stroke-dasharray="46 34" />
+          <circle cx="1420" cy="960" r="962" stroke-opacity=".045" stroke-width="1.4" stroke-dasharray="28 26" />
+          <circle cx="1420" cy="960" r="998" stroke-opacity=".036" stroke-width="1.5" stroke-dasharray="64 40" />
+          <circle cx="1420" cy="960" r="1042" stroke-opacity=".028" stroke-width="1.4" stroke-dasharray="36 32" />
+          <circle cx="1420" cy="960" r="866" stroke-opacity=".05" stroke-width="1.3" stroke-dasharray="52 36" />
+          <circle cx="1420" cy="960" r="836" stroke-opacity=".042" stroke-width="1.4" stroke-dasharray="32 28" />
+          <circle cx="1420" cy="960" r="800" stroke-opacity=".034" stroke-width="1.5" stroke-dasharray="68 44" />
+          <circle cx="1420" cy="960" r="756" stroke-opacity=".026" stroke-width="1.4" stroke-dasharray="40 34" />
         </g>
 
         <!-- ④ 细沟槽：只在右下角那一片露出盘面（`.record`），这里补两条紧挨标签的沙纹把淤泥的边走实 -->
@@ -222,17 +216,15 @@
              它沉在右下角的水底，左上被淤泥压住 —— 音乐还在，只是沉下去了。 -->
         <circle cx="1420" cy="960" r="268" fill="url(#label)" />
         <circle cx="1420" cy="960" r="336" fill="none" stroke="rgba(214,241,247,.11)" stroke-width="1" />
-        <circle cx="1420" cy="960" r="262" fill="none" stroke="rgba(212,85,58,.52)" stroke-width="1.6" />
-        <circle cx="1420" cy="960" r="275" fill="none" stroke="rgba(243,249,250,.18)" stroke-width="1" />
-        <!-- 沉物被水面的光擦到的那一条边：埋在水里的东西是靠这条边被认出来的，不是靠它变亮 -->
-        <path d="M 1235 775 A 262 262 0 0 1 1420 702" fill="none" stroke="rgba(236,252,255,.22)" stroke-width="1.8" />
+        <circle cx="1420" cy="960" r="262" fill="none" stroke="rgba(199,69,44,.4)" stroke-width="1.6" />
+        <circle cx="1420" cy="960" r="275" fill="none" stroke="rgba(243,249,250,.16)" stroke-width="1" />
         <ellipse cx="1216" cy="742" rx="318" ry="176" fill="url(#silt)" transform="rotate(-19 1216 742)" />
 
         <!-- ⑥ 河道：一条**有暗槽 + 亮水芯**的水道（不是一根亮线），从左下深处升到右上的水面 -->
         <g mask="url(#chanMask)">
           <circle cx="1420" cy="960" r="900" fill="none" stroke="rgba(2,12,17,.66)" stroke-width="48" />
           <circle cx="1420" cy="960" r="900" fill="none" stroke="rgba(38,148,170,.32)" stroke-width="30" />
-          <circle cx="1420" cy="960" r="900" fill="none" stroke="rgba(159,230,237,.52)" stroke-width="6" />
+          <circle cx="1420" cy="960" r="900" fill="none" stroke="rgba(159,230,237,.58)" stroke-width="6" />
           <circle cx="1420" cy="960" r="913" fill="none" stroke="rgba(216,243,246,.4)" stroke-width="1.4" />
           <circle cx="1420" cy="960" r="887" fill="none" stroke="rgba(216,243,246,.48)" stroke-width="1.4" />
           <!-- 水芯两侧的两条细流：水是**在走的**，不是一条静态的亮带 -->
@@ -257,10 +249,9 @@
 
           <!-- 空泊位：水痕断口 + 两道横越河槽的标桩 + 一个虚线空位轮廓。
                §7.1-5 —— 默认态不画瓶子，"没有东西在这里"本身要读得出来。 -->
-          <ellipse cx="665" cy="470" rx="48" ry="11" fill="rgba(2,12,17,.42)" transform="rotate(-57 665 470)" />
-          <ellipse cx="665" cy="470" rx="48" ry="11" fill="none" stroke="rgba(243,249,250,.44)" stroke-width="1.2" stroke-dasharray="7 6" transform="rotate(-57 665 470)" />
-          <path d="M 674 409 L 717 437" fill="none" stroke="rgba(243,249,250,.48)" stroke-width="1.3" stroke-linecap="round" />
-          <path d="M 613 503 L 656 531" fill="none" stroke="rgba(243,249,250,.48)" stroke-width="1.3" stroke-linecap="round" />
+          <ellipse cx="665" cy="470" rx="44" ry="10.5" fill="none" stroke="rgba(243,249,250,.32)" stroke-width="1.2" stroke-dasharray="7 6" transform="rotate(-57 665 470)" />
+          <path d="M 674 409 L 717 437" fill="none" stroke="rgba(243,249,250,.36)" stroke-width="1.2" stroke-linecap="round" />
+          <path d="M 613 503 L 656 531" fill="none" stroke="rgba(243,249,250,.36)" stroke-width="1.2" stroke-linecap="round" />
           <!-- 空位里唯一在动的东西：三颗从空槽升起的气泡 -->
           <g fill="none" stroke="#e4fafd" stroke-linecap="round">
             <circle cx="657" cy="444" r="1.6" stroke-opacity=".26" stroke-width="1" />
@@ -282,10 +273,6 @@
             <circle cx="992" cy="268" r="4.6" stroke-opacity=".26" stroke-width="1.3" />
             <circle cx="1014" cy="246" r="3" stroke-opacity=".2" stroke-width="1.1" />
             <circle cx="1108" cy="392" r="2.6" stroke-opacity=".2" stroke-width="1.1" />
-            <circle cx="1180" cy="602" r="2.2" stroke-opacity=".24" stroke-width="1.1" />
-            <circle cx="1246" cy="664" r="1.8" stroke-opacity=".2" stroke-width="1" />
-            <circle cx="1122" cy="542" r="2.4" stroke-opacity=".26" stroke-width="1.1" />
-            <circle cx="1024" cy="806" r="1.7" stroke-opacity=".2" stroke-width="1" />
           </g>
           <g fill="#eafdff">
             <circle cx="961" cy="298" r="1.1" opacity=".42" />
@@ -307,22 +294,13 @@
       <div class="caustic"></div>
       <div class="shaft"></div>
       <div class="shaft two"></div>
-      <div class="shaft three"></div>
-      <div class="shaft four"></div>
       <div class="glints">
-        <i style="left:600px; top:249.5px; width:14px; opacity:.2"></i>
-        <i style="left:636px; top:248px; width:24px; opacity:.3"></i>
-        <i style="left:672px; top:246.5px; width:10px; opacity:.16"></i>
-        <i style="left:714px; top:244.8px; width:30px; opacity:.36"></i>
-        <i style="left:756px; top:243px; width:16px; opacity:.22"></i>
-        <i style="left:800px; top:241.2px; width:22px; opacity:.3"></i>
-        <i style="left:842px; top:239.4px; width:12px; opacity:.18"></i>
-        <i style="left:888px; top:237.5px; width:34px; opacity:.4"></i>
-        <i style="left:934px; top:235.6px; width:18px; opacity:.24"></i>
-        <i style="left:980px; top:233.6px; width:26px; opacity:.3"></i>
-        <i style="left:1024px; top:231.8px; width:12px; opacity:.16"></i>
-        <i style="left:1070px; top:229.8px; width:20px; opacity:.22"></i>
-        <i style="left:1116px; top:227.9px; width:11px; opacity:.15"></i>
+        <i style="left:652px; top:246px; width:26px; opacity:.4"></i>
+        <i style="left:714px; top:243px; width:15px; opacity:.28"></i>
+        <i style="left:784px; top:240px; width:30px; opacity:.32"></i>
+        <i style="left:856px; top:237px; width:18px; opacity:.24"></i>
+        <i style="left:926px; top:234px; width:24px; opacity:.28"></i>
+        <i style="left:1006px; top:231px; width:13px; opacity:.18"></i>
       </div>
       <div class="surface"></div>
     </div>

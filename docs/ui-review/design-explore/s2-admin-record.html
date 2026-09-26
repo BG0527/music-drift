@@ -2,15 +2,13 @@
 <html lang="zh-CN">
   <head>
     <meta charset="utf-8" />
-    <title>S2 · 审核台（F4 压片工单语言）</title>
+    <title>S2 · 审核台（水面上下 · 浮上来的压片工单 + 裁决印章）</title>
     <style>
       @import url('/node_modules/.pnpm/lxgw-wenkai-webfont@1.7.0/node_modules/lxgw-wenkai-webfont/lxgwwenkai-regular.css');
       @import url('/node_modules/.pnpm/lxgw-wenkai-webfont@1.7.0/node_modules/lxgw-wenkai-webfont/lxgwwenkai-bold.css');
       @import url('/node_modules/.pnpm/@fontsource+quattrocento@5.3.0/node_modules/@fontsource/quattrocento/400.css');
       @import url('/node_modules/.pnpm/@fontsource+quattrocento@5.3.0/node_modules/@fontsource/quattrocento/700.css');
-      :root { --ink:#050f14; --paper:#f3f9fa; --muted:#a9c7cf; --glass:#7fd1d9; --coral:#d4553a; --line:rgba(243,249,250,.13);
-  --warm: #f6d79a;
-}
+      :root { --ink:#050f14; --paper:#f3f9fa; --muted:#a9c7cf; --glass:#7fd1d9; --coral:#d4553a; --warm:#f6d79a; --line:rgba(243,249,250,.13); }
       * { box-sizing:border-box; margin:0; padding:0; }
       html,body { width:1440px; height:900px; }
       html { overflow:hidden; }
@@ -18,55 +16,149 @@
       body { position:relative; overflow:hidden; background:var(--ink); color:var(--paper);
         font-family:'LXGW WenKai',serif; -webkit-font-smoothing:antialiased; }
       .mono { font-family:Quattrocento,serif; font-variant-numeric:tabular-nums; }
-      .surface { position:absolute; inset:0; opacity:.9;
+
+      /* ── 同一张盘的两半：水面之上沟槽是干的，水面之下沟槽里流着水（融合，不是两张贴纸并排） ── */
+      .dry { position:absolute; left:0; right:0; top:0; height:540px; overflow:hidden; }
+      .wet { position:absolute; left:0; right:0; top:540px; bottom:0; overflow:hidden; }
+      .platter { position:absolute; inset:0; opacity:.8;
         background:
           repeating-radial-gradient(circle at 1420px 960px, rgba(216,243,246,.055) 0 1.2px, transparent 1.2px 6.5px),
           radial-gradient(circle at 1420px 960px, rgba(127,209,217,.05) 0 30%, transparent 68%); }
+      .platter.sub { top:-540px; opacity:1;
+        background:
+          repeating-radial-gradient(circle at 1420px 960px, rgba(216,243,246,.115) 0 1.2px, transparent 1.2px 6.5px),
+          radial-gradient(circle at 1420px 960px, rgba(127,209,217,.1) 0 30%, transparent 68%); }
       .glint { position:absolute; inset:0; mix-blend-mode:screen;
         background:linear-gradient(101deg, transparent 28%, rgba(228,247,252,.045) 45%, rgba(228,247,252,.065) 50%, rgba(228,247,252,.028) 55%, transparent 72%); }
-      .rim { position:absolute; left:-40px; right:-40px; top:-820px; height:900px; border-radius:50%; border:2px solid rgba(207,233,238,.16); }
+      /* 光从上方斜插下来，打在水面那一段最亮 —— 水面上的光就落在这半张盘上 */
+      .shaft { position:absolute; left:60px; top:-30px; width:900px; height:610px; opacity:.62; filter:blur(13px);
+        background:linear-gradient(184deg, rgba(228,247,252,.11) 0%, rgba(228,247,252,.05) 48%, rgba(228,247,252,0) 80%);
+        clip-path:polygon(9% 0, 30% 0, 88% 100%, 54% 100%); }
+      .caustic { position:absolute; left:-40px; right:-40px; top:0; height:360px; opacity:.62; filter:blur(13px);
+        background:
+          linear-gradient(97deg, transparent 10%, rgba(200,240,250,.1) 20%, transparent 31%),
+          linear-gradient(86deg, transparent 36%, rgba(200,240,250,.07) 50%, transparent 64%),
+          linear-gradient(102deg, transparent 66%, rgba(200,240,250,.06) 78%, transparent 90%); }
+      .deep { position:absolute; inset:0; background:linear-gradient(180deg, rgba(3,17,23,0) 0%, rgba(3,17,23,.5) 48%, rgba(3,17,23,.88) 100%); }
+      /* 水面：一条 1px 亮线 + 它上方的一层薄雾 */
+      .surface { position:absolute; left:0; right:0; top:539px; height:1px;
+        background:linear-gradient(90deg, rgba(228,249,255,0) 0%, rgba(228,249,255,.3) 9%, rgba(228,249,255,.62) 40%, rgba(228,249,255,.56) 76%, rgba(228,249,255,.1) 100%); }
+      .surface-haze { position:absolute; left:0; right:0; top:518px; height:44px; filter:blur(9px);
+        background:linear-gradient(90deg, rgba(190,238,248,0) 0%, rgba(190,238,248,.1) 24%, rgba(214,244,252,.2) 47%, rgba(190,238,248,.07) 79%, rgba(190,238,248,0) 100%); }
+      /* 每一件浮上来的东西在水面上留下一圈涟漪：越早浮上来的圈越宽越淡 */
+      .ripple { position:absolute; transform:translate(-50%,-50%); border-radius:50%;
+        border:1px solid rgba(228,249,255,.3); }
+      .refl { position:absolute; transform:translateX(-50%);
+        background:linear-gradient(180deg, rgba(228,249,255,.085), rgba(228,249,255,0)); }
+      .bub { position:absolute; border-radius:50%; border:1px solid rgba(228,249,255,.34); }
+      .bed { position:absolute; left:0; right:0; bottom:52px; height:1px;
+        background:repeating-linear-gradient(90deg, rgba(169,199,207,.2) 0 3px, transparent 3px 13px); }
+      .bed.two { bottom:64px; opacity:.55;
+        background:repeating-linear-gradient(90deg, transparent 0 9px, rgba(169,199,207,.16) 9px 12px, transparent 12px 26px); }
 
-      main { position:relative; z-index:2; padding:60px 76px 0; }
+      main { position:relative; z-index:2; padding:46px 76px 0; }
       .cat { font-family:Quattrocento,serif; font-size:11px; letter-spacing:.24em; color:rgba(243,249,250,.5); }
       header h1 { margin-top:12px; font-size:56px; font-weight:700; line-height:1; }
       header .sub { margin-top:14px; font-size:14.5px; line-height:1.85; color:var(--muted); max-width:820px; }
 
-      .sides { display:flex; gap:34px; margin-top:26px; border-bottom:1px solid var(--line); }
-      .side { padding-bottom:12px; font-size:15px; color:var(--muted); display:flex; align-items:baseline; gap:10px; }
-      .side b { font-weight:700; } .side .n { font-family:Quattrocento,serif; font-size:13px; opacity:.7; }
-      .side[aria-selected='true'] { color:var(--paper); border-bottom:2px solid var(--coral); margin-bottom:-1px; }
+      /* 两个视图 = 水面的两侧：待处理在水上，历史裁决在水下 */
+      .views { display:flex; gap:34px; margin-top:20px; }
+      .view { display:flex; align-items:baseline; gap:9px; padding-bottom:10px; font-size:15px;
+        color:var(--muted); border-bottom:2px solid transparent; }
+      .view b { font-weight:700; }
+      .view .n { font-family:Quattrocento,serif; font-size:12.5px; opacity:.75; }
+      .view[aria-selected='true'] { color:var(--paper); border-bottom-color:var(--coral); }
 
-      /* 每一行 = 一张压片工单：左边母版号，中间举报对象，右边裁决印章 + 动作 */
-      ul.orders { list-style:none; margin-top:4px; }
-      li.order { display:grid; grid-template-columns:150px 1fr 152px 238px; gap:24px; align-items:center;
-        padding:21px 0; border-bottom:1px solid rgba(243,249,250,.07); }
-      .matrix { font-family:Quattrocento,serif; font-size:13px; color:rgba(169,199,207,.85); letter-spacing:.06em; }
-      .matrix small { display:block; margin-top:5px; font-size:11px; color:rgba(169,199,207,.5); letter-spacing:.14em; }
-      .target { font-size:16px; font-weight:700; }
-      .target em { font-style:normal; color:var(--glass); font-weight:400; font-size:13.5px; margin-left:8px; }
-      .when { margin-top:6px; font-family:Quattrocento,serif; font-size:12px; color:rgba(169,199,207,.7); }
-      /* 裁决印章：把"结论"做成一个盖上去的印（唱片厂质检就盖这个） */
-      .stamp { width:132px; height:52px; display:grid; place-items:center; border-radius:3px;
-        font-size:12.5px; letter-spacing:.16em; }
-      .stamp.pending { border:1.5px dashed rgba(212,85,58,.75); color:#e8967c; }
-      .stamp.done { border:1.5px solid rgba(203,238,246,.5); color:var(--glass); }
-      .stamp.restored { border:1.5px solid rgba(246,215,154,.55); color:#e8c07a; }
-      .acts { display:flex; gap:9px; justify-content:flex-end; }
-      .acts button { font-family:inherit; font-size:12.5px; padding:8px 13px; cursor:pointer;
-        background:transparent; color:var(--paper); border:1px solid rgba(243,249,250,.24); border-radius:2px;  white-space:nowrap;}
-      .acts button.primary { border-color:rgba(212,85,58,.7); color:#f0b7a6; }
-      .acts button.icy { border-color:rgba(203,238,246,.5); color:var(--glass); }
+      /* 待处理 = 刚从深水里浮上来的三张压片工单：悬得越久的浮得越高，脚下一圈涟漪 */
+      .float { position:relative; height:282px; margin-top:11px; }
+      .card { position:absolute; padding:14px 16px; border-radius:2px; border:1px solid rgba(243,249,250,.16);
+        background:radial-gradient(76% 76% at 30% 22%, rgba(10,48,60,.52), rgba(3,17,23,.8)); }
+      .card::before { content:''; position:absolute; left:0; top:11px; bottom:11px; width:3px;
+        background:repeating-linear-gradient(180deg, rgba(243,249,250,.24) 0 2px, transparent 2px 7px); }
+      .card .no { font-family:Quattrocento,serif; font-size:13px; letter-spacing:.06em; color:rgba(169,199,207,.92); }
+      .card .kind { margin-top:5px; font-size:10.5px; letter-spacing:.14em; color:rgba(169,199,207,.72); }
+      .card .hair { position:absolute; left:16px; right:16px; top:53px; height:1px; background:rgba(243,249,250,.1); }
+      .card .rep { position:absolute; left:16px; top:64px; font-size:15px; font-weight:700; }
+      .card .rep em { font-style:normal; margin-left:7px; font-size:13.5px; font-weight:400; color:var(--glass); }
+      .card .when { position:absolute; left:16px; top:90px; font-family:Quattrocento,serif; font-size:11.5px; color:rgba(169,199,207,.8); }
 
-      footer { position:absolute; left:76px; right:76px; bottom:28px; z-index:2; display:flex; align-items:center; }
+      /* 裁决印章：真印章不会落在格子里 —— 转动、墨色不匀、并且压在行与行的分界线上 */
+      .seal { position:absolute; z-index:3; font-style:normal; text-align:center; border-radius:2px;
+        font-size:12.5px; letter-spacing:.17em; color:#e8967c; border:2px solid rgba(212,85,58,.72);
+        background:radial-gradient(62% 72% at 31% 34%, rgba(212,85,58,.15), rgba(212,85,58,0) 74%); }
+      .seal::before { content:''; position:absolute; inset:-2px; border:2px solid rgba(212,85,58,.5);
+        -webkit-mask-image:repeating-linear-gradient(74deg, #fff 0 6px, rgba(255,255,255,.28) 6px 8px, #fff 8px 15px);
+        mask-image:repeating-linear-gradient(74deg, #fff 0 6px, rgba(255,255,255,.28) 6px 8px, #fff 8px 15px); }
+      .seal::after { content:attr(data-s); position:absolute; inset:0; display:grid; place-items:center;
+        color:rgba(212,85,58,.4); transform:translate(1px,-1.5px); }
+      .seal.sunk { right:-8px; bottom:-15px; min-width:112px; padding:9px 13px; }
+      /* 还没盖的印位：空着，虚线，落在工单的右下角 */
+      .seal.due { right:14px; bottom:12px; min-width:112px; padding:8px 13px; color:#e8c07a;
+        border:1.5px dashed rgba(246,215,154,.62); background:none; }
+      .seal.due::before, .seal.due::after { content:none; }
+
+      .acts { position:absolute; left:16px; bottom:12px; display:flex; gap:8px; }
+      .acts button { font-family:inherit; font-size:12.5px; padding:7px 13px; cursor:pointer; white-space:nowrap;
+        background:transparent; color:var(--paper); border:1px solid rgba(243,249,250,.24); border-radius:2px; }
+      .acts button.cut { border-color:rgba(212,85,58,.62); color:#f0b7a6; }
+      .acts button.ban { border-color:rgba(212,85,58,.72); color:#f0b7a6; background:rgba(212,85,58,.12); }
+
+      /* 历史裁决 = 已经沉下去的东西：小一号、暗一档、按时间往深处沉，印章盖穿了行分界线 */
+      ul.sunk { list-style:none; position:relative; margin-top:36px; }
+      li.rec { position:relative; display:grid; grid-template-columns:186px 1fr 196px auto;
+        align-items:baseline; gap:20px; padding:16px 0 22px; }
+      li.rec .rule { position:absolute; left:0; bottom:0; height:1px;
+        background:linear-gradient(90deg, rgba(243,249,250,.17), rgba(243,249,250,.02)); }
+      li.rec .rno { font-family:Quattrocento,serif; font-size:12.5px; letter-spacing:.06em; color:rgba(169,199,207,.9); }
+      li.rec .robj { font-size:14.5px; font-weight:700; }
+      li.rec .robj em { font-style:normal; margin-left:7px; font-size:13px; font-weight:400; color:rgba(169,199,207,.9); }
+      li.rec .rtime { font-family:Quattrocento,serif; font-size:11.5px; color:rgba(169,199,207,.78); }
+      li.rec .back { justify-self:end; font-family:inherit; font-size:12.5px; padding:7px 13px; cursor:pointer;
+        background:transparent; color:var(--glass); border:1px solid rgba(203,238,246,.5); border-radius:2px; }
+      li.rec:nth-child(2) { padding-left:10px; }
+      li.rec:nth-child(3) { padding-left:20px; }
+
+      footer { position:absolute; left:76px; right:76px; bottom:28px; z-index:3; display:flex; align-items:center; }
       footer .cat { margin-left:auto; }
       footer .lead { font-size:13px; color:var(--muted); }
     </style>
   </head>
   <body>
     <div class="clip">
-      <div class="surface"></div>
+      <div class="dry"><div class="platter"></div></div>
+      <div class="wet"><div class="platter sub"></div><div class="caustic"></div><div class="deep"></div></div>
       <div class="glint"></div>
-      <div class="rim"></div>
+      <div class="shaft"></div>
+      <div class="surface-haze"></div>
+      <div class="surface"></div>
+
+      <i class="refl" style="left:282px; top:541px; width:360px; height:34px"></i>
+      <i class="refl" style="left:720px; top:541px; width:300px; height:26px"></i>
+      <i class="refl" style="left:1158px; top:541px; width:250px; height:20px"></i>
+      <i class="ripple" style="left:282px; top:540px; width:158px; height:28px"></i>
+      <i class="ripple" style="left:720px; top:540px; width:214px; height:34px; border-color:rgba(228,249,255,.22)"></i>
+      <i class="ripple" style="left:720px; top:540px; width:286px; height:42px; border-color:rgba(228,249,255,.13)"></i>
+      <i class="ripple" style="left:1158px; top:540px; width:268px; height:40px; border-color:rgba(228,249,255,.17)"></i>
+      <i class="ripple" style="left:1158px; top:540px; width:340px; height:50px; border-color:rgba(228,249,255,.09)"></i>
+
+      <i class="bub" style="left:520px; top:498px; width:5px; height:5px"></i>
+      <i class="bub" style="left:538px; top:516px; width:3px; height:3px"></i>
+      <i class="bub" style="left:846px; top:492px; width:6px; height:6px"></i>
+      <i class="bub" style="left:826px; top:520px; width:4px; height:4px"></i>
+      <i class="bub" style="left:1310px; top:502px; width:4px; height:4px"></i>
+      <i class="bub" style="left:1296px; top:524px; width:3px; height:3px"></i>
+      <i class="bub" style="left:196px; top:604px; width:7px; height:7px"></i>
+      <i class="bub" style="left:236px; top:660px; width:5px; height:5px"></i>
+      <i class="bub" style="left:166px; top:716px; width:4px; height:4px"></i>
+      <i class="bub" style="left:660px; top:588px; width:6px; height:6px"></i>
+      <i class="bub" style="left:702px; top:648px; width:8px; height:8px"></i>
+      <i class="bub" style="left:640px; top:722px; width:5px; height:5px"></i>
+      <i class="bub" style="left:1112px; top:596px; width:5px; height:5px"></i>
+      <i class="bub" style="left:1166px; top:664px; width:7px; height:7px"></i>
+      <i class="bub" style="left:1090px; top:740px; width:4px; height:4px"></i>
+      <i class="bub" style="left:1348px; top:700px; width:6px; height:6px"></i>
+      <i class="bed two"></i>
+      <i class="bed"></i>
     </div>
 
     <main>
@@ -76,51 +168,63 @@
         <p class="sub">人工审核是最终决定权：可以驳回、删段、删瓶下架、封禁作者。自动斩杀只负责「把可疑的段先拿下来」，误斩可以在历史里用「恢复这一段」还回去。</p>
       </header>
 
-      <div class="sides">
-        <div class="side" aria-selected="true"><b>待处理</b><span class="n">3</span></div>
-        <div class="side"><b>历史裁决</b><span class="n">41</span></div>
+      <div class="views" role="tablist">
+        <div class="view" role="tab" aria-selected="true"><b>待处理</b><span class="n">3</span></div>
+        <div class="view" role="tab" aria-selected="false"><b>历史裁决</b><span class="n">41</span></div>
       </div>
 
-      <ul class="orders">
-        <li class="order">
-          <div class="matrix">MDB-0001-A<small>唱段 · 第 2 段</small></div>
-          <div>
-            <p class="target">举报：唱段 <em>第 2 段</em></p>
-            <p class="when">举报于 2026/9/23 22:41</p>
-          </div>
-          <div class="stamp pending">待处理</div>
-          <div class="acts">
-            <button>驳回</button><button class="icy">删段</button><button class="primary">封禁作者</button>
-          </div>
+      <div class="float">
+        <div class="card" style="left:0; width:412px; height:152px; bottom:0; transform:rotate(-.35deg)">
+          <div class="no">MDB-0001-A</div>
+          <div class="kind">唱段 · 第 2 段</div>
+          <i class="hair"></i>
+          <div class="rep">举报：唱段 <em>第 2 段</em></div>
+          <div class="when">举报于 2026/9/23 22:41</div>
+          <div class="acts"><button>驳回</button><button class="cut">删段</button><button class="ban">封禁作者</button></div>
+          <i class="seal due" data-s="待处理">待处理</i>
+        </div>
+        <div class="card" style="left:438px; width:412px; height:152px; bottom:18px; transform:rotate(.3deg)">
+          <div class="no">MDB-0007-C</div>
+          <div class="kind">瓶子</div>
+          <i class="hair"></i>
+          <div class="rep">举报：瓶子 <em>整支下架请求</em></div>
+          <div class="when">举报于 2026/9/23 20:02</div>
+          <div class="acts"><button>驳回</button><button class="cut">删瓶下架</button><button class="ban">封禁作者</button></div>
+          <i class="seal due" style="transform:rotate(-1.6deg); bottom:34px" data-s="待处理">待处理</i>
+        </div>
+        <div class="card" style="left:876px; width:412px; height:152px; bottom:36px; transform:rotate(-.25deg)">
+          <div class="no">MDB-0012-B</div>
+          <div class="kind">留言</div>
+          <i class="hair"></i>
+          <div class="rep">举报：留言 <em>私密留言</em></div>
+          <div class="when">举报于 2026/9/22 11:18</div>
+          <div class="acts"><button>驳回</button><button class="ban">封禁作者</button></div>
+          <i class="seal due" style="transform:rotate(-3deg); bottom:52px" data-s="待处理">待处理</i>
+        </div>
+      </div>
+
+      <ul class="sunk">
+        <li class="rec">
+          <span class="rno">MDB-0006-C</span>
+          <span class="robj">举报：唱段 <em>第 3 段</em></span>
+          <span class="rtime">举报于 2026/9/22 09:40</span>
+          <button class="back">恢复这一段</button>
+          <i class="seal sunk" style="transform:rotate(-3.2deg)" data-s="已删段">已删段</i>
+          <i class="rule" style="width:64%"></i>
         </li>
-        <li class="order">
-          <div class="matrix">MDB-0007-C<small>瓶子</small></div>
-          <div>
-            <p class="target">举报：瓶子 <em>整支下架请求</em></p>
-            <p class="when">举报于 2026/9/23 20:02</p>
-          </div>
-          <div class="stamp pending">待处理</div>
-          <div class="acts">
-            <button>驳回</button><button class="icy">删瓶下架</button><button class="primary">封禁作者</button>
-          </div>
+        <li class="rec">
+          <span class="rno">MDB-0003-A</span>
+          <span class="robj">举报：唱段 <em>第 1 段</em></span>
+          <span class="rtime">举报于 2026/9/21 19:55</span>
+          <i class="seal sunk" style="transform:rotate(2.4deg); bottom:-18px" data-s="已恢复唱段">已恢复唱段</i>
+          <i class="rule" style="width:78%; left:10px"></i>
         </li>
-        <li class="order">
-          <div class="matrix">MDB-0012-B<small>留言</small></div>
-          <div>
-            <p class="target">举报：留言 <em>私密留言</em></p>
-            <p class="when">举报于 2026/9/22 11:18</p>
-          </div>
-          <div class="stamp pending">待处理</div>
-          <div class="acts"><button>驳回</button><button class="primary">封禁作者</button></div>
-        </li>
-        <li class="order">
-          <div class="matrix">MDB-0003-A<small>唱段 · 第 1 段</small></div>
-          <div>
-            <p class="target">举报：唱段 <em>第 1 段</em></p>
-            <p class="when">举报于 2026/9/21 19:55</p>
-          </div>
-          <div class="stamp restored">已恢复唱段</div>
-          <div class="acts"><button class="icy">恢复这一段</button></div>
+        <li class="rec">
+          <span class="rno">MDB-0005-B</span>
+          <span class="robj">举报：留言 <em>私密留言</em></span>
+          <span class="rtime">举报于 2026/9/20 14:07</span>
+          <i class="seal sunk" style="transform:rotate(-2.1deg); bottom:-13px; right:40px" data-s="已驳回">已驳回</i>
+          <i class="rule" style="width:52%; left:20px"></i>
         </li>
       </ul>
     </main>

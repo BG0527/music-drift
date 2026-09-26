@@ -104,9 +104,16 @@ for (const name of files) {
   checks.push(['出血装饰有 .clip 容器', clipOk, clipOk ? 'ok' : '缺 .clip']);
 
   // ↓ 三项来自某 agent 的临时校验器 _check-sea-hall.mjs，现并入统一守卫，避免每人各写一份
-  const CONTRACT_COLORS = ['#050f14', '#f3f9fa', '#a9c7cf', '#7fd1d9', '#d4553a', '#f6d79a'];
+  const CONTRACT_COLORS = ['#050f14', '#f3f9fa', '#a9c7cf', '#7fd1d9', '#f6d79a'];
   const missingColors = CONTRACT_COLORS.filter((c) => !src.includes(c));
-  checks.push(['七色变量原样', missingColors.length === 0, missingColors.join(' ') || 'ok']);
+  // 珊瑚：新稿用 #d4553a（约 4.9:1）；**冻结的标杆页仍是旧值 #c7452c（3.98:1，已知欠账）**，显式报出用的是哪个
+  const coral = src.includes('#d4553a') ? '#d4553a' : src.includes('#c7452c') ? '#c7452c' : '缺失';
+  if (coral === '缺失') missingColors.push('--coral');
+  checks.push([
+    '七色变量原样',
+    missingColors.length === 0,
+    missingColors.length > 0 ? missingColors.join(' ') : `ok · coral=${coral}${coral === '#c7452c' ? '（冻结稿旧值）' : ''}`,
+  ]);
 
   const tags = (src.match(/<(img|script|link)\b/gi) ?? []).length;
   checks.push(['无 img/script/link', tags === 0, `${String(tags)} 个`]);
