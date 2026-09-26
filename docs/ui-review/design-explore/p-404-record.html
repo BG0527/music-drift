@@ -25,42 +25,47 @@
         background:linear-gradient(101deg, transparent 28%, rgba(228,247,252,.045) 45%, rgba(228,247,252,.065) 50%, rgba(228,247,252,.028) 55%, transparent 72%); }
       .art { position:absolute; inset:0; }
 
-      /* 划伤之上是水路：水在沟槽里流，越接近那道断口越亮 —— 光是在水面上攒起来的 */
+      /* 划伤之上是水路：沟槽里灌着水 —— 所以这一片每一道槽里都有一段亮起来的水线 */
       .groove { position:absolute; left:0; right:0; top:0; height:365px;
         background:repeating-radial-gradient(circle at 1500px 1400px, rgba(216,243,246,.1) 0 1px, transparent 1px 15px);
         -webkit-mask-image:radial-gradient(1150px 820px at 1180px 180px, rgba(255,255,255,.95), rgba(255,255,255,.3) 72%);
         mask-image:radial-gradient(1150px 820px at 1180px 180px, rgba(255,255,255,.95), rgba(255,255,255,.3) 72%); }
+      /* 整片水：越靠近断口越亮（光在水面上攒起来，然后断掉） */
       .water { position:absolute; left:0; right:0; top:0; height:365px;
-        background:linear-gradient(180deg, rgba(127,209,217,.04) 0%, rgba(127,209,217,.075) 46%,
-          rgba(160,226,236,.15) 88%, rgba(160,226,236,.2) 100%); }
-      /* 顺槽的水流：短横向划痕，密在断口那一侧 */
+        background:linear-gradient(180deg, rgba(127,209,217,.07) 0%, rgba(127,209,217,.12) 44%,
+          rgba(160,226,236,.2) 78%, rgba(189,238,246,.26) 100%); }
+      /* 水面上的短波：几笔横的光，散在水面上 */
       .flows span { position:absolute; height:1px; background:rgba(203,238,246,.16); }
+      /* 水走到断口之前先亮起来：光在最后这一段水面上攒住 */
+      .lip { position:absolute; left:0; right:0; top:312px; height:42px;
+        background:linear-gradient(180deg, rgba(203,238,246,0), rgba(203,238,246,.14) 62%, rgba(203,238,246,.28)); }
       /* 沟槽临近伤口处压暗：母版被划开时边缘翘起投下的影 */
-      .edge { position:absolute; left:0; right:0; top:327px; height:38px;
-        background:linear-gradient(180deg, transparent, rgba(2,8,11,.88)); }
+      .edge { position:absolute; left:0; right:0; top:344px; height:22px;
+        background:linear-gradient(180deg, transparent, rgba(2,8,11,.72)); }
       .wrap { position:absolute; inset:0; z-index:2; }
 
-      /* 水走到这里到头：一条亮线，0 到 878 就没了（878 之后是那道豁口） */
-      .surface { position:absolute; left:0; top:357px; width:880px; height:1px;
-        background:linear-gradient(90deg, rgba(203,238,246,.22) 0%, rgba(203,238,246,.12) 34%,
-          rgba(203,238,246,.3) 62%, rgba(203,238,246,.52) 92%, rgba(203,238,246,.62) 100%); }
+      /* 水到这里到头：一条全宽的亮水线，底下立刻是干的 */
+      .surface { position:absolute; left:0; right:0; top:355px; height:2px;
+        background:linear-gradient(90deg, rgba(203,238,246,.3) 0%, rgba(203,238,246,.16) 30%,
+          rgba(203,238,246,.42) 58%, rgba(207,240,247,.62) 84%, rgba(203,238,246,.32) 100%); }
+      .lintel { position:absolute; left:0; right:0; top:357px; height:1px; background:rgba(2,8,11,.6); }
 
-      /* 断口往下漏的水：几道细流落进干河床，越落越淡 */
+      /* 断口往下漏的水：几道细流落到干床上，越落越淡 */
       .drips span { position:absolute; width:1px;
-        background:linear-gradient(180deg, rgba(203,238,246,.36), rgba(203,238,246,0)); }
+        background:linear-gradient(180deg, rgba(203,238,246,.5), rgba(203,238,246,0)); }
+      .drips i { position:absolute; width:3px; height:3px; border-radius:50%; background:rgba(203,238,246,.34); }
 
-      /* 断口以下是干河床：沟槽只剩 150px 的残影，再往下什么都没有 */
-      .ghost { position:absolute; left:0; right:0; top:365px; height:150px;
-        background:repeating-radial-gradient(circle at 1500px 1400px, rgba(216,243,246,.055) 0 1px, transparent 1px 15px);
-        -webkit-mask-image:linear-gradient(180deg, rgba(255,255,255,.5), rgba(255,255,255,0));
-        mask-image:linear-gradient(180deg, rgba(255,255,255,.5), rgba(255,255,255,0)); }
+      /* 断口以下是干河床：沟槽只剩一段残影，再往下就没有水的痕迹了 */
+      .ghost { position:absolute; left:0; right:0; top:365px; height:160px;
+        background:repeating-radial-gradient(circle at 1500px 1400px, rgba(216,243,246,.09) 0 1px, transparent 1px 15px);
+        -webkit-mask-image:linear-gradient(180deg, rgba(255,255,255,.7), rgba(255,255,255,.08) 62%, rgba(255,255,255,0));
+        mask-image:linear-gradient(180deg, rgba(255,255,255,.7), rgba(255,255,255,.08) 62%, rgba(255,255,255,0)); }
+      .bed { position:absolute; left:0; right:0; top:365px; height:430px;
+        background:linear-gradient(180deg, rgba(246,215,154,.075), rgba(246,215,154,.025) 40%, rgba(5,15,20,0) 72%); }
       /* 干裂的水位痕：曾经有水的地方，现在只剩一道晒干的白印 */
       .tidewater { position:absolute; left:0; right:0; top:452px; height:1px;
-        background:linear-gradient(90deg, transparent 0%, rgba(246,215,154,.09) 18%, rgba(246,215,154,.05) 58%, transparent 96%); }
-      .bed { position:absolute; left:0; right:0; top:365px; height:420px;
-        background:linear-gradient(180deg, rgba(246,215,154,.035), rgba(5,15,20,0) 58%); }
-      /* 干河床上的裂：只在右半边（左边留给字） */
-      .crack { position:absolute; height:1px; background:rgba(216,243,246,.1); }
+        background:linear-gradient(90deg, transparent 0%, rgba(246,215,154,.14) 20%, rgba(246,215,154,.08) 58%, transparent 96%); }
+      .crack { position:absolute; height:1px; background:rgba(216,243,246,.16); }
 
       .tl { position:absolute; left:76px; top:64px; }
       .status { position:absolute; right:76px; top:58px; font-size:34px; line-height:1; color:rgba(169,199,207,.85); }
@@ -84,8 +89,8 @@
       .links a { font-size:15px; color:var(--glass); text-decoration:underline; text-underline-offset:5px; }
       .links i { display:block; width:1px; height:12px; background:rgba(127,209,217,.45); }
       .pair { display:flex; align-items:center; gap:9px; }
-      /* 那只漂出画外的瓶子底下的一句话 */
-      .drift { position:absolute; left:1128px; top:196px; font-size:12.5px; letter-spacing:.06em; color:var(--muted); }
+      /* 那只漂走的瓶子底下的一句话 */
+      .drift { position:absolute; left:1096px; top:186px; font-size:12.5px; letter-spacing:.06em; color:var(--muted); }
     </style>
   </head>
   <body>
@@ -94,28 +99,56 @@
       <div class="groove"></div>
       <div class="water"></div>
 
-      <!-- 顺槽的水流：一束束贴着沟槽走的水纹，越靠断口越密 -->
+      <!-- 水面上的几笔短波 -->
       <div class="flows">
-        <span style="left:64px; top:96px; width:196px"></span>
-        <span style="left:300px; top:150px; width:132px"></span>
-        <span style="left:96px; top:212px; width:238px"></span>
-        <span style="left:420px; top:238px; width:164px"></span>
-        <span style="left:246px; top:280px; width:288px"></span>
-        <span style="left:600px; top:196px; width:120px"></span>
-        <span style="left:660px; top:268px; width:206px"></span>
-        <span style="left:520px; top:322px; width:150px"></span>
-        <span style="left:760px; top:300px; width:280px; background:rgba(203,238,246,.22)"></span>
-        <span style="left:872px; top:334px; width:300px; background:rgba(203,238,246,.24)"></span>
-        <span style="left:1060px; top:224px; width:212px"></span>
-        <span style="left:928px; top:158px; width:150px"></span>
-        <span style="left:1180px; top:300px; width:240px; background:rgba(203,238,246,.2)"></span>
-        <span style="left:1268px; top:112px; width:172px"></span>
+        <span style="left:588px; top:302px; width:206px; background:rgba(203,238,246,.22)"></span>
+        <span style="left:872px; top:326px; width:300px; background:rgba(203,238,246,.24)"></span>
+        <span style="left:180px; top:330px; width:230px"></span>
+        <span style="left:1216px; top:312px; width:200px; background:rgba(203,238,246,.2)"></span>
       </div>
 
       <div class="edge"></div>
+      <div class="lip"></div>
 
-      <!-- 划伤：沟槽从画外盘面斜切下来，在这一段被豁开；唱针停在豁口里；右边那只瓶已经顺水漂出画外 -->
+      <!-- 划伤：水路在这一段被豁开；右边那只瓶已经顺水漂出画外 -->
       <svg class="art" width="1440" height="900" viewBox="0 0 1440 900" fill="none" aria-hidden="true">
+        <defs>
+          <clipPath id="wet">
+            <rect x="0" y="0" width="1440" height="356" />
+          </clipPath>
+          <linearGradient id="glass" x1="1300" y1="262" x2="1300" y2="302" gradientUnits="userSpaceOnUse">
+            <stop offset="0" stop-color="#cbeef6" stop-opacity=".34" />
+            <stop offset="1" stop-color="#7fd1d9" stop-opacity=".14" />
+          </linearGradient>
+        </defs>
+
+        <!-- 水在沟槽里：每一道槽里亮出一段水线，段与段错开，所以读起来是水在流 -->
+        <g clip-path="url(#wet)" stroke-width="1.3">
+          <circle cx="1500" cy="1400" r="1130" stroke="rgba(203,238,246,.26)" stroke-dasharray="88 210" stroke-dashoffset="12" />
+          <circle cx="1500" cy="1400" r="1175" stroke="rgba(203,238,246,.3)" stroke-dasharray="60 240" stroke-dashoffset="128" />
+          <circle cx="1500" cy="1400" r="1220" stroke="rgba(203,238,246,.24)" stroke-dasharray="96 160" stroke-dashoffset="44" />
+          <circle cx="1500" cy="1400" r="1265" stroke="rgba(203,238,246,.22)" stroke-dasharray="120 300" stroke-dashoffset="260" />
+          <circle cx="1500" cy="1400" r="1310" stroke="rgba(203,238,246,.24)" stroke-dasharray="168 240" stroke-dashoffset="96" />
+          <circle cx="1500" cy="1400" r="1355" stroke="rgba(203,238,246,.2)" stroke-dasharray="210 190" stroke-dashoffset="330" />
+          <circle cx="1500" cy="1400" r="1400" stroke="rgba(203,238,246,.22)" stroke-dasharray="64 220" stroke-dashoffset="180" />
+          <circle cx="1500" cy="1400" r="1445" stroke="rgba(203,238,246,.18)" stroke-dasharray="104 170" stroke-dashoffset="58" />
+          <circle cx="1500" cy="1400" r="1490" stroke="rgba(203,238,246,.2)" stroke-dasharray="84 250" stroke-dashoffset="412" />
+          <circle cx="1500" cy="1400" r="1535" stroke="rgba(203,238,246,.16)" stroke-dasharray="116 180" stroke-dashoffset="236" />
+          <circle cx="1500" cy="1400" r="1580" stroke="rgba(203,238,246,.15)" stroke-dasharray="68 200" stroke-dashoffset="520" />
+          <circle cx="1500" cy="1400" r="1640" stroke="rgba(203,238,246,.14)" stroke-dasharray="124 210" stroke-dashoffset="88" />
+          <circle cx="1500" cy="1400" r="1700" stroke="rgba(203,238,246,.12)" stroke-dasharray="92 190" stroke-dashoffset="298" />
+          <circle cx="1500" cy="1400" r="1770" stroke="rgba(203,238,246,.11)" stroke-dasharray="76 170" stroke-dashoffset="176" />
+        </g>
+        <!-- 水面的长波：断成一段一段、弯着的几道亮线 —— 连续的长线会读成表格线，所以必须断开 -->
+        <g clip-path="url(#wet)">
+          <path d="M 40 118 C 300 100, 560 138, 820 118 C 1060 100, 1300 134, 1440 120"
+            stroke="rgba(203,238,246,.24)" stroke-dasharray="260 150" />
+          <path d="M 0 232 C 260 212, 520 252, 800 230 C 1050 210, 1290 246, 1440 232"
+            stroke="rgba(246,215,154,.22)" stroke-dasharray="190 240" />
+          <path d="M 0 306 C 280 288, 560 326, 840 304 C 1080 286, 1320 320, 1440 308"
+            stroke="rgba(203,238,246,.26)" stroke-dasharray="330 190" />
+        </g>
+
         <!-- 划伤本体：细口横穿整页，从画外进来、从画外出去 -->
         <path d="M 0 369 C 160 365, 320 372, 470 367 C 620 362, 760 371, 878 367"
           stroke="rgba(2,8,11,.85)" stroke-width="11" />
@@ -151,26 +184,28 @@
         <circle cx="1355" cy="866" r="9" stroke="rgba(228,249,252,.3)" />
         <circle cx="1355" cy="866" r="3.5" fill="rgba(3,17,23,.95)" stroke="rgba(228,249,252,.3)" />
 
-        <!-- 已经被人接走的那只瓶子：正顺水漂出右上角，身后只剩尾迹与两圈散开的涟漪 -->
-        <path d="M 872 338 C 1010 332, 1140 316, 1288 298" stroke="rgba(203,238,246,.2)"
-          stroke-dasharray="7 9" />
-        <ellipse cx="1188" cy="304" rx="46" ry="11" stroke="rgba(203,238,246,.24)" />
-        <ellipse cx="1188" cy="304" rx="78" ry="19" stroke="rgba(203,238,246,.13)" />
-        <ellipse cx="1092" cy="318" rx="30" ry="7.5" stroke="rgba(203,238,246,.15)" />
+        <!-- 已经被人接走的那只瓶子：正顺水漂出右上角，身后只剩尾迹与散开的涟漪 -->
+        <path d="M 840 344 C 990 338, 1130 320, 1292 300" stroke="rgba(203,238,246,.26)" stroke-dasharray="7 9" />
+        <path d="M 906 356 C 1040 348, 1170 330, 1300 314" stroke="rgba(203,238,246,.13)" stroke-dasharray="5 12" />
+        <ellipse cx="1176" cy="304" rx="48" ry="11" stroke="rgba(203,238,246,.3)" />
+        <ellipse cx="1176" cy="304" rx="84" ry="20" stroke="rgba(203,238,246,.15)" />
+        <ellipse cx="1078" cy="320" rx="32" ry="8" stroke="rgba(203,238,246,.18)" />
         <g transform="rotate(-13 1362 282)">
           <path d="M 1306 262 L 1382 262 L 1382 272 L 1408 272 L 1408 292 L 1382 292 L 1382 302 L 1306 302 Z"
-            fill="rgba(127,209,217,.1)" stroke="rgba(203,238,246,.4)" />
-          <path d="M 1316 268 L 1316 296" stroke="rgba(228,247,252,.22)" />
-          <rect x="1406" y="269" width="6" height="26" rx="1" fill="rgba(203,238,246,.34)" />
-          <rect x="1412" y="271" width="13" height="22" rx="2" fill="rgba(246,215,154,.46)"
-            stroke="rgba(246,215,154,.66)" />
+            fill="url(#glass)" stroke="rgba(228,247,252,.86)" />
+          <path d="M 1316 268 L 1316 296" stroke="rgba(228,247,252,.56)" />
+          <path d="M 1348 268 L 1348 296" stroke="rgba(228,247,252,.28)" />
+          <rect x="1406" y="269" width="6" height="26" rx="1" fill="rgba(228,247,252,.62)" />
+          <rect x="1412" y="271" width="13" height="22" rx="2" fill="rgba(246,215,154,.5)"
+            stroke="rgba(246,215,154,.72)" />
         </g>
-        <path d="M 1276 232 L 1302 250" stroke="rgba(203,238,246,.3)" />
+        <path d="M 1244 216 L 1300 254" stroke="rgba(203,238,246,.32)" />
       </svg>
 
       <div class="surface"></div>
+      <div class="lintel"></div>
 
-      <!-- 断口以下是干河床：沟槽只剩一段残影，再往下什么都没有 -->
+      <!-- 断口以下是干河床：沟槽只剩一段残影 -->
       <div class="ghost"></div>
       <div class="bed"></div>
       <span class="tidewater"></span>
@@ -178,16 +213,24 @@
       <div class="crack" style="left:1064px; top:544px; width:236px; transform:rotate(1.4deg)"></div>
       <div class="crack" style="left:938px; top:596px; width:160px; transform:rotate(-1deg)"></div>
       <div class="crack" style="left:1156px; top:638px; width:196px; transform:rotate(1.1deg)"></div>
+      <div class="crack" style="left:868px; top:434px; width:170px; transform:rotate(-1.2deg)"></div>
+      <div class="crack" style="left:1240px; top:472px; width:150px; transform:rotate(1.3deg)"></div>
 
-      <!-- 断口往下漏的水：落到干床上的那几道细流 -->
+      <!-- 断口往下漏的水：落到干床上的那几道细流，末尾还坠着水珠 -->
       <div class="drips">
-        <span style="left:196px; top:370px; height:48px"></span>
-        <span style="left:430px; top:372px; height:34px"></span>
-        <span style="left:566px; top:370px; height:62px"></span>
-        <span style="left:706px; top:372px; height:40px"></span>
-        <span style="left:832px; top:372px; height:28px"></span>
-        <span style="left:1012px; top:372px; height:54px"></span>
-        <span style="left:1252px; top:374px; height:38px"></span>
+        <span style="left:196px; top:360px; height:62px"></span>
+        <i style="left:195px; top:428px"></i>
+        <span style="left:430px; top:362px; height:44px"></span>
+        <i style="left:429px; top:412px"></i>
+        <span style="left:566px; top:360px; height:78px"></span>
+        <i style="left:565px; top:444px"></i>
+        <span style="left:706px; top:362px; height:50px"></span>
+        <i style="left:705px; top:418px"></i>
+        <span style="left:832px; top:362px; height:36px"></span>
+        <span style="left:1012px; top:362px; height:68px"></span>
+        <i style="left:1011px; top:436px"></i>
+        <span style="left:1252px; top:364px; height:48px"></span>
+        <i style="left:1251px; top:418px"></i>
       </div>
       <div class="glint"></div>
     </div>
