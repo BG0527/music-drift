@@ -1,0 +1,178 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=1440">
+    <title>登录 · 认领线</title>
+    <style>
+      @import url('/node_modules/.pnpm/lxgw-wenkai-webfont@1.7.0/node_modules/lxgw-wenkai-webfont/lxgwwenkai-regular.css');
+      @import url('/node_modules/.pnpm/lxgw-wenkai-webfont@1.7.0/node_modules/lxgw-wenkai-webfont/lxgwwenkai-bold.css');
+      @import url('/node_modules/.pnpm/@fontsource+quattrocento@5.3.0/node_modules/@fontsource/quattrocento/400.css');
+      @import url('/node_modules/.pnpm/@fontsource+quattrocento@5.3.0/node_modules/@fontsource/quattrocento/700.css');
+      :root {
+        --ink:#050f14; --paper:#f3f9fa; --muted:#a9c7cf; --glass:#7fd1d9;
+        --coral:#d4553a; --warm:#f6d79a; --line:rgba(243,249,250,.13);
+      }
+      * { box-sizing:border-box; margin:0; padding:0; }
+      html,body { width:1440px; height:900px; }
+      html { overflow:hidden; }
+      body { position:relative; overflow:hidden; background:var(--ink); color:var(--paper);
+        font-family:'LXGW WenKai',serif; font-size:15px; line-height:1.6; -webkit-font-smoothing:antialiased; }
+      .clip { position:absolute; inset:0; overflow:hidden; }
+      .mono { font-family:Quattrocento,serif; font-variant-numeric:tabular-nums; }
+      .meta { font-family:Quattrocento,'LXGW WenKai',serif; }
+      .lbl { font-size:11px; letter-spacing:.24em; color:rgba(243,249,250,.5); }
+
+      /* 背景：留白 + 一条自上方斜下的水面光；没有任何横贯页面的线 */
+      .platter { position:absolute; inset:0;
+        background:
+          repeating-radial-gradient(circle at 1420px 960px, rgba(216,243,246,.055) 0 1.2px, transparent 1.2px 6.5px),
+          radial-gradient(circle at 1420px 960px, rgba(127,209,217,.05) 0 30%, transparent 68%); }
+      .glint { position:absolute; inset:0; mix-blend-mode:screen;
+        background:linear-gradient(101deg, transparent 28%, rgba(228,247,252,.045) 45%, rgba(228,247,252,.065) 50%, rgba(228,247,252,.028) 55%, transparent 72%); }
+      .surface { position:absolute; inset:0; mix-blend-mode:screen;
+        background:linear-gradient(164deg, rgba(203,238,246,.2) 0, rgba(203,238,246,.055) 19%, rgba(203,238,246,0) 43%);
+        -webkit-mask-image:linear-gradient(180deg, rgba(255,255,255,1), rgba(255,255,255,0));
+        mask-image:linear-gradient(180deg, rgba(255,255,255,1), rgba(255,255,255,0)); }
+
+      /* ── 主体：左栏一列，右栏一个装置 ─────────────────────────── */
+      .page { position:relative; z-index:2; width:1440px; height:900px;
+        padding:64px 96px 0; display:flex; flex-direction:column; }
+      .col { width:560px; }
+
+      h1 { font-size:52px; font-weight:700; line-height:1.1; letter-spacing:.005em; }
+      .lede { width:500px; margin-top:16px; font-size:14.5px; line-height:1.85; color:var(--muted); }
+
+      /* 装置：一根认领线。一枚代号牌坠在线头上，线的另一头是只有你认领得到的那只瓶 ——
+         瓶只被画到画面的角上，读到的是它在，而不是它长什么样。 */
+      .device { position:absolute; right:96px; top:124px; width:364px; height:698px; }
+      .tag { position:absolute; right:0; top:0; width:88px; height:88px; border-radius:2px;
+        border:1px solid rgba(243,249,250,.34);
+        background:linear-gradient(168deg, rgba(243,249,250,.11), rgba(243,249,250,.025)); }
+      .tag::before { content:''; position:absolute; left:50%; top:12px; width:7px; height:7px; margin-left:-3.5px;
+        border:1px solid rgba(243,249,250,.5); border-radius:50%; background:var(--ink); }
+      .tag b { position:absolute; left:50%; top:30px; width:88px; margin-left:-44px;
+        font-size:11px; font-weight:400; line-height:1.45; letter-spacing:.12em; text-align:center;
+        color:rgba(243,249,250,.92); text-shadow:0 1px 0 rgba(5,15,20,.6); }
+      /* 认领线：整根 ≥3:1。原渐变 .06 / .44 / .22 让 2/3 的线低于下限（实测最低 1.19:1），
+         "线那一头串着瓶"就断了；现取 .47 / .56 / .49 —— 对盘面最亮条纹 rgba(24,37,42) 也 ≥3.5:1。 */
+      .thread { position:absolute; right:44px; top:208px; width:1px; height:464px;
+        background:linear-gradient(180deg, rgba(203,238,246,.47), rgba(203,238,246,.56) 34%, rgba(203,238,246,.49)); }
+      .devnote { position:absolute; right:56px; top:224px; width:238px; text-align:right;
+        font-size:11.5px; line-height:1.8; color:var(--muted); }
+
+      /* 线的另一头：只露一角 —— 玻璃口沿（近唇亮、远唇暗）、瓶肩、栓在口里的线头 */
+      .mouth { position:absolute; left:1184px; top:872px; }
+
+      .form { display:flex; flex-direction:column; margin-top:56px; }
+      .modes { display:flex; gap:26px; }
+      .mode { padding:0 0 8px; font-family:inherit; font-size:15px; font-weight:700; letter-spacing:.14em;
+        color:var(--muted); background:transparent; border:0;
+        border-bottom:1px solid rgba(243,249,250,.40); cursor:pointer; }
+      .mode.on { color:var(--coral); border-bottom:2px solid var(--coral); }
+      /* 图注：.46 实测 4.45:1（差 0.05 掉出正文口径），提到 .54，5.0:1 以上 */
+      .tip { max-width:452px; margin-top:20px; font-size:12.5px; line-height:1.8; color:rgba(243,249,250,.54); }
+
+      .field { display:flex; flex-direction:column; }
+      .f-handle { margin-top:32px; }
+      .f-pass { margin-top:26px; }
+      .field input { width:440px; height:32px; margin-top:8px; padding:0 1px 6px; font-family:inherit; font-size:16px;
+        color:var(--paper); background:transparent; border:0;
+        border-bottom:1px solid rgba(243,249,250,.40); }
+      .msg { margin-top:8px; font-size:12px; line-height:1.7; color:var(--coral); }
+      .msg .code { letter-spacing:.14em; color:rgba(243,249,250,.56); }
+      .field.bad input { border-bottom-color:var(--coral); }
+      .field.strong input { border-bottom-width:2px; }
+      .hint { margin-top:6px; font-size:12px; line-height:1.7; color:var(--muted); }
+      .hint .code { letter-spacing:.14em; color:rgba(243,249,250,.5); }
+
+      .act { align-self:flex-start; margin-top:36px; width:238px; height:50px; padding:0;
+        font-family:inherit; font-size:15px; font-weight:700; letter-spacing:.05em;
+        color:var(--ink); background:var(--coral); border:0; border-radius:2px; cursor:pointer; }
+      .oath { margin-top:40px; width:452px; font-size:13.5px; line-height:1.9; color:var(--muted); }
+
+      .foot { margin-top:auto; padding-bottom:12px; border-top:1px solid var(--line); }
+      .foot .row { max-width:1100px; display:flex; align-items:baseline; gap:20px; padding-top:14px; }
+      .foot .said { font-size:13px; color:var(--muted); }
+      .go { margin-left:auto; font-size:14px; color:var(--glass);
+        text-decoration:underline; text-underline-offset:5px; }
+      .colophon { position:absolute; left:1240px; top:88px; }
+    </style>
+  </head>
+  <body>
+    <div class="clip">
+      <div class="platter"></div>
+      <div class="surface"></div>
+      <div class="glint"></div>
+    </div>
+
+    <div class="page">
+      <p class="colophon lbl meta">SIDE A · 未登录</p>
+
+      <div class="col">
+        <h1>每一段旋律，<br />都在寻找下一个声音</h1>
+        <p class="lede">这是一个由歌声、回音和宿命组成的角落。<br />你只录一段，剩下的交给漂流。</p>
+      </div>
+
+      <form class="col form">
+        <div class="modes">
+          <button class="mode" type="button">登录</button>
+          <button class="mode on" type="button">注册</button>
+        </div>
+        <p class="tip">登录和注册都只用这两项：账号、密码。</p>
+
+        <div class="field f-handle bad">
+          <label class="lbl meta" for="handle">账号</label>
+          <input id="handle" name="handle" type="text" autocomplete="username" aria-invalid="true" aria-describedby="handle-err" />
+          <p class="msg" id="handle-err" role="alert"><span class="code meta">HANDLE_TAKEN</span>　这个账号已被占用。</p>
+        </div>
+
+        <div class="field f-pass bad strong">
+          <label class="lbl meta" for="password">密码</label>
+          <input id="password" name="password" type="password" autocomplete="new-password" aria-invalid="true" aria-describedby="password-err password-hint" />
+          <p class="msg" id="password-err" role="alert"><span class="code meta">WEAK_PASSWORD</span>　口令强度不够。</p>
+          <p class="hint" id="password-hint"><span class="code meta">密码规则</span>　至少 8 位，同时含字母和数字。</p>
+        </div>
+
+        <button class="act" type="button">注册并进入</button>
+        <p class="oath">不用真名，不用露脸，只要一段声音。同一个瓶子里，不同的人看到的是不同的匿名代号。</p>
+      </form>
+
+      <div class="device" aria-hidden="true">
+        <div class="tag"><b class="meta">匿名代号</b></div>
+        <div class="thread"></div>
+        <p class="devnote">线上那枚代号，是别人在瓶里看到的全部；线那头串着的瓶，只有你认领得到。</p>
+      </div>
+
+      <svg class="mouth" width="196" height="28" viewBox="0 0 196 28" fill="none" aria-hidden="true">
+        <!-- 对比度（WCAG 1.4.11 非文本图形 ≥3:1）：每条描边对盘面最亮条纹 rgba(22,37,42)
+             都不低于 3.4:1 —— 瓶肩 .50/.46、内壁 .44/.42、口沿底描边 .40（单独即 ≥3.2:1，与两段
+             唇弧再叠成 近唇 .58 / 远唇 .76）、线头 .46、结 .66；暗开口不靠填充（它比盘面还黑，
+             做不到 3:1），靠这圈冷光轮廓被读成"洞"。 -->
+        <!-- 瓶肩：口沿以下只留两侧玻璃壁，中间不画 —— 全页没有一条横贯的线 -->
+        <path d="M96 20 L84 28" stroke="#cbeef6" stroke-opacity=".50" />
+        <path d="M168 20 L180 28" stroke="#cbeef6" stroke-opacity=".46" />
+        <path d="M92 24 L78 28" stroke="#cbeef6" stroke-opacity=".44" />
+        <path d="M172 24 L186 28" stroke="#cbeef6" stroke-opacity=".42" />
+        <!-- 玻璃口：暗的开口；近唇亮、远唇暗，只露这半边 -->
+        <ellipse cx="132" cy="20" rx="36" ry="11" fill="rgba(3,14,20,.6)" />
+        <ellipse cx="132" cy="20" rx="36" ry="11" stroke="#cbeef6" stroke-opacity=".40" />
+        <path d="M96 20 A36 11 0 0 1 168 20" stroke="#cbeef6" stroke-opacity=".6" />
+        <path d="M168 20 A36 11 0 0 1 96 20" stroke="#cbeef6" stroke-opacity=".3" />
+        <!-- 口里的线头：认领线终止在这只瓶里 -->
+        <path d="M132 22 L132 28" stroke="#cbeef6" stroke-opacity=".46" />
+        <circle cx="132" cy="22" r="2.4" stroke="#cbeef6" stroke-opacity=".66" />
+      </svg>
+
+
+      <div class="foot">
+        <div class="row">
+          <span class="lbl meta">已登录态</span>
+          <span class="said">你已经登录为「你的代号」，不用再登录一次。</span>
+          <a class="go" href="#">直接去河道捞一个瓶子</a>
+        </div>
+      </div>
+    </div>
+  <script type="module" src="/app/page-login.js"></script>
+  </body>
+</html>

@@ -1,0 +1,253 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=1440">
+    <title>F4 · 沟槽河道 Groove River</title>
+    <style>
+      @import url('/node_modules/.pnpm/lxgw-wenkai-webfont@1.7.0/node_modules/lxgw-wenkai-webfont/lxgwwenkai-regular.css');
+      @import url('/node_modules/.pnpm/lxgw-wenkai-webfont@1.7.0/node_modules/lxgw-wenkai-webfont/lxgwwenkai-bold.css');
+      @import url('/node_modules/.pnpm/@fontsource+quattrocento@5.3.0/node_modules/@fontsource/quattrocento/400.css');
+      @import url('/node_modules/.pnpm/@fontsource+quattrocento@5.3.0/node_modules/@fontsource/quattrocento/700.css');
+      :root { --ink:#050f14; --paper:#f3f9fa; --muted:#a9c7cf; --glass:#7fd1d9; --coral:#c7452c; --line:rgba(243,249,250,.16); }
+      * { box-sizing:border-box; margin:0; padding:0; }
+      html,body { width:1440px; height:900px; }
+      body { position:relative; overflow:hidden; background:var(--ink); color:var(--paper);
+        font-family:'LXGW WenKai',serif; -webkit-font-smoothing:antialiased; }
+
+      /* ══ 唱片表面层 ══
+         圆心 (1420,960) 在画布外右下；可见半径带 = 60–1714px。
+         旧版读成"行星轨道"的根因不是线太少，而是**线能被数清**（26px 一条、alpha .09）
+         —— 可数的同心亮线 ＋ 散落的白色星点 ＋ 圆心外的椭圆族 = 太阳系。
+         于是这一版把"表面"拆成五层：台面 / 盘身 / 录音区 / 外圈沟槽 / 掠光，全部按半径分段遮罩。
+         全文只有**两个沟距**：11px（贴着标签的那圈）与 4.4px（外圈），中间夹一条无沟的 land。 */
+
+      /* 半径是这页唯一的自由度：圆心出画，外圈（r 1700）的浅弧在局部只是平行线，
+         无论多密都只能读成"拉丝"；只有 r 400–790 那一圈曲率大到能自己说出"同心"。
+         所以沟槽按半径分档，而不是整体加密 —— 旧版把整片加密到 26px，加密的是数量，
+         不是"唱片感"；这一版把密度放进**读得懂的那一圈**，别处让它安静。 */
+
+      /* 台面：画布之外那圈原来只是"虚空"，于是唱片像悬在太空里 ——
+         一张黑胶最难被认成行星的时刻，是它**躺在一张桌子上**。
+         台面只抬 2.2%（比盘面低一档的哑光），靠一圈贴着外缘的接触阴影把两者分开。
+         这一层同时干掉了"行星"的最后一个条件：行星周围是黑的，唱片周围是东西。 */
+      .platter { position:absolute; inset:0;
+        background:
+          radial-gradient(circle at 1420px 960px,
+            rgba(2,9,13,0) 0 1276px, rgba(2,9,13,.52) 1285px, rgba(2,9,13,0) 1366px),
+          rgba(127,209,217,.022); }
+
+      /* 盘身：极淡的玻璃色抬升，让盘面比台面亮一档 —— 物件需要体积 */
+      .body { position:absolute; inset:0;
+        background:radial-gradient(circle at 1420px 960px,
+          rgba(127,209,217,.055) 0 1210px, rgba(127,209,217,0) 1330px); }
+
+      /* 沟槽：一张表面，不是一叠环。4.4px 周期在 2x 下落成 ~8.8px 的连续纹理，
+         对比度低到单条线读不出来，只剩整体的丝光。
+         外圈按半径遮罩（唱片有边），内层再按左上角做一次衰减 —— 那是字所在的角，
+         表面在那里安静下来，字这才有底。
+         半径只取 930–1258：950 以内的部分交给 .center（见下）。 */
+      .field { position:absolute; inset:0;
+        -webkit-mask-image:radial-gradient(circle at 1420px 960px,
+          transparent 0 930px, #fff 990px, #fff 1258px, transparent 1300px);
+        mask-image:radial-gradient(circle at 1420px 960px,
+          transparent 0 930px, #fff 990px, #fff 1258px, transparent 1300px);
+        -webkit-mask-repeat:no-repeat; mask-repeat:no-repeat; }
+      .field i { position:absolute; inset:0;
+        background:repeating-radial-gradient(circle at 1420px 960px,
+          rgba(214,241,247,.03) 0 1px, rgba(214,241,247,0) 1px 4.4px);
+        -webkit-mask-image:radial-gradient(circle at 0 0, transparent 0 340px, #fff 820px);
+        mask-image:radial-gradient(circle at 0 0, transparent 0 340px, #fff 820px);
+        -webkit-mask-repeat:no-repeat; mask-repeat:no-repeat; }
+
+      /* 录音区：**只有它一圈能真读出"同心"**。
+         半径 1700 的浅弧在局部就是一组平行线，读者只会读成"拉丝"；只有在贴着标签的那一圈，
+         曲率才大到自己会说话。所以把**较粗的沟距（11px）**放在 340–790：
+         35 条沟绕着珊瑚标签转 —— 这是全画面唯一一处让"沟槽"字面成立的几何。
+         再往外 830–930 留一条**没有沟的跑道（land）**，那条被点亮的水槽（r=900）正好落在里面。 */
+      .center { position:absolute; inset:0;
+        background:repeating-radial-gradient(circle at 1420px 960px,
+          rgba(216,243,246,.07) 0 1.25px, rgba(216,243,246,0) 1.25px 11px);
+        -webkit-mask-image:radial-gradient(circle at 1420px 960px,
+          transparent 0 340px, #fff 400px, #fff 790px, transparent 880px);
+        mask-image:radial-gradient(circle at 1420px 960px,
+          transparent 0 340px, #fff 400px, #fff 790px, transparent 880px);
+        -webkit-mask-repeat:no-repeat; mask-repeat:no-repeat; }
+
+      /* 光：只剩**一道**宽的镜面反光带 + 一道掠光。
+         第二轮留了两道宽亮环，结果画面变成"带环行星"；盘面被慢慢渐变洗过 = 球体，不是唱片。
+         唱片是**平的**：亮度靠几何（标签 / 留白带 / 外缘）说，不靠柔光。
+         第五轮把这道带子做全柔了，于是盘面读成哑光；黑胶的材质来自**反射有硬边**——
+         所以 53%–55% 之间给一个陡降：那是灯管的像被盘面切断的那一刀，哑光是不会有这条边的。 */
+      .light { position:absolute; inset:0; mix-blend-mode:screen;
+        background:
+          radial-gradient(circle at 1420px 960px,
+            rgba(210,240,246,0) 980px, rgba(210,240,246,.034) 1060px, rgba(210,240,246,0) 1140px),
+          linear-gradient(101deg,
+            rgba(206,238,245,0) 26%, rgba(206,238,245,.03) 40%, rgba(228,247,252,.058) 50%,
+            rgba(206,238,245,.05) 53%, rgba(206,238,245,.012) 55%,
+            rgba(206,238,245,.006) 62%, rgba(206,238,245,0) 74%);
+        -webkit-mask-image:radial-gradient(circle at 1420px 960px, #fff 0 1258px, transparent 1300px);
+        mask-image:radial-gradient(circle at 1420px 960px, #fff 0 1258px, transparent 1300px);
+        -webkit-mask-repeat:no-repeat; mask-repeat:no-repeat; }
+
+      svg.canvas { position:absolute; inset:0; width:1440px; height:900px; }
+      .ov { position:absolute; }
+      h1 { font-size:84px; font-weight:700; line-height:1; }
+      .sub { margin-top:14px; font-size:15.5px; line-height:1.9; color:var(--muted); }
+      .cat { font-family:Quattrocento,serif; font-size:11px; letter-spacing:.24em; color:rgba(243,249,250,.5); }
+      .note { font-size:13px; line-height:1.85; color:rgba(243,249,250,.72); }
+      .note b { color:var(--glass); font-weight:400; }
+      .rpm { font-family:Quattrocento,serif; font-size:26px; color:var(--glass); }
+
+      /* 泊位：照搬 g3 的按钮（深色半透圆盘 + 亮边 + 外环），盘身不填彩色 —— 用户："有颜色太丑了" */
+      .port { position:absolute; display:grid; place-items:center; cursor:pointer; z-index:3; }
+      .port i { position:absolute; border-radius:50%; pointer-events:none; }
+      .port .r1 { inset:-13px; border:1.5px solid rgba(228,249,252,.42); }
+      .port .r2 { inset:-29px; border:1px solid rgba(228,249,252,.2); }
+      .port .r3 { inset:-45px; border:1px solid rgba(228,249,252,.1); }
+      .port .core { position:relative; width:100%; height:100%; border-radius:50%; display:grid; place-items:center; gap:3px;
+        font-family:inherit; font-size:20px; font-weight:700; letter-spacing:.12em; color:#f3f9fa;
+        background:radial-gradient(76% 76% at 34% 26%, rgba(10,48,60,.5), rgba(3,17,23,.78));
+        text-shadow:0 1px 12px rgba(3,16,22,.95); }
+      .port .core span { font-size:10px; letter-spacing:.28em; opacity:.7; font-weight:400; }
+      .draw .core { border:1px solid rgba(203,238,246,.7); box-shadow:0 0 52px rgba(178,232,244,.3), inset 0 0 28px rgba(160,226,240,.2); }
+      .cast .core { border:1px solid rgba(246,215,154,.66); box-shadow:0 0 52px rgba(246,215,154,.26), inset 0 0 28px rgba(246,215,154,.16); }
+      .port .cap { position:absolute; width:290px; font-size:12.5px; line-height:1.75; color:var(--muted);
+        text-shadow:0 1px 8px rgba(2,10,14,.95); }
+      .port .cap b { display:block; color:var(--paper); font-size:15px; margin-bottom:3px; }
+
+      footer { position:absolute; left:76px; right:76px; bottom:30px; display:flex; align-items:center; gap:10px; z-index:5; }
+      .tag { background:transparent; border:1px solid var(--line); color:var(--muted); font-family:inherit; font-size:12px;
+        padding:8px 15px; cursor:pointer; letter-spacing:.1em; }
+      .tag[aria-pressed='true'] { border-color:rgba(127,209,217,.6); color:var(--paper); }
+      footer .go { margin-left:auto; font-size:13px; color:var(--glass); text-decoration:none; letter-spacing:.06em; }
+    </style>
+  </head>
+  <body>
+    <div class="platter"></div>
+    <div class="body"></div>
+    <div class="center"></div>
+    <div class="field"><i></i></div>
+    <div class="light"></div>
+    <svg class="canvas" viewBox="0 0 1440 900">
+      <defs>
+        <radialGradient id="sheen" cx=".99" cy="1" r=".42">
+          <stop offset="0" stop-color="#7fd1d9" stop-opacity=".06" />
+          <stop offset=".4" stop-color="#7fd1d9" stop-opacity="0" />
+        </radialGradient>
+        <!-- 标签盘改成**平的**：原来是一团 radial 光晕，在暗场里读成"大气层"，
+             而唱片中心那圈东西之所以一眼是唱片，正因为它是**纸**——平的、有硬边。
+             平铺 alpha .19 + 硬边珊瑚圈 + 圈外一道纸白 = 标签；不填渐变。 -->
+        <radialGradient id="label" cx=".5" cy=".5" r=".5">
+          <stop offset="0" stop-color="#c7452c" stop-opacity=".19" />
+          <stop offset=".97" stop-color="#c7452c" stop-opacity=".19" />
+          <stop offset="1" stop-color="#c7452c" stop-opacity="0" />
+        </radialGradient>
+        <!-- 外缘的倒角只在**下面**吃到光（光从右上斜掠），所以上半段自然隐去，
+             它由此不再横穿左上角的标题区 —— 一条穿过正文的边线是这一版最想修掉的旧疾。 -->
+        <linearGradient id="rim" gradientUnits="userSpaceOnUse" x1="0" y1="800" x2="0" y2="330">
+          <stop offset="0" stop-color="#e6f8fb" stop-opacity=".5" />
+          <stop offset=".5" stop-color="#e6f8fb" stop-opacity=".17" />
+          <stop offset="1" stop-color="#e6f8fb" stop-opacity="0" />
+        </linearGradient>
+      </defs>
+
+      <rect width="1440" height="900" fill="url(#sheen)" />
+      <circle cx="1420" cy="960" r="268" fill="url(#label)" />
+
+      <!-- 唱片中心（在画布外）：标签盘的两条边 —— 珊瑚的内圈 + 一圈纸白的外沿。
+           这是全画面成本最低、辨识度最高的一处"这是唱片"：标签 + 标签外的平滑留白（run-out）。 -->
+      <circle cx="1420" cy="960" r="262" fill="none" stroke="rgba(199,69,44,.52)" stroke-width="1.6" />
+      <circle cx="1420" cy="960" r="275" fill="none" stroke="rgba(243,249,250,.2)" stroke-width="1" />
+      <!-- 录音区的外边界（lead-out）：262–336 之间是一段**没有沟槽的平滑留白**，
+            两边各一条硬边。两条硬边夹一条平滑带 = 唱针停靠的那圈，唱片最难被误读的一处。 -->
+      <circle cx="1420" cy="960" r="336" fill="none" stroke="rgba(214,241,247,.13)" stroke-width="1" />
+
+      <!-- 只留**一条外缘**：唱片只有一个边界。旧版这条线是均匀的，于是它同时穿过了标题；
+           现在它按 y 渐隐，成为一条"只有下半圈被灯照到"的盘边。
+           旁边 14px 内再补一条更暗的细线 = 车出来的边唇（倒角），一条线是画上去的，两条才是做出来的。 -->
+      <circle cx="1420" cy="960" r="1276" fill="none" stroke="url(#rim)" stroke-width="2" />
+      <circle cx="1420" cy="960" r="1268" fill="none" stroke="rgba(214,241,247,.14)" stroke-width="1" />
+
+      <!-- ── 河道 = 那条被点亮的沟槽：它不是一条线，而是一条**有宽度的水槽**（两条岸 + 中间的水） ── -->
+      <circle cx="1420" cy="960" r="900" fill="none" stroke="rgba(42,157,177,.2)" stroke-width="26" />
+      <circle cx="1420" cy="960" r="900" fill="none" stroke="rgba(159,230,237,.42)" stroke-width="7" />
+      <circle cx="1420" cy="960" r="887" fill="none" stroke="rgba(216,243,246,.5)" stroke-width="1.4" />
+      <circle cx="1420" cy="960" r="913" fill="none" stroke="rgba(216,243,246,.44)" stroke-width="1.4" />
+      <!-- 水流：沿槽走的两道漂移虚线（水在流） -->
+      <circle cx="1420" cy="960" r="900" fill="none" stroke="rgba(243,249,250,.42)" stroke-width="2"
+        stroke-dasharray="16 30" stroke-linecap="round" />
+      <circle cx="1420" cy="960" r="906" fill="none" stroke="rgba(243,249,250,.2)" stroke-width="1.6"
+        stroke-dasharray="10 40" stroke-linecap="round" />
+
+      <!-- ── 尘埃：旧版是 20 颗散落的白点，那是**星空**（暗场 + 环 + 星点 = 行星轨道）。
+           唱片表面的"脏"不是星，是唱针刮出来的**顺槽擦痕** —— 沿沟槽方向的短弧。
+           所以星点全删，换成 4 道等圆心角、长短不一的擦痕弧；另留 4 颗极暗的尘点，聚成一撮（不散落就成不了星图）。 -->
+      <g fill="none" stroke="#e6f7fb" stroke-linecap="butt">
+        <circle cx="1420" cy="960" r="1180" stroke-opacity=".17" stroke-width="1.1"
+          stroke-dasharray="126 9999" stroke-dashoffset="-4120" />
+        <circle cx="1420" cy="960" r="1214" stroke-opacity=".12" stroke-width="1"
+          stroke-dasharray="92 9999" stroke-dashoffset="-4460" />
+        <circle cx="1420" cy="960" r="1128" stroke-opacity=".14" stroke-width="1.2"
+          stroke-dasharray="158 9999" stroke-dashoffset="-3700" />
+        <circle cx="1420" cy="960" r="1246" stroke-opacity=".1" stroke-width="1"
+          stroke-dasharray="70 9999" stroke-dashoffset="-4830" />
+      </g>
+      <g fill="#eafcff">
+        <circle cx="556" cy="700" r="1.5" opacity=".26" /><circle cx="578" cy="712" r="1.1" opacity=".2" />
+        <circle cx="540" cy="716" r="1.2" opacity=".22" /><circle cx="592" cy="698" r="1" opacity=".16" />
+      </g>
+
+      <!-- 转向：唱片只往一个方向转 —— 河道也只有一条（这就是"单支路"在唱片上的说法） -->
+      <g opacity=".8">
+        <path d="M1296 700 Q 1366 640 1442 674" fill="none" stroke="rgba(199,69,44,.55)" stroke-width="2" stroke-linecap="round" />
+        <path d="M1442 674 l -6 -15 l -15 6" fill="none" stroke="rgba(199,69,44,.55)" stroke-width="2" stroke-linecap="round" />
+        <text x="1146" y="712" fill="rgba(199,69,44,.62)" font-family="ui-monospace, Consolas, monospace"
+          font-size="10" letter-spacing="1.6">顺槽 · 33⅓</text>
+      </g>
+
+      <!-- 唱臂已删：它在右上角读成了一枚火箭，而这里是一张**唱片**（用户裁决） -->
+
+      <!-- 旧版的 detail2（blur 环 + 14 颗尘屑 + 6 个椭圆摩尔纹 + 波形调制）已整组删除：
+           那一组里最伤的是**以 (176,92) 为圆心的椭圆族** —— 圆心不在唱片中心上，
+           在画面上就是"另一颗行星的轨道"，是"行星轨道"读法最直接的字面来源。 -->
+    </svg>
+
+    <!-- 覆盖层 -->
+    <div class="ov" style="left:76px; top:96px; width:520px">
+      <div class="cat">音乐共创 · 匿名接力 · 0001</div>
+      <h1 style="margin-top:12px">暖流河道</h1>
+      <p class="sub">一条沟槽就是一条河。<br />唱一段，让它顺水去找下一个陌生人。</p>
+    </div>
+
+
+    <div class="ov" style="left:1150px; top:112px; width:266px; text-align:right">
+      <div class="rpm">33⅓</div>
+      <div class="cat" style="margin-top:4px">RPM · 匿名接力</div>
+      <div class="cat" style="margin-top:14px; letter-spacing:.06em; line-height:2; opacity:.82">
+        唱一段，投进河里，让陌生人接棒<br />四段齐了入海，成为公共作品
+      </div>
+    </div>
+
+    <!-- 圆形按钮：骑在那条被点亮的沟槽上 -->
+    <div class="port draw ov" style="left:60px; top:400px; width:190px; height:190px" role="button" aria-label="捞一个漂流瓶">
+      <i class="r1"></i><i class="r2"></i><i class="r3"></i>
+      <span class="core">捞取<span>DRAW</span></span>
+      <span class="cap" style="left:230px; top:40px; width:240px"><b>捞一个漂流瓶</b>捞到别人的半句，接下一句。捞到即持有：同一时刻只有你拿着它。</span>
+    </div>
+    <div class="port cast ov" style="left:380px; top:580px; width:150px; height:150px" role="button" aria-label="投下一支漂流瓶">
+      <i class="r1"></i><i class="r2"></i><i class="r3"></i>
+      <span class="core">投下<span>CAST</span></span>
+      <span class="cap" style="left:-180px; top:165px; width:300px"><b>投下一支漂流瓶</b>选一首歌，录下第 1 段，投进河道，等一个陌生人接棒。</span>
+    </div>
+
+    <footer>
+      <button class="tag" aria-pressed="true">全部</button>
+      <button class="tag">深夜</button><button class="tag">通勤</button>
+      <button class="tag">告白</button><button class="tag">雨天</button>
+      <a class="go" href="#">先去公海听听已经完成的作品</a>
+    </footer>
+  <script type="module" src="/app/page-river.js"></script>
+  </body>
+</html>

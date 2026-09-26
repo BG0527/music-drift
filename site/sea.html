@@ -1,0 +1,488 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=1440">
+    <title>P · 公海大厅（静海 · 六支到岸的瓶子 · 四段涟漪环）</title>
+    <style>
+      @import url('/node_modules/.pnpm/lxgw-wenkai-webfont@1.7.0/node_modules/lxgw-wenkai-webfont/lxgwwenkai-regular.css');
+      @import url('/node_modules/.pnpm/lxgw-wenkai-webfont@1.7.0/node_modules/lxgw-wenkai-webfont/lxgwwenkai-bold.css');
+      @import url('/node_modules/.pnpm/@fontsource+quattrocento@5.3.0/node_modules/@fontsource/quattrocento/400.css');
+      @import url('/node_modules/.pnpm/@fontsource+quattrocento@5.3.0/node_modules/@fontsource/quattrocento/700.css');
+
+      :root {
+        --ink:#050f14; --paper:#f3f9fa; --muted:#a9c7cf; --glass:#7fd1d9;
+        --coral:#d4553a; --warm:#f6d79a; --line:rgba(243,249,250,.13);
+      }
+      * { box-sizing:border-box; margin:0; padding:0; }
+      html,body { width:1440px; height:900px; }
+      html { overflow:hidden; }
+      .clip { position:absolute; inset:0; overflow:hidden; z-index:0; }
+      body { position:relative; overflow:hidden; background:var(--ink); color:var(--paper);
+        font-family:'LXGW WenKai',serif; -webkit-font-smoothing:antialiased; }
+      a { text-decoration:none; }
+      .mono { font-family:Quattrocento,serif; font-variant-numeric:tabular-nums; }
+      .meta { font-family:Quattrocento,'LXGW WenKai',serif; font-size:11px; letter-spacing:.24em;
+        color:rgba(243,249,250,.5); }
+
+      /* ══ 一、海里有什么：水线之上是空气（天光），之下是一张沉在水里的盘面 ═══════════ */
+      .sky { position:absolute; left:0; right:0; top:0; height:366px;
+        background:radial-gradient(118% 84% at 52% 106%, rgba(127,209,217,.078), rgba(127,209,217,0) 70%); }
+      /* 水面光带：光从上方斜打下来，落到水线上（世界有"上面"，瓶子从那儿来） */
+      .beam { position:absolute; left:0; right:0; top:0; height:366px; mix-blend-mode:screen;
+        background:linear-gradient(101deg, rgba(203,238,246,0) 26%, rgba(203,238,246,.05) 46%,
+          rgba(228,247,252,.075) 53%, rgba(203,238,246,.03) 66%, rgba(203,238,246,0) 80%); }
+      .platter { position:absolute; inset:0;
+        background:
+          repeating-radial-gradient(circle at 1420px 960px, rgba(216,243,246,.055) 0 1.2px, transparent 1.2px 6.5px),
+          radial-gradient(circle at 1420px 960px, rgba(127,209,217,.05) 0 30%, transparent 68%);
+        -webkit-mask-image:linear-gradient(180deg, rgba(255,255,255,.38) 0 310px, #fff 406px);
+        mask-image:linear-gradient(180deg, rgba(255,255,255,.38) 0 310px, #fff 406px); }
+      .glint { position:absolute; inset:0; mix-blend-mode:screen;
+        background:linear-gradient(101deg, transparent 28%, rgba(228,247,252,.045) 45%, rgba(228,247,252,.065) 50%, rgba(228,247,252,.028) 55%, transparent 72%);
+        -webkit-mask-image:linear-gradient(180deg, rgba(255,255,255,.38) 0 310px, #fff 406px);
+        mask-image:linear-gradient(180deg, rgba(255,255,255,.38) 0 310px, #fff 406px); }
+      /* 水面的光向下打：两族斜向光柱，越深越淡（沟槽里流的是水，不是并排的两张皮） */
+      .shafts { position:absolute; left:0; right:0; top:0; bottom:0;
+        background:
+          repeating-linear-gradient(99deg, rgba(203,238,246,.062) 0 5px, transparent 5px 104px),
+          repeating-linear-gradient(103deg, rgba(203,238,246,.028) 0 18px, transparent 18px 268px);
+        -webkit-mask-image:linear-gradient(180deg, rgba(255,255,255,0) 0 358px, rgba(255,255,255,.9) 386px, rgba(255,255,255,.22) 100%);
+        mask-image:linear-gradient(180deg, rgba(255,255,255,0) 0 358px, rgba(255,255,255,.9) 386px, rgba(255,255,255,.22) 100%); }
+      /* 水面以下几米：光还没散尽的一层水（让水线下面立刻是水，不是黑） */
+      .lit { position:absolute; left:0; right:0; top:366px; height:186px;
+        background:linear-gradient(180deg, rgba(127,209,217,.085) 0%, rgba(127,209,217,0) 100%); }
+      .abyss { position:absolute; left:0; right:0; top:366px; bottom:0;
+        background:linear-gradient(180deg, rgba(5,15,20,0) 0%, rgba(3,11,16,.36) 52%, rgba(2,8,12,.64) 100%); }
+      /* 海床：一条极缓的弧 + 弧下一道光，页码落在它上面 */
+      .seabed { position:absolute; left:-1880px; top:806px; width:5200px; height:900px;
+        border-radius:50%; border-top:1px solid rgba(243,249,250,.13);
+        background:
+          radial-gradient(46% 130px at 50% 0%, rgba(127,209,217,.06), rgba(127,209,217,0) 74%),
+          linear-gradient(180deg, rgba(243,249,250,.018), rgba(243,249,250,0) 240px); }
+      .bub i { position:absolute; border-radius:50%; background:rgba(203,238,246,.3); }
+      /* 海底沉积：躺在海床上的几笔（时间久了，已经归档） */
+      .sed i { position:absolute; height:1px; background:rgba(243,249,250,.12); }
+      .surface { position:absolute; left:0; top:0; }
+      .rings { position:absolute; left:0; top:0; }
+
+      /* ══ 三、前台 ══════════════════════════════════════════════════════════════ */
+      main { position:absolute; inset:0; z-index:3; }
+
+      .topbar { position:absolute; left:88px; right:88px; top:38px;
+        display:flex; justify-content:space-between; }
+      .rule { position:absolute; left:88px; right:88px; top:68px; height:1px;
+        background:rgba(243,249,250,.09); }
+      .rule i { position:absolute; left:0; top:0; width:88px; height:1px; background:var(--coral); }
+
+      .hero { position:absolute; left:88px; top:98px; }
+      h1 { font-size:60px; font-weight:700; line-height:1; letter-spacing:.01em; }
+      .lede { margin-top:18px; width:524px; font-size:15px; line-height:1.9; color:var(--muted); }
+
+      /* 分区：两个分区，两个水位（上面是已定型的，下面还没浮上来） */
+      .zones { position:absolute; right:88px; top:98px; text-align:right; }
+      .zones ul { list-style:none; display:flex; gap:30px; margin-top:15px; }
+      .zones li { padding-bottom:7px; border-bottom:2px solid transparent;
+        font-size:15px; letter-spacing:.04em; color:rgba(243,249,250,.5); }
+      .zones li .n { margin-left:6px; font-size:12px; color:rgba(243,249,250,.42); }
+      .zones li[aria-selected='true'] { color:var(--paper); border-bottom-color:var(--coral); }
+      .zones li[aria-selected='true'] .n { color:var(--glass); }
+
+      /* ── 船队：六支瓶子跨骑同一条水线；涟漪环的四段弧 = 四个段位 ─────────────── */
+      .fleet { position:absolute; inset:0; list-style:none; }
+      .col { position:absolute; top:0; height:900px; width:190.67px; }
+
+      .bottle { position:absolute; left:50%; top:calc(var(--wy) - 96px);
+        width:60px; height:124px; margin-left:-30px;
+        transform:rotate(var(--tilt)); transform-origin:50% 77.4%; }
+      .glass { position:absolute; left:0; top:6px; width:60px; height:118px;
+        clip-path:polygon(14% 100%, 14% 47%, 34% 27%, 34% 7%, 66% 7%, 66% 27%, 86% 47%, 86% 100%);
+        background:linear-gradient(100deg, rgba(203,238,246,.46) 0 2.6%, rgba(10,48,60,.5) 17%,
+          rgba(3,17,23,.82) 62%, rgba(127,209,217,.3) 96%, rgba(203,238,246,.34) 100%); }
+      .note { position:absolute; left:27%; right:27%; bottom:42px; height:18px;
+        display:flex; align-items:flex-end; gap:3px; }
+      .note i { flex:1; background:rgba(203,238,246,.38); }
+      .note i:nth-child(1) { height:5px; }
+      .note i:nth-child(2) { height:12px; }
+      .note i:nth-child(3) { height:17px; }
+      .note i:nth-child(4) { height:10px; }
+      .note i:nth-child(5) { height:6px; }
+      /* 水线以下的那一截：玻璃被水压暗，并在水线上留一道印子 */
+      .sub { position:absolute; left:0; right:0; top:90px; bottom:0;
+        background:linear-gradient(180deg, rgba(4,20,26,.3), rgba(2,10,15,.62)); }
+      .sub::before { content:''; position:absolute; left:0; right:0; top:0; height:1px;
+        background:rgba(203,238,246,.32); }
+      .cork { position:absolute; left:50%; top:0; width:28px; height:18px; margin-left:-14px;
+        border-radius:2px; background:linear-gradient(180deg, rgba(246,215,154,.44), rgba(246,215,154,.24)); }
+
+      /* 测深线：从涟漪环的下缘垂到它自己那条目录 */
+      .sounding { position:absolute; left:50%; top:calc(var(--wy) + 36px); width:1px;
+        height:calc(416px - var(--wy));
+        background:linear-gradient(180deg, rgba(243,249,250,.17), rgba(243,249,250,.05)); }
+      .sounding::after { content:''; position:absolute; left:-2px; bottom:0; width:5px; height:1px;
+        background:rgba(243,249,250,.22); }
+
+      .entry { position:absolute; left:0; right:0; top:452px; }
+      .song { font-size:17px; line-height:1.35; color:var(--paper); }
+      .rec { margin-top:8px; font-size:12.5px; line-height:1.6; color:var(--muted); }
+      .rec b { font-weight:400; color:rgba(243,249,250,.76); }
+      .st { margin-top:4px; font-size:12.5px; line-height:1.6; }
+      .st.ok { color:var(--glass); }
+      .st.gap { color:var(--warm); }
+      .tm { margin-top:8px; font-size:11.5px; line-height:1.6; color:rgba(169,199,207,.72); }
+      .listen { display:inline-block; margin-top:10px; font-size:12.5px; color:var(--glass);
+        text-decoration:underline; text-underline-offset:4px; }
+
+      /* 等待接力：瓶子还没浮上来 —— 位置更低、环上断一段、状态转暖 */
+      .col.wait .bottle { top:calc(var(--wy) + 26px); }
+      .col.wait .sounding { top:calc(var(--wy) + 100px); }
+
+      /* ── 页脚：海床上 ══════════════════════════════════════════════════════════ */
+      .foot { position:absolute; left:88px; right:88px; bottom:34px;
+        display:flex; justify-content:space-between; align-items:center; }
+      .tail { display:flex; align-items:center; }
+      .tail .dot { display:inline-block; width:4px; height:4px; background:var(--coral);
+        margin-right:9px; }
+      .pages { display:flex; align-items:center; gap:20px; }
+      .pages ol { list-style:none; display:flex; gap:8px; }
+      .pages a { display:flex; align-items:center; justify-content:center; width:26px; height:22px;
+        border:1px solid rgba(243,249,250,.16); border-radius:2px;
+        font-family:Quattrocento,serif; font-size:12px; color:rgba(243,249,250,.66); }
+      .pages a[aria-current='page'] { position:relative; border-color:rgba(212,85,58,.62);
+        background:rgba(212,85,58,.16); color:var(--paper); }
+
+      /* ── 空态：潮位退到最低，水线上空着 ════════════════════════════════════════ */
+      .empty { position:absolute; left:88px; top:452px; }
+      .lowtide { position:relative; display:block; width:256px; height:14px; }
+      .lowtide::before { content:''; position:absolute; left:0; top:6px; width:256px; height:1px;
+        background:rgba(127,209,217,.34); }
+      .lowtide::after { content:''; position:absolute; left:0; top:0; width:1px; height:14px;
+        background:rgba(127,209,217,.5); }
+      .lowtide i { position:absolute; top:3px; width:1px; height:8px; background:rgba(243,249,250,.18); }
+      .empty h2 { margin-top:30px; font-size:19px; font-weight:700; color:var(--paper); }
+      .empty p { margin-top:10px; width:430px; font-size:14px; line-height:1.95; color:var(--muted); }
+      .empty a { display:inline-block; margin-top:16px; font-size:13.5px; color:var(--glass);
+        text-decoration:underline; text-underline-offset:5px; }
+    </style>
+  </head>
+  <body>
+    <div class="clip">
+      <div class="sky"></div>
+      <div class="beam"></div>
+      <div class="platter"></div>
+      <div class="glint"></div>
+      <div class="shafts"></div>
+      <div class="lit"></div>
+      <div class="abyss"></div>
+      <div class="seabed"></div>
+      <div class="sed" aria-hidden="true">
+        <i style="left:150px;top:817px;width:34px"></i>
+        <i style="left:330px;top:811px;width:22px"></i>
+        <i style="left:468px;top:808px;width:44px"></i>
+        <i style="left:742px;top:806px;width:26px"></i>
+        <i style="left:946px;top:808px;width:38px"></i>
+        <i style="left:1168px;top:812px;width:20px"></i>
+        <i style="left:1284px;top:817px;width:30px"></i>
+      </div>
+      <div class="bub" aria-hidden="true">
+        <i style="left:250px;top:712px;width:3px;height:3px"></i>
+        <i style="left:263px;top:682px;width:2px;height:2px"></i>
+        <i style="left:433px;top:626px;width:2.5px;height:2.5px"></i>
+        <i style="left:560px;top:754px;width:2px;height:2px"></i>
+        <i style="left:700px;top:766px;width:3.5px;height:3.5px"></i>
+        <i style="left:712px;top:730px;width:2px;height:2px"></i>
+        <i style="left:894px;top:640px;width:2.5px;height:2.5px"></i>
+        <i style="left:1090px;top:698px;width:2px;height:2px"></i>
+        <i style="left:1104px;top:664px;width:3px;height:3px"></i>
+        <i style="left:1218px;top:734px;width:2.5px;height:2.5px"></i>
+        <i style="left:1058px;top:610px;width:2px;height:2px"></i>
+        <i style="left:352px;top:640px;width:2px;height:2px"></i>
+        <i style="left:1044px;top:660px;width:3px;height:3px"></i>
+        <i style="left:1038px;top:622px;width:2px;height:2px"></i>
+        <i style="left:1046px;top:588px;width:2.5px;height:2.5px"></i>
+        <i style="left:404px;top:566px;width:2px;height:2px"></i>
+      </div>
+
+      <!-- 水面：一条从 -40 到 1480 的缓波（起伏 18px，瓶子的倾角由它推出） -->
+      <svg class="surface" width="1440" height="900" viewBox="0 0 1440 900" fill="none" aria-hidden="true">
+        <defs>
+          <linearGradient id="wl" x1="0" y1="0" x2="1440" y2="0" gradientUnits="userSpaceOnUse">
+            <stop offset="0" stop-color="rgb(228,247,252)" stop-opacity=".16" />
+            <stop offset=".2" stop-color="rgb(203,238,246)" stop-opacity=".58" />
+            <stop offset=".44" stop-color="rgb(228,247,252)" stop-opacity=".74" />
+            <stop offset=".7" stop-color="rgb(203,238,246)" stop-opacity=".34" />
+            <stop offset="1" stop-color="rgb(228,247,252)" stop-opacity=".11" />
+          </linearGradient>
+        </defs>
+        <path d="M-40 360.33 L0 361.94 L40 363.72 L80 365.62 L120 367.53 L160 369.37 L200 371.05 L240 372.51 L280 373.68 L320 374.5 L360 374.93 L400 374.96 L440 374.59 L480 373.83 L520 372.71 L560 371.29 L600 369.63 L640 367.81 L680 365.9 L720 364 L760 362.19 L800 360.56 L840 359.16 L880 358.08 L920 357.36 L960 357.02 L1000 357.09 L1040 357.57 L1080 358.42 L1120 359.62 L1160 361.1 L1200 362.81 L1240 364.66 L1280 366.57 L1320 368.46 L1360 370.23 L1400 371.82 L1440 373.14 L1480 374.14" stroke="url(#wl)" stroke-width="26" opacity=".09" />
+        <path d="M300 374.66 L360 374.93 L400 374.96 L440 374.59 L480 373.83 L520 372.71 L560 371.29 L600 369.63 L640 367.81 L680 365.9 L720 364 L760 362.19 L800 360.56 L840 359.16 L880 358.08 L920 357.36 L960 357.02" stroke="url(#wl)" stroke-width="30" opacity=".08" />
+        <!-- 水面碎光：水线上下散开的几小段亮点（水面被照亮的地方） -->
+        <g stroke="rgb(228,247,252)" stroke-width="1.4">
+          <path d="M226 369.53 L268 370.86" opacity=".42" />
+          <path d="M300 376.64 L338 377.24" opacity=".24" />
+          <path d="M446 377 L486 376.18" opacity=".32" />
+          <path d="M500 370.81 L540 369.53" opacity=".2" />
+          <path d="M664 364.17 L706 362.16" opacity=".4" />
+          <path d="M712 366.88 L748 365.22" opacity=".22" />
+          <path d="M884 355.49 L918 354.88" opacity=".34" />
+          <path d="M1086 361.08 L1128 362.4" opacity=".24" />
+          <path d="M1150 358.21 L1192 359.96" opacity=".3" />
+          <path d="M1310 370.5 L1344 372.04" opacity=".22" />
+        </g>
+        <path d="M-40 360.33 L0 361.94 L40 363.72 L80 365.62 L120 367.53 L160 369.37 L200 371.05 L240 372.51 L280 373.68 L320 374.5 L360 374.93 L400 374.96 L440 374.59 L480 373.83 L520 372.71 L560 371.29 L600 369.63 L640 367.81 L680 365.9 L720 364 L760 362.19 L800 360.56 L840 359.16 L880 358.08 L920 357.36 L960 357.02 L1000 357.09 L1040 357.57 L1080 358.42 L1120 359.62 L1160 361.1 L1200 362.81 L1240 364.66 L1280 366.57 L1320 368.46 L1360 370.23 L1400 371.82 L1440 373.14 L1480 374.14" stroke="url(#wl)" stroke-width="1.1" />
+      </svg>
+
+      <!-- 涟漪环：4 段弧（含 4 个缺口）= 4 个段位；远侧淡、近侧亮（水面的远近） -->
+      <svg class="rings" width="1440" height="900" viewBox="0 0 1440 900" fill="none" aria-hidden="true">
+        <defs>
+          <linearGradient id="rip" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stop-color="rgb(127,209,217)" stop-opacity=".3" />
+            <stop offset=".52" stop-color="rgb(127,209,217)" stop-opacity=".62" />
+            <stop offset="1" stop-color="rgb(127,209,217)" stop-opacity=".9" />
+          </linearGradient>
+          <linearGradient id="rip2" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stop-color="rgb(127,209,217)" stop-opacity=".09" />
+            <stop offset="1" stop-color="rgb(127,209,217)" stop-opacity=".3" />
+          </linearGradient>
+        </defs>
+        <!-- 外圈：水面被扰动后散开的那一圈（连续，不是刻度 —— 刻度只有内圈的四段弧） -->
+        <g stroke="url(#rip2)" stroke-width="1" stroke-dasharray="26 24 26 24" stroke-dashoffset="-12">
+          <ellipse cx="183.3" cy="378.4" rx="106" ry="42" pathLength="100" />
+          <ellipse cx="398" cy="383" rx="106" ry="42" pathLength="100" />
+          <ellipse cx="612.7" cy="377.1" rx="106" ry="42" pathLength="100" />
+          <ellipse cx="827.3" cy="367.6" rx="106" ry="42" pathLength="100" />
+          <ellipse cx="1042" cy="365.6" rx="106" ry="42" pathLength="100" />
+          <ellipse cx="1256.7" cy="373.5" rx="106" ry="42" pathLength="100" />
+        </g>
+        <ellipse cx="183.3" cy="374.4" rx="76" ry="30" pathLength="100" stroke="url(#rip)" stroke-width="1.5" stroke-dasharray="18 7" />
+        <ellipse cx="398" cy="379" rx="76" ry="30" pathLength="100" stroke="url(#rip)" stroke-width="1.5" stroke-dasharray="18 7" />
+        <ellipse cx="612.7" cy="373.1" rx="76" ry="30" pathLength="100" stroke="url(#rip)" stroke-width="1.5" stroke-dasharray="18 7" />
+        <ellipse cx="827.3" cy="363.6" rx="76" ry="30" pathLength="100" stroke="url(#rip)" stroke-width="1.5" stroke-dasharray="18 7" />
+        <ellipse cx="1042" cy="361.6" rx="76" ry="30" pathLength="100" stroke="url(#rip)" stroke-width="1.5" stroke-dasharray="18 7" />
+        <ellipse cx="1256.7" cy="369.5" rx="76" ry="30" pathLength="100" stroke="url(#rip)" stroke-width="1.5" stroke-dasharray="18 7" />
+      </svg>
+    </div>
+
+    <main>
+      <div class="topbar">
+        <p class="meta">音乐漂流瓶 · MUSIC DRIFT</p>
+        <p class="meta">CATALOGUE OF THE OPEN SEA</p>
+      </div>
+      <div class="rule"><i></i></div>
+
+      <header class="hero">
+        <h1>公海大厅</h1>
+        <p class="lede">聆听那些经历漂流与合唱、完全绽放的终极乐章。作品一旦入海就不再漂流 —— 这里只能听，不能接。</p>
+      </header>
+
+      <div class="zones">
+        <p class="meta">分区 · SECTIONS</p>
+        <ul role="tablist" aria-label="分区">
+          <li role="tab" aria-selected="true">完整作品<span class="mono n">39</span></li>
+          <li role="tab" aria-selected="false">等待接力<span class="mono n">12</span></li>
+        </ul>
+      </div>
+
+      <ul class="fleet">
+        <!-- 渲染态：默认分区「完整作品」，第 1 页（6 支 = SEA_PAGE_SIZE） -->
+        <li class="col" style="left:88px; --wy:370.4px; --tilt:2.4deg">
+          <span class="sounding" aria-hidden="true"></span>
+          <span class="bottle" aria-hidden="true">
+            <span class="glass">
+              <span class="note"><i></i><i></i><i></i><i></i><i></i></span>
+              <span class="sub"></span>
+            </span>
+            <span class="cork"></span>
+          </span>
+          <div class="entry">
+            <p class="song">占位曲目 · 一</p>
+            <p class="rec">已录 <b class="mono">4</b> / <b class="mono">4</b> 段</p>
+            <p class="st ok">全部段位都有人唱过</p>
+            <p class="tm">最近更新 <span class="mono">2026/9/23 20:38</span></p>
+            <a class="listen" href="#">听这支作品</a>
+          </div>
+        </li>
+
+        <li class="col" style="left:302.67px; --wy:375px; --tilt:-0.22deg">
+          <span class="sounding" aria-hidden="true"></span>
+          <span class="bottle" aria-hidden="true">
+            <span class="glass">
+              <span class="note"><i></i><i></i><i></i><i></i><i></i></span>
+              <span class="sub"></span>
+            </span>
+            <span class="cork"></span>
+          </span>
+          <div class="entry">
+            <p class="song">占位曲目 · 二</p>
+            <p class="rec">已录 <b class="mono">4</b> / <b class="mono">4</b> 段</p>
+            <p class="st ok">全部段位都有人唱过</p>
+            <p class="tm">最近更新 <span class="mono">2026/9/22 11:04</span></p>
+            <a class="listen" href="#">听这支作品</a>
+          </div>
+        </li>
+
+        <li class="col" style="left:517.33px; --wy:369.1px; --tilt:-2.58deg">
+          <span class="sounding" aria-hidden="true"></span>
+          <span class="bottle" aria-hidden="true">
+            <span class="glass">
+              <span class="note"><i></i><i></i><i></i><i></i><i></i></span>
+              <span class="sub"></span>
+            </span>
+            <span class="cork"></span>
+          </span>
+          <div class="entry">
+            <p class="song">占位曲目 · 三</p>
+            <p class="rec">已录 <b class="mono">4</b> / <b class="mono">4</b> 段</p>
+            <p class="st ok">全部段位都有人唱过</p>
+            <p class="tm">最近更新 <span class="mono">2026/9/21 08:47</span></p>
+            <a class="listen" href="#">听这支作品</a>
+          </div>
+        </li>
+
+        <li class="col" style="left:732px; --wy:359.6px; --tilt:-1.92deg">
+          <span class="sounding" aria-hidden="true"></span>
+          <span class="bottle" aria-hidden="true">
+            <span class="glass">
+              <span class="note"><i></i><i></i><i></i><i></i><i></i></span>
+              <span class="sub"></span>
+            </span>
+            <span class="cork"></span>
+          </span>
+          <div class="entry">
+            <p class="song">占位曲目 · 四</p>
+            <p class="rec">已录 <b class="mono">4</b> / <b class="mono">4</b> 段</p>
+            <p class="st ok">全部段位都有人唱过</p>
+            <p class="tm">最近更新 <span class="mono">2026/9/19 22:12</span></p>
+            <a class="listen" href="#">听这支作品</a>
+          </div>
+        </li>
+
+        <li class="col" style="left:946.67px; --wy:357.6px; --tilt:0.99deg">
+          <span class="sounding" aria-hidden="true"></span>
+          <span class="bottle" aria-hidden="true">
+            <span class="glass">
+              <span class="note"><i></i><i></i><i></i><i></i><i></i></span>
+              <span class="sub"></span>
+            </span>
+            <span class="cork"></span>
+          </span>
+          <div class="entry">
+            <p class="song">占位曲目 · 五</p>
+            <p class="rec">已录 <b class="mono">4</b> / <b class="mono">4</b> 段</p>
+            <p class="st ok">全部段位都有人唱过</p>
+            <p class="tm">最近更新 <span class="mono">2026/9/18 14:30</span></p>
+            <a class="listen" href="#">听这支作品</a>
+          </div>
+        </li>
+
+        <li class="col" style="left:1161.33px; --wy:365.5px; --tilt:2.74deg">
+          <span class="sounding" aria-hidden="true"></span>
+          <span class="bottle" aria-hidden="true">
+            <span class="glass">
+              <span class="note"><i></i><i></i><i></i><i></i><i></i></span>
+              <span class="sub"></span>
+            </span>
+            <span class="cork"></span>
+          </span>
+          <div class="entry">
+            <p class="song">占位曲目 · 六</p>
+            <p class="rec">已录 <b class="mono">4</b> / <b class="mono">4</b> 段</p>
+            <p class="st ok">全部段位都有人唱过</p>
+            <p class="tm">最近更新 <span class="mono">2026/9/17 19:55</span></p>
+            <a class="listen" href="#">听这支作品</a>
+          </div>
+        </li>
+      </ul>
+
+      <!-- ══ 规格证据（hidden）：切到「等待接力」分区时，同一片海长什么样 ═══════════
+           源码里 INCOMPLETE 区的两个必备字段在这里：进度（已录 N / 4 段）与
+           「缺第 x 段（成品里这段时间是静音）」。瓶子的位置沉到水线以下（还没浮上来），
+           涟漪环断掉一段（缺口 = 歌里固定的段位），状态转暖。 -->
+      <ul class="fleet" hidden>
+        <li class="col wait" style="left:88px; --wy:370.4px; --tilt:2.4deg">
+          <span class="sounding" aria-hidden="true"></span>
+          <span class="bottle" aria-hidden="true">
+            <span class="glass">
+              <span class="note"><i></i><i></i><i></i><i></i><i></i></span>
+              <span class="sub"></span>
+            </span>
+            <span class="cork"></span>
+          </span>
+          <div class="entry">
+            <p class="song">占位曲目 · 七</p>
+            <p class="rec">已录 <b class="mono">4</b> / <b class="mono">4</b> 段</p>
+            <p class="st ok">全部段位都有人唱过</p>
+            <p class="tm">最近更新 <span class="mono">2026/9/16 10:02</span></p>
+            <a class="listen" href="#">听这支作品</a>
+          </div>
+        </li>
+
+        <li class="col wait" style="left:302.67px; --wy:375px; --tilt:-0.22deg">
+          <span class="sounding" aria-hidden="true"></span>
+          <span class="bottle" aria-hidden="true">
+            <span class="glass">
+              <span class="note"><i></i><i></i><i></i><i></i><i></i></span>
+              <span class="sub"></span>
+            </span>
+            <span class="cork"></span>
+          </span>
+          <div class="entry">
+            <p class="song">占位曲目 · 八</p>
+            <p class="rec">已录 <b class="mono">3</b> / <b class="mono">4</b> 段</p>
+            <p class="st gap">缺第 3 段（成品里这段时间是静音）</p>
+            <p class="tm">最近更新 <span class="mono">2026/9/15 21:40</span></p>
+            <a class="listen" href="#">听这支作品</a>
+          </div>
+        </li>
+
+        <li class="col wait" style="left:517.33px; --wy:369.1px; --tilt:-2.58deg">
+          <span class="sounding" aria-hidden="true"></span>
+          <span class="bottle" aria-hidden="true">
+            <span class="glass">
+              <span class="note"><i></i><i></i><i></i><i></i><i></i></span>
+              <span class="sub"></span>
+            </span>
+            <span class="cork"></span>
+          </span>
+          <div class="entry">
+            <p class="song">占位曲目 · 九</p>
+            <p class="rec">已录 <b class="mono">2</b> / <b class="mono">4</b> 段</p>
+            <p class="st gap">缺第 2、3 段（成品里这段时间是静音）</p>
+            <p class="tm">最近更新 <span class="mono">2026/9/14 09:18</span></p>
+            <a class="listen" href="#">听这支作品</a>
+          </div>
+        </li>
+      </ul>
+
+      <!-- 空态 A（完整作品区）—— 渲染时与上面那张舰队二选一，此处留作规格证据 -->
+      <div class="empty" hidden>
+        <span class="lowtide" aria-hidden="true"><i style="left:64px"></i><i style="left:128px"></i><i style="left:192px"></i></span>
+        <h2>还没有完整的作品</h2>
+        <p>完整作品要等每个段位都有人唱过之后，由持有者送进公海。</p>
+        <a href="#">去河道捞一个</a>
+      </div>
+
+      <!-- 空态 B（等待接力区）—— 渲染时与上表二选一 -->
+      <div class="empty" hidden>
+        <span class="lowtide" aria-hidden="true"><i style="left:64px"></i><i style="left:128px"></i><i style="left:192px"></i></span>
+        <h2>没有等待接力的作品</h2>
+        <p>这里的作品都还差几个段位，等着有人补上——补完才会进完整作品区。</p>
+        <a href="#">去河道捞一个</a>
+      </div>
+
+      <footer class="foot">
+        <p class="meta tail"><span class="dot" aria-hidden="true"></span>完整作品 · 本页 <span class="mono">6</span> 支</p>
+        <nav class="pages" aria-label="分页">
+          <span class="meta">PAGE</span>
+          <ol>
+            <li><a href="#" aria-current="page">1</a></li>
+            <li><a href="#">2</a></li>
+            <li><a href="#">3</a></li>
+          </ol>
+          <span class="meta">第 1 页 · 后面还有更多</span>
+        </nav>
+      </footer>
+    </main>
+  <script type="module" src="/app/page-sea.js"></script>
+  </body>
+</html>

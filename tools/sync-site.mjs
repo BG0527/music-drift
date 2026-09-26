@@ -1,0 +1,99 @@
+/**
+ * 把 11 张设计定稿同步成发布副本 `site/*.html`。
+ *
+ * 为什么需要它：用户指正「design-explore 里已经有 html 网页」——
+ * 那 11 张 `.html` **就是源**（冻结、字节不改、设计期守卫继续有效），
+ * `site/` 只是**发布副本**：只注入两行（viewport + 页面脚本），结构一字不改。
+ * 重跑本脚本 = 从源重新生成发布副本，源永远是设计稿。
+ *
+ * 用法：node tools/sync-site.mjs [--check]
+ *   --check：只比对，不写盘；有差异则 exit 1（可用于"发布副本是否与源一致"的守卫）。
+ */
+/* eslint-disable no-console */
+import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
+import { createHash } from 'node:crypto';
+import { dirname, join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
+const SRC_DIR = join(ROOT, 'docs', 'ui-review', 'design-explore');
+const OUT_DIR = join(ROOT, 'site');
+
+/** 设计稿 → 发布路径（与 docs/deploy-plan-html.md §7.3 的表一致）。 */
+const PAGES = [
+  ['f4-groove.html', 'river.html', 'river'],
+  ['p-songpicker-record.html', 'new.html', 'new'],
+  ['p-bottle-record.html', 'bottle.html', 'bottle'],
+  ['p-driftlog-record.html', 'drift-log.html', 'drift-log'],
+  ['p-sea-hall.html', 'sea.html', 'sea'],
+  ['p-sea-detail-record.html', 'sea-detail.html', 'sea-detail'],
+  ['p-profile-record.html', 'me.html', 'me'],
+  ['p-settings-record.html', 'settings.html', 'settings'],
+  ['p-login-record.html', 'login.html', 'login'],
+  ['s2-admin-record.html', 'admin.html', 'admin'],
+  ['p-404-record.html', '404.html', '404'],
+];
+
+const VIEWPORT = '    <meta name="viewport" content="width=1440">';
+
+/** 只注入两行：charset 之后插 viewport，</body> 之前插本页脚本。其余字节原样。 */
+function inject(html, slug) {
+  if (html.includes('name="viewport"')) throw new Error(`源里已有 viewport（${slug}），不重复注入`);
+  // 注意：源里写的是 `<meta charset="utf-8" />`（斜杠前有空格），别把 `">` 写死。
+  const charset = /(<meta charset="[^"]*"\s*\/?>)/;
+  if (!charset.test(html)) throw new Error(`源里没有 charset 行（${slug}）`);
+  const withViewport = html.replace(charset, `$1\n${VIEWPORT}`);
+
+  if (withViewport.includes('/app/page-')) throw new Error(`源里已有页面脚本（${slug}）`);
+  if (!withViewport.includes('</body>')) throw new Error(`源里没有 </body>（${slug}）`);
+  // 源里 `</body>` 自带 2 空格缩进，它前面的空白会保留 ⇒ 这里脚本行不再加缩进，
+  // 替换文本里的 `</body>` 补回 2 空格，才能得到「脚本 2 空格 / </body> 2 空格」的同级缩进。
+  return withViewport.replace(
+    '</body>',
+    `<script type="module" src="/app/page-${slug}.js"></script>\n  </body>`,
+  );
+}
+
+const sha = (text) => createHash('sha256').update(text, 'utf8').digest('hex');
+const checkOnly = process.argv.includes('--check');
+if (!checkOnly) mkdirSync(OUT_DIR, { recursive: true });
+
+let changed = 0;
+for (const [source, target, slug] of PAGES) {
+  const from = join(SRC_DIR, source);
+  if (!existsSync(from)) {
+    console.error(`✗ 缺源文件：${source}`);
+    process.exitCode = 1;
+    continue;
+  }
+  const out = inject(readFileSync(from, 'utf8'), slug);
+  const to = join(OUT_DIR, target);
+  const current = existsSync(to) ? readFileSync(to, 'utf8') : null;
+  if (current === out) {
+    console.log(`= ${target.padEnd(16)} 已是最新  ${sha(out).slice(0, 12)}`);
+    continue;
+  }
+  changed += 1;
+  if (checkOnly) {
+    console.error(`✗ ${target} 与源不一致（重跑 node tools/sync-site.mjs 修复）`);
+    process.exitCode = 1;
+  } else {
+    writeFileSync(to, out);
+    console.log(`+ ${target.padEnd(16)} 已同步    ${sha(out).slice(0, 12)}`);
+  }
+}
+
+console.log(
+  checkOnly
+    ? `\n比对完成：${String(PAGES.length)} 页，${String(changed)} 页不一致`
+    : `\n同步完成：${String(PAGES.length)} 页，写入 ${String(changed)} 页`,
+);
+
+// 反向检查：site/ 里不该有不在名单内的 .html（防"手写的第 12 页"）
+const strays = readdirSync(OUT_DIR)
+  .filter((n) => n.endsWith('.html'))
+  .filter((n) => !PAGES.some(([, target]) => target === n));
+if (strays.length > 0) {
+  console.error(`✗ site/ 里有名单外的页面：${strays.join(', ')}（发布副本必须全部来自设计稿）`);
+  process.exitCode = 1;
+}

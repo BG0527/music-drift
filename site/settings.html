@@ -1,0 +1,338 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=1440">
+    <title>设置 · 内袋里的说明书折页，半页浸在水线里</title>
+    <style>
+      @import url('/node_modules/.pnpm/lxgw-wenkai-webfont@1.7.0/node_modules/lxgw-wenkai-webfont/lxgwwenkai-regular.css');
+      @import url('/node_modules/.pnpm/lxgw-wenkai-webfont@1.7.0/node_modules/lxgw-wenkai-webfont/lxgwwenkai-bold.css');
+      @import url('/node_modules/.pnpm/@fontsource+quattrocento@5.3.0/node_modules/@fontsource/quattrocento/400.css');
+      @import url('/node_modules/.pnpm/@fontsource+quattrocento@5.3.0/node_modules/@fontsource/quattrocento/700.css');
+      :root {
+        --ink:#050f14; --paper:#f3f9fa; --muted:#a9c7cf; --glass:#7fd1d9;
+        --coral:#d4553a; --warm:#f6d79a; --line:rgba(243,249,250,.13);
+      }
+      * { box-sizing:border-box; margin:0; padding:0; }
+      html,body { width:1440px; height:900px; }
+      html { overflow:hidden; }
+      body { position:relative; overflow:hidden; background:var(--ink); color:var(--paper);
+        font-family:'LXGW WenKai',serif; -webkit-font-smoothing:antialiased; }
+      .clip { position:absolute; inset:0; overflow:hidden; }
+      .mono { font-family:Quattrocento,serif; font-variant-numeric:tabular-nums; }
+      .meta { font-family:Quattrocento,'LXGW WenKai',serif; }
+
+      /* ── §1.4 唱片表面：盘心 (1420,960)，整张盘都沉在水线以下 ────────── */
+      .platter { position:absolute; inset:0;
+        background:
+          repeating-radial-gradient(circle at 1420px 960px, rgba(216,243,246,.055) 0 1.2px, transparent 1.2px 6.5px),
+          radial-gradient(circle at 1420px 960px, rgba(127,209,217,.05) 0 30%, transparent 68%); }
+      .glint { position:absolute; inset:0; mix-blend-mode:screen;
+        background:linear-gradient(101deg, transparent 28%, rgba(228,247,252,.045) 45%, rgba(228,247,252,.065) 50%, rgba(228,247,252,.028) 55%, transparent 72%); }
+
+      /* ── 水线 y=520：之上是空气（别人看得到的），之下是水（只有你自己知道的） ── */
+      .air { position:absolute; left:0; right:0; top:0; height:520px;
+        background:linear-gradient(180deg, rgba(127,209,217,.085) 0%, rgba(127,209,217,.022) 58%, rgba(127,209,217,0) 100%); }
+      .sea { position:absolute; left:0; right:0; top:520px; bottom:0;
+        background:linear-gradient(180deg, rgba(5,24,32,.5) 0%, rgba(4,16,22,.7) 52%, rgba(3,12,17,.8) 100%); }
+      /* 进水的光柱：被水面折过，比空气里那道更陡更淡 */
+      .shaft { position:absolute; left:0; right:0; top:520px; height:380px;
+        background:linear-gradient(99deg, transparent 20%, rgba(127,209,217,.05) 37%,
+          rgba(127,209,217,.085) 44%, rgba(127,209,217,.035) 53%, transparent 70%);
+        -webkit-mask-image:linear-gradient(180deg, #fff, rgba(255,255,255,0) 92%);
+        mask-image:linear-gradient(180deg, #fff, rgba(255,255,255,0) 92%); }
+      /* 湿纸才透光：水里的沟槽比空气里更亮 = 唱片是沉在水里那一面 */
+      .grooves-wet { position:absolute; left:0; right:0; top:520px; bottom:0;
+        background:repeating-radial-gradient(circle at 1420px 960px, rgba(216,243,246,.085) 0 1.2px, transparent 1.2px 6.5px); }
+      /* 水线正下方那一层被光照亮的水皮 */
+      .surf { position:absolute; left:0; right:0; top:520px; height:30px;
+        background:linear-gradient(180deg, rgba(127,209,217,.09), rgba(127,209,217,0)); }
+
+      /* ── 内袋里的说明书折页：一张纸，上半干燥、下半泡在水里 ────────── */
+      .leaf { position:absolute; left:104px; top:52px; width:1232px; height:796px; border-radius:2px;
+        border:1px solid rgba(243,249,250,.15);
+        clip-path:polygon(30px 0, 100% 0, 100% 100%, 0 100%, 0 30px); }
+      /* 干的那半：几乎不透，背后那张盘看不见 */
+      .leaf-dry { position:absolute; left:0; top:0; width:1232px; height:468px;
+        background:linear-gradient(168deg, rgba(12,42,54,.9) 0%, rgba(8,31,42,.92) 60%, rgba(6,25,34,.93) 100%); }
+      /* 湿的那半：纸被泡透，透出背后的沟槽，越深越暗 */
+      .leaf-wet { position:absolute; left:0; top:468px; width:1232px; height:328px;
+        background:linear-gradient(180deg, rgba(8,34,45,.32) 0%, rgba(6,26,35,.46) 58%, rgba(5,20,28,.56) 100%); }
+      /* 湿纸前沿：水渍从这条线往纸里走 */
+      .tide { position:absolute; left:0; top:468px; width:1232px; height:12px;
+        background:linear-gradient(180deg, rgba(2,10,14,.5), rgba(2,10,14,0)); }
+      .film { position:absolute; left:0; top:468px; width:1232px; height:328px;
+        background:linear-gradient(180deg, rgba(127,209,217,.07), rgba(127,209,217,.015) 55%, rgba(127,209,217,0)); }
+      .leaf-top { position:absolute; left:0; right:0; top:0; height:1px;
+        background:linear-gradient(90deg, transparent 3%, rgba(203,238,246,.32) 38%, rgba(243,249,250,.14) 82%, transparent 97%); }
+      /* 折角：这张折页是从一本说明书上撕下来的 */
+      .dogear { position:absolute; left:0; top:29px; width:41px; height:1px;
+        background:rgba(203,238,246,.4); transform:rotate(-45deg); transform-origin:0 0; }
+
+      /* 对折的折缝：1px 亮线 + 两侧明暗差（纸往背光那面弯） */
+      .crease-shl { position:absolute; left:588px; top:0; width:28px; height:796px;
+        background:linear-gradient(90deg, rgba(3,12,17,0), rgba(3,12,17,.38)); }
+      .crease-shr { position:absolute; left:619px; top:0; width:28px; height:796px;
+        background:linear-gradient(90deg, rgba(203,238,246,.07), rgba(203,238,246,0)); }
+      .crease { position:absolute; left:616px; top:0; width:3px; height:796px;
+        background:linear-gradient(90deg, rgba(3,12,17,.62) 0 1px, rgba(228,247,252,.3) 1px 2px, rgba(3,12,17,.34) 2px 3px); }
+      /* 湿区里折缝泡胀了一点 */
+      .crease-soak { position:absolute; left:615px; top:468px; width:5px; height:328px;
+        background:linear-gradient(90deg, rgba(3,12,17,0), rgba(2,10,14,.5), rgba(3,12,17,0)); }
+      /* 毛细：水顺着折缝往上爬一截，纸的两个侧边也被水咬住 */
+      .wick { position:absolute; background:linear-gradient(0deg, rgba(127,209,217,.45), rgba(127,209,217,0)); }
+      .wick.mid { left:614px; top:452px; width:6px; height:16px; }
+      .wick.lf { left:0; top:456px; width:3px; height:12px; }
+      .wick.rt { left:1229px; top:456px; width:3px; height:12px; }
+      /* die-cut 指孔：从纸上挖掉一块，透过去是水 */
+      .hole { position:absolute; left:1160px; top:730px; width:34px; height:34px; border-radius:50%;
+        background:radial-gradient(circle at 36% 32%, rgba(2,8,12,.97) 0 64%, rgba(127,209,217,.14) 100%);
+        border:1px solid rgba(228,247,252,.34); }
+      .hole i { position:absolute; inset:2px; border-radius:50%;
+        border-bottom:1px solid rgba(228,247,252,.42); border-right:1px solid rgba(228,247,252,.24); }
+
+      /* ── 水线本体：一条被揉皱的横线，几处反光、几处断口 ──────────── */
+      .wline { position:absolute; left:0; right:0; top:520px; height:1px;
+        background:linear-gradient(90deg, rgba(203,238,246,.52) 0 120px, rgba(203,238,246,.2) 120px 300px,
+          rgba(203,238,246,.48) 336px 424px, rgba(203,238,246,.19) 460px 1040px,
+          rgba(203,238,246,.36) 1080px 1400px, rgba(243,249,250,.16) 1400px 1440px); }
+      .wline i { position:absolute; height:1px; background:rgba(228,247,252,.32); }
+
+      /* ── 水面上的那一只瓶子 = 别人看得到的（独立代号 + 你的声音） ──── */
+      .glass { position:absolute;
+        background:linear-gradient(90deg, rgba(127,209,217,.34), rgba(127,209,217,.12) 26%,
+          rgba(228,247,252,.4) 40%, rgba(127,209,217,.14) 54%, rgba(127,209,217,.3)); }
+      .bot-body { left:1182px; top:416px; width:112px; height:104px; border-radius:2px 2px 4px 4px;
+        border:1px solid rgba(216,243,246,.68); }
+      .bot-shoulder { left:1182px; top:400px; width:112px; height:16px;
+        clip-path:polygon(32px 0, 80px 0, 112px 16px, 0 16px); }
+      .bot-neck { left:1214px; top:356px; width:48px; height:44px; border-radius:2px;
+        border:1px solid rgba(216,243,246,.64); }
+      .bot-lip { position:absolute; left:1212px; top:346px; width:52px; height:10px; border-radius:2px;
+        background:rgba(216,243,246,.62); }
+      .bot-cork { position:absolute; left:1216px; top:332px; width:44px; height:14px; border-radius:2px;
+        background:rgba(246,215,154,.52); border:1px solid rgba(246,215,154,.72); }
+      .bot-l1 { position:absolute; left:1191px; top:420px; width:3px; height:96px;
+        background:linear-gradient(180deg, rgba(228,247,252,.82), rgba(228,247,252,.14)); }
+      .bot-l2 { position:absolute; left:1287px; top:420px; width:1px; height:96px; background:rgba(228,247,252,.34); }
+      /* 瓶里那张纸条：写着「代号」——同一瓶里大家看到的是同一个 */
+      .slip { position:absolute; left:1204px; top:440px; width:68px; height:36px; border-radius:2px;
+        background:rgba(246,215,154,.18); border:1px solid rgba(246,215,154,.55); transform:rotate(-4deg);
+        font-size:12.5px; letter-spacing:.18em; line-height:36px; text-align:center; color:rgba(246,215,154,.95); }
+      /* 从瓶口出来的声音 */
+      .wave { position:absolute; left:1216px; top:264px; width:45px; height:48px; }
+      .wave i { position:absolute; bottom:0; width:3px; background:rgba(127,209,217,.55); }
+      /* 玻璃压在水面上：接触处那一圈被抬起来的亮水皮 */
+      .contact { position:absolute; left:1182px; top:516px; width:112px; height:7px;
+        background:linear-gradient(180deg, rgba(203,238,246,.06), rgba(203,238,246,.46) 48%, rgba(203,238,246,0)); }
+      /* 瓶底压在水面上的两圈涟漪 */
+      .rip { position:absolute; border:1px solid rgba(203,238,246,.32); border-radius:50%; }
+      .rip.a { left:1163px; top:513px; width:150px; height:13px; }
+      .rip.b { left:1190px; top:516px; width:96px; height:8px; border-color:rgba(203,238,246,.2); }
+
+      /* ── 水下的倒影：同一只瓶子，只有你知道的那一面（账号 / 邮箱） ── */
+      .refl { position:absolute; left:1182px; top:520px; width:112px; height:190px;
+        -webkit-mask-image:linear-gradient(180deg, #fff 0%, rgba(255,255,255,.62) 58%, rgba(255,255,255,.14) 100%);
+        mask-image:linear-gradient(180deg, #fff 0%, rgba(255,255,255,.62) 58%, rgba(255,255,255,.14) 100%); }
+      .refl .glass { background:linear-gradient(90deg, rgba(127,209,217,.2), rgba(127,209,217,.07) 30%,
+        rgba(228,247,252,.24) 46%, rgba(127,209,217,.07) 62%, rgba(127,209,217,.17)); }
+      .refl .rb { left:0; top:0; width:112px; height:104px; border-radius:2px; border:1px solid rgba(216,243,246,.28); }
+      .refl .rs { left:0; top:104px; width:112px; height:16px;
+        clip-path:polygon(0 0, 112px 0, 80px 16px, 32px 16px); }
+      .refl .rn { left:32px; top:120px; width:48px; height:44px; border-radius:2px; }
+      .refl .rl { position:absolute; left:30px; top:164px; width:52px; height:10px; border-radius:2px;
+        background:rgba(203,238,246,.16); }
+      .refl .rc { position:absolute; left:34px; top:174px; width:44px; height:14px; border-radius:2px;
+        background:rgba(246,215,154,.22); }
+      .refl .rslip { position:absolute; left:22px; top:24px; width:68px; height:36px; border-radius:2px;
+        background:rgba(246,215,154,.1); border:1px solid rgba(246,215,154,.34); transform:rotate(4deg);
+        font-size:12.5px; letter-spacing:.18em; line-height:36px; text-align:center; color:rgba(246,215,154,.66); }
+      /* 水面的波纹把倒影切成几段 */
+      .wav { position:absolute; height:1px;
+        background:linear-gradient(90deg, transparent, rgba(203,238,246,.3) 16%, rgba(203,238,246,.13) 64%, transparent); }
+      .bub { position:absolute; border-radius:50%; background:rgba(203,238,246,.14);
+        border:1px solid rgba(203,238,246,.26); }
+
+      /* ── 文字层 ───────────────────────────────────────────────── */
+      main { position:absolute; inset:0; z-index:3; }
+      .cat { font-size:11px; letter-spacing:.24em; color:rgba(243,249,250,.5); }
+      h1 { margin-top:12px; font-size:58px; font-weight:700; line-height:1; letter-spacing:.01em; }
+      .standfirst { margin-top:16px; width:500px; font-size:14.5px; line-height:1.85; color:var(--muted); }
+      .rule { margin-top:26px; height:1px; background:var(--line); }
+      h2 { font-size:17px; font-weight:700; line-height:1.3; }
+      h2.block { padding-bottom:11px; border-bottom:1px solid var(--line); }
+      h2.after { margin-top:30px; }
+      .l-dry { position:absolute; left:152px; top:92px; width:528px; }
+      .l-wet { position:absolute; left:152px; top:552px; width:528px; }
+      .r-dry { position:absolute; left:760px; top:92px; width:380px; }
+
+      /* 三条边界：一、二在水面之上（别人看得到），三在水面之下（只有你知道） */
+      .rows { margin-top:14px; }
+      .row { display:grid; grid-template-columns:40px 1fr; align-items:baseline; padding:17px 0; }
+      .row + .row { border-top:1px solid rgba(243,249,250,.08); }
+      .row p { font-size:15.5px; line-height:1.85; color:var(--paper); }
+      .num { font-size:14px; color:rgba(203,238,246,.5); }
+      .num.deep { color:rgba(243,249,250,.36); }
+
+      /* 水线两侧各一条图例：这就是「匿名的边界」的图形表达 */
+      .cap { position:absolute; left:152px; font-size:11px; letter-spacing:.2em; }
+      .cap::before { content:''; position:absolute; left:-16px; top:6px; width:10px; height:1px; }
+      .cap.up { top:488px; color:rgba(203,238,246,.62); }
+      .cap.up::before { background:rgba(203,238,246,.5); }
+      .cap.dn { top:540px; color:rgba(169,199,207,.7); }
+      .cap.dn::before { background:rgba(243,249,250,.28); }
+
+      .who { margin-top:20px; display:flex; align-items:center; font-size:19px; font-weight:700; }
+      .tick { display:inline-block; width:2px; height:19px; background:var(--coral); margin-right:11px; }
+      .alt { margin-top:10px; display:flex; align-items:baseline; gap:12px; }
+      .alt .lbl { font-size:11px; letter-spacing:.2em; color:rgba(243,249,250,.42); }
+      .alt .v { font-size:12.5px; color:rgba(243,249,250,.42); }
+      .hr { margin-top:24px; height:1px; background:var(--line); }
+      .act { margin-top:18px; display:grid; grid-template-columns:auto 1fr; gap:22px; align-items:start; }
+      .act .note { font-size:12.5px; line-height:1.75; color:var(--muted); }
+      .btn { display:inline-block; padding:9px 17px; font-family:inherit; font-size:13px; color:var(--paper);
+        background:transparent; border:1px solid rgba(243,249,250,.26); border-radius:2px;
+        cursor:pointer; letter-spacing:.04em; white-space:nowrap; }
+
+      /* 水线以下：节奏收紧一档，整块刚好落在纸里 */
+      .l-wet .rows { margin-top:0; }
+      .l-wet .row { padding:12px 0; }
+      .l-wet h2.after { margin-top:24px; }
+      .l-wet .who { margin-top:14px; }
+      .l-wet .alt { margin-top:8px; }
+      .l-wet .hr { margin-top:18px; }
+      .l-wet .act { margin-top:14px; }
+
+      .body { margin-top:12px; font-size:13.5px; line-height:1.8; color:var(--muted); text-wrap:pretty; }
+      .r-dry .btn { margin-top:14px; }
+      .ver { margin-top:14px; display:flex; align-items:baseline; gap:14px; }
+      .ver .lbl { font-size:11px; letter-spacing:.2em; color:rgba(243,249,250,.5); }
+      .ver .v { font-size:18px; letter-spacing:.04em; }
+      .env { margin-top:14px; font-size:12.5px; line-height:1.75; color:var(--muted); text-wrap:pretty; }
+
+      /* 图版上的小注 */
+      .tiny { position:absolute; font-size:11px; letter-spacing:.16em; color:rgba(243,249,250,.5); }
+    </style>
+  </head>
+  <body>
+    <div class="clip">
+      <div class="platter"></div>
+      <div class="glint"></div>
+      <div class="air"></div>
+      <div class="sea"></div>
+      <div class="shaft"></div>
+      <div class="grooves-wet"></div>
+      <div class="surf"></div>
+
+      <div class="leaf">
+        <div class="leaf-dry"></div>
+        <div class="leaf-wet"></div>
+        <div class="tide"></div>
+        <div class="film"></div>
+        <div class="leaf-top"></div>
+        <div class="dogear"></div>
+        <div class="crease-shl"></div>
+        <div class="crease-shr"></div>
+        <div class="crease"></div>
+        <div class="crease-soak"></div>
+        <div class="wick mid"></div>
+        <div class="wick lf"></div>
+        <div class="wick rt"></div>
+        <div class="hole"><i></i></div>
+      </div>
+
+      <div class="wline">
+        <i style="left:148px;top:-1px;width:30px"></i>
+        <i style="left:402px;top:1px;width:14px"></i>
+        <i style="left:640px;top:-1px;width:44px"></i>
+        <i style="left:872px;top:1px;width:10px"></i>
+        <i style="left:1010px;top:-1px;width:24px"></i>
+        <i style="left:1300px;top:1px;width:18px"></i>
+      </div>
+
+      <div class="rip a"></div>
+      <div class="rip b"></div>
+      <div class="contact"></div>
+
+      <div class="glass bot-shoulder"></div>
+      <div class="glass bot-neck"></div>
+      <div class="glass bot-body"></div>
+      <div class="bot-lip"></div>
+      <div class="bot-cork"></div>
+      <div class="bot-l1"></div>
+      <div class="bot-l2"></div>
+      <div class="slip meta">代号</div>
+
+      <div class="wave">
+        <i style="left:0;height:10px"></i>
+        <i style="left:7px;height:22px"></i>
+        <i style="left:14px;height:38px"></i>
+        <i style="left:21px;height:16px"></i>
+        <i style="left:28px;height:30px"></i>
+        <i style="left:35px;height:12px"></i>
+        <i style="left:42px;height:6px"></i>
+      </div>
+
+      <div class="refl">
+        <div class="glass rb"></div>
+        <div class="glass rs"></div>
+        <div class="glass rn"></div>
+        <div class="rl"></div>
+        <div class="rc"></div>
+        <div class="rslip meta">账号</div>
+      </div>
+
+      <div class="wav" style="left:1150px;top:540px;width:160px"></div>
+      <div class="wav" style="left:1168px;top:566px;width:130px"></div>
+      <div class="wav" style="left:1156px;top:598px;width:150px"></div>
+
+      <div class="bub" style="left:1146px;top:636px;width:8px;height:8px"></div>
+      <div class="bub" style="left:1159px;top:603px;width:6px;height:6px"></div>
+      <div class="bub" style="left:1136px;top:670px;width:4px;height:4px"></div>
+    </div>
+
+    <main>
+      <section class="l-dry">
+        <p class="cat meta">内袋说明书 · INNER SLEEVE INSERT</p>
+        <h1>设置</h1>
+        <p class="standfirst">这一版只保留最小设置：看看匿名规则、退出登录、确认页面版本。</p>
+        <div class="rule"></div>
+        <h2 class="block">匿名的边界</h2>
+        <div class="rows">
+          <div class="row"><span class="num meta">一</span><p>每支瓶子一个独立代号（同一瓶里大家看到的是同一个）</p></div>
+          <div class="row"><span class="num meta">二</span><p>别人拿不到你的账号，只能看到代号与你的声音</p></div>
+        </div>
+      </section>
+
+      <p class="cap meta up">水面之上 · 别人看得到的</p>
+      <p class="cap meta dn">水面之下 · 只有你自己知道的</p>
+
+      <p class="tiny meta" style="left:1213px;top:238px">你的声音</p>
+      <p class="tiny meta" style="left:1182px;top:718px">倒影 · 账号与邮箱</p>
+
+      <section class="l-wet">
+        <div class="rows">
+          <div class="row"><span class="num deep meta">三</span><p>账号只用于认领你自己的漂流瓶与漂流日志。</p></div>
+        </div>
+        <h2 class="block after">当前身份</h2>
+        <p class="who"><i class="tick"></i>未登录</p>
+        <p class="alt"><span class="lbl meta">已登录态</span><span class="v meta">已登录：代号（邮箱）</span></p>
+        <div class="hr"></div>
+        <div class="act">
+          <button class="btn" type="button">登出</button>
+          <p class="note">登出只清掉这台设备上的会话，别人不会因此看到你的瓶子。</p>
+        </div>
+      </section>
+
+      <section class="r-dry">
+        <h2 class="block">伴奏与授权</h2>
+        <p class="body">曲库伴奏为 CC BY 4.0 授权（署名义务），点开查看完整署名与许可条款。</p>
+        <button class="btn" type="button">查看署名与许可</button>
+        <h2 class="block after">关于</h2>
+        <p class="ver"><span class="lbl meta">契约版本</span><span class="v mono">0.2.0-s1</span></p>
+        <p class="env">录音只在 https 或 localhost 下可用（浏览器策略）；局域网 IP 访问时录不了音不是页面故障。</p>
+      </section>
+    </main>
+  <script type="module" src="/app/page-settings.js"></script>
+  </body>
+</html>

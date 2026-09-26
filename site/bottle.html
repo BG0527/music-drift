@@ -1,0 +1,480 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=1440">
+    <title>P · 漂流瓶详情（瓶中四格 · 水位到第 3 段）</title>
+    <style>
+      @import url('/node_modules/.pnpm/lxgw-wenkai-webfont@1.7.0/node_modules/lxgw-wenkai-webfont/lxgwwenkai-regular.css');
+      @import url('/node_modules/.pnpm/lxgw-wenkai-webfont@1.7.0/node_modules/lxgw-wenkai-webfont/lxgwwenkai-bold.css');
+      @import url('/node_modules/.pnpm/@fontsource+quattrocento@5.3.0/node_modules/@fontsource/quattrocento/400.css');
+      @import url('/node_modules/.pnpm/@fontsource+quattrocento@5.3.0/node_modules/@fontsource/quattrocento/700.css');
+      :root {
+        --ink:#050f14; --paper:#f3f9fa; --muted:#a9c7cf; --glass:#7fd1d9;
+        --coral:#d4553a; --warm:#f6d79a; --line:rgba(243,249,250,.13);
+      }
+      * { box-sizing:border-box; margin:0; padding:0; }
+      html,body { width:1440px; height:900px; }
+      html { overflow:hidden; }
+      body { position:relative; overflow:hidden; background:var(--ink); color:var(--paper);
+        font-family:'LXGW WenKai',serif; -webkit-font-smoothing:antialiased; }
+      .mono { font-family:Quattrocento,serif; font-variant-numeric:tabular-nums; }
+      .meta { font-family:Quattrocento,'LXGW WenKai',serif; font-variant-numeric:tabular-nums; }
+      a, button { cursor:pointer; }
+      button { font-family:inherit; }
+
+      /* -- 环境：水（公共层图层按 §1.4 微调密度：这一页的地面是河，不是盘面） -- */
+      .clip { position:absolute; inset:0; overflow:hidden; }
+      .platter { position:absolute; inset:0;
+        background:
+          repeating-radial-gradient(circle at 1420px 960px, rgba(216,243,246,.02) 0 1.2px, rgba(216,243,246,0) 1.2px 15px),
+          radial-gradient(circle at 1420px 960px, rgba(127,209,217,.05) 0 30%, rgba(127,209,217,0) 68%); }
+      /* 水面之上：天光（标题区靠它撑亮度） */
+      .air { position:absolute; left:-40px; right:-40px; top:-60px; height:560px;
+        background:
+          radial-gradient(46% 62% at 16% 6%, rgba(203,238,246,.115), rgba(203,238,246,0) 70%),
+          radial-gradient(70% 50% at 78% 0%, rgba(127,209,217,.075), rgba(127,209,217,0) 72%); }
+      /* 水面之下：水色与深度 */
+      .deep { position:absolute; left:0; right:0; top:430px; bottom:0;
+        background:linear-gradient(180deg, rgba(127,209,217,.09) 0%, rgba(10,48,60,.34) 34%, rgba(5,15,20,.72) 100%); }
+      /* 水流线：河道在走 */
+      .current { position:absolute; left:0; right:0; top:430px; bottom:0;
+        background:
+          repeating-linear-gradient(180deg, rgba(216,243,246,.05) 0 1px, rgba(216,243,246,0) 1px 42px),
+          linear-gradient(94deg, rgba(228,247,252,0) 40%, rgba(228,247,252,.035) 52%, rgba(228,247,252,0) 62%); }
+      .glint { position:absolute; inset:0; mix-blend-mode:screen;
+        background:linear-gradient(101deg, rgba(228,247,252,0) 28%, rgba(228,247,252,.045) 45%, rgba(228,247,252,.065) 50%, rgba(228,247,252,.028) 55%, rgba(228,247,252,0) 72%); }
+      .scene { position:absolute; left:0; top:0; width:1440px; height:900px; }
+      main { position:absolute; inset:0; z-index:2; }
+
+      /* -- 顶栏 ----------------------------------------------- */
+      .crumb { position:absolute; left:76px; top:30px; height:26px; display:flex; align-items:center; gap:16px; }
+      .back { display:inline-flex; align-items:center; gap:7px; font-size:14px; color:var(--glass);
+        text-decoration:underline; text-underline-offset:4px; }
+      .back svg { width:15px; height:15px; }
+      .pill { font-size:12.5px; letter-spacing:.08em; color:var(--coral);
+        border:1px solid rgba(212,85,58,.55); border-radius:2px; padding:3px 10px 4px; }
+
+      h1 { position:absolute; left:76px; top:60px; font-size:56px; font-weight:700; line-height:1; }
+      .work { position:absolute; left:76px; top:126px; font-size:19px; font-weight:700; }
+      .metaRow { position:absolute; left:76px; top:156px; display:flex; gap:20px; font-size:14px; color:var(--muted); }
+      .note { position:absolute; left:76px; top:184px; width:800px; display:flex; gap:11px;
+        font-size:14.5px; line-height:1.6; color:var(--warm); }
+      .note i { flex:none; width:5px; height:5px; margin-top:8px; background:var(--coral); }
+
+      /* 发起者徽记：谁起的头 */
+      .maker { position:absolute; right:76px; top:62px; display:flex; align-items:center; gap:16px; }
+      .maker .k { font-size:11px; letter-spacing:.24em; color:rgba(243,249,250,.5); }
+      .maker .v { margin-top:6px; font-size:14.5px; }
+      .seal { flex:none; width:52px; height:52px; border-radius:50%; border:1px solid rgba(212,85,58,.62);
+        background:radial-gradient(76% 76% at 34% 26%, rgba(10,48,60,.5), rgba(3,17,23,.78));
+        display:grid; place-items:center; }
+      .seal i { width:40px; height:40px; border-radius:50%; border:1px solid rgba(243,249,250,.16);
+        display:grid; place-items:center; }
+      .seal i b { width:9px; height:9px; border-radius:50%; background:var(--coral); }
+
+      /* -- 瓶身剖面：四格段位刻度，改用水来说 -- */
+      .heroLab { position:absolute; left:76px; top:272px; font-size:11px; letter-spacing:.18em;
+        color:rgba(243,249,250,.5); }
+      .segNum { position:absolute; top:320px; width:231px; text-align:center; padding-left:.06em;
+        font-size:28px; color:rgba(243,249,250,.18); }
+      .segLab { position:absolute; top:356px; width:231px; text-align:center; padding-left:.24em;
+        font-size:11px; letter-spacing:.24em; color:rgba(243,249,250,.5); }
+      .segLab.gap { color:var(--warm); }
+      .segLab.sel { color:var(--coral); }
+      .segNum.gap { color:rgba(246,215,154,.26); }
+      /* 正在试听的那一段：水面上多一道珊瑚刻度 */
+      .selMark { position:absolute; left:623px; top:451px; width:60px; height:2px; background:var(--coral); }
+
+      .cap { position:absolute; top:458px; width:231px; text-align:center; }
+      .cap .code { font-size:14.5px; }
+      .cap .line { margin-top:6px; display:flex; justify-content:center; gap:13px; font-size:12.5px; color:var(--muted); }
+      .cap .listen { display:inline-block; margin-top:8px; font-size:13px; color:var(--glass);
+        text-decoration:underline; text-underline-offset:4px; }
+
+      /* 第 4 格：水没到的那一格，录制入口就长在这个空位上 */
+      .gapBox { position:absolute; left:779px; top:402px; width:211px; text-align:center; }
+      .gapSlot { width:110px; height:46px; margin:0 auto; border:1px dashed rgba(246,215,154,.5);
+        border-radius:23px; }
+      .gapKind { margin-top:10px; font-size:11px; letter-spacing:.24em; color:var(--warm); }
+      .gapHead { margin-top:7px; font-size:13.5px; }
+      .cta { margin-top:5px; display:inline-flex; align-items:center; gap:8px; height:44px; padding:0 17px;
+        border:0; border-radius:2px; background:var(--coral); color:var(--ink); font-size:15px; }
+      .cta svg { width:16px; height:16px; }
+      .gapNote { margin-top:4px; font-size:11px; line-height:1.5; color:var(--muted); }
+
+      /* 图注：水面与瓶塞 */
+      .callout { position:absolute; left:1116px; top:322px; font-size:11px; letter-spacing:.18em;
+        color:rgba(169,199,207,.8); }
+      .corkLab { position:absolute; right:14px; top:468px; font-size:11px; letter-spacing:.12em;
+        color:rgba(246,215,154,.8); }
+
+      /* -- 试听与投票 ---------------------------------------- */
+      .col h2 { font-size:17px; font-weight:700; display:flex; align-items:baseline; gap:16px; }
+      .col h2 span { font-size:13.5px; font-weight:400; color:var(--muted); }
+      .listenCol { position:absolute; left:76px; top:630px; width:614px; }
+      .destCol { position:absolute; left:720px; top:630px; width:644px; }
+      .destCol .sub { margin-top:6px; font-size:12.5px; color:var(--muted); }
+
+      .transport { margin-top:14px; display:flex; align-items:center; gap:16px; height:52px; }
+      /* 播放键降级成一枚小唱片：音乐载体，不再是母题 */
+      .play { flex:none; width:52px; height:52px; padding:0; border-radius:50%;
+        border:1px solid rgba(127,209,217,.42); background:rgba(5,15,20,0); display:grid; place-items:center; }
+      .play svg { width:34px; height:34px; }
+      /* 进度条 = 一条水道：听过的部分是灌进去的水 */
+      .bar { position:relative; flex:none; width:400px; height:20px;
+        border-top:1px solid rgba(243,249,250,.12); border-bottom:1px solid rgba(243,249,250,.12); }
+      .bar .fill { position:absolute; left:0; top:0; width:152px; height:18px; background:rgba(127,209,217,.16);
+        border-top:1px solid rgba(203,238,246,.5); }
+      .bar .head { position:absolute; left:150px; top:-6px; width:2px; height:32px; background:var(--coral); }
+      .bar svg { position:absolute; left:0; top:0; width:400px; height:20px; }
+
+      .votes { margin-top:14px; display:flex; align-items:center; gap:12px; }
+      .voteBtn { display:inline-flex; align-items:center; gap:8px; height:38px; padding:0 15px;
+        border:1px solid rgba(127,209,217,.42); border-radius:2px; background:rgba(5,15,20,0);
+        color:var(--paper); font-size:14px; }
+      .voteBtn svg { width:15px; height:15px; }
+      .voteBtn .n { font-size:13px; color:var(--muted); }
+      .votesNote { margin-top:10px; font-size:12.5px; color:var(--muted); }
+
+      /* 打捞者不接时的出口：把瓶子还给河道 */
+      .putBack { margin-top:14px; display:flex; align-items:center; gap:14px; }
+      .ghost { display:inline-flex; align-items:center; gap:8px; height:36px; padding:0 15px;
+        border:1px solid rgba(243,249,250,.2); border-radius:2px; background:rgba(5,15,20,0);
+        color:var(--paper); font-size:14px; }
+      .ghost svg { width:15px; height:15px; }
+      .putBack span { font-size:12.5px; color:var(--muted); }
+
+      /* -- 三选一去向：三条水路 ------------------------------- */
+      .destRow { display:flex; gap:16px; width:100%; height:46px; margin-top:9px; padding:0;
+        border:0; background:rgba(5,15,20,0); color:inherit; text-align:left; }
+      .destRow .glyph { flex:none; width:30px; height:30px; margin-top:6px; }
+      .destRow .glyph svg { width:30px; height:30px; }
+      .destRow .t { display:block; font-size:16px; font-weight:700; }
+      .destRow .d { display:block; margin-top:3px; font-size:12.5px; line-height:1.4; color:var(--muted); }
+
+      /* -- 底栏 ----------------------------------------------- */
+      .bottomRule { position:absolute; left:76px; top:852px; width:1288px; height:1px; background:rgba(243,249,250,.1); }
+      .bottom { position:absolute; left:76px; top:864px; width:1288px; display:flex; align-items:center;
+        gap:22px; font-size:13px; color:var(--muted); }
+      .bottom .r { margin-left:auto; display:flex; align-items:center; gap:26px; }
+      .botLink { display:inline-flex; align-items:center; gap:7px; color:var(--muted);
+        text-decoration:underline; text-underline-offset:4px; }
+      .botLink svg { width:14px; height:14px; }
+      .journey { color:var(--glass); text-decoration:underline; text-underline-offset:4px; }
+    </style>
+  </head>
+  <body>
+    <div class="clip">
+      <div class="platter"></div>
+      <div class="air"></div>
+      <div class="glint"></div>
+      <div class="deep"></div>
+      <div class="current"></div>
+    </div>
+
+    <!-- 瓶子：玻璃、里头的三卷声音、水位切在第 3 格、瓶塞被取下 -->
+    <svg class="scene" viewBox="0 0 1440 900" aria-hidden="true">
+      <defs>
+        <path id="bottleShape" d="M226 300 H1000 L1090 390 H1310 L1340 382 V518 L1310 510 H1090 L1000 600 H226 A150 150 0 0 1 226 300 Z" />
+        <clipPath id="cpBottle"><use href="#bottleShape" /></clipPath>
+        <linearGradient id="gGlass" x1="0" y1="300" x2="0" y2="600" gradientUnits="userSpaceOnUse">
+          <stop offset="0" stop-color="#cbeef6" stop-opacity=".075" />
+          <stop offset=".42" stop-color="#0a303c" stop-opacity=".20" />
+          <stop offset="1" stop-color="#031117" stop-opacity=".52" />
+        </linearGradient>
+        <linearGradient id="gWater" x1="0" y1="430" x2="0" y2="592" gradientUnits="userSpaceOnUse">
+          <stop offset="0" stop-color="#7fd1d9" stop-opacity=".22" />
+          <stop offset="1" stop-color="#7fd1d9" stop-opacity=".06" />
+        </linearGradient>
+        <linearGradient id="gPaper" x1="0" y1="402" x2="0" y2="448" gradientUnits="userSpaceOnUse">
+          <stop offset="0" stop-color="#f3f9fa" stop-opacity=".92" />
+          <stop offset=".55" stop-color="#dbeef2" stop-opacity=".8" />
+          <stop offset="1" stop-color="#a9c7cf" stop-opacity=".62" />
+        </linearGradient>
+        <linearGradient id="gCork" x1="0" y1="-12" x2="0" y2="12" gradientUnits="userSpaceOnUse">
+          <stop offset="0" stop-color="#f6d79a" stop-opacity=".5" />
+          <stop offset="1" stop-color="#8a6a34" stop-opacity=".62" />
+        </linearGradient>
+        <linearGradient id="gSheen" x1="0" y1="900" x2="1440" y2="0" gradientUnits="userSpaceOnUse">
+          <stop offset=".28" stop-color="#e4f7fc" stop-opacity="0" />
+          <stop offset=".47" stop-color="#e4f7fc" stop-opacity=".07" />
+          <stop offset=".52" stop-color="#e4f7fc" stop-opacity=".1" />
+          <stop offset=".68" stop-color="#e4f7fc" stop-opacity="0" />
+        </linearGradient>
+      </defs>
+
+      <!-- 河道水面：一条横贯全页的线，穿过玻璃，也在瓶里当水位 -->
+      <line x1="0" y1="430" x2="1440" y2="430" stroke="#eafcff" stroke-opacity=".08" stroke-width="4" />
+      <line x1="0" y1="430" x2="1440" y2="430" stroke="#eafcff" stroke-opacity=".3" />
+
+      <!-- 玻璃 -->
+      <use href="#bottleShape" fill="url(#gGlass)" stroke="#e4f7fc" stroke-opacity=".4" />
+
+      <g clip-path="url(#cpBottle)">
+        <!-- 水只到第 3 格，第 4 格是干着的 -->
+        <path d="M60 430 H769 Q840 468 862 592 H60 Z" fill="url(#gWater)" />
+        <rect x="60" y="430" width="709" height="24" fill="#cbeef6" fill-opacity=".05" />
+        <!-- 水面在玻璃上打出的折光 -->
+        <rect x="90" y="406" width="820" height="6" fill="#cbeef6" fill-opacity=".045" />
+        <rect x="150" y="420" width="700" height="4" fill="#cbeef6" fill-opacity=".03" />
+        <path d="M769 430 Q840 468 862 592" fill="none" stroke="#eafcff" stroke-opacity=".5" stroke-width="1.2" />
+        <line x1="60" y1="430" x2="769" y2="430" stroke="#eafcff" stroke-opacity=".4" />
+        <line x1="307" y1="308" x2="307" y2="592" stroke="#f3f9fa" stroke-opacity=".13" />
+        <line x1="538" y1="308" x2="538" y2="592" stroke="#f3f9fa" stroke-opacity=".13" />
+        <!-- 水里更深的折光与气泡 -->
+        <path d="M110 552 q40 -7 80 0 t80 0 t80 0 t80 0 t80 0 t80 0 t80 0" fill="none" stroke="#eafcff" stroke-opacity=".09" />
+        <path d="M200 578 q40 -6 80 0 t80 0 t80 0 t80 0 t80 0" fill="none" stroke="#eafcff" stroke-opacity=".06" />
+        <circle cx="140" cy="536" r="2.5" fill="none" stroke="#eafcff" stroke-opacity=".3" />
+        <circle cx="252" cy="512" r="2" fill="none" stroke="#eafcff" stroke-opacity=".24" />
+        <circle cx="430" cy="566" r="3" fill="none" stroke="#eafcff" stroke-opacity=".26" />
+        <circle cx="640" cy="542" r="2" fill="none" stroke="#eafcff" stroke-opacity=".24" />
+        <!-- 玻璃上的掠光 -->
+        <path d="M0 0 H1440 V900 H0 Z" fill="url(#gSheen)" />
+      </g>
+
+      <!-- 瓶壁厚度与瓶底：让它读起来是玻璃瓶，不是一条管子 -->
+      <g fill="none" stroke="#e4f7fc" stroke-opacity=".13">
+        <path d="M239 310 H995 L1085 398 H1300" />
+        <path d="M239 590 H995 L1085 502 H1300" />
+      </g>
+      <path d="M226 309 A141 141 0 0 0 226 591" fill="none" stroke="#eafcff" stroke-opacity=".2" stroke-width="2" />
+      <!-- 瓶颈的箍与瓶口的口沿：有这两道，它才是个瓶子 -->
+      <rect x="1088" y="390" width="9" height="120" fill="#e4f7fc" fill-opacity=".06" />
+      <line x1="1092" y1="390" x2="1092" y2="510" stroke="#e4f7fc" stroke-opacity=".3" />
+      <rect x="1310" y="382" width="30" height="136" fill="#e4f7fc" fill-opacity=".05" />
+      <line x1="1312" y1="382" x2="1312" y2="518" stroke="#e4f7fc" stroke-opacity=".26" />
+      <line x1="1338" y1="382" x2="1338" y2="518" stroke="#e4f7fc" stroke-opacity=".26" />
+      <!-- 水面被瓶身破开的两圈涟漪 -->
+      <path d="M60 432 A16 16 0 0 0 60 428" fill="none" stroke="#eafcff" stroke-opacity=".3" />
+      <path d="M40 434 A28 28 0 0 0 40 426" fill="none" stroke="#eafcff" stroke-opacity=".18" />
+      <!-- 四格刻度：挂在瓶壁内侧的短刻线 -->
+      <g stroke="#e4f7fc" stroke-opacity=".18">
+        <line x1="307" y1="312" x2="307" y2="328" />
+        <line x1="538" y1="312" x2="538" y2="328" />
+        <line x1="769" y1="312" x2="769" y2="328" />
+      </g>
+
+      <!-- 三卷声音：浮在水位上（半沉半露） -->
+      <g>
+        <rect x="136" y="402" width="110" height="46" rx="23" fill="url(#gPaper)" stroke="#f3f9fa" stroke-opacity=".5" />
+        <path d="M158 404 A21 21 0 0 0 158 446" fill="none" stroke="#050f14" stroke-opacity=".34" />
+        <path d="M146 407 A18 18 0 0 0 146 443" fill="none" stroke="#050f14" stroke-opacity=".2" />
+        <circle cx="158" cy="425" r="4" fill="none" stroke="#050f14" stroke-opacity=".34" />
+      </g>
+      <g>
+        <rect x="367" y="402" width="110" height="46" rx="23" fill="url(#gPaper)" stroke="#f3f9fa" stroke-opacity=".5" />
+        <path d="M389 404 A21 21 0 0 0 389 446" fill="none" stroke="#050f14" stroke-opacity=".34" />
+        <path d="M377 407 A18 18 0 0 0 377 443" fill="none" stroke="#050f14" stroke-opacity=".2" />
+        <circle cx="389" cy="425" r="4" fill="none" stroke="#050f14" stroke-opacity=".34" />
+      </g>
+      <g>
+        <rect x="598" y="402" width="110" height="46" rx="23" fill="url(#gPaper)" stroke="#f3f9fa" stroke-opacity=".5" />
+        <path d="M620 404 A21 21 0 0 0 620 446" fill="none" stroke="#050f14" stroke-opacity=".34" />
+        <path d="M608 407 A18 18 0 0 0 608 443" fill="none" stroke="#050f14" stroke-opacity=".2" />
+        <circle cx="620" cy="425" r="4" fill="none" stroke="#050f14" stroke-opacity=".34" />
+      </g>
+
+      <!-- 瓶塞被取下：塞子在谁手里，瓶子就在谁手里 -->
+      <g transform="translate(1392 428) rotate(-14)">
+        <rect x="-28" y="-12" width="56" height="24" rx="12" fill="url(#gCork)" stroke="#f6d79a" stroke-opacity=".5" />
+        <line x1="-9" y1="-10" x2="-9" y2="10" stroke="#050f14" stroke-opacity=".2" />
+        <line x1="9" y1="-10" x2="9" y2="10" stroke="#050f14" stroke-opacity=".2" />
+      </g>
+
+      <!-- 水面引线 -->
+      <line x1="1120" y1="336" x2="1120" y2="430" stroke="#a9c7cf" stroke-opacity=".34" />
+
+      <!-- 水里的气泡 -->
+      <circle cx="133" cy="692" r="3" fill="none" stroke="#eafcff" stroke-opacity=".3" />
+      <circle cx="203" cy="762" r="2" fill="none" stroke="#eafcff" stroke-opacity=".26" />
+      <circle cx="306" cy="655" r="2.5" fill="none" stroke="#eafcff" stroke-opacity=".28" />
+      <circle cx="1180" cy="618" r="2" fill="none" stroke="#eafcff" stroke-opacity=".24" />
+      <circle cx="1332" cy="700" r="3" fill="none" stroke="#eafcff" stroke-opacity=".22" />
+      <circle cx="430" cy="842" r="2" fill="none" stroke="#eafcff" stroke-opacity=".22" />
+      <!-- 水下更远的水流：河道在走 -->
+      <line x1="0" y1="700" x2="1440" y2="700" stroke="#eafcff" stroke-opacity=".05" />
+      <line x1="0" y1="820" x2="1440" y2="820" stroke="#eafcff" stroke-opacity=".04" />
+      <path d="M-20 648 q 240 -14 480 0 t 480 0 t 480 0" fill="none" stroke="#eafcff" stroke-opacity=".06" />
+      <path d="M-20 742 q 300 -12 600 0 t 600 0" fill="none" stroke="#eafcff" stroke-opacity=".045" />
+    </svg>
+
+    <main>
+      <nav class="crumb">
+        <a class="back" href="#">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6" /></svg>
+          回河道
+        </a>
+        <span class="pill">有人持有</span>
+      </nav>
+
+      <h1>漂流瓶详情</h1>
+      <p class="work">占位曲目</p>
+      <p class="metaRow">
+        <span>已录 3 / 4 段</span>
+        <span>作品还不完整：缺第 4 段</span>
+      </p>
+      <p class="note"><i></i><span>缺口是歌里固定的段位，不会被别人的段顶替。成品里这段时间会留成静音。</span></p>
+
+      <div class="maker">
+        <div class="seal" role="img" aria-label="发起者徽记"><i><b></b></i></div>
+        <div>
+          <div class="k meta">发起者</div>
+          <div class="v meta">匿名歌手#042</div>
+        </div>
+      </div>
+
+      <p class="heroLab meta">瓶身剖面 · 水只到第 3 段</p>
+
+      <!-- 第 1 格 -->
+      <div class="segNum mono" style="left:76px">1</div>
+      <div class="segLab meta" style="left:76px">第 1 段</div>
+      <div class="cap" style="left:76px">
+        <p class="code meta">匿名歌手#042</p>
+        <p class="line mono"><span>0:38</span><span>赞 14</span><span>踩 1</span></p>
+        <a class="listen" href="#">听</a>
+      </div>
+
+      <!-- 第 2 格 -->
+      <div class="segNum mono" style="left:307px">2</div>
+      <div class="segLab meta" style="left:307px">第 2 段</div>
+      <div class="cap" style="left:307px">
+        <p class="code meta">匿名歌手#097</p>
+        <p class="line mono"><span>0:44</span><span>赞 9</span><span>踩 0</span></p>
+        <a class="listen" href="#">听</a>
+      </div>
+
+      <!-- 第 3 格（正在试听） -->
+      <div class="segNum mono" style="left:538px">3</div>
+      <div class="segLab meta sel" style="left:538px">第 3 段</div>
+      <div class="selMark" aria-hidden="true"></div>
+      <div class="cap" style="left:538px">
+        <p class="code meta">匿名歌手#118</p>
+        <p class="line mono"><span>0:42</span><span>赞 8</span><span>踩 1</span></p>
+        <a class="listen" href="#">听</a>
+      </div>
+
+      <!-- 第 4 格：水没到的那一格，录制入口就长在这个空位上 -->
+      <div class="segNum mono gap" style="left:769px">4</div>
+      <div class="segLab meta gap" style="left:769px">第 4 段</div>
+      <div class="gapBox">
+        <div class="gapSlot" aria-hidden="true"></div>
+        <p class="gapKind meta">缺口</p>
+        <p class="gapHead">第 4 段由你开第一句</p>
+        <button class="cta" type="button">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z" /><path d="M19 10v1a7 7 0 0 1-14 0v-1" /><line x1="12" y1="19" x2="12" y2="22" /></svg>
+          录第 4 段
+        </button>
+        <p class="gapNote">这一段按该段的固定时长录，录完再选去向。不点开就不会占用你的麦克风。</p>
+      </div>
+
+      <p class="callout meta">河道水面</p>
+      <p class="corkLab meta">瓶塞 · 有人持有</p>
+
+      <!-- -- 试听与投票 ---------------------------------------- -->
+      <div class="listenCol col">
+        <h2>试听与投票<span>第 3 段　匿名歌手#118　在瓶身上点「听」换段</span></h2>
+        <div class="transport">
+          <button class="play" type="button" aria-label="播放第 3 段">
+            <svg viewBox="0 0 34 34" fill="none" aria-hidden="true">
+              <circle cx="17" cy="17" r="16" stroke="#cbeef6" stroke-opacity=".45" />
+              <circle cx="17" cy="17" r="11.5" stroke="#cbeef6" stroke-opacity=".2" />
+              <path d="M14 12l9 5-9 5z" fill="#d4553a" />
+            </svg>
+          </button>
+          <div class="bar" role="img" aria-label="第 3 段播放进度 0:16 / 0:42">
+            <svg viewBox="0 0 400 20" fill="none" aria-hidden="true">
+              <path d="M0 11 q14 -7 28 0 t28 0 t28 0 t28 0 t28 0 t28 0 t28 0 t28 0 t28 0 t28 0 t28 0 t28 0 t28 0 t28 0" stroke="#cbeef6" stroke-opacity=".18" />
+            </svg>
+            <div class="fill"></div>
+            <div class="head"></div>
+          </div>
+          <span class="timecode mono">0:16 / 0:42</span>
+        </div>
+        <div class="votes">
+          <button class="voteBtn" type="button">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 10v12" /><path d="M15 5.88 14 10h5.83a2 2 0 0 1 1.92 2.56l-2.33 8A2 2 0 0 1 17.5 22H4a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2h2.76a2 2 0 0 0 1.79-1.11L12 2a3.13 3.13 0 0 1 3 3.88Z" /></svg>
+            赞<span class="n mono">8</span>
+          </button>
+          <button class="voteBtn" type="button">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17 14V2" /><path d="M9 18.12 10 14H4.17a2 2 0 0 1-1.92-2.56l2.33-8A2 2 0 0 1 6.5 2H20a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-2.76a2 2 0 0 0-1.79 1.11L12 22a3.13 3.13 0 0 1-3-3.88Z" /></svg>
+            踩<span class="n mono">1</span>
+          </button>
+        </div>
+        <p class="votesNote">还没有听满这一段，继续听一会儿再点踩吧。</p>
+        <div class="putBack">
+          <button class="ghost" type="button">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7L3 8" /><path d="M3 3v5h5" /></svg>
+            放回海中，继续漂流
+          </button>
+          <span>还没想好要不要唱？放回去不会记录任何东西。</span>
+        </div>
+      </div>
+
+      <!-- -- 三选一去向：三条水路 ------------------------------- -->
+      <div class="destCol col">
+        <h2>选择去向</h2>
+        <p class="sub">接下来决定它去哪。发起者的第一棒没有「回传」，可选去向由服务端给。</p>
+
+        <button class="destRow" type="button">
+          <span class="glyph" aria-hidden="true">
+            <svg viewBox="0 0 30 30" fill="none" stroke="#7fd1d9" stroke-opacity=".8" stroke-width="1.5" stroke-linecap="round">
+              <path d="M2 8c1 .9 2 1.6 3.6 1.6 3.4 0 3.4-2.6 6.8-2.6 3.5 0 3.3 2.6 6.8 2.6 1.7 0 2.6-.7 3.6-1.6" />
+              <path d="M2 15c1 .9 2 1.6 3.6 1.6 3.4 0 3.4-2.6 6.8-2.6 3.5 0 3.3 2.6 6.8 2.6 1.7 0 2.6-.7 3.6-1.6" />
+              <path d="M2 22c1 .9 2 1.6 3.6 1.6 3.4 0 3.4-2.6 6.8-2.6 3.5 0 3.3 2.6 6.8 2.6 1.7 0 2.6-.7 3.6-1.6" />
+            </svg>
+          </span>
+          <span class="txt">
+            <span class="t">继续投河</span>
+            <span class="d">把当前版本重新投进河道，交给下一位陌生人接下一棒。</span>
+          </span>
+        </button>
+
+        <button class="destRow" type="button">
+          <span class="glyph" aria-hidden="true">
+            <svg viewBox="0 0 30 30" fill="none" stroke="#7fd1d9" stroke-opacity=".8" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M4 15a11 11 0 1 0 3.6-8.2L4 10" />
+              <path d="M3 4v6h6" />
+            </svg>
+          </span>
+          <span class="txt">
+            <span class="t">回传</span>
+            <span class="d">沿父链把当前版本交回投给你的那个人，由他决定下一步。</span>
+          </span>
+        </button>
+
+        <button class="destRow" type="button">
+          <span class="glyph" aria-hidden="true">
+            <svg viewBox="0 0 30 30" fill="none" stroke="#7fd1d9" stroke-opacity=".8" stroke-width="1.5" stroke-linecap="round">
+              <path d="M2 15h11" />
+              <path d="M13 15 27 7" />
+              <path d="M13 15h14" />
+              <path d="M13 15l14 8" />
+            </svg>
+          </span>
+          <span class="txt">
+            <span class="t">入海</span>
+            <span class="d">把当下的版本送进公海，成为所有人都能听到的公共作品。</span>
+          </span>
+        </button>
+      </div>
+
+      <div class="bottomRule"></div>
+      <div class="bottom">
+        <a class="journey" href="#">看这只瓶子的漂流日志</a>
+        <span>捞取 / 录音 / 投河 / 回传 / 入海 全部记在服务端。</span>
+        <span class="r">
+          <a class="botLink" href="#">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" /></svg>
+            私密留言
+          </a>
+          <a class="botLink" href="#">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z" /><line x1="4" y1="22" x2="4" y2="15" /></svg>
+            举报（进人工队列，不是自动删除）
+          </a>
+        </span>
+      </div>
+    </main>
+  <script type="module" src="/app/page-bottle.js"></script>
+  </body>
+</html>
