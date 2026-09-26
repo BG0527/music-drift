@@ -14,22 +14,82 @@
       body { position:relative; overflow:hidden; background:var(--ink); color:var(--paper);
         font-family:'LXGW WenKai',serif; -webkit-font-smoothing:antialiased; }
 
-      /* 沟槽：**密度就是唱片的身份证**。44px 一条的稀环会被读成"行星轨道"；
-         真实唱片的沟槽是极密纹理，这里压到 5.5px（再叠一层 17px 让它有疏密），于是从"几十条线"变成"一张表面"。 */
-      .grooves { position:absolute; inset:0;
+      /* ══ 唱片表面层 ══
+         圆心 (1420,960) 在画布外右下；可见半径带 = 60–1714px。
+         旧版读成"行星轨道"的根因不是线太少，而是**线能被数清**（26px 一条、alpha .09）
+         —— 可数的同心亮线 ＋ 散落的白色星点 ＋ 圆心外的椭圆族 = 太阳系。
+         于是这一版把"表面"拆成五层：台面 / 盘身 / 录音区 / 外圈沟槽 / 掠光，全部按半径分段遮罩。
+         全文只有**两个沟距**：11px（贴着标签的那圈）与 4.4px（外圈），中间夹一条无沟的 land。 */
+
+      /* 半径是这页唯一的自由度：圆心出画，外圈（r 1700）的浅弧在局部只是平行线，
+         无论多密都只能读成"拉丝"；只有 r 400–790 那一圈曲率大到能自己说出"同心"。
+         所以沟槽按半径分档，而不是整体加密 —— 旧版把整片加密到 26px，加密的是数量，
+         不是"唱片感"；这一版把密度放进**读得懂的那一圈**，别处让它安静。 */
+
+      /* 台面：画布之外那圈原来只是"虚空"，于是唱片像悬在太空里 ——
+         一张黑胶最难被认成行星的时刻，是它**躺在一张桌子上**。
+         台面只抬 2.2%（比盘面低一档的哑光），靠一圈贴着外缘的接触阴影把两者分开。
+         这一层同时干掉了"行星"的最后一个条件：行星周围是黑的，唱片周围是东西。 */
+      .platter { position:absolute; inset:0;
         background:
-          /* 档位：3.5px 线 × 26px 周期（约 39 环） */
-          repeating-radial-gradient(circle at 1420px 960px,
-            rgba(216,243,246,.09) 0 3.5px, transparent 3.5px 26px),
-          repeating-radial-gradient(circle at 1420px 960px,
-            rgba(207,233,238,.028) 0 16px, transparent 16px 60px),
-          radial-gradient(circle at 1420px 960px, rgba(127,209,217,.06) 0 26%, transparent 62%);
-      }
-      /* 黑胶最认得出来的一处：表面被灯扫过的那道反光 */
-      .glint { position:absolute; inset:0; mix-blend-mode:screen;
-        background:linear-gradient(104deg, transparent 24%, rgba(207,233,238,.07) 39%,
-          rgba(240,252,254,.11) 47%, rgba(207,233,238,.05) 55%, transparent 70%);
-      }
+          radial-gradient(circle at 1420px 960px,
+            rgba(2,9,13,0) 0 1276px, rgba(2,9,13,.52) 1285px, rgba(2,9,13,0) 1366px),
+          rgba(127,209,217,.022); }
+
+      /* 盘身：极淡的玻璃色抬升，让盘面比台面亮一档 —— 物件需要体积 */
+      .body { position:absolute; inset:0;
+        background:radial-gradient(circle at 1420px 960px,
+          rgba(127,209,217,.055) 0 1210px, rgba(127,209,217,0) 1330px); }
+
+      /* 沟槽：一张表面，不是一叠环。4.4px 周期在 2x 下落成 ~8.8px 的连续纹理，
+         对比度低到单条线读不出来，只剩整体的丝光。
+         外圈按半径遮罩（唱片有边），内层再按左上角做一次衰减 —— 那是字所在的角，
+         表面在那里安静下来，字这才有底。
+         半径只取 930–1258：950 以内的部分交给 .center（见下）。 */
+      .field { position:absolute; inset:0;
+        -webkit-mask-image:radial-gradient(circle at 1420px 960px,
+          transparent 0 930px, #fff 990px, #fff 1258px, transparent 1300px);
+        mask-image:radial-gradient(circle at 1420px 960px,
+          transparent 0 930px, #fff 990px, #fff 1258px, transparent 1300px);
+        -webkit-mask-repeat:no-repeat; mask-repeat:no-repeat; }
+      .field i { position:absolute; inset:0;
+        background:repeating-radial-gradient(circle at 1420px 960px,
+          rgba(214,241,247,.03) 0 1px, rgba(214,241,247,0) 1px 4.4px);
+        -webkit-mask-image:radial-gradient(circle at 0 0, transparent 0 340px, #fff 820px);
+        mask-image:radial-gradient(circle at 0 0, transparent 0 340px, #fff 820px);
+        -webkit-mask-repeat:no-repeat; mask-repeat:no-repeat; }
+
+      /* 录音区：**只有它一圈能真读出"同心"**。
+         半径 1700 的浅弧在局部就是一组平行线，读者只会读成"拉丝"；只有在贴着标签的那一圈，
+         曲率才大到自己会说话。所以把**较粗的沟距（11px）**放在 340–790：
+         35 条沟绕着珊瑚标签转 —— 这是全画面唯一一处让"沟槽"字面成立的几何。
+         再往外 830–930 留一条**没有沟的跑道（land）**，那条被点亮的水槽（r=900）正好落在里面。 */
+      .center { position:absolute; inset:0;
+        background:repeating-radial-gradient(circle at 1420px 960px,
+          rgba(216,243,246,.07) 0 1.25px, rgba(216,243,246,0) 1.25px 11px);
+        -webkit-mask-image:radial-gradient(circle at 1420px 960px,
+          transparent 0 340px, #fff 400px, #fff 790px, transparent 880px);
+        mask-image:radial-gradient(circle at 1420px 960px,
+          transparent 0 340px, #fff 400px, #fff 790px, transparent 880px);
+        -webkit-mask-repeat:no-repeat; mask-repeat:no-repeat; }
+
+      /* 光：只剩**一道**宽的镜面反光带 + 一道掠光。
+         第二轮留了两道宽亮环，结果画面变成"带环行星"；盘面被慢慢渐变洗过 = 球体，不是唱片。
+         唱片是**平的**：亮度靠几何（标签 / 留白带 / 外缘）说，不靠柔光。
+         第五轮把这道带子做全柔了，于是盘面读成哑光；黑胶的材质来自**反射有硬边**——
+         所以 53%–55% 之间给一个陡降：那是灯管的像被盘面切断的那一刀，哑光是不会有这条边的。 */
+      .light { position:absolute; inset:0; mix-blend-mode:screen;
+        background:
+          radial-gradient(circle at 1420px 960px,
+            rgba(210,240,246,0) 980px, rgba(210,240,246,.034) 1060px, rgba(210,240,246,0) 1140px),
+          linear-gradient(101deg,
+            rgba(206,238,245,0) 26%, rgba(206,238,245,.03) 40%, rgba(228,247,252,.058) 50%,
+            rgba(206,238,245,.05) 53%, rgba(206,238,245,.012) 55%,
+            rgba(206,238,245,.006) 62%, rgba(206,238,245,0) 74%);
+        -webkit-mask-image:radial-gradient(circle at 1420px 960px, #fff 0 1258px, transparent 1300px);
+        mask-image:radial-gradient(circle at 1420px 960px, #fff 0 1258px, transparent 1300px);
+        -webkit-mask-repeat:no-repeat; mask-repeat:no-repeat; }
+
       svg.canvas { position:absolute; inset:0; width:1440px; height:900px; }
       .ov { position:absolute; }
       h1 { font-size:84px; font-weight:700; line-height:1; }
@@ -64,28 +124,50 @@
     </style>
   </head>
   <body>
-    <div class="grooves"></div>
-    <div class="glint"></div>
+    <div class="platter"></div>
+    <div class="body"></div>
+    <div class="center"></div>
+    <div class="field"><i></i></div>
+    <div class="light"></div>
     <svg class="canvas" viewBox="0 0 1440 900">
       <defs>
-        <radialGradient id="sheen" cx=".99" cy="1" r="1">
-          <stop offset="0" stop-color="#7fd1d9" stop-opacity=".1" />
+        <radialGradient id="sheen" cx=".99" cy="1" r=".42">
+          <stop offset="0" stop-color="#7fd1d9" stop-opacity=".06" />
           <stop offset=".4" stop-color="#7fd1d9" stop-opacity="0" />
         </radialGradient>
+        <!-- 标签盘改成**平的**：原来是一团 radial 光晕，在暗场里读成"大气层"，
+             而唱片中心那圈东西之所以一眼是唱片，正因为它是**纸**——平的、有硬边。
+             平铺 alpha .19 + 硬边珊瑚圈 + 圈外一道纸白 = 标签；不填渐变。 -->
         <radialGradient id="label" cx=".5" cy=".5" r=".5">
-          <stop offset=".62" stop-color="#c7452c" stop-opacity=".2" />
+          <stop offset="0" stop-color="#c7452c" stop-opacity=".19" />
+          <stop offset=".97" stop-color="#c7452c" stop-opacity=".19" />
           <stop offset="1" stop-color="#c7452c" stop-opacity="0" />
         </radialGradient>
+        <!-- 外缘的倒角只在**下面**吃到光（光从右上斜掠），所以上半段自然隐去，
+             它由此不再横穿左上角的标题区 —— 一条穿过正文的边线是这一版最想修掉的旧疾。 -->
+        <linearGradient id="rim" gradientUnits="userSpaceOnUse" x1="0" y1="800" x2="0" y2="330">
+          <stop offset="0" stop-color="#e6f8fb" stop-opacity=".5" />
+          <stop offset=".5" stop-color="#e6f8fb" stop-opacity=".17" />
+          <stop offset="1" stop-color="#e6f8fb" stop-opacity="0" />
+        </linearGradient>
       </defs>
 
       <rect width="1440" height="900" fill="url(#sheen)" />
-      <circle cx="1420" cy="960" r="300" fill="url(#label)" />
+      <circle cx="1420" cy="960" r="268" fill="url(#label)" />
 
-      <!-- 唱片中心（在画布外）：只留一条实的圆心环 + 主轴孔的一点暗示 -->
-      <circle cx="1420" cy="960" r="262" fill="none" stroke="rgba(199,69,44,.35)" stroke-width="1.6" />
+      <!-- 唱片中心（在画布外）：标签盘的两条边 —— 珊瑚的内圈 + 一圈纸白的外沿。
+           这是全画面成本最低、辨识度最高的一处"这是唱片"：标签 + 标签外的平滑留白（run-out）。 -->
+      <circle cx="1420" cy="960" r="262" fill="none" stroke="rgba(199,69,44,.52)" stroke-width="1.6" />
+      <circle cx="1420" cy="960" r="275" fill="none" stroke="rgba(243,249,250,.2)" stroke-width="1" />
+      <!-- 录音区的外边界（lead-out）：262–336 之间是一段**没有沟槽的平滑留白**，
+            两边各一条硬边。两条硬边夹一条平滑带 = 唱针停靠的那圈，唱片最难被误读的一处。 -->
+      <circle cx="1420" cy="960" r="336" fill="none" stroke="rgba(214,241,247,.13)" stroke-width="1" />
 
-      <!-- 只留**一条外缘**：唱片只有一个边界，其余全是沟槽纹理（再多几圈就变回行星轨道） -->
-      <circle cx="1420" cy="960" r="1276" fill="none" stroke="rgba(207,233,238,.2)" stroke-width="2" />
+      <!-- 只留**一条外缘**：唱片只有一个边界。旧版这条线是均匀的，于是它同时穿过了标题；
+           现在它按 y 渐隐，成为一条"只有下半圈被灯照到"的盘边。
+           旁边 14px 内再补一条更暗的细线 = 车出来的边唇（倒角），一条线是画上去的，两条才是做出来的。 -->
+      <circle cx="1420" cy="960" r="1276" fill="none" stroke="url(#rim)" stroke-width="2" />
+      <circle cx="1420" cy="960" r="1268" fill="none" stroke="rgba(214,241,247,.14)" stroke-width="1" />
 
       <!-- ── 河道 = 那条被点亮的沟槽：它不是一条线，而是一条**有宽度的水槽**（两条岸 + 中间的水） ── -->
       <circle cx="1420" cy="960" r="900" fill="none" stroke="rgba(42,157,177,.2)" stroke-width="26" />
@@ -98,14 +180,23 @@
       <circle cx="1420" cy="960" r="906" fill="none" stroke="rgba(243,249,250,.2)" stroke-width="1.6"
         stroke-dasharray="10 40" stroke-linecap="round" />
 
-      <!-- 灰尘与划痕：让这张唱片"被用过" -->
-      <g fill="#eafcff">
-        <circle cx="300" cy="640" r="1.6" opacity=".35" /><circle cx="520" cy="330" r="1.3" opacity=".3" />
-        <circle cx="980" cy="540" r="1.5" opacity=".3" /><circle cx="1240" cy="760" r="1.7" opacity=".32" />
-        <circle cx="180" cy="300" r="1.2" opacity=".26" /><circle cx="760" cy="820" r="1.4" opacity=".28" />
+      <!-- ── 尘埃：旧版是 20 颗散落的白点，那是**星空**（暗场 + 环 + 星点 = 行星轨道）。
+           唱片表面的"脏"不是星，是唱针刮出来的**顺槽擦痕** —— 沿沟槽方向的短弧。
+           所以星点全删，换成 4 道等圆心角、长短不一的擦痕弧；另留 4 颗极暗的尘点，聚成一撮（不散落就成不了星图）。 -->
+      <g fill="none" stroke="#e6f7fb" stroke-linecap="butt">
+        <circle cx="1420" cy="960" r="1180" stroke-opacity=".17" stroke-width="1.1"
+          stroke-dasharray="126 9999" stroke-dashoffset="-4120" />
+        <circle cx="1420" cy="960" r="1214" stroke-opacity=".12" stroke-width="1"
+          stroke-dasharray="92 9999" stroke-dashoffset="-4460" />
+        <circle cx="1420" cy="960" r="1128" stroke-opacity=".14" stroke-width="1.2"
+          stroke-dasharray="158 9999" stroke-dashoffset="-3700" />
+        <circle cx="1420" cy="960" r="1246" stroke-opacity=".1" stroke-width="1"
+          stroke-dasharray="70 9999" stroke-dashoffset="-4830" />
       </g>
-      <path d="M420 120 l 90 60" stroke="rgba(243,249,250,.08)" stroke-width="1" />
-      <path d="M1040 700 l 70 40" stroke="rgba(243,249,250,.07)" stroke-width="1" />
+      <g fill="#eafcff">
+        <circle cx="556" cy="700" r="1.5" opacity=".26" /><circle cx="578" cy="712" r="1.1" opacity=".2" />
+        <circle cx="540" cy="716" r="1.2" opacity=".22" /><circle cx="592" cy="698" r="1" opacity=".16" />
+      </g>
 
       <!-- 转向：唱片只往一个方向转 —— 河道也只有一条（这就是"单支路"在唱片上的说法） -->
       <g opacity=".8">
@@ -116,55 +207,11 @@
       </g>
 
       <!-- 唱臂已删：它在右上角读成了一枚火箭，而这里是一张**唱片**（用户裁决） -->
-    
-      <!-- ── 细节层 2（**删掉这个 g 就回到上一版**）——
-           从 g3 借来的四种"感觉"，按唱片主题翻译：尘屑 / 摩尔纹 / 远处尘屑群 / 沟槽调制 -->
-      <g id="detail2">
-        <!-- 灯下的同心反光：**宽而柔**（16–34px + 模糊）才像唱片；细而硬就又变回行星轨道 -->
-        <filter id="fSheen"><feGaussianBlur stdDeviation="11" /></filter>
-        <g filter="url(#fSheen)">
-          <circle cx="1420" cy="960" r="1150" fill="none" stroke="rgba(207,233,238,.075)" stroke-width="30" />
-          <circle cx="1420" cy="960" r="1010" fill="none" stroke="rgba(240,252,254,.06)" stroke-width="18" />
-          <circle cx="1420" cy="960" r="800" fill="none" stroke="rgba(207,233,238,.055)" stroke-width="38" />
-        </g>
-        <!-- 悬浮在光里的尘屑（g3 的"泡泡" → 唱片表面被灯照到的微尘） -->
-        <g fill="#eafcff">
-          <circle cx="240" cy="180" r="2.4" opacity=".48" /><circle cx="318" cy="244" r="1.6" opacity=".34" />
-          <circle cx="186" cy="332" r="2" opacity=".4" /><circle cx="420" cy="150" r="1.4" opacity=".28" />
-          <circle cx="560" cy="252" r="2.2" opacity=".42" /><circle cx="662" cy="178" r="1.5" opacity=".3" />
-          <circle cx="880" cy="430" r="2.6" opacity=".44" /><circle cx="1012" cy="360" r="1.7" opacity=".32" />
-          <circle cx="1160" cy="470" r="2.1" opacity=".38" /><circle cx="1320" cy="420" r="1.5" opacity=".28" />
-          <circle cx="760" cy="560" r="2.3" opacity=".4" /><circle cx="420" cy="620" r="1.8" opacity=".32" />
-          <circle cx="600" cy="700" r="2" opacity=".34" /><circle cx="980" cy="660" r="1.6" opacity=".26" />
-        </g>
-        <!-- 摩尔纹：沟槽最密处被灯照出的干涉纹（g3 的"左上波纹" → 唱片上的对应物） -->
-        <g fill="none" stroke="#cfe9ee">
-          <ellipse cx="176" cy="92" rx="118" ry="110" stroke-width="1" opacity=".16" />
-          <ellipse cx="176" cy="92" rx="130" ry="121" stroke-width="1" opacity=".09" />
-          <ellipse cx="176" cy="92" rx="142" ry="132" stroke-width="1" opacity=".14" />
-          <ellipse cx="176" cy="92" rx="154" ry="143" stroke-width="1" opacity=".08" />
-          <ellipse cx="176" cy="92" rx="166" ry="154" stroke-width="1" opacity=".12" />
-          <ellipse cx="176" cy="92" rx="178" ry="165" stroke-width="1" opacity=".07" />
-        </g>
-        <!-- 远处一撮极淡的尘屑群（g3 的"远处鱼群"→ 保留"隐约有一群"，但唱片上没有鱼） -->
-        <g fill="#eafcff" opacity=".3">
-          <ellipse cx="248" cy="498" rx="6" ry="1.8" transform="rotate(-22 248 498)" />
-          <ellipse cx="268" cy="512" rx="5" ry="1.5" transform="rotate(-18 268 512)" />
-          <ellipse cx="232" cy="518" rx="4.4" ry="1.4" transform="rotate(-26 232 518)" />
-          <ellipse cx="286" cy="492" rx="5.6" ry="1.7" transform="rotate(-20 286 492)" />
-          <ellipse cx="256" cy="534" rx="4" ry="1.3" transform="rotate(-24 256 534)" />
-          <ellipse cx="300" cy="520" rx="4.8" ry="1.5" transform="rotate(-16 300 520)" />
-          <ellipse cx="222" cy="480" rx="4.2" ry="1.3" transform="rotate(-28 222 480)" />
-        </g>
-        <!-- 沟槽的调制：一段槽壁露出波形（g3 的"音符" → 唱片上的对应物：沟槽本身就是声音） -->
-        <g transform="translate(784 324) rotate(-45)">
-          <path d="M-86 0 q 10 -15 20 0 t 20 0 t 20 0 t 20 0 t 20 0 t 20 0 t 20 0 t 20 0"
-            fill="none" stroke="rgba(216,243,246,.46)" stroke-width="1.6" stroke-linecap="round" />
-          <path d="M-86 0 q 10 15 20 0 t 20 0 t 20 0 t 20 0 t 20 0 t 20 0 t 20 0 t 20 0"
-            fill="none" stroke="rgba(127,209,217,.32)" stroke-width="1.2" stroke-linecap="round" />
-        </g>
-      </g>
-</svg>
+
+      <!-- 旧版的 detail2（blur 环 + 14 颗尘屑 + 6 个椭圆摩尔纹 + 波形调制）已整组删除：
+           那一组里最伤的是**以 (176,92) 为圆心的椭圆族** —— 圆心不在唱片中心上，
+           在画面上就是"另一颗行星的轨道"，是"行星轨道"读法最直接的字面来源。 -->
+    </svg>
 
     <!-- 覆盖层 -->
     <div class="ov" style="left:76px; top:96px; width:520px">
