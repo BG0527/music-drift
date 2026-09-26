@@ -4,7 +4,7 @@
  * 判据（真解码，不是看文件头猜）：
  *   ① **演示账号自己瓶子**里的一段：打开 `/bottle.html?id=…`，点瓶身上的「听」+ 播放键，
  *      `<audio>.currentTime` 必须真的前进、`error` 必须为空、控制台不得出现 `DEMUXER_ERROR`；
- *   ② **公海完整作品**：打开 `/sea-detail.html?id=…`，点「试听全部」连播，
+ *   ② **公海完整作品**：打开 `/bottle.html?id=…`，点「试听全部」连播，
  *      同样断言 `currentTime` 前进，并且**跨段**（`currentSrc` 换成第 2 段）后继续前进；
  *   ③ **全库抽样**：按公海页序取前 N 支作品（= 评委最先看到的那些）＋演示账号参与过的全部作品，
  *      逐段拉 `GET /api/segments/:id/audio`，既判字节形态（有 `webm` DocType + `A_OPUS`），
