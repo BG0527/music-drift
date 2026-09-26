@@ -14,7 +14,7 @@
 /* eslint-disable no-console */
 /* global document, getComputedStyle */
 import { createServer } from 'node:http';
-import { readdirSync, readFileSync, existsSync, statSync } from 'node:fs';
+import { readdirSync, readFileSync, existsSync, statSync, openSync, writeSync, closeSync, unlinkSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { extname, join, normalize } from 'node:path';
 
@@ -57,10 +57,54 @@ async function loadPlaywright() {
 }
 
 const { chromium } = await loadPlaywright();
+/**
+ * 跨进程锁：多个 agent 会同时跑这个脚本，而 Chromium 截图是**直接写目标文件**，
+ * 两个进程写同一个 PNG 会报 `UNKNOWN: unknown error, open ...`（实测反复出现，重试救不了）。
+ * 所以在这里串行化：拿不到锁就等；持有者超过 5 分钟没心跳，视为死锁抢过来。
+ */
+const LOCK = join(DIR, '.shoot.lock');
+async function acquireLock() {
+  for (let i = 0; i < 180; i += 1) {
+    try {
+      const fd = openSync(LOCK, 'wx');
+      writeSync(fd, String(process.pid));
+      closeSync(fd);
+      return true;
+    } catch {
+      try {
+        if (Date.now() - statSync(LOCK).mtimeMs > 5 * 60 * 1000) unlinkSync(LOCK);
+      } catch {
+        /* 锁刚好被释放，下一轮重试即可 */
+      }
+      if (i === 0) console.log('… 另一个进程正在渲染，排队等待锁');
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+    }
+  }
+  return false;
+}
+function releaseLock() {
+  try {
+    unlinkSync(LOCK);
+  } catch {
+    /* 已经没了就算了 */
+  }
+}
+process.on('exit', releaseLock);
+process.on('SIGINT', () => {
+  releaseLock();
+  process.exit(130);
+});
+
+if (!(await acquireLock())) {
+  console.error('✗ 等锁超时（3 分钟）——另一个进程可能卡住了，请检查 .shoot.lock');
+  process.exit(1);
+}
+
 const browser = await chromium.launch();
 const context = await browser.newContext({ viewport: VIEWPORT, deviceScaleFactor: 2 });
 const page = await context.newPage();
 
+const failures = [];
 const shots = readdirSync(DIR)
   .filter((name) => name.endsWith('.html'))
   .sort();
@@ -70,7 +114,9 @@ for (const name of shots) {
   const src = join(DIR, name);
   // 并发跑本脚本会抢写同名 PNG（实测 UNKNOWN open 崩溃）。图已比源码新就跳过，--force 可强制重画。
   if (!process.argv.includes('--force') && existsSync(out) && statSync(out).mtimeMs >= statSync(src).mtimeMs) {
-    console.log(`skip ${name}  （png 比 html 新；--force 强制重画）`);
+    console.log(
+      `skip ${name}  （png 比 html 新，**本次未重画 = 没有校验证据**；要证据请加 --force）`,
+    );
     continue;
   }
   await page.goto(`http://127.0.0.1:${PORT}/docs/ui-review/design-explore/${name}`, {
@@ -87,14 +133,21 @@ for (const name of shots) {
     width: document.documentElement.scrollWidth,
   }));
   let shot = false;
+  let lastError = null;
   for (let attempt = 1; attempt <= 3 && !shot; attempt += 1) {
     try {
       await page.screenshot({ path: out, fullPage: true });
       shot = true;
     } catch (error) {
-      if (attempt === 3) throw error;
-      await page.waitForTimeout(500);
+      lastError = error;
+      await page.waitForTimeout(800);
     }
+  }
+  if (!shot) {
+    // 一个文件写失败不该让后面所有页都不渲染（实测同一页会偶发 UNKNOWN open）。
+    failures.push(`${name}: ${lastError?.message ?? 'unknown'}`);
+    console.log(`FAIL ${name}  ✗ 三次都写不进去（本批继续，见末尾汇总）`);
+    continue;
   }
   const over = [];
   if (measured.width > VIEWPORT.width) over.push(`横向 +${String(measured.width - VIEWPORT.width)}px`);
@@ -106,4 +159,10 @@ for (const name of shots) {
 }
 
 await browser.close();
+releaseLock();
+
+if (failures.length > 0) {
+  console.error(`✗ ${String(failures.length)} 个文件渲染失败：\n  ${failures.join('\n  ')}`);
+  process.exitCode = 1;
+}
 server.close();

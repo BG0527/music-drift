@@ -72,35 +72,33 @@
       .rule { position:absolute; left:116px; width:712px; height:1px; background:var(--line); }
 
       /* 模式切换 = 压在封套左栏顶上的一对制式页签（源码里的 Tabs） */
-      .modes { position:absolute; left:116px; top:346px; display:flex; gap:26px; }
+      .modes { position:absolute; left:116px; top:336px; display:flex; gap:26px; }
       .mode { padding:0 0 9px; font-family:inherit; font-size:15px; font-weight:700; letter-spacing:.14em;
         color:var(--muted); background:transparent; border:0; border-bottom:1px solid rgba(243,249,250,.22);
         cursor:pointer; }
       .mode.on { color:var(--coral); border-bottom:2px solid var(--coral); }
 
-      /* 表单 = 一张印在封套左栏的三栏规格表：
-         左 = 字段名与控件 · 中 = 字段说明（页边注） · 右 = 字段级错误的落位与文案 */
-      .grid-head { position:absolute; left:560px; top:448px; }
-      .grid-head .r { left:0; }
-      .grid-head .r .lbl { color:rgba(243,249,250,.38); }
-
-      .frow { position:absolute; left:116px; width:712px; height:82px; }
+      /* 表单 = 一张印在封套左栏的规格表：字段名与控件 · 页边注说明 · 字段级错误的落位 */
+      .frow { position:absolute; left:116px; width:712px; height:88px; }
       .frow .fname { position:absolute; left:0; top:6px; }
       .frow input { position:absolute; left:0; top:26px; width:440px; height:34px; padding:0 0 6px;
         font-family:inherit; font-size:15.5px; color:var(--paper); background:transparent;
         border:0; border-bottom:1px solid rgba(243,249,250,.24); }
       .frow.bad input { border-bottom-width:2px; border-bottom-color:var(--error); }
-      .frow .note { position:absolute; left:456px; top:6px; width:172px; font-size:12.5px;
+      .frow .note { position:absolute; left:474px; top:26px; width:142px; font-size:12.5px;
         line-height:1.7; color:var(--muted); }
       .frow .note .lbl { display:block; margin-bottom:6px; }
-      .frow .errcell { position:absolute; left:652px; top:6px; width:60px; color:var(--error); }
-      .frow .errcell .lbl { display:block; margin-bottom:6px; color:inherit; }
+      /* 落位标注：左侧一道珊瑚色竖线把它钉在字段行上，再靠下划线不依赖颜色单独表达 */
+      .frow .errcell { position:absolute; left:636px; top:26px; width:110px; padding-left:8px;
+        color:var(--error); border-left:2px solid var(--error); }
+      .frow .errcell .lbl { display:block; margin-bottom:6px; color:inherit; font-size:10.5px;
+        letter-spacing:.1em; }
       .frow .errcell .v { font-size:11px; line-height:1.6;
         text-decoration:underline; text-decoration-thickness:1px; text-underline-offset:3px; }
 
-      .r-handle { top:474px; }
-      .r-email { top:556px; }
-      .r-password { top:638px; }
+      .r-handle { top:434px; }
+      .r-email { top:522px; }
+      .r-password { top:610px; }
 
       .etiquette { position:absolute; left:116px; top:748px; width:420px; font-size:13.5px;
         line-height:1.9; color:var(--muted); }
@@ -140,15 +138,11 @@
       <h1>每一段旋律，<br />都在寻找下一个声音</h1>
       <p class="lede">这是一个由歌声、回音和宿命组成的角落。<br />你只录一段，剩下的交给漂流。</p>
 
-      <div class="rule" style="top:340px"></div>
+      <div class="rule" style="top:382px"></div>
 
       <div class="modes">
         <button class="mode" type="button">登录</button>
         <button class="mode on" type="button">注册</button>
-      </div>
-
-      <div class="grid-head">
-        <span class="lbl">字段级错误落在哪一栏，就落到哪个字段</span>
       </div>
 
       <div class="frow r-handle">
@@ -161,7 +155,7 @@
       <div class="frow r-email bad">
         <label class="lbl meta fname" for="email">邮箱</label>
         <input id="email" name="email" type="email" autocomplete="email" aria-invalid="true" />
-        <p class="errcell" role="alert"><span class="lbl meta">EMAIL_TAKEN</span><span class="v">这个邮箱已经注册过。</span></p>
+        <p class="errcell" role="alert"><span class="lbl meta">EMAIL_TAKEN</span><span class="v">该邮箱已注册。</span></p>
       </div>
 
       <div class="frow r-password bad">

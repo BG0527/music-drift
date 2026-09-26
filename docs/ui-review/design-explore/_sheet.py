@@ -1,6 +1,6 @@
-"""全站一致性对照表：把 record-v1 的每页稿按同一底色、同一缩放拼成一张图。
+"""全站一致性对照表：把每页稿按同一底色、同一缩放拼成一张图。
 
-用途：用户的第一优先级是「好看」，第二是「切换页面后画面和谐」——后者只有把页面并排才看得出来。
+用途：用户第一优先级是「好看」，第二是「切换页面后画面和谐」——后者只有把页面并排才看得出来。
 缺的页面画成「待交付」占位，等补齐后重跑本脚本即可（python _sheet.py）。
 
 运行：<bundled python> docs/ui-review/design-explore/_sheet.py
@@ -21,13 +21,13 @@ LINE = (58, 78, 86)
 PAPER = (243, 249, 250)
 MUTED = (150, 175, 183)
 
-# 顺序＝用户旅程：发起 → 河道 → 公海 → 审核 → 设置
+# 顺序＝用户旅程：发起 → 河道 → 瓶子 → 公海 → 我的 → 审核 → 设置
 PAGES = [
     ("河道（主线）", "f4-groove"),
     ("选一首歌", "p-songpicker-record"),
     ("瓶子详情", "p-bottle-record"),
     ("登录 / 注册", "p-login-record"),
-    ("公海大厅", "s1-sea-record"),
+    ("公海大厅", "p-sea-hall"),
     ("公海作品详情", "p-sea-detail-record"),
     ("漂流日志", "p-driftlog-record"),
     ("我的", "p-profile-record"),
@@ -69,14 +69,16 @@ for index, (name, stem) in enumerate(PAGES):
     y = MARGIN + TITLE_H + row * (TILE_H + LABEL_H + GAP)
     src = DIR / f"{stem}.png"
     if src.exists():
-        tile = Image.open(src).convert("RGB").resize((TILE_W, TILE_H), Image.LANCZOS)
+        # 用 with 打开：上一版没有显式关闭句柄，在 Windows 上可能妨碍后续写同名文件
+        with Image.open(src) as handle:
+            tile = handle.convert("RGB").resize((TILE_W, TILE_H), Image.LANCZOS)
         canvas.paste(tile, (x, y))
         draw.rectangle([x, y, x + TILE_W - 1, y + TILE_H - 1], outline=LINE)
     else:
         missing.append(stem)
         draw.rectangle([x, y, x + TILE_W - 1, y + TILE_H - 1], outline=LINE)
         draw.text((x + TILE_W // 2 - 34, y + TILE_H // 2 - 8), "待交付", font=font_label, fill=MUTED)
-    draw.text((x, y + TILE_H + 6), f"{name}", font=font_label, fill=PAPER)
+    draw.text((x, y + TILE_H + 6), name, font=font_label, fill=PAPER)
     draw.text((x + 108, y + TILE_H + 9), stem, font=font_meta, fill=MUTED)
 
 out = DIR / "_contact-sheet.png"

@@ -1,0 +1,182 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <title>漂流日志 · 刻痕（record-v1）</title>
+    <style>
+      @import url('/node_modules/.pnpm/lxgw-wenkai-webfont@1.7.0/node_modules/lxgw-wenkai-webfont/lxgwwenkai-regular.css');
+      @import url('/node_modules/.pnpm/lxgw-wenkai-webfont@1.7.0/node_modules/lxgw-wenkai-webfont/lxgwwenkai-bold.css');
+      @import url('/node_modules/.pnpm/@fontsource+quattrocento@5.3.0/node_modules/@fontsource/quattrocento/400.css');
+      @import url('/node_modules/.pnpm/@fontsource+quattrocento@5.3.0/node_modules/@fontsource/quattrocento/700.css');
+      :root {
+        --ink:#050f14;
+        --paper:#f3f9fa;
+        --muted:#a9c7cf;
+        --glass:#7fd1d9;
+        --coral:#c7452c;
+        --warm:#f6d79a;
+        --line:rgba(243,249,250,.13);
+      }
+      * { box-sizing:border-box; margin:0; padding:0; }
+      html,body { width:1440px; height:900px; }
+      html { overflow:hidden; }
+      .clip { position:absolute; inset:0; overflow:hidden; }
+      body { position:relative; overflow:hidden; background:var(--ink); color:var(--paper);
+        font-family:'LXGW WenKai',serif; -webkit-font-smoothing:antialiased; }
+      .mono { font-family:Quattrocento,serif; font-variant-numeric:tabular-nums; }
+      .platter { position:absolute; inset:0;
+        background:
+          repeating-radial-gradient(circle at 1420px 960px, rgba(216,243,246,.055) 0 1.2px, transparent 1.2px 6.5px),
+          radial-gradient(circle at 1420px 960px, rgba(127,209,217,.05) 0 30%, transparent 68%); }
+      .glint { position:absolute; inset:0; mix-blend-mode:screen;
+        background:linear-gradient(101deg, transparent 28%, rgba(228,247,252,.045) 45%, rgba(228,247,252,.065) 50%, rgba(228,247,252,.028) 55%, transparent 72%); }
+
+      main { position:relative; z-index:2; height:900px; padding:64px 76px 0; }
+      .cat { font-family:Quattrocento,serif; font-size:11px; letter-spacing:.24em; color:rgba(243,249,250,.5); }
+
+      /* ── 页头 ───────────────────────────────────────────── */
+      .crumb { display:inline-flex; align-items:center; gap:7px; height:28px; padding:0 12px;
+        border:1px solid rgba(243,249,250,.16); border-radius:2px; font-size:12.5px; color:var(--muted); }
+      .crumb svg { display:block; }
+      h1 { margin-top:14px; font-size:56px; font-weight:700; line-height:1; letter-spacing:.02em; }
+      .sub { margin-top:14px; font-size:15px; line-height:1.85; color:var(--muted); max-width:730px; }
+
+      .hright { position:absolute; right:76px; top:64px; text-align:right; }
+      .hright .song { margin-top:8px; font-size:19px; font-weight:700; }
+      .hright .n { margin-top:10px; font-family:Quattrocento,serif; font-size:30px; line-height:1; color:var(--glass); }
+      .hright .cap { margin-top:2px; }
+
+      /* ── 刻痕语法表：七种切口（长度＝权重，色＝归处） ─────── */
+      .key { margin-top:22px; display:flex; align-items:flex-start; gap:19px; }
+      .key figure { display:flex; flex-direction:column; gap:7px; }
+      .key svg { display:block; }
+      .key figcaption { font-size:12px; color:var(--muted); letter-spacing:.03em; }
+
+      /* ── 主体：左刻痕螺旋 / 右时间线 ────────────────────── */
+      .body { position:relative; height:562px; margin-top:24px; }
+      .lathe { position:absolute; left:0; top:0; display:block; }
+      .roll { position:absolute; left:564px; right:0; top:4px; bottom:0; }
+      .roll ol { list-style:none; border-top:1px solid var(--line); }
+      .roll li { display:grid; grid-template-columns:52px 1fr 126px 150px; align-items:baseline;
+        padding:12px 0 12px 0; border-bottom:1px solid rgba(243,249,250,.07); }
+      .roll li.last { border-bottom-color:var(--line); }
+      .roll .seq { font-family:Quattrocento,serif; font-size:11px; letter-spacing:.08em; color:rgba(243,249,250,.5); }
+      .roll .op { font-size:17px; line-height:1.4; padding-right:18px; }
+      .roll .who { font-size:14px; color:var(--muted); }
+      .roll .at { font-family:Quattrocento,serif; font-size:12px; color:rgba(243,249,250,.5); text-align:right; }
+      /* 终局那一笔（入海）在时间线里也只留一道珊瑚色的刻痕边 —— 珊瑚全页仅此两处 */
+      .roll li.last { position:relative; }
+      .roll li.last::before { content:''; position:absolute; left:-14px; top:11px; bottom:11px; width:2px; background:var(--coral); }
+    </style>
+  </head>
+  <body>
+    <div class="clip">
+      <div class="platter"></div>
+      <div class="glint"></div>
+    </div>
+
+    <main>
+      <header>
+        <span class="crumb">
+          <svg width="8" height="12" viewBox="0 0 8 12" aria-hidden="true"><path d="M6.4 1.2 1.8 6l4.6 4.8" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          回漂流瓶
+        </span>
+        <div class="cat" style="margin-top:16px">SIDE A · 刻痕</div>
+        <h1>漂流日志</h1>
+        <p class="sub">这里只记核心操作：发起、接唱、捞取、投河、回传、入海。操作者只显示匿名代号。</p>
+      </header>
+
+      <div class="hright">
+        <div class="cat">曲名</div>
+        <div class="song">占位曲目 · 一</div>
+        <div class="n">11</div>
+        <div class="cat cap">道刻痕</div>
+      </div>
+
+      <!-- 刻痕语法表：切口越长＝这一笔越重；色只标归处 -->
+      <div class="key">
+        <figure>
+          <svg width="44" height="30" viewBox="0 0 44 30" fill="none" aria-hidden="true"><path d="M7.5 11.4 A15 15 0 0 1 9.9 6.2" stroke="rgba(127,209,217,.95)" stroke-width="2.4" stroke-linecap="round"/></svg>
+          <figcaption>发起</figcaption>
+        </figure>
+        <figure>
+          <svg width="44" height="30" viewBox="0 0 44 30" fill="none" aria-hidden="true"><path d="M7 15.4 A15 15 0 0 1 12.7 3.3" stroke="rgba(243,249,250,.85)" stroke-width="1.8" stroke-linecap="round"/></svg>
+          <figcaption>接唱</figcaption>
+        </figure>
+        <figure>
+          <svg width="44" height="30" viewBox="0 0 44 30" fill="none" aria-hidden="true"><path d="M7.1 13.1 A15 15 0 0 1 11 4.9" stroke="rgba(127,209,217,.62)" stroke-width="1.8" stroke-linecap="round"/></svg>
+          <figcaption>投河</figcaption>
+        </figure>
+        <figure>
+          <svg width="44" height="30" viewBox="0 0 44 30" fill="none" aria-hidden="true"><path d="M7.2 12.5 A15 15 0 0 1 10.6 5.3" stroke="rgba(169,199,207,.62)" stroke-width="1.8" stroke-linecap="round"/></svg>
+          <figcaption>捞取</figcaption>
+        </figure>
+        <figure>
+          <svg width="44" height="30" viewBox="0 0 44 30" fill="none" aria-hidden="true"><path d="M7.1 15.9 A15 15 0 0 1 13.1 2.9" stroke="rgba(246,215,154,.9)" stroke-width="1.8" stroke-linecap="round"/></svg>
+          <figcaption>回传</figcaption>
+        </figure>
+        <figure>
+          <svg width="44" height="30" viewBox="0 0 44 30" fill="none" aria-hidden="true"><path d="M7.2 12.5 A15 15 0 0 1 10.6 5.3" stroke="rgba(243,249,250,1)" stroke-width="1.6" stroke-linecap="round"/><path d="M9.9 13.8 A11.5 11.5 0 0 1 12.6 8" stroke="rgba(243,249,250,1)" stroke-width="1.6" stroke-linecap="round"/></svg>
+          <figcaption>完成</figcaption>
+        </figure>
+        <figure>
+          <svg width="44" height="30" viewBox="0 0 44 30" fill="none" aria-hidden="true"><path d="M8.2 21 A15 15 0 0 1 17.7 0.6" stroke="rgba(199,69,44,1)" stroke-width="2.4" stroke-linecap="round"/></svg>
+          <figcaption>入海</figcaption>
+        </figure>
+      </div>
+
+      <div class="body">
+        <!-- 刻痕盘：这一笔的弧长＝这一笔的重量；十一条短弧首尾相望（间隔固定 10°），
+             拼成一圈半的螺旋 —— 内圈最早，往外走就是往后走；缺口朝上＝还没走完。 -->
+        <svg class="lathe" width="480" height="540" viewBox="0 0 480 540" fill="none" aria-hidden="true">
+          <g transform="translate(8 4)">
+            <g fill="none" stroke-linecap="round">
+              <path d="M210.5 191.8 A52 52 0 0 1 228.3 200.5" stroke="rgba(127,209,217,.95)" stroke-width="2.4"/>
+              <path d="M251.9 190.8 A75 75 0 0 1 271.9 245.9" stroke="rgba(243,249,250,.85)" stroke-width="1.8"/>
+              <path d="M292.5 264.1 A98 98 0 0 1 268.7 308.8" stroke="rgba(127,209,217,.62)" stroke-width="1.8"/>
+              <path d="M269.8 338.6 A121 121 0 0 1 220.1 360.8" stroke="rgba(169,199,207,.62)" stroke-width="1.8"/>
+              <path d="M199.5 386.0 A144 144 0 0 1 95.2 343.8" stroke="rgba(243,249,250,.85)" stroke-width="1.8"/>
+              <path d="M60.2 337.8 A167 167 0 0 1 30.6 256.6" stroke="rgba(127,209,217,.62)" stroke-width="1.8"/>
+              <path d="M7.7 225.4 A190 190 0 0 1 34.1 144.1" stroke="rgba(169,199,207,.62)" stroke-width="1.8"/>
+              <path d="M36.2 102.2 A213 213 0 0 1 185.9 29.3" stroke="rgba(243,249,250,.85)" stroke-width="1.8"/>
+              <path d="M225.8 7.8 A236 236 0 0 1 394.9 113.5" stroke="rgba(246,215,154,.9)" stroke-width="1.8"/>
+              <path d="M435.4 140.8 A259 259 0 0 1 435.4 343.2" stroke="rgba(243,249,250,1)" stroke-width="1.6"/>
+              <path d="M439.6 139.0 A263.5 263.5 0 0 1 439.6 345.0" stroke="rgba(243,249,250,1)" stroke-width="1.6"/>
+              <path d="M433.5 395.6 A282 282 0 0 1 69.0 493.3" stroke="rgba(199,69,44,1)" stroke-width="2.4"/>
+            </g>
+            <circle cx="197" cy="242" r="2.6" fill="rgba(127,209,217,.5)"/>
+            <g font-family="Quattrocento,serif" font-size="10" fill="rgba(243,249,250,.5)">
+              <text x="214.1" y="206.9" dy="0.34em" text-anchor="middle">#01</text>
+              <text x="255.3" y="220.8" dy="0.34em" text-anchor="middle">#02</text>
+              <text x="272.0" y="281.9" dy="0.34em" text-anchor="middle">#03</text>
+              <text x="240.9" y="340.7" dy="0.34em" text-anchor="middle">#04</text>
+              <text x="147.9" y="363.5" dy="0.34em" text-anchor="middle">#05</text>
+              <text x="52.3" y="294.7" dy="0.34em" text-anchor="middle">#06</text>
+              <text x="28.7" y="187.3" dy="0.34em" text-anchor="middle">#07</text>
+              <text x="109.3" y="62.2" dy="0.34em" text-anchor="middle">#08</text>
+              <text x="315.2" y="52.9" dy="0.34em" text-anchor="middle">#09</text>
+              <text x="443.0" y="242.0" dy="0.34em" text-anchor="middle">#10</text>
+              <text x="266.6" y="501.8" dy="0.34em" text-anchor="middle">#11</text>
+            </g>
+          </g>
+        </svg>
+
+        <div class="roll">
+          <ol>
+            <li><span class="seq">#01</span><span class="op">发起：选定了这首歌</span><span class="who">潮汐-3F</span><span class="at">2026/9/19 20:14</span></li>
+            <li><span class="seq">#02</span><span class="op">接唱：有人录下了一段</span><span class="who">潮汐-3F</span><span class="at">2026/9/19 20:52</span></li>
+            <li><span class="seq">#03</span><span class="op">投河：交给河道，等待下一位</span><span class="who">潮汐-3F</span><span class="at">2026/9/19 21:06</span></li>
+            <li><span class="seq">#04</span><span class="op">捞取：有人从河道里把它拿走了</span><span class="who">浮标-2C</span><span class="at">2026/9/20 09:31</span></li>
+            <li><span class="seq">#05</span><span class="op">接唱：有人录下了一段</span><span class="who">浮标-2C</span><span class="at">2026/9/20 10:07</span></li>
+            <li><span class="seq">#06</span><span class="op">投河：交给河道，等待下一位</span><span class="who">浮标-2C</span><span class="at">2026/9/20 10:20</span></li>
+            <li><span class="seq">#07</span><span class="op">捞取：有人从河道里把它拿走了</span><span class="who">暗礁-91</span><span class="at">2026/9/21 19:48</span></li>
+            <li><span class="seq">#08</span><span class="op">接唱：有人录下了一段</span><span class="who">暗礁-91</span><span class="at">2026/9/21 20:35</span></li>
+            <li><span class="seq">#09</span><span class="op">回传：交回上游的传递者</span><span class="who">暗礁-91</span><span class="at">2026/9/21 20:58</span></li>
+            <li><span class="seq">#10</span><span class="op">完成：最后一段录好了，作品完整</span><span class="who">灯塔-5A</span><span class="at">2026/9/22 09:03</span></li>
+            <li class="last"><span class="seq">#11</span><span class="op">入海：成为公海里的公共作品</span><span class="who">系统</span><span class="at">2026/9/22 09:04</span></li>
+          </ol>
+        </div>
+      </div>
+    </main>
+  </body>
+</html>

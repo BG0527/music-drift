@@ -1,0 +1,395 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <title>P · 公海大厅（水位尺 · 到港登记）</title>
+    <style>
+      @import url('/node_modules/.pnpm/lxgw-wenkai-webfont@1.7.0/node_modules/lxgw-wenkai-webfont/lxgwwenkai-regular.css');
+      @import url('/node_modules/.pnpm/lxgw-wenkai-webfont@1.7.0/node_modules/lxgw-wenkai-webfont/lxgwwenkai-bold.css');
+      @import url('/node_modules/.pnpm/@fontsource+quattrocento@5.3.0/node_modules/@fontsource/quattrocento/400.css');
+      @import url('/node_modules/.pnpm/@fontsource+quattrocento@5.3.0/node_modules/@fontsource/quattrocento/700.css');
+
+      :root {
+        --ink:#050f14; --paper:#f3f9fa; --muted:#a9c7cf; --glass:#7fd1d9;
+        --coral:#c7452c; --warm:#f6d79a; --line:rgba(243,249,250,.13);
+      }
+      * { box-sizing:border-box; margin:0; padding:0; }
+      html,body { width:1440px; height:900px; }
+      html { overflow:hidden; }
+      .clip { position:absolute; inset:0; overflow:hidden; }
+      body { position:relative; overflow:hidden; background:var(--ink); color:var(--paper);
+        font-family:'LXGW WenKai',serif; -webkit-font-smoothing:antialiased; }
+      a { text-decoration:none; }
+      .mono { font-family:Quattrocento,serif; font-variant-numeric:tabular-nums; }
+      .cat { font-family:Quattrocento,serif; font-size:11px; letter-spacing:.24em;
+        color:rgba(243,249,250,.5); }
+
+      /* 水面肌理：同心圆收在画面下方，一圈一圈没入更深处 */
+      .surface { position:absolute; inset:0; opacity:.92;
+        background:
+          repeating-radial-gradient(circle at 760px 1000px, rgba(216,243,246,.05) 0 1.2px, transparent 1.2px 6.5px),
+          radial-gradient(circle at 760px 1000px, rgba(127,209,217,.055) 0 30%, transparent 68%); }
+      .glint { position:absolute; inset:0; mix-blend-mode:screen;
+        background:linear-gradient(101deg, transparent 28%, rgba(228,247,252,.045) 45%, rgba(228,247,252,.06) 50%, rgba(228,247,252,.028) 55%, transparent 72%); }
+      .sink { position:absolute; left:0; right:0; bottom:0; height:230px;
+        background:linear-gradient(180deg, rgba(5,15,20,0) 0%, rgba(3,12,17,.66) 100%); }
+
+      main { position:relative; z-index:2; padding:38px 88px 0; }
+
+      .topbar { display:flex; justify-content:space-between; align-items:center; height:14px; }
+      .rule { position:relative; height:1px; margin-top:16px; background:rgba(243,249,250,.09); }
+      .rule i { position:absolute; left:0; top:0; width:88px; height:1px; background:var(--coral); }
+
+      /* ---- 页头：一片开阔水面 + 一支水位尺 ---- */
+      .hero { display:flex; justify-content:space-between; align-items:flex-start;
+        height:188px; padding-top:26px; }
+      h1 { font-size:58px; font-weight:700; line-height:1; letter-spacing:.01em; }
+      .lede { margin-top:16px; width:524px; font-size:15px; line-height:1.9; color:var(--muted); }
+
+      /* 水位尺：每一格 = 一个段位格。填满 = 四个段位都有人唱过。 */
+      .gauge { width:326px; }
+      .gauge .cat { display:flex; justify-content:space-between; }
+      .gmarks { position:relative; height:54px; margin-top:14px;
+        display:flex; align-items:flex-end; gap:4px; }
+      .gmarks::after { content:''; position:absolute; left:0; right:0; bottom:-5px; height:1px;
+        background:rgba(243,249,250,.16); }
+      .gm { flex:1; position:relative; }
+      .gm:nth-child(10n)::after { content:''; position:absolute; left:0; right:0; bottom:-5px;
+        height:4px; background:rgba(243,249,250,.18); }
+      .gm.full { height:54px; background:rgba(127,209,217,.5); }
+      .gm.part { height:16px; background:rgba(246,215,154,.7); }
+      .gm.none { height:4px;  background:rgba(243,249,250,.22); }
+      /* 水面：尺上那一小段被水盖住的部分 */
+      .surge { position:relative; height:0; }
+      .surge::after { content:''; position:absolute; left:-14px; right:-14px; top:-2px; height:9px;
+        background:linear-gradient(180deg, rgba(127,209,217,0), rgba(127,209,217,.16)); }
+      .gread { margin-top:16px; font-size:11.5px; line-height:14px; color:var(--muted); }
+      .gread b { font-weight:400; color:var(--paper); }
+      .gread .warm { color:var(--warm); }
+
+      /* ---- 水线：一条横切全页的浅色刻度线 + 左上角一小段冷光 ---- */
+      .waterline { position:relative; height:1px;
+        background:linear-gradient(90deg, rgba(127,209,217,.62) 0 300px, rgba(243,249,250,.13) 300px 100%); }
+      /* 更深一层的水线：让下半页那片空白是"水"，不是没画完。
+         单层 hairline（不做两线平行——那种"丝带"不属这套语言） */
+      .deep { position:relative; height:1px; margin-top:38px;
+        background:linear-gradient(90deg, rgba(243,249,250,.13) 0 300px,
+          rgba(127,209,217,.3) 300px 640px, rgba(243,249,250,.07) 640px 100%); }
+      .deep i { position:absolute; left:0; right:0; top:1px; height:132px;
+        background:linear-gradient(180deg, rgba(6,22,29,.5) 0%, rgba(5,15,20,0) 100%); }
+
+      /* ---- 台面：左边是登记项，右边是条目 ---- */
+      .desk { display:grid; grid-template-columns:272px 1fr; gap:56px; padding-top:36px; }
+      .seal .cat { display:block; }
+      .seal .big { margin-top:12px; font-size:104px; line-height:1; color:rgba(243,249,250,.11); }
+      .seal p { margin-top:18px; font-size:14px; line-height:1.95; color:var(--muted); }
+
+      .zone { display:flex; align-items:baseline; gap:18px; height:18px; }
+      .zone .cat { color:rgba(243,249,250,.34); }
+      .tab { font-size:15px; letter-spacing:.04em; color:rgba(243,249,250,.46); }
+      .tab .n { font-size:12px; margin-left:6px; }
+      .tab[aria-selected='true'] { color:var(--paper); }
+      .tab[aria-selected='true'] .n { color:var(--glass); }
+
+      ul.log { list-style:none; margin-top:22px; }
+      li.entry { display:grid; grid-template-columns:48px 130px 142px 1fr 164px; gap:22px;
+        align-items:start; padding-top:15px; height:60px;
+        border-bottom:1px solid rgba(243,249,250,.075); }
+      li.entry:first-child { border-top:1px solid rgba(243,249,250,.075); }
+      li.entry[data-zone='INCOMPLETE'] { border-bottom:1px dashed rgba(246,215,154,.24); }
+      .tk { font-size:12px; line-height:1.9; color:rgba(243,249,250,.34); }
+      .tk.cur { color:var(--coral); }
+      .job { display:flex; flex-direction:column; gap:7px; }
+      .song { font-size:17px; line-height:1.35; color:var(--paper); }
+      li.entry[data-zone='INCOMPLETE'] .song { color:var(--warm); }
+      .seg { display:flex; gap:5px; align-items:center; height:4px; }
+      .cell { width:22px; height:4px; }
+      .cell.on { background:rgba(127,209,217,.72); }
+      .cell.off { background:rgba(169,199,207,.2); }
+      .status { font-size:13px; line-height:1.76; }
+      .status.ok { color:var(--glass); }
+      .status.gap { color:var(--warm); }
+      .stamp { text-align:right; }
+      .stamp .t { font-size:12px; line-height:1.9; color:rgba(169,199,207,.82); white-space:nowrap; }
+      .stamp a { display:inline-block; margin-top:5px; font-size:12.5px; color:var(--glass);
+        text-decoration:underline; text-underline-offset:4px; }
+
+      /* 空态：潮位退到最低 —— 海面空了，尺还在 */
+      .empty { position:relative; }
+      .lowtide { position:relative; display:block; width:256px; height:14px; }
+      .lowtide::before { content:''; position:absolute; left:0; top:6px; width:256px; height:1px;
+        background:rgba(127,209,217,.34); }
+      .lowtide::after { content:''; position:absolute; left:0; top:0; width:1px; height:14px;
+        background:rgba(127,209,217,.5); }
+      .lowtide i { position:absolute; top:3px; width:1px; height:8px; background:rgba(243,249,250,.18); }
+      .empty h2 { margin-top:30px; font-size:19px; font-weight:700; color:var(--paper); }
+      .empty p { margin-top:10px; width:430px; font-size:14px; line-height:1.95; color:var(--muted); }
+      .empty a { display:inline-block; margin-top:16px; font-size:13.5px; color:var(--glass);
+        text-decoration:underline; text-underline-offset:5px; }
+
+      /* ---- 页脚：登记簿收尾 + 真分页（游标走得到才有下一页） ---- */
+      footer { position:absolute; left:88px; right:88px; bottom:26px; z-index:2; }
+      .footrule { position:absolute; left:88px; right:88px; bottom:60px; height:1px; z-index:2;
+        background:rgba(243,249,250,.09); }
+      .footrow { display:flex; justify-content:space-between; align-items:center; }
+      .tail { font-family:Quattrocento,'LXGW WenKai',serif; font-size:11px; line-height:1;
+        letter-spacing:.2em; color:rgba(243,249,250,.34); }
+      .tail .dot { display:inline-block; width:4px; height:4px; background:var(--coral);
+        margin-right:9px; vertical-align:2px; }
+      .tail .code { color:rgba(243,249,250,.5); }
+      .pages { display:flex; align-items:center; gap:22px; }
+      .pages .cat { letter-spacing:.2em; }
+      .pages ol { list-style:none; display:flex; gap:8px; }
+      .pages a { display:flex; align-items:center; justify-content:center; width:26px; height:22px;
+        border:1px solid rgba(243,249,250,.16); border-radius:2px;
+        font-family:Quattrocento,serif; font-size:12px; color:rgba(243,249,250,.66); }
+      .pages a[aria-current='page'] { position:relative; border-color:rgba(199,69,44,.62);
+        background:rgba(199,69,44,.16); color:var(--paper); }
+      .pages a[aria-current='page']::after { content:''; position:absolute; left:-1px; right:-1px;
+        bottom:-4px; height:1px; background:var(--coral); }
+    </style>
+  </head>
+  <body>
+    <div class="clip">
+      <div class="surface"></div>
+      <div class="glint"></div>
+      <div class="sink"></div>
+    </div>
+
+    <main>
+      <div class="topbar">
+        <p class="cat">音乐漂流瓶 · MUSIC DRIFT</p>
+        <p class="cat">CATALOGUE OF THE OPEN SEA</p>
+      </div>
+      <div class="rule"><i></i></div>
+
+      <section class="hero">
+        <div>
+          <h1>公海大厅</h1>
+          <p class="lede">聆听那些经历漂流与合唱、完全绽放的终极乐章。作品一旦入海就不再漂流 —— 这里只能听，不能接。</p>
+        </div>
+
+        <!-- 水位尺：把「完整 / 等待接力」的数量关系画成水位，而不是写成一行数字 -->
+        <div class="gauge">
+          <p class="cat"><span>潮位 · AT HIGH TIDE</span><span>段位格</span></p>
+          <div class="gmarks" aria-hidden="true">
+            <span class="gm full"></span><span class="gm full"></span><span class="gm full"></span>
+            <span class="gm full"></span><span class="gm full"></span><span class="gm full"></span>
+            <span class="gm full"></span><span class="gm full"></span><span class="gm full"></span>
+            <span class="gm full"></span><span class="gm full"></span><span class="gm full"></span>
+            <span class="gm full"></span><span class="gm full"></span><span class="gm full"></span>
+            <span class="gm full"></span><span class="gm full"></span><span class="gm full"></span>
+            <span class="gm full"></span><span class="gm full"></span><span class="gm full"></span>
+            <span class="gm full"></span><span class="gm full"></span><span class="gm full"></span>
+            <span class="gm full"></span><span class="gm full"></span><span class="gm full"></span>
+            <span class="gm full"></span><span class="gm full"></span><span class="gm full"></span>
+            <span class="gm full"></span><span class="gm full"></span><span class="gm full"></span>
+            <span class="gm full"></span><span class="gm full"></span><span class="gm full"></span>
+            <span class="gm full"></span><span class="gm full"></span><span class="gm full"></span>
+            <span class="gm part"></span><span class="gm none"></span><span class="gm none"></span>
+            <span class="gm none"></span>
+          </div>
+          <span class="surge" aria-hidden="true"></span>
+          <p class="gread">这一潮 <b class="mono">39</b> 支盘已刻满，<span class="warm">1</span> 支还在等第 4 段</p>
+        </div>
+      </section>
+
+      <div class="waterline" aria-hidden="true"></div>
+
+      <div class="desk">
+        <!-- 左：这片水自己的登记项（全站唯一的 MDB 字样出现在这里，不是填空白） -->
+        <div class="seal">
+          <span class="cat">到港登记 · REGISTER</span>
+          <p class="big mono">MDB</p>
+          <p>入海之后不再漂流。每支作品在这里编上母版号、记下最近一次更新。</p>
+        </div>
+
+        <!-- 右：登记簿本体（默认只看完整作品） -->
+        <section>
+          <div class="zone" role="tablist" aria-label="分区">
+            <span class="cat">分区</span>
+            <span class="tab" role="tab" aria-selected="true">完整作品<span class="mono n">39</span></span>
+            <span class="tab" role="tab" aria-selected="false">等待接力<span class="mono n">12</span></span>
+          </div>
+
+          <ul class="log">
+            <!-- 渲染态：默认分区「完整作品」，第 1 页（6 支 = SEA_PAGE_SIZE） -->
+            <li class="entry" data-zone="COMPLETED">
+              <span class="tk mono cur">A01</span>
+              <span class="job">
+                <span class="song">占位曲目 · 一</span>
+                <span class="seg" aria-hidden="true">
+                  <i class="cell on"></i><i class="cell on"></i><i class="cell on"></i><i class="cell on"></i>
+                </span>
+              </span>
+              <span class="status ok">全部段位都有人唱过</span>
+              <span class="stamp">
+                <span class="t">最近更新 <span class="mono">2026/9/23 20:38</span></span>
+                <a href="#">听这支作品</a>
+              </span>
+            </li>
+
+            <li class="entry" data-zone="COMPLETED">
+              <span class="tk mono cur">A02</span>
+              <span class="job">
+                <span class="song">占位曲目 · 二</span>
+                <span class="seg" aria-hidden="true">
+                  <i class="cell on"></i><i class="cell on"></i><i class="cell on"></i><i class="cell on"></i>
+                </span>
+              </span>
+              <span class="status ok">全部段位都有人唱过</span>
+              <span class="stamp">
+                <span class="t">最近更新 <span class="mono">2026/9/22 11:04</span></span>
+                <a href="#">听这支作品</a>
+              </span>
+            </li>
+
+            <li class="entry" data-zone="COMPLETED">
+              <span class="tk mono cur">A03</span>
+              <span class="job">
+                <span class="song">占位曲目 · 三</span>
+                <span class="seg" aria-hidden="true">
+                  <i class="cell on"></i><i class="cell on"></i><i class="cell on"></i><i class="cell on"></i>
+                </span>
+              </span>
+              <span class="status ok">全部段位都有人唱过</span>
+              <span class="stamp">
+                <span class="t">最近更新 <span class="mono">2026/9/21 08:47</span></span>
+                <a href="#">听这支作品</a>
+              </span>
+            </li>
+
+            <li class="entry" data-zone="COMPLETED">
+              <span class="tk mono cur">A04</span>
+              <span class="job">
+                <span class="song">占位曲目 · 四</span>
+                <span class="seg" aria-hidden="true">
+                  <i class="cell on"></i><i class="cell on"></i><i class="cell on"></i><i class="cell on"></i>
+                </span>
+              </span>
+              <span class="status ok">全部段位都有人唱过</span>
+              <span class="stamp">
+                <span class="t">最近更新 <span class="mono">2026/9/19 22:12</span></span>
+                <a href="#">听这支作品</a>
+              </span>
+            </li>
+
+            <li class="entry" data-zone="COMPLETED">
+              <span class="tk mono cur">A05</span>
+              <span class="job">
+                <span class="song">占位曲目 · 五</span>
+                <span class="seg" aria-hidden="true">
+                  <i class="cell on"></i><i class="cell on"></i><i class="cell on"></i><i class="cell on"></i>
+                </span>
+              </span>
+              <span class="status ok">全部段位都有人唱过</span>
+              <span class="stamp">
+                <span class="t">最近更新 <span class="mono">2026/9/18 14:30</span></span>
+                <a href="#">听这支作品</a>
+              </span>
+            </li>
+
+            <li class="entry" data-zone="COMPLETED">
+              <span class="tk mono cur">A06</span>
+              <span class="job">
+                <span class="song">占位曲目 · 六</span>
+                <span class="seg" aria-hidden="true">
+                  <i class="cell on"></i><i class="cell on"></i><i class="cell on"></i><i class="cell on"></i>
+                </span>
+              </span>
+              <span class="status ok">全部段位都有人唱过</span>
+              <span class="stamp">
+                <span class="t">最近更新 <span class="mono">2026/9/17 19:55</span></span>
+                <a href="#">听这支作品</a>
+              </span>
+            </li>
+          </ul>
+
+          <!-- ══ 规格证据（hidden）：切到「等待接力」分区时同一张表长什么样 ══
+               保留源码里 INCOMPLETE 区的两个必备字段：「缺第 x 段」与
+               「（成品里这段时间是静音）」—— 段位刻度上留有空洞的那种行。 -->
+          <ul class="log" hidden>
+            <li class="entry" data-zone="INCOMPLETE">
+              <span class="tk mono">B01</span>
+              <span class="job">
+                <span class="song">占位曲目 · 七</span>
+                <span class="seg" aria-hidden="true">
+                  <i class="cell on"></i><i class="cell on"></i><i class="cell on"></i><i class="cell on"></i>
+                </span>
+              </span>
+              <span class="status ok">全部段位都有人唱过</span>
+              <span class="stamp">
+                <span class="t">最近更新 <span class="mono">2026/9/16 10:02</span></span>
+                <a href="#">听这支作品</a>
+              </span>
+            </li>
+
+            <li class="entry" data-zone="INCOMPLETE">
+              <span class="tk mono">B02</span>
+              <span class="job">
+                <span class="song">占位曲目 · 八</span>
+                <span class="seg" aria-hidden="true">
+                  <i class="cell on"></i><i class="cell on"></i><i class="cell off"></i><i class="cell on"></i>
+                </span>
+              </span>
+              <span class="status gap">缺第 3 段（成品里这段时间是静音）</span>
+              <span class="stamp">
+                <span class="t">最近更新 <span class="mono">2026/9/15 21:40</span></span>
+                <a href="#">听这支作品</a>
+              </span>
+            </li>
+
+            <li class="entry" data-zone="INCOMPLETE">
+              <span class="tk mono">B03</span>
+              <span class="job">
+                <span class="song">占位曲目 · 九</span>
+                <span class="seg" aria-hidden="true">
+                  <i class="cell on"></i><i class="cell off"></i><i class="cell off"></i><i class="cell on"></i>
+                </span>
+              </span>
+              <span class="status gap">缺第 2、3 段（成品里这段时间是静音）</span>
+              <span class="stamp">
+                <span class="t">最近更新 <span class="mono">2026/9/14 09:18</span></span>
+                <a href="#">听这支作品</a>
+              </span>
+            </li>
+          </ul>
+
+          <!-- 空态 A（完整作品区）—— 渲染时与上面那张表二选一，此处留作规格证据 -->
+          <div class="empty" hidden>
+            <span class="lowtide" aria-hidden="true"><i style="left:64px"></i><i style="left:128px"></i><i style="left:192px"></i></span>
+            <h2>还没有完整的作品</h2>
+            <p>完整作品要等每个段位都有人唱过之后，由持有者送进公海。</p>
+            <a href="#">去河道捞一个</a>
+          </div>
+
+          <!-- 空态 B（等待接力区）—— 渲染时与上表二选一 -->
+          <div class="empty" hidden>
+            <span class="lowtide" aria-hidden="true"><i style="left:64px"></i><i style="left:128px"></i><i style="left:192px"></i></span>
+            <h2>没有等待接力的作品</h2>
+            <p>这里的作品都还差几个段位，等着有人补上——补完才会进完整作品区。</p>
+            <a href="#">去河道捞一个</a>
+          </div>
+        </section>
+      </div>
+    </main>
+
+    <div class="deep" aria-hidden="true"><i></i></div>
+
+    <footer>
+      <div class="footrow">
+        <p class="tail"><span class="dot" aria-hidden="true"></span>到港登记 <span class="code mono">MDB-CAT-A</span></p>
+        <nav class="pages" aria-label="分页">
+          <span class="cat">PAGE</span>
+          <ol>
+            <li><a href="#" aria-current="page">1</a></li>
+            <li><a href="#">2</a></li>
+            <li><a href="#">3</a></li>
+          </ol>
+          <span class="cat">第 1 页 · 后面还有更多</span>
+        </nav>
+      </div>
+    </footer>
+    <div class="footrule" aria-hidden="true"></div>
+  </body>
+</html>
