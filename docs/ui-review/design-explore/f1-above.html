@@ -50,8 +50,10 @@
       .port .core { position:relative; width:104px; height:104px; border-radius:50%; display:grid; place-items:center; gap:2px;
         font-family:inherit; font-size:16px; font-weight:700; letter-spacing:.14em; color:#fff; }
       .port .core span { font-size:10px; letter-spacing:.28em; opacity:.75; font-weight:400; }
-      .draw .core { background:linear-gradient(180deg,#12798d,#0b4e5b); box-shadow:0 0 0 8px rgba(6,28,37,.8), 0 12px 34px rgba(0,0,0,.45); }
-      .cast .core { background:linear-gradient(180deg,#d2502f,#9d4125); box-shadow:0 0 0 8px rgba(6,28,37,.8), 0 12px 34px rgba(0,0,0,.45); }
+      .draw .core { background:radial-gradient(circle at 34% 26%, rgba(240,252,254,.44), rgba(42,157,177,.32) 46%, rgba(11,78,91,.62) 100%);
+        border:1px solid rgba(216,243,246,.5); box-shadow:0 0 0 8px rgba(6,28,37,.72), inset 0 1px 14px rgba(255,255,255,.26), 0 12px 34px rgba(0,0,0,.4); }
+      .cast .core { background:radial-gradient(circle at 34% 26%, rgba(255,238,232,.5), rgba(210,80,47,.4) 46%, rgba(120,36,20,.62) 100%);
+        border:1px solid rgba(255,228,218,.5); box-shadow:0 0 0 8px rgba(6,28,37,.72), inset 0 1px 14px rgba(255,255,255,.28), 0 12px 34px rgba(0,0,0,.4); }
       .port .cap { position:absolute; width:290px; font-size:12.5px; line-height:1.75; color:var(--muted);
         text-shadow:0 1px 8px rgba(3,20,26,.95); }
       .port .cap b { display:block; color:var(--paper); font-size:15px; margin-bottom:3px; }
@@ -156,7 +158,60 @@
 
           <!-- 默认态：河道里没有瓶子，只有水在流（用户第 ④ 条） -->
         </g>
-      </svg>
+      
+      <!-- ── 细节层（**删掉这个 g 就回到上一版**）——
+           从 g3 借来的四种"感觉"，按河道主题落地：上浮水泡 / 打着旋的音符 / 水面涟漪 / 远处鱼群 -->
+      <defs>
+        <!-- 八分音符：**内联 SVG**，刻意不用 ♪ 字符（U+266A 落在仓库禁 emoji 的码点区间里） -->
+        <g id="note8">
+          <ellipse cx="0" cy="0" rx="7.5" ry="5.6" transform="rotate(-20)" fill="#eafcff" />
+          <rect x="6" y="-30" width="1.6" height="30" fill="#eafcff" />
+          <path d="M7.6 -30 C 16 -26, 20 -20, 19 -11 C 17 -19, 13 -22, 7.6 -23 Z" fill="#eafcff" />
+        </g>
+        <g id="fish1">
+          <path d="M0 0 C 8 -6, 20 -6, 28 0 C 20 6, 8 6, 0 0 Z" />
+          <path d="M0 0 L -9 -7 L -9 7 Z" />
+        </g>
+      </defs>
+      <g id="detail">
+        <!-- 上浮的水泡：越靠下越大（贴近镜头） -->
+        <g fill="none" stroke="#eafcff">
+          <circle cx="120" cy="640" r="6" stroke-width="1" opacity=".3" /><circle cx="188" cy="700" r="9" stroke-width="1.2" opacity=".26" />
+          <circle cx="268" cy="596" r="4.5" stroke-width="1" opacity=".3" /><circle cx="360" cy="742" r="13" stroke-width="1.4" opacity=".2" />
+          <circle cx="470" cy="660" r="7" stroke-width="1.1" opacity=".28" /><circle cx="590" cy="770" r="17" stroke-width="1.6" opacity=".16" />
+          <circle cx="700" cy="600" r="5.5" stroke-width="1" opacity=".3" /><circle cx="820" cy="726" r="11" stroke-width="1.3" opacity=".2" />
+          <circle cx="940" cy="650" r="8" stroke-width="1.1" opacity=".26" /><circle cx="1080" cy="790" r="21" stroke-width="1.8" opacity=".13" />
+          <circle cx="1240" cy="620" r="6.5" stroke-width="1" opacity=".28" /><circle cx="1380" cy="740" r="15" stroke-width="1.5" opacity=".17" />
+        </g>
+        <g fill="#eafcff">
+          <circle cx="186" cy="697" r="2" opacity=".3" /><circle cx="700" cy="598" r="1.6" opacity=".3" />
+          <circle cx="940" cy="647" r="2.2" opacity=".26" /><circle cx="1240" cy="618" r="1.8" opacity=".28" />
+        </g>
+        <!-- 打着旋的音符（内联 SVG，不是字符） -->
+        <use href="#note8" transform="translate(300 300) scale(1.1) rotate(-14)" opacity=".34" />
+        <use href="#note8" transform="translate(520 470) scale(.8) rotate(11)" opacity=".26" />
+        <use href="#note8" transform="translate(760 620) scale(1.25) rotate(-6)" opacity=".3" />
+        <use href="#note8" transform="translate(1080 470) scale(.95) rotate(17)" opacity=".24" />
+        <use href="#note8" transform="translate(1300 690) scale(1.05) rotate(-9)" opacity=".2" />
+        <!-- 远处的水面涟漪（g3 左上那圈波纹 → 河道上的对应物） -->
+        <g fill="none" stroke="#cfe9ee">
+          <ellipse cx="150" cy="150" rx="52" ry="17" stroke-width="1" opacity=".17" />
+          <ellipse cx="150" cy="150" rx="78" ry="26" stroke-width="1" opacity=".11" />
+          <ellipse cx="150" cy="150" rx="106" ry="35" stroke-width="1" opacity=".14" />
+          <ellipse cx="150" cy="150" rx="136" ry="45" stroke-width="1" opacity=".08" />
+          <ellipse cx="228" cy="196" rx="42" ry="14" stroke-width="1" opacity=".12" />
+        </g>
+        <!-- 河里远处的鱼群：极淡，只给"隐约有一群"的观感 -->
+        <g fill="#02141a" opacity=".42">
+          <use href="#fish1" transform="translate(470 402) scale(.9) rotate(-26)" />
+          <use href="#fish1" transform="translate(528 428) scale(1.1) rotate(-22)" />
+          <use href="#fish1" transform="translate(432 436) scale(.75) rotate(-30)" />
+          <use href="#fish1" transform="translate(576 404) scale(.85) rotate(-24)" />
+          <use href="#fish1" transform="translate(494 460) scale(.65) rotate(-28)" />
+          <use href="#fish1" transform="translate(612 448) scale(1) rotate(-20)" opacity=".8" />
+        </g>
+      </g>
+</svg>
 
       <!-- 河道上不放任何段号/段位标记（用户第 ② 条） -->
     </div>
@@ -168,15 +223,15 @@
       <div class="meter"><i class="on"></i><i></i><i></i><i></i></div>
     </div>
 
-    <div class="port draw ov" style="left:98px; top:566px; width:196px; height:196px" role="button" aria-label="捞一个漂流瓶">
-      <i class="r1" style="inset:0"></i><i class="r2" style="inset:28px"></i><i class="r3" style="inset:56px"></i>
-      <span class="core" style="width:78px;height:78px;font-size:17px">捞取<span>DRAW</span></span>
-      <span class="cap" style="left:212px; top:44px; width:270px"><b>捞一个漂流瓶</b>捞取深水里传来的匿名哼唱，接续她的下一句。捞到即持有：同一时刻，同一条河道上只有你拿着它。</span>
+    <div class="port draw ov" style="left:76px; top:544px; width:240px; height:240px" role="button" aria-label="捞一个漂流瓶">
+      <i class="r1" style="inset:0"></i><i class="r2" style="inset:34px"></i><i class="r3" style="inset:68px"></i>
+      <span class="core" style="width:96px;height:96px;font-size:19px">捞取<span>DRAW</span></span>
+      <span class="cap" style="left:258px; top:66px; width:270px"><b>捞一个漂流瓶</b>捞取深水里传来的匿名哼唱，接续她的下一句。捞到即持有：同一时刻，同一条河道上只有你拿着它。</span>
     </div>
-    <div class="port cast ov" style="left:246px; top:356px; width:148px; height:148px" role="button" aria-label="投下一支漂流瓶">
-      <i class="r1" style="inset:0"></i><i class="r2" style="inset:20px"></i><i class="r3" style="inset:40px"></i>
-      <span class="core" style="width:62px;height:62px;font-size:15px">投下<span>CAST</span></span>
-      <span class="cap" style="left:164px; top:24px; width:268px"><b>投下一支漂流瓶</b>选一首歌，录下第 1 段（时长以该段为准），然后放进上游等一个陌生人接下一棒。</span>
+    <div class="port cast ov" style="left:212px; top:322px; width:184px; height:184px" role="button" aria-label="投下一支漂流瓶">
+      <i class="r1" style="inset:0"></i><i class="r2" style="inset:26px"></i><i class="r3" style="inset:52px"></i>
+      <span class="core" style="width:76px;height:76px;font-size:17px">投下<span>CAST</span></span>
+      <span class="cap" style="left:200px; top:42px; width:268px"><b>投下一支漂流瓶</b>选一首歌，录下第 1 段（时长以该段为准），然后放进上游等一个陌生人接下一棒。</span>
     </div>
 
     <footer>

@@ -38,8 +38,10 @@
       .port .core { position:relative; width:104px; height:104px; border-radius:50%; display:grid; place-items:center; gap:2px;
         font-family:inherit; font-size:16px; font-weight:700; letter-spacing:.14em; color:#fff; }
       .port .core span { font-size:10px; letter-spacing:.28em; opacity:.75; font-weight:400; }
-      .draw .core { background:linear-gradient(180deg,#12798d,#0b4e5b); box-shadow:0 0 0 8px rgba(5,15,20,.85), 0 0 46px rgba(42,157,177,.55); }
-      .cast .core { background:linear-gradient(180deg,#d2502f,#9d4125); box-shadow:0 0 0 8px rgba(5,15,20,.85), 0 0 46px rgba(199,69,44,.5); }
+      .draw .core { background:radial-gradient(circle at 34% 26%, rgba(240,252,254,.46), rgba(42,157,177,.34) 46%, rgba(11,78,91,.62) 100%);
+        border:1px solid rgba(216,243,246,.5); box-shadow:0 0 0 8px rgba(5,15,20,.72), inset 0 1px 14px rgba(255,255,255,.26), 0 0 46px rgba(42,157,177,.42); }
+      .cast .core { background:radial-gradient(circle at 34% 26%, rgba(255,238,232,.5), rgba(210,80,47,.42) 46%, rgba(120,36,20,.62) 100%);
+        border:1px solid rgba(255,228,218,.5); box-shadow:0 0 0 8px rgba(5,15,20,.72), inset 0 1px 14px rgba(255,255,255,.28), 0 0 46px rgba(199,69,44,.4); }
       .port .cap { position:absolute; width:290px; font-size:12.5px; line-height:1.75; color:var(--muted);
         text-shadow:0 1px 8px rgba(2,10,14,.95); }
       .port .cap b { display:block; color:var(--paper); font-size:15px; margin-bottom:3px; }
@@ -109,7 +111,48 @@
         <circle cx="1180" cy="252" r="4.6" fill="#c7452c" />
         <circle cx="1180" cy="252" r="13" fill="none" stroke="rgba(199,69,44,.35)" stroke-width="1.2" />
       </g>
-    </svg>
+    
+      <!-- ── 细节层 2（**删掉这个 g 就回到上一版**）——
+           从 g3 借来的四种"感觉"，按唱片主题翻译：尘屑 / 摩尔纹 / 远处尘屑群 / 沟槽调制 -->
+      <g id="detail2">
+        <!-- 悬浮在光里的尘屑（g3 的"泡泡" → 唱片表面被灯照到的微尘） -->
+        <g fill="#eafcff">
+          <circle cx="240" cy="180" r="2.4" opacity=".48" /><circle cx="318" cy="244" r="1.6" opacity=".34" />
+          <circle cx="186" cy="332" r="2" opacity=".4" /><circle cx="420" cy="150" r="1.4" opacity=".28" />
+          <circle cx="560" cy="252" r="2.2" opacity=".42" /><circle cx="662" cy="178" r="1.5" opacity=".3" />
+          <circle cx="880" cy="430" r="2.6" opacity=".44" /><circle cx="1012" cy="360" r="1.7" opacity=".32" />
+          <circle cx="1160" cy="470" r="2.1" opacity=".38" /><circle cx="1320" cy="420" r="1.5" opacity=".28" />
+          <circle cx="760" cy="560" r="2.3" opacity=".4" /><circle cx="420" cy="620" r="1.8" opacity=".32" />
+          <circle cx="600" cy="700" r="2" opacity=".34" /><circle cx="980" cy="660" r="1.6" opacity=".26" />
+        </g>
+        <!-- 摩尔纹：沟槽最密处被灯照出的干涉纹（g3 的"左上波纹" → 唱片上的对应物） -->
+        <g fill="none" stroke="#cfe9ee">
+          <ellipse cx="176" cy="92" rx="118" ry="110" stroke-width="1" opacity=".16" />
+          <ellipse cx="176" cy="92" rx="130" ry="121" stroke-width="1" opacity=".09" />
+          <ellipse cx="176" cy="92" rx="142" ry="132" stroke-width="1" opacity=".14" />
+          <ellipse cx="176" cy="92" rx="154" ry="143" stroke-width="1" opacity=".08" />
+          <ellipse cx="176" cy="92" rx="166" ry="154" stroke-width="1" opacity=".12" />
+          <ellipse cx="176" cy="92" rx="178" ry="165" stroke-width="1" opacity=".07" />
+        </g>
+        <!-- 远处一撮极淡的尘屑群（g3 的"远处鱼群"→ 保留"隐约有一群"，但唱片上没有鱼） -->
+        <g fill="#eafcff" opacity=".3">
+          <ellipse cx="248" cy="498" rx="6" ry="1.8" transform="rotate(-22 248 498)" />
+          <ellipse cx="268" cy="512" rx="5" ry="1.5" transform="rotate(-18 268 512)" />
+          <ellipse cx="232" cy="518" rx="4.4" ry="1.4" transform="rotate(-26 232 518)" />
+          <ellipse cx="286" cy="492" rx="5.6" ry="1.7" transform="rotate(-20 286 492)" />
+          <ellipse cx="256" cy="534" rx="4" ry="1.3" transform="rotate(-24 256 534)" />
+          <ellipse cx="300" cy="520" rx="4.8" ry="1.5" transform="rotate(-16 300 520)" />
+          <ellipse cx="222" cy="480" rx="4.2" ry="1.3" transform="rotate(-28 222 480)" />
+        </g>
+        <!-- 沟槽的调制：一段槽壁露出波形（g3 的"音符" → 唱片上的对应物：沟槽本身就是声音） -->
+        <g transform="translate(784 324) rotate(-45)">
+          <path d="M-86 0 q 10 -15 20 0 t 20 0 t 20 0 t 20 0 t 20 0 t 20 0 t 20 0 t 20 0"
+            fill="none" stroke="rgba(216,243,246,.46)" stroke-width="1.6" stroke-linecap="round" />
+          <path d="M-86 0 q 10 15 20 0 t 20 0 t 20 0 t 20 0 t 20 0 t 20 0 t 20 0 t 20 0"
+            fill="none" stroke="rgba(127,209,217,.32)" stroke-width="1.2" stroke-linecap="round" />
+        </g>
+      </g>
+</svg>
 
     <!-- 覆盖层 -->
     <div class="ov" style="left:76px; top:96px; width:520px">
