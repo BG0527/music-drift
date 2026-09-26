@@ -78,7 +78,7 @@ describe('DESIGN.md 的 t10 amend 已落地（跨文档契约）', () => {
   it('核心纪律未被 amend 改动（抽样：8px、12px 圆角、spring 120/20、480ms、z-index 契约）', () => {
     for (const line of [
       'Base unit: 0.5rem (8px)',
-      'Base corner radius: 12px',
+      'Base corner radius: 2px',
       'stiffness 120, damping 20',
       'over 480ms ease-out',
       'base (0) / sticky-nav (100) / overlay (200) / modal (300) / toast (500)',

@@ -4,60 +4,74 @@
  *
  * 与 `theme.css` 同源：两边都由 `DESIGN.md` front matter 决定，
  * 一致性由 `__tests__/tokens.test.ts` 守卫（出现 DESIGN.md 之外的色值即红）。
+ *
+ * record-v1（2026-09-23 裁决）：页面底 = `ink`（近黑），唯一强调色 = `coral`，
+ * 圆角基准 = 2px。旧名保留为过渡别名并 re-point 到新值，S8 删除。
  */
 
-/** 色板（30 个 token，与 DESIGN.md front matter 逐条一致）。 */
+/** 色板（43 个 token，与 DESIGN.md front matter 逐条一致）。 */
 export const colors = {
-  // 水面（浅色基线）
-  'wave-white': '#F3F9FA',
-  foam: '#E4F0F2',
-  'tide-pool': '#D7E8EC',
-  mist: '#C2D9DF',
-  driftline: '#648C99',
-  // 深水（仅沉浸式区块，不是深色模式）
-  'deep-current': '#0B3A4A',
-  trench: '#123E52',
-  'night-ink': '#061A22',
-  // 品牌主色
-  peacock: '#0F6D80',
-  'peacock-deep': '#0B4E5B',
-  'peacock-active': '#093E49',
-  lagoon: '#2A9DB1',
+  // 基底与文字
+  ink: '#050F14',
+  paper: '#F3F9FA',
+  muted: '#A9C7CF',
+  // 三种光：冷光 / 唯一强调色 / 暖光
+  glass: '#7FD1D9',
+  coral: '#D4553A',
+  warm: '#F6D79A',
+  // 水光冷色族（基色 + alpha 派生）
+  'water-light': '#EAFCFF',
+  'water-mid': '#CBEEF6',
+  'water-deep': '#E4F7FC',
+  'water-void': '#031117',
+  'water-bed': '#0A303C',
+  'water-body': '#12414F',
+  'water-surface': '#1D5F70',
+  line: '#D8F3F6',
+  // 语义四件套（深底重算；色相取自本语言，不引入新色相）
+  success: '#7FD1D9',
+  warning: '#F6D79A',
+  danger: '#DC7E6A',
+  info: '#A9C7CF',
+  'success-tint': '#14262C',
+  'success-border': '#427077',
+  'warning-tint': '#222724',
+  'warning-border': '#716950',
+  'danger-tint': '#1E1719',
+  'danger-border': '#AB4732',
+  'info-tint': '#19252A',
+  'info-border': '#576B72',
+  // 过渡别名（迁移期专用；S8 整批删除）
+  'wave-white': '#050F14',
+  foam: '#EAFCFF',
+  'tide-pool': '#031117',
+  mist: '#D8F3F6',
+  driftline: '#CBEEF6',
+  'deep-current': '#12414F',
+  trench: '#0A303C',
+  'night-ink': '#031117',
+  peacock: '#D4553A',
+  'peacock-deep': '#1D5F70',
+  'peacock-active': '#D4553A',
+  lagoon: '#CBEEF6',
   'sea-glass': '#7FD1D9',
-  // 文字
-  abyss: '#07202B',
-  'slate-current': '#44646F',
+  abyss: '#F3F9FA',
+  'slate-current': '#A9C7CF',
   'on-dark-muted': '#A9C7CF',
-  // 点缀与语义
-  coral: '#C7452C',
-  'coral-deep': '#9D4125',
-  success: '#1F6B51',
-  warning: '#875C12',
-  info: '#0F6D80',
-  danger: '#9D4125',
-  // 语义 tint / border
-  'success-tint': '#E7F2EE',
-  'success-border': '#BFDCCF',
-  'warning-tint': '#FAF1E0',
-  'warning-border': '#E8D3A6',
-  'danger-tint': '#FAEDE9',
-  'danger-border': '#EBC3B6',
-  'info-tint': '#E6F1F4',
-  'info-border': '#BFDCE3',
+  'coral-deep': '#D4553A',
 } as const;
 
 export type ColorToken = keyof typeof colors;
 
-/** 语义色到「文字/图标 + tint 底 + 描边」的三件套（DESIGN.md §Semantic & Status Colors）。 */
+/**
+ * 语义色到「文字/图标 + tint 底 + 描边」的三件套（DESIGN.md §Semantic & Status Colors）。
+ * tint = 语义色 12% 覆盖在 ink 上；border = 语义色 α 覆盖在 ink 上（取到 ≥3:1）。
+ */
 export const semanticTones = {
   success: { text: colors.success, tint: colors['success-tint'], border: colors['success-border'] },
   warning: { text: colors.warning, tint: colors['warning-tint'], border: colors['warning-border'] },
-  danger: {
-    text: colors['coral-deep'],
-    tint: colors['danger-tint'],
-    border: colors['danger-border'],
-  },
-  info: { text: colors.peacock, tint: colors['info-tint'], border: colors['info-border'] },
+  danger: { text: colors.danger, tint: colors['danger-tint'], border: colors['danger-border'] },
+  info: { text: colors.info, tint: colors['info-tint'], border: colors['info-border'] },
 } as const;
 
 export type SemanticTone = keyof typeof semanticTones;
@@ -118,15 +132,15 @@ export const zIndex = {
   toast: 500,
 } as const;
 
-/** 圆角档位（基准 12px）。 */
+/** 圆角档位（基准 2px · record-v1：圆角 ≤4px，pill / full / 半圆除外）。 */
 export const radius = {
   none: 0,
-  sm: 6,
-  md: 8,
-  base: 12,
-  lg: 16,
-  xl: 20,
-  '2xl': 24,
+  sm: 1,
+  md: 2,
+  base: 2,
+  lg: 4,
+  xl: 4,
+  '2xl': 6,
   pill: 999,
   full: '50%',
 } as const;

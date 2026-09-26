@@ -114,15 +114,15 @@ describe('布局 / 圆角 / 层级 token 与 DESIGN.md 一致', () => {
     expect(themeCss).toContain('--container-padding-inline: 1.5rem');
   });
 
-  it('rounded 全量档位映射正确（基准 12px）', () => {
+  it('rounded 全量档位映射正确（基准 2px · record-v1 圆角纪律）', () => {
     expect(themeCss).toContain('--radius-none: 0');
     for (const [token, value] of Object.entries({
-      sm: 6,
-      md: 8,
-      base: 12,
-      lg: 16,
-      xl: 20,
-      '2xl': 24,
+      sm: 1,
+      md: 2,
+      base: 2,
+      lg: 4,
+      xl: 4,
+      '2xl': 6,
     })) {
       expect(themeCss, `缺少 --radius-${token}: ${value}px`).toContain(
         `--radius-${token}: ${value}px`,

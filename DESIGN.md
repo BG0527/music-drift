@@ -1,66 +1,88 @@
 ---
-version: "ocean-v1"
-name: "Ocean Drift"
-description: "桌面为主要场景的 Web 应用（移动端可用性适配）的海洋主题设计 token：水波 / 河道 / 浪线 / 漂流瓶。用于『音乐漂流瓶』匿名接力音乐共创社区。Tokens only — no component code."
+version: "record-v1"
+name: "Record Drift"
+description: "桌面为主要场景的 Web 应用（移动端可用性适配）的唱片主题设计 token：沟槽 / 标签盘 / 水面 / 漂流瓶。用于『音乐漂流瓶』匿名接力音乐共创社区。Tokens only — no component code."
 colors:
-  # —— 水面（浅色基线，原文 Ivory/Cream 的语义位）——
-  wave-white: "#F3F9FA"
-  foam: "#E4F0F2"
-  tide-pool: "#D7E8EC"
-  mist: "#C2D9DF"
-  driftline: "#648C99"
-  # —— 深水（沉浸式区块的暗底）——
-  deep-current: "#0B3A4A"
-  trench: "#123E52"
-  night-ink: "#061A22"
-  # —— 品牌主色（原文 Deep Teal 的语义位）——
-  peacock: "#0F6D80"
-  peacock-deep: "#0B4E5B"
-  peacock-active: "#093E49"
-  lagoon: "#2A9DB1"
+  # ── 基底与文字（record-v1 公共层）────────────────────────────────────
+  ink: "#050F14"
+  paper: "#F3F9FA"
+  muted: "#A9C7CF"
+  # ── 三种光：冷光 / 唯一强调色 / 暖光 ─────────────────────────────────
+  glass: "#7FD1D9"
+  coral: "#D4553A"
+  warm: "#F6D79A"
+  # ── 水光冷色族（11 页实测的高频手写值，本版收成具名 token）──────────
+  # 用法一律是「基色 + alpha 派生」：沟槽/水线 rgba(line,.055~.13)、掠光
+  # rgba(water-deep,.028~.065)、冷边 rgba(water-mid,.7)、遮罩 rgba(water-void,.78)。
+  water-light: "#EAFCFF"
+  water-mid: "#CBEEF6"
+  water-deep: "#E4F7FC"
+  water-void: "#031117"
+  water-bed: "#0A303C"
+  water-body: "#12414F"
+  water-surface: "#1D5F70"
+  line: "#D8F3F6"
+  # ── 语义四件套（深底重算；色相全部取自上面的语言色，不引入新色相）──
+  # danger 是 coral 的**提亮档**（75% coral + 25% paper），因为 coral 原文压在
+  # 自己的 12% 淡底上只有 4.33:1，不到正文 4.5:1 下限。详见 §Semantic & Status。
+  success: "#7FD1D9"
+  warning: "#F6D79A"
+  danger: "#DC7E6A"
+  info: "#A9C7CF"
+  success-tint: "#14262C"
+  success-border: "#427077"
+  warning-tint: "#222724"
+  warning-border: "#716950"
+  danger-tint: "#1E1719"
+  danger-border: "#AB4732"
+  info-tint: "#19252A"
+  info-border: "#576B72"
+  # ── 过渡别名（**迁移期专用**；旧名 re-point 到新值，S8 整批删除）──────
+  # 语义同角色映射：wave-white（页面底）→ ink、abyss（正文）→ paper、
+  # sea-glass（冷光）→ glass、coral-deep（危险文字）→ coral …
+  # 这些名字在新语言里**会撒谎**（wave-white 现在是近黑、abyss 是近白），
+  # 完整对照与高危清单见 §Colors · 迁移别名。
+  wave-white: "#050F14"
+  foam: "#EAFCFF"
+  tide-pool: "#031117"
+  mist: "#D8F3F6"
+  driftline: "#CBEEF6"
+  deep-current: "#12414F"
+  trench: "#0A303C"
+  night-ink: "#031117"
+  peacock: "#D4553A"
+  peacock-deep: "#1D5F70"
+  peacock-active: "#D4553A"
+  lagoon: "#CBEEF6"
   sea-glass: "#7FD1D9"
-  # —— 文字 ——
-  abyss: "#07202B"
-  slate-current: "#44646F"
+  abyss: "#F3F9FA"
+  slate-current: "#A9C7CF"
   on-dark-muted: "#A9C7CF"
-  # —— 点缀与语义 ——
-  coral: "#C7452C"
-  coral-deep: "#9D4125"
-  success: "#1F6B51"
-  warning: "#875C12"
-  info: "#0F6D80"
-  danger: "#9D4125"
-  # —— 语义 tint / border（机器可读；与正文「Semantic & Status Colors」一致）——
-  success-tint: "#E7F2EE"
-  success-border: "#BFDCCF"
-  warning-tint: "#FAF1E0"
-  warning-border: "#E8D3A6"
-  danger-tint: "#FAEDE9"
-  danger-border: "#EBC3B6"
-  info-tint: "#E6F1F4"
-  info-border: "#BFDCE3"
-# 渐变（本轮新增）。规则：**只允许由既有 colors 组合**，不得借"加渐变"发明新颜色。
+  coral-deep: "#D4553A"
 gradients:
-  # 河道剖面的水体：水面（peacock-deep）→ 中层（deep-current）→ 河底（trench）。
-  # 语义是「越往下越深」——深水暗底硬约束在这里的体现是：它**不是**深色模式，是"这一页是一幅水的剖面"。
+  # 规则：**只允许由既有 colors 组合**，不得借"加渐变"发明新颜色。
+  # 河道剖面的水体：水面 → 中层 → 河底（越往下越深）。
+  # 三个 stop 的名字沿用过渡别名（机器守卫把这三个名字钉在渐变里），
+  # 它们现在分别指向 water-surface / water-body / water-bed：
+  #   #1D5F70 → #12414F → #0A303C（明度 0.096 > 0.045 > 0.025，单调变深）。
   river: "linear-gradient(180deg, {colors.peacock-deep} 0%, {colors.deep-current} 44%, {colors.trench} 100%)"
 typography:
   hero:
     fontFamily: Quattrocento
-    fontSize: clamp(2.5rem, 5vw, 4rem)
+    fontSize: 56px
     fontWeight: 700
     letterSpacing: "-0.02em"
   h1:
     fontFamily: Quattrocento
-    fontSize: 2.25rem
+    fontSize: 26px
     fontWeight: 700
   h2:
     fontFamily: Quattrocento
-    fontSize: 1.5rem
+    fontSize: 19px
     fontWeight: 700
   body-md:
     fontFamily: Quattrocento
-    fontSize: 1rem
+    fontSize: 16px
     fontWeight: 400
     lineHeight: 1.6
   body-cjk:
@@ -70,21 +92,26 @@ typography:
     lineHeight: 1.6
   ui-label:
     fontFamily: 'Quattrocento, "LXGW WenKai", ui-serif, system-ui'
-    fontSize: 0.875rem
+    fontSize: 13px
     fontWeight: 500
     letterSpacing: "0.01em"
+  meta:
+    fontFamily: 'Quattrocento, "LXGW WenKai", serif'
+    fontSize: 11px
+    fontWeight: 400
+    letterSpacing: "0.24em"
   mono:
     fontFamily: '"JetBrains Mono", ui-monospace, monospace'
-    fontSize: 0.875rem
+    fontSize: 14px
     fontWeight: 400
 rounded:
   none: 0
-  sm: 6px
-  md: 8px
-  base: 12px
-  lg: 16px
-  xl: 20px
-  "2xl": 24px
+  sm: 1px
+  md: 2px
+  base: 2px
+  lg: 4px
+  xl: 4px
+  "2xl": 6px
   pill: 999px
   full: 50%
 spacing:
@@ -115,7 +142,7 @@ motion:
     # 约束：只动 transform；低幅度低速度不争夺注意力；reduced-motion 下由全局重置冻结。
   driftDuration: 24000ms   # 24s 一个来回的一半（配 alternate）—— 慢到不引人注意
   driftShift: 10px         # 横向位移幅度（±10px）—— 小到只"感觉到"而不是"看到"
-  # 漂流瓶沿河道通过（本轮，河道剖面的主角装饰）。与 drift 的区别：drift 动的是**整面水纹**
+  # 漂流瓶沿河道通过（河道剖面的主角装饰）。与 drift 的区别：drift 动的是**整面水纹**
   # （幅度小、周期 24s），passage 动的是**一只瓶子**（幅度大、周期更长）。
   # 判据仍是"低速度"而不是"低幅度"：46s 走 320px ≈ 7px/s，比水纹还慢 ⇒ 不争夺注意力。
   passageDuration: 46000ms  # 一个来回（配 alternate）
@@ -148,109 +175,156 @@ zIndex:
   modal: 300
   toast: 500
 components:
+  # record-v1：唯一的强调色是 coral，**实心 coral 填充上的文字一律用 ink**（双向 4.76:1）。
   button-primary:
-    backgroundColor: "{colors.peacock}"
-    textColor: "{colors.wave-white}"
+    backgroundColor: "{colors.coral}"
+    textColor: "{colors.ink}"
     padding: 12px
     borderRadius: "{rounded.base}"
     fontWeight: 600
   button-ghost:
     backgroundColor: transparent
-    borderColor: "{colors.driftline}"
-    borderWidth: 1.5px
-    textColor: "{colors.peacock}"
+    borderColor: "{colors.muted}"
+    borderWidth: 1px
+    textColor: "{colors.coral}"
     padding: 12px
     borderRadius: "{rounded.base}"
   card:
-    backgroundColor: "{colors.foam}"
-    borderColor: "{colors.mist}"
+    backgroundColor: "{colors.ink}"
+    borderColor: "{colors.line}"
     borderWidth: 1px
     borderRadius: "{rounded.base}"
-    shadow: "0 2px 12px rgba(0,0,0,0.06)"
+    shadow: none   # record-v1：不用阴影造层次，用亮度差与 1px 细线
   input:
-    backgroundColor: "{colors.wave-white}"
-    borderColor: "{colors.driftline}"
+    backgroundColor: "{colors.water-void}"
+    borderColor: "{colors.muted}"
     borderWidth: 1px
-    textColor: "{colors.abyss}"
+    textColor: "{colors.paper}"
     borderRadius: "{rounded.md}"
-    focusRing: "2px {colors.peacock} offset 2px"
+    focusRing: "2px {colors.coral} offset 2px"
 ---
 
 ## Overview
 
-Ocean Drift is the visual system for a mobile-first H5 app: an anonymous relay music community where one person drops a song into a bottle, someone downstream picks it up, records the next segment, and lets it drift on. The water is the product's own structure — a channel that carries something from hand to hand.
+Record Drift is the visual system for a desktop-primary web app with mobile usability: an anonymous relay music community where one person drops a song into a bottle, someone downstream picks it up, records the next segment, and lets it drift on.
 
-The system keeps the discipline of a flowing line without the ornament tax: wave contours and channel guides tell you where the relay goes next, ripples mark where it landed, and the drift bottle is the one motif the eye is allowed to follow. Ornament earns its place by guiding the eye through the relay, not by competing with the recording controls. Where the original Art Nouveau accent was drawn from flowers and whiplash tendrils, this system draws from water: **水波 (wave contours)、河道 (channel guides)、浪线 (tide lines)、涟漪 (ripples)、漂流瓶 (drift bottle)**. No floral ornament, no stained glass, no whiplash curls.
+The product has four themes — **海洋 (ocean) · 河道 (river channel) · 漂流瓶 (drift bottle) · 音乐 (music)** — and the visual language of this version is **a vinyl record lying in water**. The record is the *carrier of music*, not the product itself:
 
-- Density: 5/10 — Balanced
+- **一条沟槽 = 一条河道**（the groove is the channel the relay travels along）
+- **一枚标签盘 = 一支作品**（the label is one work's identity）
+- **唱针 = 播放头**（the stylus is the playhead）
+- **印章 = 裁决**（the stamp is a moderation verdict）
+
+The iron rule of this version (from the 11-page design contract): **母题必须承担信息，不能只做背景** — every device must encode something, and no page may be "a generic dark dashboard". Each page carries at most two devices, and adjacent pages must not repeat the same one.
+
+- Density: 4/10 — Spacious (information carried by lines and light, not by boxes)
 
 - Variance: 8/10 — Expressive
 
-- Motion: 6/10 — Expressive
+- Motion: 3/10 — Quiet (decoration does not move; see §Elevation & Depth)
 
-- **Style:** Tidal, Fluid, Quiet
+- **Style:** Deep-water, Grooved, Quiet
 
-- **Keywords:** ocean, tide, river channel, drift bottle, wave contour, ripple, flowing water, anonymous relay, music collaboration, hand-to-hand
+- **Keywords:** vinyl record, groove, river channel, waterline, drift bottle, anonymous relay, music collaboration, hand-to-hand
 
-- **Era:** Contemporary — 当代数字海洋
+- **Era:** Contemporary — 当代唱片与水
 
-- **Light/Dark:** ✓ Full / ✗ No
+- **Light/Dark:** ✗ No light / ✓ Dark only（本版**只有深底**，不提供主题切换，也没有 light variant）
 
 ## Colors
 
-语义名 · 值 · 用途 · 实测对比度（WCAG 2.1，底色 wave-white #F3F9FA，除注明外）
+底色一律是 `ink`；文字只有两档（`paper` / `muted`）；彩色只有三种光（`glass` / `warm` / `coral`）。语义名 · 值 · 用途 · 实测对比度（WCAG 2.1，底色 = 页面底 `ink` #050F14，除注明外）。
 
-**水面（浅色基线）**
+**基底与文字**
 
-- **wave-white** (#F3F9FA) — 页面底色 / 输入框底 / 反白文字色。全局 default surface。
-- **foam** (#E4F0F2) — 卡片、抬升面板、列表行底。卡片背景 SSOT（不再使用橄榄绿 #808000）。
-- **tide-pool** (#D7E8EC) — 凹陷面：标签 chip、进度槽、骨架屏底。
-- **mist** (#C2D9DF) — 纯装饰细线、水波分隔（非文本、非交互边界，1.38:1）。
-- **driftline** (#648C99) — 表单 / 卡片交互边界描边，对 wave-white 3.43:1、对 foam 3.14:1（满足非文本 UI 3:1）。
+- **ink** (#050F14) — 盘面底 / 页面基底 / 卡片底。**禁纯黑 #000000**（纯黑会让沟槽纹理与水面光带失去层次）。
+- **paper** (#F3F9FA) — 正文与标题（对 ink **18.20:1**）。
+- **muted** (#A9C7CF) — 次要文字、元信息、说明、时间戳、placeholder（对 ink **10.84:1**）。**这是文字的暗端下限**：不得再引入比它更暗的文字色。
 
-**深水（沉浸式区块暗底）**
+**三种光**
 
-- **deep-current** (#0B3A4A) — Hero / 试听页暗底；其上 wave-white 文字 11.49:1。
-- **trench** (#123E52) — 暗底上的抬升层；wave-white 10.75:1、on-dark-muted 6.40:1、sea-glass 6.55:1。
-- **night-ink** (#061A22) — Modal / Sheet 遮罩（不承载文字）。
+- **glass** (#7FD1D9) — **冷光**：链接、已达成、冷边（环形外环、冷色描边）。对 ink **11.08:1**。
+- **coral** (#D4553A) — **唯一强调色**：标签盘、印章、当前项、危险态填充、主 CTA。
+  - 作文字 / 线压在 ink 上 = **4.76:1** ✓（旧值 #C7452C 只有 3.98:1，被用户裁决替换）。
+  - 作**实心填充**时，其上的文字**一律用 `ink`** = **4.76:1** ✓；压纸白字只有 3.83:1 ✗ —— 所以「`ink` ↔ `coral`」这一对**双向都达标**，一个 token 就解掉了填充与文字互相拉扯的矛盾。
+  - **12–16% 的 coral 淡底不算填充**：那种底上的文字照旧用 coral 的提亮档 `danger`。
+- **warm** (#F6D79A) — **暖光**：等待态、「投下」一侧、暖边（`rgba(warm,.66)`）。对 ink **13.92:1**。
 
-**品牌主色**
+**水光冷色族**（11 页实测高频手写值，本版收成 token；**只准以「基色 + alpha」派生，不得写死新的 hex**）
 
-- **peacock** (#0F6D80) — 主品牌色 / 主按钮底 / 链接 / focus ring。白字 5.97:1，作文字对 wave-white 5.61:1、对 foam 5.13:1。
-- **peacock-deep** (#0B4E5B) — 主按钮 hover 底（等效 8% darken）。白字 9.31:1。
-- **peacock-active** (#093E49) — 主按钮 active 底。白字 11.69:1。
-- **lagoon** (#2A9DB1) — **仅装饰与水波动效填充**（水波渐变、图表面积），不承载文字（对深底 3.82:1 不达标，禁止用作文字色）。
-- **sea-glass** (#7FD1D9) — 深底上的强调**图标 / 水波高光**（对 deep-current 7.00:1）。深底承载文字只允许 wave-white 与 on-dark-muted。
+| token | 值 | 在画面里是什么 | 典型派生 |
+| --- | --- | --- | --- |
+| `water-light` | #EAFCFF | 最亮的水光（字形高光、承板） | `rgba(234,252,255,·)` |
+| `water-mid` | #CBEEF6 | 冷边光（环、冷描边） | `rgba(203,238,246,.7)` |
+| `water-deep` | #E4F7FC | 掠光（glint）与细线 | `rgba(228,247,252,.028~.065)` |
+| `line` | #D8F3F6 | 沟槽线 / 水线基色 | `rgba(216,243,246,.055~.13)` |
+| `water-bed` | #0A303C | 盘面内层（水体基层） | 盘面径向填充的亮端 |
+| `water-body` | #12414F | 水体（沉浸式区块底） | 河道剖面中层 |
+| `water-surface` | #1D5F70 | 水面（剖面顶层） | 河道剖面第一段 |
+| `water-void` | #031117 | 沟槽底 / Modal 遮罩 | `rgba(3,17,23,.78)` |
 
-**文字**
+- `water-bed / water-body / water-surface` 是**有层次的深水**（明度 0.025 < 0.045 < 0.096）：越往下越深。它们**只作面**，不承载文字（对 ink 只有 1.75:1）。
+- 分隔线不新造颜色：细线取 `rgba(line, .13)` 或 `rgba(paper, .13)`；沟槽取 `rgba(line, .055)`。
 
-- **abyss** (#07202B) — 正文与标题（对 wave-white 15.79:1、对 foam 14.43:1）。全站唯一"最深"色，替代纯黑。
-- **slate-current** (#44646F) — 次要文字、说明、时间戳、placeholder（对 wave-white 5.99:1、对 foam 5.47:1、对 tide-pool 5.05:1）。
-- **on-dark-muted** (#A9C7CF) — 深底上的次要文字（对 deep-current 6.84:1）。
+**迁移别名（过渡期专用，S8 删除）**
 
-**点缀与语义色**（详见「Semantic & Status Colors」）
+旧契约（`ocean-v1`）的名字全部保留并 **re-point 到新值**，语义同角色映射。**它们会撒谎**——这是迁移期已知的代价，逐条记账：
 
-- **coral** (#C7452C) — 珊瑚点缀：主 CTA 强调位（如「投瓶」）、危险态填充。白字 4.87:1。
-- **coral-deep** (#9D4125) — 危险 / 错误**文字与图标**（对 wave-white 6.14:1）。
+| 旧名 | 旧角色 | 现在指向 | 是否撒谎 |
+| --- | --- | --- | --- |
+| `wave-white` | 页面底色 | `ink` #050F14 | **是**（"白"现在是近黑） |
+| `abyss` | 正文 | `paper` #F3F9FA | **是**（"深渊"现在是近白） |
+| `foam` / `tide-pool` | 卡片面 / 凹陷面 | `water-light` / `water-void` | **是**（卡片面现在是浅水光面） |
+| `mist` / `driftline` | 装饰细线 / 交互边界 | `line` / `water-mid` | 否（仍是"线"） |
+| `deep-current` / `trench` | 深水暗底 / 抬升层 | `water-body` / `water-bed` | 部分（"抬升"不再靠变亮） |
+| `night-ink` | Modal 遮罩 | `water-void` | 否 |
+| `peacock` / `peacock-active` | 品牌主色 / 按下态 | `coral` | **是**（"孔雀蓝"现在是珊瑚红） |
+| `peacock-deep` | 主按钮 hover 底 | `water-surface` #1D5F70 | **是**（为了 `gradients.river` 的第一段仍是一幅水，见下） |
+| `lagoon` / `sea-glass` | 装饰水色 / 冷光 | `water-mid` / `glass` | 否 |
+| `slate-current` / `on-dark-muted` | 次要文字 | `muted` | 部分 |
+| `coral-deep` | 危险文字 | `coral` | 部分（新语言只有一个强调色） |
+
+- `gradients.river` 的三个 stop 名字由机器守卫钉死（`water-motif.test.tsx` 要求含 `peacock-deep` / `deep-current` / `trench`），因此**不允许**在这里改成新名；它们现在分别解析为 `water-surface` / `water-body` / `water-bed`，剖面因此是真正的水（越往下越深）。
+- 迁移期**唯一已知的坏组合**：`bg-foam` + `text-abyss` = 浅水光面 + 近白文字 = **1.01:1**（不可读）。原因是 `pages/__tests__/deep-surface-cta.test.ts` 的 token 关系守卫要求 `foam` 与 `deep-current` 相差 ≥3:1、且 coral 固定为 #D4553A ⇒ `foam` 必须落在浅端。**S2/S3 起逐页消除**，不要在新代码里写这个组合。
 
 规则：
 
 - 文案可读性硬约束：**所有承载文字的颜色 ≥4.5:1**（≥24px 或 ≥19px bold 时 ≥3:1）；非文本 UI 边界与图标 ≥3:1。
-- **饱和度上限 80%**：整份色板实测最高 79%（peacock #0F6D80）。色相集中在 190°（水）/ 14°（珊瑚点缀）/ 150°（成功）/ 38°（警告）；点缀色只占画面 <10%。
-- 原 Art Nouveau 色板中的 Olive Green #808000 已从 surface 位彻底移除。
+- **不引入新色相**：整份色板只有「近黑 / 近白 / 冷青 / 暖沙 / 珊瑚」五个色相族。语义状态色也从这五族里取（见 §Semantic & Status Colors），**禁止**为了"成功绿"再加一个绿色。
+- 珊瑚点缀占画面 <10%；彩色只出现在边缘微光、当前项、印章与主 CTA 上，**盘身不填彩色**。
 
 ## Typography
 
-- **Display / Hero:** Quattrocento — Weight 700, tight tracking, used for headline impact
-- **Body:** Quattrocento — Weight 400, 16px/1.6 line-height, max 72ch per line
-- **UI Labels / Captions:** Quattrocento — 0.875rem, weight 500, slight letter-spacing
-- **Monospace:** JetBrains Mono — Used for code, metadata, and technical values
+- **Display / Hero:** Quattrocento — Weight 700, line-height 1, tracking tight
+- **Body:** 霞鹜文楷 LXGW WenKai — 中文正文，line-height 1.85
+- **Metadata:** Quattrocento — `11px` + `letter-spacing: .24em`（如 `SIDE B · 已入海`、`QC · 母版检验`）
+- **Monospace:** JetBrains Mono — 码率、时长等技术值
 
-中文主字体（本轮新增）:
+字号阶梯（来自 11 页实测，**只有这些档**）：
 
-- **中文正文字体：霞鹜文楷 LXGW WenKai** — 自托管 npm 包 `lxgw-wenkai-webfont`，`font-display: swap`。楷体的手写笔意对应"匿名手写接力"的产品气质，正文与界面文案统一用它。
-- **拉丁 / 数字：Quattrocento** — 自托管 npm 包 `@fontsource/quattrocento`。数字、时长、秒数、拉丁用户名走 Quattrocento，与中文楷体形成"航标 + 手迹"的对照。
-- 合规红线：**禁止任何 CDN 引用**（jsDelivr 不可达，离线 demo 不可依赖外网）。字体只允许 `npm` 包 → 本地 `woff2` → `@font-face` 自托管。
+| 档 | 值 | 用途 |
+| --- | --- | --- |
+| hero | 56–62px | 页面主标题（**例外**：河道标杆页允许 76–84px —— 既成的视觉层级，写明白而不是留着不一致） |
+| h1 | 26px | 区块标题、作品名 |
+| h2 | 19px | 卡片标题 |
+| lead | 17px | 引导句 |
+| body | 14.5–15.5px | 正文（中文 1.85 行高） |
+| ui | 13px | 界面标签、按钮 |
+| small | 12.5px | 次要说明 |
+| meta | 11px / `.24em` | 元信息（封套/母版号/时间戳） |
+| micro | 10px | 刻度、刻度旁的极小标注 |
+
+中文排版要求：
+
+- 页面正文块的目标档是 **14.5–15.5px / 1.85**（S2+ 逐块落地）；**`body` 基线本轮不动**（仍是 1rem/1.6）—— 一次性改全站纵向节奏会撞「一屏装下」门禁，而 S1 没有截图验证手段。中文**不使用负 letter-spacing**，字距恒为 normal。
+- 副标题（`--muted`）**宽度 ≤ 820px**；中文正文目标 30–40 字/行。
+- 中英混排的元信息用 `.meta` 栈（Quattrocento → 中文回落到文楷），**不要让中文落到系统衬线**（那等于偷偷引入第三种字体）。
+- 中文标点用全角；中英之间保留 1/4 空，不靠硬编码空格。
+- 示例句（可读性自检）：「把副歌留给下一个人。你只录 15–30 秒，剩下的交给漂流。」
+
+字体自托管（**合规红线：禁止任何 CDN 引用**）：
+
+- 中文正文：`lxgw-wenkai-webfont`（楷体的手写笔意 = 匿名手写接力）；拉丁 / 数字：`@fontsource/quattrocento`（航标 + 手迹的对照）。两者都是 **npm 包 → 本地 woff2 → `@font-face`**，`font-display: swap`。
 - Fallback 栈（必须按此顺序，无 webfont 时中文仍有可用衬线）:
 
 ```css
@@ -263,206 +337,173 @@ font-family: Quattrocento, "LXGW WenKai", ui-serif, system-ui, serif;
 font-family: "JetBrains Mono", ui-monospace, "SFMono-Regular", monospace;
 ```
 
-中文排版要求（可读性示例）:
-
-- 正文 1rem / 1.6 为唯一基线；中文不使用负 letter-spacing，字距恒为 normal。
-- 中文标点使用全角；中英之间保留 1/4 空（用 `text-spacing` 或样式实现，不靠硬编码多余空格）。
-- 标题可用 Quattrocento 700 + 中文楷体 700 混排。
-- 每行 **<80ch 为硬上限**，中文正文目标 30–40 字/行（约等于 72ch 拉丁宽度）。
-- 示例句（可读性自检）：「把副歌留给下一个人。你只录 15–30 秒，剩下的交给漂流。」
-
-Scale:
-
-- Hero: clamp(2.5rem, 5vw, 4rem)
-- H1: 2.25rem
-- H2: 1.5rem
-- Body: 1rem / 1.6
-- Small: 0.875rem
-
 ## Layout
 
 - **Grid:** CSS Grid primary. Max-width containment: 1280px centered with 1.5rem side padding.
-  - **侧边距分档（2026-09-23 amend · B5）**：**移动 1.5rem（24px）**；**桌面 48px**。
-    · 依据：Figma 帧实测页面内边距 40/48（用户设计派生）；裁定「以 Figma 派生为准」，故本文档补桌面档以匹配设计。
-    · 出处：`docs/ui-review/visual-audit.md` B5。
-    · **可回退**：删去本分档，即回到「全断点统一 1.5rem」的原文口径。
+  - **侧边距分档**：**移动 1.5rem（24px）**；**桌面 48px**（出处：`docs/ui-review/visual-audit.md` B5，Figma 帧实测 40/48）。
 - **Spacing rhythm:** Balanced. Base unit: 0.5rem (8px).
   —— 这里的 Base unit 指**节奏步长**（间距只取 8px 派生档：4/8/12/16/24/32/48/64）。
   它**不是** Tailwind `--spacing` 的值：后者的语义是「**尺度值 1 的长度**」，本项目取框架默认 `0.25rem`（=4px），
   因此节奏档用**偶数**表达（`p-2` = 8px、`p-4` = 16px、`p-6` = 24px、`p-8` = 32px、`p-12` = 48px、`p-16` = 64px），
   4px = `p-1`，44px 触控底线 = `min-h-11`（`--touch-target-min: 44px`）。
   **禁止覆盖 `--spacing`** —— 覆盖会让**每一个**数字档 utility ×2（`min-h-11` 变 88px、侧栏 `w-64` 变 512px）。
-- **Section vertical gaps:** clamp(4rem, 8vw, 8rem).
-  - **适用范围限定（2026-09-23 amend · B1）**：上式的 `clamp(4rem, 8vw, 8rem)`（1440 下 ≈ 115.2px）**仅适用于有纵向余量的场景**；
-    **H5「一屏装下、禁止下滑」语境取 32–40px**（当前实现 32px）。
-    · 理由：该式与**用户直接指令**「所有页面一屏装下、禁止下滑」（`docs/architecture.md` §46.3）冲突；**用户直接指令优先于本文档这类内部契约**。
-    · 出处：`docs/ui-review/visual-audit.md` B1（实测页面 gap 32px，对照本文档 115.2px）。
-    · **可回退**：若用户改选「大留白 + 允许滚动」，删去本限定即恢复原文口径（大留白生效）。
-- **Hero layout:** Asymmetric composition.
-  - **收敛到 Figma 实际形态（2026-09-23 amend · B2）**：**Hero 主交互区为居中同心圆**（Figma `home-river` 骨架：240·180·130 涟漪 + 110 主按钮）；
-    「非对称」指的是**同页内容层**（标题左对齐、快捷入口右对齐），**不适用于 hero 主交互区本身**。
-    · 理由：Figma 是**用户的设计**，文档应匹配设计 —— 修回 Figma 属合规，不需用户批准。
-    · 出处：`docs/ui-review/visual-audit.md` B2。
-    · **可回退**：删去本限定，即回到「hero 整体非对称构图」的原文口径。
+- **Section vertical gaps:** clamp(4rem, 8vw, 8rem)。
+  - **适用范围限定**：上式**仅适用于有纵向余量的场景**；**H5「一屏装下、禁止下滑」语境取 32–40px**。
 - **Feature sections:** Asymmetric grid with varied card sizes. No 3-equal-columns.
 - **Mobile collapse:** All multi-column layouts collapse below 768px. No horizontal overflow.
 - **z-index contract:** base (0) / sticky-nav (100) / overlay (200) / modal (300) / toast (500).
 
-移动优先落地（不改任何数值，只补齐 H5 语境）:
+响应式落地（设计稿是 1440×900 固定画布，真实前端必须重排）：
 
-- 设计顺序：桌面主场景（1440px 评审稿、1280px 容器居中 + 1.5rem 侧边距）→ 768px（折叠阈值）→ 375px（可用性适配验证）；窄屏下容器退化为 100% 宽 + 1.5rem 侧边距。
-- 间距只取 8px 派生档：4 / 8 / 12 / 16 / 24 / 32 / 48 / 64。
-- 触控目标 ≥44px 见方（含 12px 内边距的按钮与列表行），相邻可点目标间距 ≥8px。
-- 安全区：底部固定导航 / 播放条预留 `env(safe-area-inset-bottom)`，纵向高度用 `min-h-[100dvh]`。
+- 设计顺序：桌面主场景（1440px 评审稿、1280px 容器居中）→ 768px（折叠阈值）→ 375px（可用性适配验证）；窄屏下容器退化为 100% 宽 + 1.5rem 侧边距。
+- **出血装饰必须包在 `overflow: hidden` 的容器里**，否则撑大 `scrollWidth` = 横向溢出（设计稿里叫 `.clip`）。
+- 触控目标 ≥44px 见方，相邻可点目标间距 ≥8px；底部固定条预留 `env(safe-area-inset-bottom)`，纵向高度用 `min-h-[100dvh]`（**禁 `h-screen`**）。
 - 单列优先：一次只让用户做一件事（选歌 → 录制 → 投瓶 → 取瓶 → 交接），接力路径以河道式纵向流呈现。
-- 深水暗底（deep-current / trench）**不是深色模式**：见「Elevation & Depth · 深水暗底硬约束」，全站不提供主题切换与 dark variant。
+- **深底不是"深色模式"**：全站只有这一个主题，不提供切换、不按 `prefers-color-scheme` 反转。
 
 ## Composition
 
-### 河道页（`/river`）· 河道剖面（本轮 t48）
+### 河道页（`/river`）· 河道剖面
 
-用户本轮指令：「必须高级符合人类审美地好看，因为这是参赛作品」。
-河道页因此**不再用卡片**组织，改用一幅**剖面**：一条水线横贯内容区，岸在上、水在下，
-两个等权的泊位骑在这条河上。方案与逐条反默认自检见 `docs/ui-review/design-plan-river.md`。
+用户指令：「必须高级符合人类审美地好看，因为这是参赛作品」；同一份指令要求**默认态不许出现漂流瓶**（"只有水在流"）。河道页因此**不用卡片**组织，改用一幅**剖面**：一条水线横贯内容区，岸在上、水在下，两个等权的泊位骑在这条河上。
 
 ```text
-┌ 岸（wave-white + 浅底水层）──────────────────────────────────────┐
+┌ 岸（ink + 沟槽质感）──────────────────────────────────────────────┐
 │  暖流河道（hero 档标题）                        我参与过的漂流瓶   │
 │  拾起那些搁浅在黑夜里的声线                                       │
-├──────────────────────── 水 线（唯一横线）────────────────────────┤
-│░ 水体（gradients.river：peacock-deep → deep-current → trench）  ░│
-│░   ◎ 捞取（下游）                     投下 ◎（上游）              ░│
-│░   捞一个漂流瓶                        投下一支漂流瓶             ░│
-│░  ～～～～～～ 河道主流（= 声波包络）～～～～～～  🍾 漂过的瓶子   ░│
-│░  〔全部〕〔深夜〕〔通勤〕〔告白〕〔雨天〕  ← 浮标                ░│
+├──────────────────────── 水 线（唯一横线 · line）───────────────────┤
+│  水体（gradients.river：water-surface → water-body → water-bed）  │
+│    ◎ 捞取（下游）                     投下 ◎（上游）              │
+│    捞一个漂流瓶                        投下一支漂流瓶             │
+│    ～～～～～～ 河道主流（= 声波包络）～～～～～～  瓶子的缺席可读  │
+│    〔全部〕〔深夜〕〔通勤〕〔告白〕〔雨天〕  ← 浮标                │
 └──────────────────────────────────────────────────────────────────┘
 ```
 
-- **为什么不是两张卡**：同宽同高同圆角同阴影的两张卡片会把「捞」与「投」读成两个并列功能；
-  剖面把两者读成**同一条河上的两个位置**（下游接住 / 上游放下）——这正是产品规则（单支路河道）的形状。
-- **「等权」仍然成立**（用户 2026-09-23 裁决）：两个泊位共用同一份尺寸定义（`PORT_SIZE`），
-  只有颜色与图标不同（`peacock` / `coral`）。**禁止**只改其中一个。
-- **流向由右向左**（上游在右）：`投下` 在右、`捞取` 在左，与阅读顺序一致（新用户的第一动作是「捞」）。
-  方向由航迹与瓶子漂移共同暗示，**不写文字解释**。
-- **四个主题装在一幅画里**：海洋（水体渐变 + 光柱）、河道（水线 + 主流 + 上下游）、
-  漂流瓶（漂过的瓶）、音乐（主流 = 声波包络）。
-- **一屏**：本构图**不**为 900px 砍画面（用户本轮明确豁免该门禁）。
-  ⚠️ **门禁脚本本身没有被放宽**：`apps/web/tools/one-screen-check.mjs` 的阈值一字未改。
-  回滚路径见 `docs/ui-review/design-plan-river.md` §7。
+- **为什么不是两张卡**：同宽同高同圆角的两张卡片会把「捞」与「投」读成两个并列功能；剖面把它们读成**同一条河上的两个位置**（下游接住 / 上游放下）——这正是产品规则（单支路河道）的形状。
+- **「等权」仍然成立**：两个泊位共用同一份尺寸定义，只有颜色与图标不同（`glass` / `coral`）。**禁止**只改其中一个。
+- **流向由右向左**（上游在右）：`投下` 在右、`捞取` 在左，与阅读顺序一致；方向由航迹与瓶子漂移共同暗示，**不写文字解释**。
+- **四个主题装在一幅画里**：海洋（水体渐变 + 光柱）、河道（水线 + 主流 + 上下游）、漂流瓶（漂过的瓶）、音乐（主流 = 声波包络）。
+- **一屏**：本构图不为 900px 砍画面（用户本轮明确豁免该门禁）。门禁脚本本身没有被放宽：`apps/web/tools/one-screen-check.mjs` 的阈值一字未改。
 
 ## Elevation & Depth
 
-Water contours, tide lines, river-channel guides, ripples, drift-bottle silhouettes, glass-water surfaces, subtle gradients, luminous depth cues, delicate restrained animation。装饰只出现在区块边缘与状态切换处，不进入内容区。
+Water contours, tide lines, river-channel guides, ripples, drift-bottle silhouettes, glass-water surfaces, subtle gradients, luminous depth cues。装饰只出现在区块边缘与状态切换处，**不进入内容区**。
 
+- **不用阴影造层次**：层级由**亮度差 + 1px 细线**表达（这是本版与上一版最大的形态差异）。阴影只允许出现在浮层（Modal / Sheet / Toast）与浮动条上。
 - **Physics:** Spring — stiffness 120, damping 20. Confident, weighted transitions.
 - **Entry animations:** Fade + translate-Y (16px → 0) over 480ms ease-out. Staggered cascades for lists: 100ms between items.
-- **Hover states:** Scale(1.03) + shadow lift over 200ms.
+- **Hover states:** Scale(1.03) + 亮度变化 over 200ms（不抬阴影）。
 - **Page transitions:** Fade + slide (300ms).
-- **Exit animations:** 一切退场（Modal / Toast / 页面）用 `exitDuration`（240ms）——**更短**因为人已经知道结果了。**进出必须配对**：有入场就必须有退场，不能"弹出来就没了"。
-- **Ripples — 两个角色，不可混为一谈**（2026-09-24 amend，按 `motion-web` §1 的目的分类拆分）:
-  - **① 事件涟漪（event ripple）**：**标记状态变化与落点**（时间轴节点、投/捞的落点、接力交接）。**短暂、事件驱动、只播一次**。
-  - **② 场景涟漪（scene ripple）**：**hero 的常驻水面母题**（Figma `home-river` 的 240·180·130 同心圆）。**允许 `infinite` 常驻**，但只有在同时满足「**低幅度 + 低速度、不争夺注意力**」与「`reduced-motion` 下静止」时才成立；它**不进内容区**、不承载任何信息（`aria-hidden`）。
-  - **产品理由（写进契约，不让它游走在契约之外）**：涟漪是本系统的水主题母题（见 Overview 的母题清单），hero 同心圆是用户设计稿的既定形态；两者共用 `rippleDuration`（2400ms）。
+- **Exit animations:** 一切退场（Modal / Toast / 页面）用 `exitDuration`（240ms）——**更短**因为人已经知道结果了。**进出必须配对**：有入场就必须有退场。
+- **Ripples — 两个角色，不可混为一谈**:
+  - **① 事件涟漪（event ripple）**：**标记状态变化与落点**（投/捞的落点、入海、接力交接）。**短暂、事件驱动、只播一次**。
+  - **② 场景涟漪（scene ripple）**：常驻水面母题。**允许 `infinite` 常驻**，但只有在同时满足「**低幅度 + 低速度、不争夺注意力**」与「`reduced-motion` 下静止」时才成立；它**不进内容区**、不承载任何信息（`aria-hidden`）。
 - **Toast 生命周期:** 成功 3000ms / 信息 5000ms 后自动退场（退场用 `exitDuration`）；**错误常驻到手动关闭**（`toastErrorPersistent`）——错误不许静默消失。
-- **水域母题层（water motif，2026-09-24 amend · t43）**：三个**零布局高度**的装饰件，把「水面—河道—深海—漂流瓶」的世界观落到页面上：
-  1. **水面光带（water sheen）**：深水暗底顶部的一层极淡渐变，暗示"从水面往下看"；强度 `sheenAlphaDark`（浅底用 `sheenAlphaLight`）。
-  2. **水位线肌理（water texture）**：横向细线平铺（周期 `textureTile`，强度 `textureAlpha`），让大块暗底不再像空白模板（`frontend-design` L59：把质量地板做到不喧哗）。
-  3. **潮线（tide line）**：`sea-glass → 透明` 的渐隐细线，替代区块之间的硬分隔线（母题见 Overview 的 tide lines）。
-  - **河道剖面四件（本轮新增，t48）** —— 让「水」从底纹升级为一幅**有深度的画面**：
-    4. **水线（surface line）**：岸与水体的**分界**（`surfaceLineAlpha`）。它不是分隔线，是**地平线**：
-       线以上是空气与岸（浅底），线以下是水（`gradients.river`）。全页**唯一**一条横向实线。
-    5. **水下光柱（light shafts）**：从水线斜射进水体的几道光（`lightShaftAlpha`）。只在水体里出现，
-       借「越往下越深」的渐变建立**深度感**；不承载任何文字、不照亮正文。
-    6. **河道主流（current line）**：水体内一条**声波包络形状**的曲线（`currentLineAlpha`）。
-       它是本系统里「音乐」与「水」**共用同一条曲线**的地方——声波即水波；
-       同时它编码**流向**（河道是单支路，见 `CONTEXT.md` §4.1），不是纯装饰。
-    7. **漂过河道的漂流瓶（passage drift）**：`BottleMark` 沿主流缓缓通过（`passageDuration` / `passageShift`）。
-       这是全站**唯一**一个会「走完一段路」的装饰——因为这一页就是河道。
-  - **产品理由**：这本就是一个关于"水面之上与深海之下"的产品；这三层让页面有**地点感**，而不是"任何 App 都能用的背景"。
-  - **不许喧宾夺主（硬约束，三条同时成立）**：① 一律 `aria-hidden="true"` + `pointer-events-none` + **绝对定位**（零布局高度，因此不会破坏"一屏装下"）；② 只出现在**深水暗底与区块边缘**，不进入内容区、不压在正文之下 —— 浅底上若要用，强度必须降到 `sheenAlphaLight` 并实测文字对比度不退化；③ **含一条低幅度常驻漂移**（water drift，t46 起生效；t47 起**浅底整面水层与深底面板/深底页头的水层共用同一对参数**，不设"深底专用"值）：水面缓缓横向流动，参数取 `driftDuration`（24s）/ `driftShift`（±10px），**只动 `transform`**、由 CSS 动画实现（因此被全局 `reduced-motion` 重置冻结为静止）。`motion-web` §1 的 decoration 三条件逐条成立：① 产品理由＝「静止的水面像贴图」，已写在本条；② 低幅度低速度、不争夺注意力；③ `reduced-motion` 下静止。
-- **漂流瓶母题（bottle motif，t44 补）**：用户点名的第三类母题。已有内联 SVG `BottleMark`（瓶身 + 瓶塞 + 一道水线 + 底部椭圆水影）本批**首次落到页面上**：公海大厅与漂流日志的页头右侧各一枚，骑在潮线上、与标题同高（绝对定位，零布局高度）。产品理由：**公海就是瓶子入海之后的去处**，页头出现"漂着的瓶子"是这个页面最该有的那一件事。
-- **航迹虚线（wake line，t44 补）**：漂流瓶划过水面留下的**断续**水痕（与潮线的"实线渐隐"区分）。落在页头与内容之间，1px 高、绝对定位。产品理由：接力是**一条路径**（河道），航迹把这个"经过"的语义画出来，而不是再加一层静态底纹。
-- **浅底装饰强度上限（t44 定，先定后用）**：浅底（wave-white）上**只允许** `textureAlphaLight`（**0.09**）级别的纹理/光带，且装饰一律在内容**之下**（`z-underlay`），不得压住正文。
-  依据（两处，均来自 `ui-ux` SKILL.md）：① 「| Glass card (light) | `bg-white/80` or higher opacity | `bg-white/10` (too transparent) |」——承载正文的容器必须足够不透明；② 「- `color-contrast` — Minimum 4.5:1 ratio for normal text」——正文必须保持 4.5:1。两条合起来 ⇒ 浅底上"重装饰"没有空间，只能极淡且在内容之下。
+
+### 母题装置库（motif · 每页至多 2 个，必须承担信息）
+
+| 装置 | 它在编码什么 | 归属 |
+| --- | --- | --- |
+| **platter（盘面）** | 世界的底：`repeating-radial-gradient` 的同心沟槽（周期见 `motif.textureLineGap`，`rgba(line,.055)`）+ 径向内层（`water-bed`） | 每页背景层（密度按页微调） |
+| **glint（掠光）** | 世界的"上方"、瓶子来的方向（一条 101° 的斜向掠光，`rgba(water-deep,.028~.065)`，`mix-blend-mode: screen`） | 每页顶部或斜穿；河道页必用 |
+| **groove（沟槽 = 河道）** | 段位进度与接力路径：一条沟槽 = 一条河道，被点亮的沟槽 = 已录段位 | 河道、公海大厅/详情、选歌、瓶子详情 |
+| **waterline（水线）** | 分界与状态：岸/水之分、线上（别人看得到）/线下的匿名边界、浮上来（待处理）/沉下去（历史裁决） | 设置、审核台；河道剖面的唯一横线 |
+| **ripple（涟漪）** | **刚刚发生过的事**（落下 / 捞起 / 入海）；同心扁椭圆，断弧可编码缺口 | 交互发生处 |
+| **bottleMark（漂流瓶）** | 一支正在漂的作品：瓶身 + 木塞 + 里面的纸条/声波；水位 = 已录段数 | 河道（待捞）、瓶子详情（主角）、公海（已到岸） |
+
+- 装置必须**承担信息**：只画一颗大圆 = 失败；一页里只有唱片元素、没有水或瓶 = 不合格。
+- 漂过河道的**漂流瓶（passage drift）**是全站唯一一个「会走完一段路」的装饰——因为那一页就是河道。
+- **浅底已不存在**：本版页面底恒为 `ink`，上一版「浅底装饰强度上限 `textureAlphaLight`」只在过渡别名仍在被引用时才有意义。
+- 装饰三条硬约束（同时成立）：① 一律 `aria-hidden="true"` + `pointer-events-none` + **绝对定位**（零布局高度，因此不会破坏"一屏装下"）；② 只出现在**区块边缘**，不进入内容区、不压在正文之下；③ 含一条**低幅度常驻漂移**（water drift，参数取 `driftDuration` / `driftShift`，**只动 `transform`**、CSS 动画实现，因此被全局 `reduced-motion` 重置冻结为静止）。
+
+### 零装饰动效规则（本版新增，硬规则）
+
+1. **静止是默认**：母题层（platter / glint / groove / waterline / ripple 的静态形态 / bottleMark）**默认零动效**；页面不得为了让画面"活"而给装饰加入场、呼吸、闪烁。
+2. **只允许两种例外**：① 上述**低幅度常驻漂移**（唯一允许的常驻动画）；② 事件涟漪（一次播完即停）。除它们之外，任何装饰动画 = 违规。
+3. **动效只用于状态过渡**（进入 / 离开 / hover / 按下 / 加载 / 播报），且**只动 `transform` / `opacity`**；禁止动画 `width` / `height` / `top` / `left` / `margin` / `box-shadow` 的尺寸与位置。
+4. `prefers-reduced-motion: reduce` 时：漂移、涟漪、交错全部冻结，入场降级为 150ms opacity 淡入。
+
 - **Performance:** Only transform and opacity animated. No layout-triggering properties.
 
 深度层级（形态语言）:
 
 | 层级 | 视觉表现 | 语义 |
 | --- | --- | --- |
-| L0 surface | wave-white 平底 | 水面：内容背景 |
-| L1 raised | foam + `0 2px 12px rgba(0,0,0,0.06)` + 1px mist 描边 | 卡片 / 列表行 |
-| L2 floating | foam + 更大扩散阴影 + driftline 描边 | 底部固定条 / 播放器 |
-| L3 overlay | night-ink 60% + backdrop blur | Sheet / Modal 遮罩 |
-| L4 deep | deep-current / trench | 沉浸式区块（Hero、成品试听）|
+| L0 surface | `ink` 平底 + platter 沟槽 | 盘面：内容背景 |
+| L1 raised | `ink` + 1px `rgba(line,.13)` 细线（**无阴影**） | 卡片 / 列表行 |
+| L2 floating | `water-void` + 1px `rgba(line,.2)` + 阴影（仅浮动条/播放器） | 底部固定条 / 播放器 |
+| L3 overlay | `rgba(water-void,.78)` + backdrop blur | Sheet / Modal 遮罩 |
+| L4 deep | `water-body` / `water-bed`（剖面水体） | 沉浸式区块（剖面水体、成品试听） |
 
-「水深」是本系统的深度隐喻：越"深"的层阴影扩散越大、底色越暗，但**永不使用纯黑**。
+「水深」是本系统的深度隐喻：越"深"的层越沉、线越亮；**永不使用纯黑**。
 
-深水暗底硬约束（仅此一种用法）:
+深水区块约束:
 
-- deep-current / trench / night-ink **仅用于沉浸式区块**（Hero、成品试听页、Modal/Sheet 遮罩），用来营造深海质感；**不是系统深色模式**。
-- 本设计**不提供主题切换，不提供 dark variant**：页面底色恒为 wave-white，不按 `prefers-color-scheme` 切换主题。
-- 深底上承载文字只允许 `wave-white`（11.49:1）与 `on-dark-muted`（6.84:1）；`sea-glass` 只用于图标、装饰与水波高光，不承载文字。
-- 深底区块不做自动明暗反转；离开区块回到 wave-white，过渡只允许 opacity。
+- `water-body` / `water-bed` / `water-void` 只用于**沉浸式区块与浮层**；本设计**不提供主题切换与 dark variant**（页面底恒为 `ink`）。
+- 深底上承载文字只允许 `paper`（18.20:1）与 `muted`（10.84:1）；`glass` 只用于图标、线、装饰与水波高光。
+- 深底区块不做自动明暗反转；过渡只允许 opacity。
 
 ## Shapes
 
-Base corner radius: 12px. See rounded tokens in front matter for the full scale.
+Base corner radius: 2px. See rounded tokens in front matter for the full scale.
 
-Rounded tokens 全量（原文档引用了 front matter 的 rounded tokens，但那里并不存在 —— 本节补齐）:
+Rounded tokens 全量（record-v1 圆角纪律：**圆角 ≤4px**，除 `pill` 与 `full`）:
 
 | Token | 值 | 用途 |
 | --- | --- | --- |
 | `rounded-none` | 0 | 全宽分隔条、贴边面板 |
-| `rounded-sm` | 6px | chip 内图标底、小标签 |
-| `rounded-md` | 8px | 输入框、下拉、时长徽标 |
-| `rounded-base` | **12px** | **基准**：按钮、卡片、列表行 |
-| `rounded-lg` | 16px | Sheet 顶部、大卡片 |
-| `rounded-xl` | 20px | 底部固定条、播放器容器 |
-| `rounded-2xl` | 24px | 全屏容器 / Hero 区块 |
-| `rounded-pill` | 999px | 胶囊标签、圆形徽标、头像环 |
-| `rounded-full` | 50% | 头像、纯图标圆形按钮 |
+| `rounded-sm` | 1px | 刻度、1px 细线端点 |
+| `rounded-md` | 2px | 输入框、下拉、时长徽标 |
+| `rounded-base` | **2px** | **基准**：按钮、卡片、列表行 |
+| `rounded-lg` | 4px | 面板、内袋 |
+| `rounded-xl` | 4px | 浮动条、播放器容器 |
+| `rounded-2xl` | 6px | 全屏容器（**上限**） |
+| `rounded-pill` | 999px | 胶囊标签（慎用：只有"必须可滚动的一排"才用） |
+| `rounded-full` | 50% | 圆盘、标签盘、纯图标圆形按钮（§圆的语法） |
 
 形态规则:
 
-- 圆角只允许来自上表，禁止任意值（如 11px）。
-- 漂流瓶母题用内联 SVG 表达（瓶身 + 瓶塞 + 涟漪），**不用圆角堆叠去"画"瓶子**。
-- 水波 / 河道装饰用 SVG path 或 canvas 绘制，纯装饰层 `aria-hidden="true"`，不参与布局高度计算。
+- 圆角只允许来自上表，**禁止任意值**（如 11px、23px）。
+- **「圆的语法」是唯一的例外**：`border-radius: 50%` 与**半圆**（半径 = 高度/2，例如唱片封套的开口指孔）**允许**；禁止的是无理由的"胶囊/药丸"大圆角。
+- 漂流瓶母题用内联 SVG 表达（瓶身 + 瓶塞 + 水面光），**不用圆角堆叠去"画"瓶子**。
+- 水波 / 沟槽 / 掠光装饰用 SVG path、`repeating-radial-gradient` 或 canvas 绘制，纯装饰层 `aria-hidden="true"`，**不参与布局高度计算**。
+- 掩膜（`mask-image`）一律写白（`#fff` / `rgba(255,255,255,α)`）：mask 只读 alpha，写 `rgba(0,0,0,α)` 等价但会撞"禁纯黑"检索。
 
 ## Components
 
-Token 绑定（不改下列规范，只把抽象词落到海洋语义色）:
-`accent → peacock`｜`surface → foam`｜`page → wave-white`｜`muted / border → mist / driftline`｜`deep section → deep-current`｜`danger → coral-deep`
+Token 绑定（只把抽象词落到唱片语义色，不改下列规范）:
+`accent → coral`｜`surface → ink`｜`page → ink`｜`muted / border → muted / line`｜`deep section → water-body`｜`danger → danger`
 
-- **Primary Button:** Moderately rounded (0.75rem) shape. Accent color fill. Hover: 8% darken + subtle lift shadow. Active: -1px translate tactile press. Font weight 600. No outer glows.
-- **Secondary / Ghost Button:** Outline variant. 1.5px border in muted color. Text in primary color. Hover: subtle background fill.
-- **Cards:** Moderately rounded (0.75rem) corners. Surface background. Subtle shadow (0 2px 12px rgba(0,0,0,0.06)). 1px border stroke.
-- **Inputs:** Label above input. 1px border stroke. Focus ring: 2px accent color offset 2px. Error text below in semantic red. No floating labels.
-- **Navigation:** Primary surface background. Active item: accent color indicator. Font weight 500 when active.
-- **Skeletons:** Shimmer animation matching component dimensions. No circular spinners.
-- **Empty States:** Icon-based composition with descriptive text and action button.
+- **Primary Button:** 2px 圆角，`coral` 实心填充 + **`ink` 文字**（4.76:1）。Hover: 亮度差 + scale(1.03)（**不加外发光**）。Active: `translateY(-1px)`。Font weight 600。
+- **Secondary / Ghost Button:** 1px `muted` 描边，文字 `coral`；Hover: 细线提亮，不填充。
+- **Cards:** 2px 圆角，`ink` 底 + 1px `rgba(line,.13)` 细线，**无阴影**。
+- **Inputs:** label 在输入框上方；1px `muted` 描边，底 `water-void`，文字 `paper`。Focus ring: 2px `coral` + offset 2px。错误文字在下方（`danger`）。**不用浮动 label**。
+- **Navigation:** `ink` 底 + 顶部 1px 细线；当前项用 `coral` 指示（1px 竖线 + 字重 500）。
+- **Skeletons:** shimmer 条（`shimmerDuration`），**禁用 spinner**。
+- **Empty States:** 瓶子 + 说明 + 一个行动按钮（空态是中性色，不是错误色）。
 
 组件 token 明细:
 
 | 组件 | 底 | 文字 | 描边 / 阴影 | 圆角 | 内边距 |
 | --- | --- | --- | --- | --- | --- |
-| `button-primary` | peacock | wave-white | 无（禁外发光） | 12px | 12px |
-| `button-primary:hover` | peacock-deep | wave-white | `0 4px 14px rgba(11,58,74,0.18)` | 12px | 12px |
-| `button-primary:active` | peacock-active | wave-white | 无 + translateY(-1px) | 12px | 12px |
-| `button-ghost` | transparent | peacock | 1.5px driftline | 12px | 12px |
-| `card` | foam | abyss / slate-current | 1px mist + `0 2px 12px rgba(0,0,0,0.06)` | 12px | 16px |
-| `input` | wave-white | abyss | 1px driftline；focus 2px peacock offset 2px | 8px | 12px |
-| `nav` | foam | slate-current / active peacock | 1px mist 上边线 | 20px（顶部） | 8px 12px |
-| `skeleton` | tide-pool + lagoon 20% shimmer | — | 无 | 与目标组件同值 | 与目标组件同值 |
-| `empty-state` | transparent | abyss + slate-current | 无 | — | 24px |
+| `button-primary` | coral | ink | 无（禁外发光） | 2px | 12px |
+| `button-primary:hover` | coral（亮度 +6%） | ink | 细线提亮 + `translateY(-1px)` 无阴影 | 2px | 12px |
+| `button-primary:active` | coral | ink | 无 + `translateY(-1px)` | 2px | 12px |
+| `button-ghost` | transparent | coral | 1px muted | 2px | 12px |
+| `card` | ink | paper / muted | 1px `rgba(line,.13)`，无阴影 | 2px | 16px |
+| `input` | water-void | paper | 1px muted；focus 2px coral offset 2px | 2px | 12px |
+| `nav` | ink | muted / active coral | 1px muted 上边线 | 4px（顶部） | 8px 12px |
+| `skeleton` | water-void + glass 22% shimmer | — | 无 | 与目标组件同值 | 与目标组件同值 |
+| `empty-state` | transparent | paper + muted | 无 | — | 24px |
 
-业务组件形态（P0 闭环，仅形态约定，不写代码）:
+业务组件形态（仅形态约定，不写代码）:
 
-- **漂流瓶卡片**：foam 底 + 12px 圆角 + 1px mist 描边；左侧瓶形内联 SVG（peacock 描边、sea-glass 涟漪）；标题 abyss 1.5rem，次行 slate-current 0.875rem（已有段数 / 剩余可接段位）。
-- **接力时间轴**：竖向河道线（2px mist，已完成段 peacock），节点为 12px 圆点（当前段 peacock + 一层 lagoon 20% 涟漪环），段位时长用 Quattrocento 数字。
-- **录制 / 波形区**：deep-current 暗底卡片；波形条 lagoon；已录进度 sea-glass；未录区 trench。
-- **播放条**：底部固定 `rounded-xl`，foam 底 + L2 阴影；标题 abyss、进度槽 tide-pool、已播进度 peacock。
-- **接力冲突提示（409）**：coral-deep 文字 + coral 图标，说明"这一段已被别人接走"，给出「换一段继续」「放回海里」两个动作，绝不静默失败。
+- **作品行（封套背）**：`ink` 底 + 1px 细线 + 右侧 4 格段位刻度（已录 = `glass`，缺口 = 干槽）；曲名 `paper` 19px，元信息 `muted` 11px / `.24em`。
+- **段链（4 段）**：横向沟槽，已唱段点亮（`coral` 或 `glass`），缺口显示「这一段还没有人唱」；母版号（`MDB-0001-A`）用 `mono`。
+- **录制 / 波形区**：`water-void` 底 + 沟槽质感；波形条 `glass`；已录进度 `water-deep`。
+- **播放条**：底部固定 `rounded-xl`，`water-void` 底 + L2 阴影；标题 `paper`、进度槽 `rgba(line,.13)`、已播进度 `coral`。
+- **接力冲突提示（409）**：`danger` 文字 + `coral` 图标，说明"这一段已被别人接走"，给出「换一段继续」「放回海里」两个动作，**绝不静默失败**。
 
 ## Interaction States
 
@@ -470,40 +511,41 @@ Token 绑定（不改下列规范，只把抽象词落到海洋语义色）:
 
 | 状态 | 填充 | 文字 | 描边 / 其他 | 时长 |
 | --- | --- | --- | --- | --- |
-| default | peacock | wave-white | — | — |
-| hover | peacock-deep | wave-white | scale(1.03) + shadow lift | 200ms |
-| active / pressed | peacock-active | wave-white | translateY(-1px) | 立即 |
-| focus-visible | peacock | wave-white | **2px peacock ring, offset 2px**（对 wave-white 5.61:1 ≥ 3:1） | 立即 |
-| disabled | tide-pool | slate-current（不复用低透明度） | 无阴影；`cursor: not-allowed`；`aria-disabled="true"` | — |
+| default | coral | **ink** | — | — |
+| hover | coral | ink | scale(1.03) + 细线提亮 | 200ms |
+| active / pressed | coral | ink | translateY(-1px) | 立即 |
+| focus-visible | coral | ink | **2px coral ring, offset 2px**（对 ink 4.76:1 ≥ 3:1） | 立即 |
+| disabled | `rgba(line,.08)` | muted（不复用低透明度以外的差别） | 无；`cursor: not-allowed`；`aria-disabled="true"` | — |
 | loading | 保持当前底色 | 文字保留 + shimmer 条（禁 spinner） | 宽度不跳变（预留占位） | shimmer 1.4s |
 
 - disabled 不受 4.5:1 约束（WCAG 1.4.3 豁免），但必须与 enabled 有形态差异，且不得作为唯一的"不可用"提示。
-- 键盘焦点永远可见：移除默认 outline 时必须给 2px peacock ring；`:focus` 与 `:focus-visible` 都要覆盖。
-- 列表项 hover 同样 scale(1.03) + shadow lift / 200ms；不做位移式 hover（会触发重排）。
-- 过渡只允许 `transform` / `opacity`；颜色变化允许（不触发重排），但禁止动画 `width/height/top/left/margin`。
+- 键盘焦点永远可见：移除默认 outline 时必须给 2px coral ring；`:focus` 与 `:focus-visible` 都要覆盖。
+- 列表项 hover 同样 scale(1.03)（不做位移式 hover，会触发重排）。
+- **状态过渡只允许 `transform` / `opacity`**；颜色变化允许（不触发重排），但禁止动画 `width/height/top/left/margin/box-shadow`。
 
 ## Semantic & Status Colors
 
-原文档缺失，本节补齐（每个语义色都给"文字/图标色 + tint 底 + 描边 + 用途"）:
+语义四件套（**色相全部取自本语言已有色**，不引入新色相；每个语义色都给"文字/图标色 + tint 底 + 描边 + 用途"）。tint = 语义色 **12% 覆盖在 `ink` 上**；border = 语义色 **α 覆盖在 `ink` 上**（α 取到 ≥3:1 的最小档）。
 
-| 语义 | 文字 / 图标 | Tint 底 | 描边 | 用途（示例） | 文字对比度 |
-| --- | --- | --- | --- | --- | --- |
-| success | `tide-green` #1F6B51 | #E7F2EE | #BFDCCF | 投瓶成功、接力完成、成品已生成 | 6.02:1（tint 上 5.60:1） |
-| warning | `lantern` #875C12 | #FAF1E0 | #E8D3A6 | 录制时长接近上限、剩余段位不足、成品未达标（<80%） | 5.53:1（5.24:1） |
-| danger | `coral-deep` #9D4125（填充用 `coral` #C7452C） | #FAEDE9 | #EBC3B6 | 录制/上传失败、账号错误、审核驳回 | 6.14:1（5.71:1） |
-| info | `peacock` #0F6D80 | #E6F1F4 | #BFDCE3 | 接力进行中、有人取走你的瓶子、系统提示 | 5.61:1（5.19:1） |
+| 语义 | 文字 / 图标 | Tint 底 | 描边 | 用途（示例） | 文字对比度 | 非文本（描边） |
+| --- | --- | --- | --- | --- | --- | --- |
+| success | `success` #7FD1D9（= glass 冷光） | #14262C | #427077 | 投瓶成功、接力完成、成品已生成、「已达成」 | **11.08:1**（tint 上 8.95:1） | 3.52:1 |
+| warning | `warning` #F6D79A（= warm 暖光） | #222724 | #716950 | 录制时长接近上限、剩余段位不足、等待态 | **13.92:1**（10.92:1） | 3.54:1 |
+| danger | `danger` #DC7E6A（coral 提亮档） | #1E1719 | #AB4732 | 录制/上传失败、账号错误、审核驳回 | **6.67:1**（6.07:1） | 3.39:1 |
+| info | `info` #A9C7CF（= muted 中性） | #19252A | #576B72 | 接力进行中、有人取走你的瓶子、系统提示 | **10.84:1**（8.78:1） | 3.46:1 |
 
-- 所有 tint 底上的语义文字实测 ≥5.19:1，达标。
-- 每个语义色必须同时提供非颜色信号（图标 + 文案），禁止只靠颜色区分状态。
-- 状态色只用于反馈，不用于装饰点缀；珊瑚点缀（coral）只在 CTA 强调与危险态出现。
+- 旧契约（浅底）的 tint 全部作废：**深底上的 tint 是"极暗的一层水"，描边才是发光的那条线**；tint 各自对 `ink` 的对比度 1.10–1.28:1（够分辨，不喧哗）。
+- **为什么 `danger` 不是 `coral` 原文**：`coral` #D4553A 压在它自己的 12% 淡底上只有 **4.33:1**（<4.5）；因此危险**文字**用 coral 的提亮档 `#DC7E6A`（75% coral + 25% paper，明度派生，不引入新色相），而危险**填充**仍然用 `coral`（其上文字用 `ink`，4.76:1）。这与旧契约「填充用 coral、文字用 coral-deep」是同一个手法的镜像。
+- **为什么 success 与 info 同族**：本语言只有五个色相族（近黑 / 近白 / 冷青 / 暖沙 / 珊瑚），"成功绿"属于**新色相**，被 §Colors 的规则禁止。因此成功 = 冷光（`glass`，语言里「已达成」本来就归它）、提示 = 中性（`muted`）。**代价**：success 与 info 的色相接近 —— 所以**每个语义色必须同时提供非颜色信号（图标 + 文案）**，禁止只靠颜色区分状态。
+- 状态色只用于反馈，不用于装饰点缀；珊瑚强调只在 CTA、当前项与危险态出现。
 
 ## Error States
 
-原文档缺失，本节补齐。错误分层与视觉/文案契约:
+错误分层与视觉/文案契约:
 
-1. **字段级错误（输入框下方）**：文字 `coral-deep`（6.14:1）+ Lucide `alert-circle` 14px；边框切 `coral`；`aria-invalid="true"` + `aria-describedby` 指向错误文本。文案必须给出修正动作，禁止只写"输入有误"。
+1. **字段级错误（输入框下方）**：文字 `danger`（6.67:1）+ Lucide `alert-circle` 14px；边框切 `coral`；`aria-invalid="true"` + `aria-describedby` 指向错误文本。文案必须给出修正动作，禁止只写"输入有误"。
    - 示例：「用户名需 3–20 个字符，仅限字母、数字和下划线。」
-2. **表单级错误（提交失败）**：tint 底 #FAEDE9 + coral 图标 + coral-deep 标题，下方给出重试动作；不整页跳转。
+2. **表单级错误（提交失败）**：tint 底 #1E1719 + `coral` 图标 + `danger` 标题，下方给出重试动作；不整页跳转。
 3. **业务冲突错误（409 接力冲突）**：见 Components 的接力冲突提示；必须解释"这段已被接走"并给出两个出口动作，不许静默失败或只弹 toast。
 4. **网络 / 上传失败**：已录内容保留在内存，提供「重试上传」与「本地回放确认」；用 warning（不是 danger），因为数据未丢。
 5. **权限错误（麦克风被拒）**：danger 态说明 + 分平台修复指引（Chrome / Safari 的授权入口），不使用系统 alert。
@@ -512,13 +554,13 @@ Token 绑定（不改下列规范，只把抽象词落到海洋语义色）:
 
 ## Accessibility
 
-原文档缺失，本节补齐（WCAG 2.1 AA 为下限）:
+WCAG 2.1 AA 为下限:
 
-- **对比度**：正文与 UI 文字 ≥4.5:1；≥24px（或 ≥19px bold）标题 ≥3:1；图标、输入框描边、focus ring 等非文本 UI ≥3:1。色板实测最低承载文字对比度 **4.57:1**（`coral` 作强调文字时 on wave-white；`coral` 默认只作填充，正文/次要文字最低 5.05:1 = slate-current on tide-pool），全部达标。
-- **焦点**：全站键盘可达；focus ring 2px peacock + offset 2px，任何情况下不被 `overflow: hidden` 裁掉。
-- **动效**：尊重 `prefers-reduced-motion: reduce` —— 关闭水波漂移、涟漪扩散与列表交错，入场动画降级为 150ms opacity 淡入；spring 120/20 在此模式下直接吸附终值。
+- **对比度**：正文与 UI 文字 ≥4.5:1；≥24px（或 ≥19px bold）标题 ≥3:1；图标、输入框描边、focus ring 等非文本 UI ≥3:1。深底色板上实测最低承载文字对比度 **4.76:1**（`coral` 作文字 / 线，也等于 `coral` 填充上的 `ink` 文字）；语义色的文字与其 tint 组合最低 **6.07:1**（danger on danger-tint），全部达标。
+- **焦点**：全站键盘可达；focus ring 2px `coral` + offset 2px，任何情况下不被 `overflow: hidden` 裁掉。
+- **动效**：尊重 `prefers-reduced-motion: reduce` —— 关闭水流漂移、涟漪扩散与列表交错，入场动画降级为 150ms opacity 淡入；spring 120/20 在此模式下直接吸附终值。
 - **触控**：可点目标 ≥44×44px；底部固定条与列表行用 padding 撑满可点区，不靠伪元素外扩。
-- **语义结构**：一页一个 `<h1>`；时间轴用有序列表；接力状态用 `aria-live="polite"` 播报（"接力成功，等待下一位"）；装饰性水波/涟漪 `aria-hidden="true"`。
+- **语义结构**：一页一个 `<h1>`；时间轴用有序列表；接力状态用 `aria-live="polite"` 播报（"接力成功，等待下一位"）；装饰性沟槽/涟漪 `aria-hidden="true"`。
 - **表单**：label 与控件显式关联；错误用 `aria-invalid` + `aria-describedby`；纯图标按钮必须带 `aria-label`。
 - **媒体**：录制/播放控件支持键盘操作与文字状态（"录制中 00:12 / 30"），不依赖波形颜色表达进度。
 - **语言**：`<html lang="zh-CN">`；中英混排中的拉丁专名（歌名等）用 `lang="en"` 局部标注。
@@ -526,44 +568,52 @@ Token 绑定（不改下列规范，只把抽象词落到海洋语义色）:
 
 ## Do's and Don'ts
 
-- No emojis in UI — use icon system only (Lucide, Heroicons)
+- No emojis in UI — use icon system only (Lucide)
 
-- No pure black (#000000) — use off-black or charcoal variants
+- No pure black (#000000) — 底用 `ink` / `water-void`（近黑），纯黑会让沟槽与掠光失去层次
 
-- No oversaturated accent colors (saturation cap: 80%)
+- No oversaturated accent colors — 彩色只出现在边缘微光、当前项、印章与主 CTA
+
+- **No 圆角 > 4px**（`pill` / `full` / 半圆除外）；禁止"胶囊/药丸"式无理由大圆角
+
+- **No 用阴影造层次** — 层级用亮度差与 1px 细线；阴影只给浮层与浮动条
+
+- **No `coral` 实心填充上的浅色文字** — 一律 `ink`（双向 4.76:1）
 
 - No 3-column equal-width feature layouts — use zig-zag or asymmetric grid
 
 - No `h-screen` — use `min-h-[100dvh]`
 
-- No AI copywriting clichés: "Elevate", "Seamless", "Unleash", "Next-Gen"
+- No AI copywriting clichés: "Elevate", "Seamless", "Unleash", "Next-Gen"；也禁「赋能 / 一键 / 极致体验 / 打造 / 颠覆 / 重新定义 / 无限可能」
 
-- No broken external image links — use picsum.photos or inline SVG
+- No broken external image links — 一律内联 SVG（外链图在离线 demo 里就是破图）
 
 - No generic lorem ipsum in demos
 
-- Do 水波与浪线（wave contours）作为区块边界与导引
+- No 用「·」把一长串元信息串起来（唱片标签处最多一个）
 
-- Do 河道式导引线（channel guides）串起接力路径
+- Do **沟槽 = 河道**（groove as channel）作为进度与路径的基本语法
 
-- Do 涟漪（ripples）标记状态变化与落点
+- Do **水线（waterline）**作为分界：岸/水、线上/线下、浮上来/沉下去
 
-- Do 漂流瓶母题（drift bottle）—— 内联 SVG，唯一可被"追踪"的具象元素
+- Do **涟漪（ripples）**标记状态变化与落点
 
-- Do Elegant typography
+- Do **漂流瓶母题（bottleMark）**—— 内联 SVG，唯一可被"追踪"的具象元素
 
-- Do Nature-inspired illustrations（水、河道、瓶、潮汐，不做花卉）
+- Do **每页至少一个「水 / 河 / 瓶」装置，且它必须承担信息**（不是背景纹理、不是贴纸）
 
-- Don't 花卉 / whiplash 卷草 / stained glass 彩窗纹样（原文母题已作废）
+- Do Elegant typography（文楷 + Quattrocento 的"手迹 + 航标"对照）
+
+- Don't 让唱片/沟槽元素占掉超过半页的视觉权重 —— 唱片只是"音乐"这一支的**载体**
 
 - Don't 用圆角堆叠"画"瓶子，或让装饰进入内容区遮挡文字
 
-- Don't 把深水暗底当作 dark mode —— 不提供主题切换与 dark variant
-
 - Don't 使用 jsDelivr、fonts.googleapis 或任何 CDN 字体（离线 demo 必须 npm 自托管 woff2）
+
+- Don't 在迁移期把 `bg-foam` 与 `text-abyss` 写在一起（1.01:1，见 §Colors · 迁移别名）
 
 ## Use Case
 
-桌面为主要场景的 Web 应用（1440px 为主场景，1280px 容器居中 + 1.5rem 侧边距；768px 折叠多列；移动端做可用性适配，H5 可用）。场景：匿名接力音乐共创社区「音乐漂流瓶」——登录/注册 → 选歌 → 录制 15–30 秒片段 → 投瓶入海 → 他人取瓶接力 → 成品试听 → 漂流日志。核心页面：首页（今日海面 / 我的瓶子）、录制页、接力页、成品页、漂流日志、审核后台。
+桌面为主要场景的 Web 应用（1440px 为主场景，1280px 容器居中；768px 折叠多列；移动端做可用性适配，H5 可用）。场景：匿名接力音乐共创社区「音乐漂流瓶」——登录/注册 → 选歌 → 录制 15–30 秒片段 → 投瓶入海 → 他人取瓶接力 → 成品试听 → 漂流日志 → 审核台。共 11 个页面：河道（标杆）、选一首歌、瓶子详情、登录/注册、公海大厅、公海作品详情、漂流日志、我的、审核台、设置、404。
 
-模板元数据里原文的 "Landing pages, SaaS" 已作废：本系统的全部 token 按桌面主场景（侧栏四入口 IA、1440px 评审）约束，**同时**保证移动端可用性四条硬底线——无横向溢出、触控目标 ≥44px、录音可用（含权限被拒降级）、关键闭环在 375px 可完成；桌面与移动共用同一套 token，不引入第二套主题。
+模板元数据里原文的 "Landing pages, SaaS" 已作废：本系统的全部 token 按桌面主场景（1440px 评审）约束，**同时**保证移动端可用性四条硬底线——无横向溢出、触控目标 ≥44px、录音可用（含权限被拒降级）、关键闭环在 375px 可完成；桌面与移动共用同一套 token，不引入第二套主题。

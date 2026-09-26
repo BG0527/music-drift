@@ -1,11 +1,15 @@
 /**
- * Ocean Drift 主题层 —— `DESIGN.md` front matter 的唯一代码映射。
+ * Record Drift 主题层 —— `DESIGN.md` front matter 的唯一代码映射。
  *
  * 纪律（AGENTS.md §4）：
  *  - 这里的每一个颜色/圆角/间距/层级/动效值都来自 `DESIGN.md`，不得在此发明新值。
- *  - 组件只允许使用本文件生成的 utilities（`bg-peacock` / `rounded-base` / `z-sticky` …），
+ *  - 组件只允许使用本文件生成的 utilities（`bg-coral` / `rounded-base` / `z-sticky` …），
  *    禁止内联 hex 或任意像素值。守卫测试：`__tests__/tokens.test.ts`。
  *  - 禁止 CDN：字体与所有资源自托管（见 `fonts.css`）。
+ *
+ * record-v1（2026-09-23 裁决，见 docs/impl-plan-record-v1.md）：页面底从浅色 `wave-white`
+ * 换成近黑 `ink`；圆角基准 12px → 2px；旧名全部保留为**过渡别名**并 re-point 到新值，
+ * app 的类名不变但观感开始变（S2+ 逐页改名，S8 删除别名）。
  */
 @import 'tailwindcss';
 
@@ -16,47 +20,61 @@
 /* `static` = 即使用户代码暂时没用到某个 token，也要产出该 CSS 变量：
    色板是契约（Canvas 水波、图表、音频时间轴都会读 var(--color-*)），不允许被 tree-shake 掉。 */
 @theme static {
-  /* ── 水面（浅色基线）────────────────────────────── */
-  --color-wave-white: #f3f9fa;
-  --color-foam: #e4f0f2;
-  --color-tide-pool: #d7e8ec;
-  --color-mist: #c2d9df;
-  --color-driftline: #648c99;
+  /* ── 基底与文字 ─────────────────────────────────── */
+  --color-ink: #050f14;
+  --color-paper: #f3f9fa;
+  --color-muted: #a9c7cf;
 
-  /* ── 深水（仅沉浸式区块，非深色模式）────────────── */
-  --color-deep-current: #0b3a4a;
-  --color-trench: #123e52;
-  --color-night-ink: #061a22;
+  /* ── 三种光：冷光 / 唯一强调色 / 暖光 ───────────── */
+  --color-glass: #7fd1d9;
+  --color-coral: #d4553a;
+  --color-warm: #f6d79a;
 
-  /* ── 品牌主色 ───────────────────────────────────── */
-  --color-peacock: #0f6d80;
-  --color-peacock-deep: #0b4e5b;
-  --color-peacock-active: #093e49;
-  --color-lagoon: #2a9db1;
+  /* ── 水光冷色族（基色 + alpha 派生，见 DESIGN.md §Colors）── */
+  --color-water-light: #eafcff;
+  --color-water-mid: #cbeef6;
+  --color-water-deep: #e4f7fc;
+  --color-water-void: #031117;
+  --color-water-bed: #0a303c;
+  --color-water-body: #12414f;
+  --color-water-surface: #1d5f70;
+  --color-line: #d8f3f6;
+
+  /* ── 语义四件套（深底重算；色相取自上面，不引入新色相）──
+     danger = coral 提亮档（coral 原文压自己的 12% 淡底只有 4.33:1 < 4.5）。 */
+  --color-success: #7fd1d9;
+  --color-warning: #f6d79a;
+  --color-danger: #dc7e6a;
+  --color-info: #a9c7cf;
+  --color-success-tint: #14262c;
+  --color-success-border: #427077;
+  --color-warning-tint: #222724;
+  --color-warning-border: #716950;
+  --color-danger-tint: #1e1719;
+  --color-danger-border: #ab4732;
+  --color-info-tint: #19252a;
+  --color-info-border: #576b72;
+
+  /* ── 过渡别名（迁移期专用；S8 整批删除）──────────────────────
+     名字沿用旧契约、值已 re-point 到 record-v1（语义同角色映射）。
+     它们会撒谎（`wave-white` 现在是近黑、`abyss` 是近白）；逐条对照见 DESIGN.md。 */
+  --color-wave-white: #050f14;
+  --color-foam: #eafcff;
+  --color-tide-pool: #031117;
+  --color-mist: #d8f3f6;
+  --color-driftline: #cbeef6;
+  --color-deep-current: #12414f;
+  --color-trench: #0a303c;
+  --color-night-ink: #031117;
+  --color-peacock: #d4553a;
+  --color-peacock-deep: #1d5f70;
+  --color-peacock-active: #d4553a;
+  --color-lagoon: #cbeef6;
   --color-sea-glass: #7fd1d9;
-
-  /* ── 文字 ───────────────────────────────────────── */
-  --color-abyss: #07202b;
-  --color-slate-current: #44646f;
+  --color-abyss: #f3f9fa;
+  --color-slate-current: #a9c7cf;
   --color-on-dark-muted: #a9c7cf;
-
-  /* ── 点缀与语义 ─────────────────────────────────── */
-  --color-coral: #c7452c;
-  --color-coral-deep: #9d4125;
-  --color-success: #1f6b51;
-  --color-warning: #875c12;
-  --color-info: #0f6d80;
-  --color-danger: #9d4125;
-
-  /* ── 语义 tint / border（机器可读，与正文表格一致）── */
-  --color-success-tint: #e7f2ee;
-  --color-success-border: #bfdccf;
-  --color-warning-tint: #faf1e0;
-  --color-warning-border: #e8d3a6;
-  --color-danger-tint: #faede9;
-  --color-danger-border: #ebc3b6;
-  --color-info-tint: #e6f1f4;
-  --color-info-border: #bfdce3;
+  --color-coral-deep: #d4553a;
 
   /* ── 字体（自托管，见 fonts.css）─────────────────── */
   --font-cjk:
@@ -73,21 +91,23 @@
          44px 触控底线 = `min-h-11`（覆盖 --spacing 会让它变成 88px，见 ADR §48）。
          档位全集另由下面的 `--space-*` token 显式声明并受测试守卫。 */
 
-  /* ── 圆角（基准 12px）───────────────────────────── */
+  /* ── 圆角（基准 2px · record-v1：圆角 ≤4px，pill / full / 半圆除外）── */
   --radius-none: 0;
-  --radius-sm: 6px;
-  --radius-md: 8px;
-  --radius-base: 12px;
-  --radius-lg: 16px;
-  --radius-xl: 20px;
-  --radius-2xl: 24px;
+  --radius-sm: 1px;
+  --radius-md: 2px;
+  --radius-base: 2px;
+  --radius-lg: 4px;
+  --radius-xl: 4px;
+  --radius-2xl: 6px;
   --radius-pill: 999px;
   --radius-full: 50%;
 
-  /* ── 阴影（卡片/播放条/遮罩）────────────────────── */
-  --shadow-card: 0 2px 12px rgba(0, 0, 0, 0.06);
-  --shadow-lift: 0 4px 14px rgba(11, 58, 74, 0.18);
-  --shadow-floating: 0 8px 24px rgba(11, 58, 74, 0.12);
+  /* ── 阴影（record-v1：**不用阴影造层次**，只给浮层与浮动条）──────
+     颜色基色统一取 water-void 的 rgba（旧值 rgba(11,58,74) 是 ocean-v1 的
+     深水色，属色板外泄漏；本次只换基色、不改几何，阴影的去留是 S2 组件层的事）。 */
+  --shadow-card: 0 2px 12px rgba(3, 17, 23, 0.06);
+  --shadow-lift: 0 4px 14px rgba(3, 17, 23, 0.18);
+  --shadow-floating: 0 8px 24px rgba(3, 17, 23, 0.12);
 }
 
 :root {
@@ -108,9 +128,10 @@
   --section-gap: clamp(4rem, 8vw, 8rem);
   --touch-target-min: 44px;
 
-  /* ── 渐变（本轮新增；契约在 DESIGN.md 的 `gradients:` 块）────────────
+  /* ── 渐变（契约在 DESIGN.md 的 `gradients:` 块）────────────────────
      规则：只允许由既有 `--color-*` 组合 —— 不得借"加渐变"发明新颜色。
-     `gradient.river` = 河道剖面的水体：水面 → 中层 → 河底（越往下越深）。 */
+     三个 stop 的名字沿用过渡别名（机器守卫把它们钉在渐变里），现在分别解析为
+     water-surface → water-body → water-bed，即"越往下越深"的河道剖面水体。 */
   --gradient-river: linear-gradient(
     180deg,
     var(--color-peacock-deep) 0%,
@@ -155,7 +176,7 @@
   /* t46：水流漂移（走 motion 契约；只动 transform） */
   --motion-drift-duration: 24000ms;
   --motion-drift-shift: 10px;
-  /* 本轮：漂流瓶沿河道通过（与 drift 的区别见 DESIGN.md 的 motion 块注释） */
+  /* 漂流瓶沿河道通过（与 drift 的区别见 DESIGN.md 的 motion 块注释） */
   --motion-passage-duration: 46000ms;
   --motion-passage-shift: 160px;
   /* t44 增强：水感（双线距干涉 + 左右渐隐）+ 浅底强度上限 + 航迹虚线 */
@@ -165,7 +186,7 @@
   --motif-wake-dash: 7px;
   --motif-wake-gap: 11px;
   --motif-wake-alpha: 0.45;
-  /* 本轮河道剖面三件：主流的强度 / 水下光柱的强度 / 水线的强度（契约在 DESIGN.md 的 motif 块） */
+  /* 河道剖面三件：主流的强度 / 水下光柱的强度 / 水线的强度（契约在 DESIGN.md 的 motif 块） */
   --motif-current-line-alpha: 0.42;
   --motif-light-shaft-alpha: 0.05;
   --motif-surface-line-alpha: 0.7;
@@ -203,17 +224,17 @@
 
 @layer base {
   html {
-    /* 页面底色恒为 wave-white；本设计不提供主题切换与 dark variant */
-    background-color: var(--color-wave-white);
-    color-scheme: light;
+    /* record-v1：页面底恒为 ink（近黑）。本设计不提供主题切换与 light variant。 */
+    background-color: var(--color-ink);
+    color-scheme: dark;
     -webkit-text-size-adjust: 100%;
   }
 
   body {
     margin: 0;
     min-height: 100dvh; /* 禁止把视口高度写死；纵向高度一律 100dvh */
-    background-color: var(--color-wave-white);
-    color: var(--color-abyss);
+    background-color: var(--color-ink);
+    color: var(--color-paper);
     font-family: var(--font-cjk);
     font-size: 1rem;
     line-height: 1.6;
@@ -224,9 +245,9 @@
     letter-spacing: normal;
   }
 
-  /* 键盘焦点永远可见（2px peacock + offset 2px） */
+  /* 键盘焦点永远可见（2px coral + offset 2px，对 ink 4.76:1） */
   :focus-visible {
-    outline: 2px solid var(--color-peacock);
+    outline: 2px solid var(--color-coral);
     outline-offset: 2px;
   }
 
@@ -237,7 +258,7 @@
   }
 
   ::selection {
-    background-color: var(--color-sea-glass);
-    color: var(--color-abyss);
+    background-color: var(--color-glass);
+    color: var(--color-ink);
   }
 }
