@@ -202,3 +202,40 @@
 - **不许装依赖**：静态服务器用 `node:http` + `fetch` 手写反代（AGENTS §7 禁止擅自引中间件）。
 - **渲染一律 `textContent`**（禁 `innerHTML`）—— 匿名代号/曲名/留言都是用户输入。
 - 每页只**增加**：`<meta viewport>`、`<script type="module" src="/app/page-xxx.js">`、`data-bind` 挂点；**不得改动既有构图与视觉值**（本阶段不做视觉重排）。
+
+---
+
+## 8. 发布方式修正（按用户指正）
+
+**用户指正**：「`docs/ui-review/design-explore` 里面已经有 html 网页」—— 对的，那些 `.html` **就是源**，不该另起一套。
+
+### 8.1 为什么不能把那个目录直接当站点根（实测事实）
+| 实测 | 后果 |
+| --- | --- |
+| 该目录共 **20 个 `.html`**（11 张定稿 + 9 张归档/候选）、**24 张 `.png`** | 评委能打开被淘汰的候选页与候选图 |
+| 同目录还有**内部文档**：`_AUDIT.md`(14KB)、`_LANGUAGE.md`(19KB)、`_VALUES.md`(320KB)、`_SCORECARD.md`、`_PERSONALITY.md`、`_DEDUP.md` | **内部评审记录与设计笔记会暴露在公网** |
+| 11 页里 `<script>` 数量 = **0** | 必须加 JS 才能接真数据，而加 JS 就动了"设计期冻结"的文件 |
+| 但页面的 **class 名是语义化的**（`.maker`/`.seal`/`.segNum`/`.segLab`/`.note`，部分还带 `role="img" aria-label`） | ⇒ **JS 可以不改 HTML 结构就绑上元素** |
+
+### 8.2 修正后的发布方式（替换 §7.4 里 W0 的"复制 + 逐页加挂点"）
+```
+docs/ui-review/design-explore/*.html   ← 源（冻结，字节不改；设计期守卫继续有效）
+        │  node tools/sync-site.mjs   （可反复重跑）
+        ▼
+site/*.html    ← 发布副本：只注入 <meta viewport> + <script type="module" src="/app/page-x.js">
+site/app/page-*.js   ← ★ 所有接线都住在这里：靠页面已有 class 名定位、填充、绑事件
+```
+1. **HTML 结构永不重构**；接线一律在 JS 里（`textContent` 赋值、克隆既有节点作模板、插入真实数据）。
+2. 于是**接线者不可能顺手把设计改坏**（他改不到 HTML），**视觉保真度天然最高**。
+3. `tools/sync-site.mjs` 可随时重跑：源改了（正常不该改）就重新同步；`site/` 是生成物。
+4. **只有 11 张定稿进 `site/`**，归档候选与内部文档一律不进 —— 站点根再无泄漏面。
+
+### 8.3 对 W1 的影响（四个接线 agent 的约束随之改变）
+- W1 的 agent **只许写 `site/app/page-<自己那几页>.js`**；**不许改 `site/*.html`**（改了会被下次 sync 覆盖，且会破坏"HTML 是源"）。
+- 若某页**确实**需要新增元素（例如动态列表容器），用 JS 在运行时创建/克隆，不要写进 HTML。
+- 每页的现有文案是**演示数据**：JS 接上真数据后要能整体替换；**未接上的部分必须在页面上标明是演示数据**（不能让人误以为是真的）。
+
+### 8.4 与 W0 的关系（诚实记录）
+W0（`0bc60f4e`）在本次指正**之前**已按 §7.5 开工（其任务书要求"复制到 site/ 并给每页加 viewport 与 script 与 `data-bind` 挂点"）。
+本会话 `send_message` 对 subagent 不可寻址 ⇒ **改不了它的任务书**。处理：它交稿后，captain 按 §8.2 收口 ——
+把"逐页加挂点"退化为"只注入两行"，并补上 `tools/sync-site.mjs`；`data-bind` 是否保留由 captain 决定（保留也无害：它只是 JS 的定位约定）。
