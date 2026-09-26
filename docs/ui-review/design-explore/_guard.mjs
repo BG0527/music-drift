@@ -40,6 +40,11 @@ const ARCHIVE = new Set([
   's2-admin-water.html',
 ]);
 
+/** 冻结页的**已记录欠账**：仍然打印，但不计失败、不影响退出码（用户要求"不要修改"那页）。 */
+const KNOWN_DEBTS = new Map([
+  ['f4-groove.html', ['出血装饰有 .clip 容器', '七色变量原样']],
+]);
+
 const EMOJI = (cp) =>
   (cp >= 0x1f000 && cp <= 0x1faff) ||
   (cp >= 0x2600 && cp <= 0x27bf) ||
@@ -135,7 +140,10 @@ for (const name of files) {
   }
   checks.push(['png 2880x1800 且不旧于 html', pngOk, pngNote]);
 
-  const bads = checks.filter(([, ok]) => !ok);
+  const debts = KNOWN_DEBTS.get(name) ?? [];
+  const bads = checks.filter(([label, ok]) => !ok && !debts.includes(label));
+  const debtHits = checks.filter(([label, ok]) => !ok && debts.includes(label));
+
   if (ARCHIVE.has(name) || name.startsWith('_hist-')) {
     console.log(
       `· ${name.padEnd(30)} 历史稿（已淘汰/被取代，仅存档）${
@@ -146,10 +154,14 @@ for (const name of files) {
   }
   gated += 1;
   if (bads.length > 0) failed += 1;
+  const debtNote =
+    debtHits.length > 0
+      ? `  · 已知欠账（冻结页，用户要求不修改）: ${debtHits.map(([label]) => label).join(' / ')}`
+      : '';
   console.log(
     `${bads.length === 0 ? '✓' : '✗'} ${name.padEnd(30)} ${
       bads.length === 0 ? '全部通过' : bads.map(([label, , note]) => `${label}(${note})`).join(' / ')
-    }`,
+    }${debtNote}`,
   );
 }
 
