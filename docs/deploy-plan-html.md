@@ -706,3 +706,32 @@ W8 的 §2.6.2 修复三步仍然有效，可用于将来 seed 出错时的回�
 - 库内 seed 范围 **21 段全 real_opus 且每段恰好 321022B**，合成容器 0；
 - 新出现的一支 seed 产作品 `d880d407…` 的 4 段也是真 opus ⇒ **"修好之后 seed 新造的数据也是真音频"的端到端旁证**；
 - `probe-fit` **已恢复绿**（W7 的"先登录 + 等 pageReady"修复生效）；`site-guard` 仅剩 `page-login.js 含 emoji`（W9 处理）。
+
+---
+
+## 24. W9 的 lint 冲突裁决（captain，2026-09-23）
+
+### 24.1 冲突事实
+`pnpm lint` 的红分三类根因：**环境/扫描范围**（`.tmp-*` 脚手架约 480 problems、`site/app` 缺浏览器全局约 100 errors、`tools/*.mjs` 里注入浏览器执行的回调 50 no-undef）——这些**加配置就解决、不是代码问题**；
+以及**剩下 7 个真·代码问题**（剔除根因后），分布在 3 个不在 W9 可改清单里的文件：
+| 位置 | 规则 | 性质 |
+| --- | --- | --- |
+| `site/app/page-bottle.js:577,718` ×3 | `no-irregular-whitespace` | **不是缺陷**：U+3000 全角空格是**设计稿的排版分隔符**（写在模板字符串里），与 `page-login.js` 的 `SEPARATOR` 同口径 |
+| `site/app/page-sea.js:117,204` ×2 | `no-unused-vars` | **真死代码**：`firstPageOf` 未使用、`renderFleet(zoneKey)` 参数未用 |
+| `tools/probe-fit.mjs:198` ×1 / `tools/contract-smoke.ts:70` ×1 | `no-unused-vars` / `no-useless-assignment` | **真死代码**：`covered` 只加不读；`let json: unknown = null` 初值从不被读 |
+
+### 24.2 裁决：**选 B（删死代码，零规则放宽）**，但 `page-sea.js` 的两处由 captain 事后自己删
+理由：**"不许放宽守卫去遮真问题"是本会话一以贯之的原则**。那 4 处是真死代码，删掉是**行为中性的**（各 ≤2 行）；
+用窄例外掩盖它们，会让"lint 绿"从此不再等于"没有死代码"。
+**U+3000 那 3 处另算**：它是有意的排版分隔符，不是问题 ⇒ 允许在 `site/app/**` 的 override 里加 `no-irregular-whitespace: ['error', { skipTemplates: true }]`，**并在注释里写明理由 = 设计稿的全角分隔符**（这是"声明意图"，不是"掩盖问题"）。
+
+### 24.3 一个执行层面的现实（必须记下来）
+**W9 收不到这条裁决**（本会话 `send_message` 对 subagent 不可寻址）⇒ 它会按默认 **A** 交付：在 eslint 里加清单化、逐文件逐规则的窄例外，并在汇报"待裁决"里点名这 4 处死代码。
+⇒ **captain 认领收尾（等 W7 收工后）**：
+1. 删掉那 4 处死代码（`page-sea.js` 两处、`probe-fit.mjs` 一处、`contract-smoke.ts` 一处）；
+2. **撤掉 W9 为它们加的所有窄例外**（只保留 `.tmp-*` ignore、浏览器/Node 全局、以及 U+3000 的 skipTemplates 三条**有正当理由**的配置）；
+3. 复跑 `pnpm lint`（应仍 0 errors）与 `site-guard` + `walkthrough`，确认收尾没弄坏东西。
+
+### 24.4 为什么不让 W9 直接删 `page-sea.js`
+`site/app/page-sea.js` **归 W7**，而 W7 可能仍在写它（W7 的第二封中途回报就在同一时段）⇒ 两人同时改同一文件必撞车。
+这正是本会话反复付出代价的那条纪律：**同一时刻同一文件只有一个写者**。
