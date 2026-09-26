@@ -18,17 +18,25 @@
  *   而被 W3 走查消费掉之后它就空了 ⇒ 那时本脚本再造一支"演示账号参与、最终完整入海"的新瓶子
  *   （这是**唯一**能从公开 API 造出未读通知的路径：BOTTLE_COMPLETED 通知只发给当时的参与者）。
  *
- * 音频字节：Node 里没有 `MediaRecorder` ⇒ 这里上传**合成的 WebM 容器**（文件头是 EBML 魔数
- * `1A 45 DF A3`，其余是确定性伪随机字节）。它能通过服务端的**容器嗅探 + 时长**两道守门人，
- * 但它**不是可解码的音频**（`<audio>` 放不出声）。真实可播放的音频由 `tools/walkthrough.mjs`
- * 用真 `MediaRecorder` 产出并写进它的那支瓶子。这一点在 `docs/site-runbook.md` 里如实标注。
+ * 音频字节（W8 起）：上传的是 **`tools/fixtures/demo-segment.webm` 里的真 WebM/Opus**
+ * （无头 Chromium 假麦克风 + 真 `MediaRecorder` 录出来的，由 `node tools/record-fixture.mjs` 生成，
+ * 浏览器能解码、点「试听」真的出声）。Node 里没有 `MediaRecorder`，所以字节**离线录一次、随仓复用**：
+ * fixture 缺失时本脚本**直接报错**并给出重建命令，**不会**退回旧的"魔数 + 伪随机字节"合成容器
+ * ——那正是 W8 要消灭的哑音频（`DEMUXER_ERROR_COULD_NOT_OPEN`）。
+ * 施种末尾还会回读演示账号自己的每一段做**形态自检**（真 WebM 必有 DocType `webm` 与 CodecID
+ * `A_OPUS`）；若库里还留着旧合成段，就用 `--print-repair-sql` 打出的 SQL 换掉它（见下面的
+ * `repairSyntheticAudioSql`）。
  *
  * 用法：
  *   node tools/seed-demo.mjs                 # 对 http://127.0.0.1:8787 施种（默认）
  *   node tools/seed-demo.mjs --base=http://127.0.0.1:5173   # 也可以经站点服务器的同源反代
+ *   node tools/seed-demo.mjs --print-repair-sql             # 只打印"把旧合成段换成真音频"的 SQL
  */
 /* eslint-disable no-console */
+import { readFileSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
+
+import { DEFAULT_FIXTURE } from './record-fixture.mjs';
 
 /** 演示账号（口令写进 `docs/site-runbook.md`；评委用它登录看「我的」页）。 */
 export const DEMO = Object.freeze({
@@ -49,25 +57,147 @@ export const RELAYS = Object.freeze([
 
 export const DEFAULT_BASE = process.env['MDB_API_BASE'] ?? 'http://127.0.0.1:8787';
 
-/** 合成段的字节数：够过"体积 > 0"，又远小于 4 MB 上限。 */
-const SEGMENT_BYTES = 4096;
+/** 段音频 fixture：真 WebM/Opus，由 `node tools/record-fixture.mjs` 录制（见 `tools/fixtures/README.md`）。 */
+export const SEGMENT_FIXTURE = DEFAULT_FIXTURE;
+
 const EBML_MAGIC = [0x1a, 0x45, 0xdf, 0xa3];
 
 /**
- * 合成一个 WebM 容器（**不是真音频**，见文件头说明）。
- * @param {number} [bytes]
- * @returns {Uint8Array}
+ * 真 WebM/Opus 的形态判据（不是"能过服务端嗅探"就算数）：
+ * EBML 魔数 + DocType `webm` + CodecID `A_OPUS`。旧合成容器只有魔数，两串都搜不到。
+ * @param {Uint8Array} bytes
+ * @returns {{ ok: boolean, reason: string }}
  */
-export function synthesizeSegmentBytes(bytes = SEGMENT_BYTES) {
-  const out = new Uint8Array(Math.max(4, bytes));
-  out.set(EBML_MAGIC, 0);
-  let state = 0x9e3779b9;
-  for (let index = 4; index < out.length; index += 1) {
-    state = (state * 1664525 + 1013904223) >>> 0;
-    out[index] = state & 0xff;
+export function inspectSegmentAudio(bytes) {
+  if (bytes.length < 8) return { ok: false, reason: `字节太少（${String(bytes.length)}）` };
+  const magicOk = EBML_MAGIC.every((byte, position) => bytes[position] === byte);
+  if (!magicOk) return { ok: false, reason: '不是 EBML（文件头不是 1A 45 DF A3）' };
+  const text = Buffer.from(bytes).toString('latin1');
+  const hasWebm = text.includes('webm');
+  const hasOpus = text.includes('A_OPUS');
+  if (!hasWebm || !hasOpus) {
+    return { ok: false, reason: `EBML 里没有 DocType webm/A_OPUS（webm=${String(hasWebm)} opus=${String(hasOpus)}）` };
   }
-  return out;
+  return { ok: true, reason: `真 WebM/Opus（${String(bytes.length)} 字节）` };
 }
+
+let cachedAudio = null;
+
+/**
+ * 读 fixture 并做形态自检（读不到/不像真音频就抛，绝不静默降级）。
+ * @param {string} [path]
+ * @returns {{ path: string, bytes: Uint8Array }}
+ */
+export function loadSegmentAudio(path = SEGMENT_FIXTURE) {
+  if (cachedAudio !== null && cachedAudio.path === path) return cachedAudio;
+  let bytes;
+  try {
+    bytes = new Uint8Array(readFileSync(path));
+  } catch {
+    throw new Error(
+      `找不到段音频 fixture：${path}\n` +
+        '  它是 seed 上传的**真音频**（旧的合成容器已废弃）。先录一份：\n' +
+        '    node tools/record-fixture.mjs\n' +
+        `  或用 --fixture=<path> 指定别的真 WebM/Opus 文件。`,
+    );
+  }
+  const verdict = inspectSegmentAudio(bytes);
+  if (!verdict.ok) {
+    throw new Error(`fixture ${path} 不是可解码的 WebM/Opus：${verdict.reason}（重录：node tools/record-fixture.mjs --force）`);
+  }
+  cachedAudio = { path, bytes };
+  return cachedAudio;
+}
+
+/**
+ * 把**旧合成段**（W8 之前 seed 上传的"EBML 魔数 + 伪随机/零填充"，浏览器解不开）换成真音频。
+ *
+ * 定位三重条件（缺一不可，避免误伤其它 agent 的探针数据）：
+ *   ① 瓶子由 seed 建的账号发起（`demo` / `driftmate1..3`）；
+ *   ② 段字节数∈ {4096, 8192}（旧合成体的体量；真 fixture 是 ~321 KB）；
+ *   ③ 字节里没有 DocType `webm` ⇒ 确实是假容器。
+ * **可重跑**：第二次执行匹配 0 行。
+ *
+ * 需要先把 fixture 放进数据库容器（`pg_read_binary_file` 读的是**服务端文件系统**）：
+ *   node tools/record-fixture.mjs
+ *   docker cp tools/fixtures/demo-segment.webm music-drift-postgres:/tmp/mdb-demo-segment.webm
+ *   node tools/seed-demo.mjs --print-repair-sql | docker exec -i music-drift-postgres psql -U music_drift -d music_drift -f -
+ *
+ * @param {string} [containerPath] fixture 在数据库容器里的路径
+ * @returns {string} 可整段执行的 SQL
+ */
+export function repairSyntheticAudioSql(containerPath = '/tmp/mdb-demo-segment.webm') {
+  return [
+    '-- W8：把 seed 产的旧合成段（EBML 魔数 + 伪随机字节，浏览器 DEMUXER_ERROR_COULD_NOT_OPEN）',
+    '-- 换成真 WebM/Opus fixture。定位三重条件：seed 账号发起 + 4096/8192 字节 + 无 webm DocType。',
+    '-- 可重跑：第二次执行匹配 0 行。其它 agent 的探针数据不在范围内（不要放宽 handle 条件）。',
+    'BEGIN;',
+    '\\echo 将要替换的段数：',
+    'SELECT count(*) AS synthetic_segments',
+    'FROM   bottle_segments AS s',
+    'JOIN   bottles AS b ON b.id = s.bottle_id',
+    'JOIN   users   AS u ON u.id = b.initiator_id',
+    'WHERE  u.handle IN (\'demo\', \'driftmate1\', \'driftmate2\', \'driftmate3\')',
+    '  AND  octet_length(s.audio) IN (4096, 8192)',
+    '  AND  position(\'webm\' in encode(s.audio, \'escape\')) = 0;',
+    'UPDATE bottle_segments AS s',
+    `SET    audio = pg_read_binary_file('${containerPath}'), audio_mime = 'audio/webm'`,
+    'FROM   bottles AS b',
+    'JOIN   users   AS u ON u.id = b.initiator_id',
+    'WHERE  b.id = s.bottle_id',
+    '  AND  u.handle IN (\'demo\', \'driftmate1\', \'driftmate2\', \'driftmate3\')',
+    '  AND  octet_length(s.audio) IN (4096, 8192)',
+    '  AND  position(\'webm\' in encode(s.audio, \'escape\')) = 0;',
+    'COMMIT;',
+    '',
+  ].join('\n');
+}
+
+/**
+ * 回读**演示账号自己**的每一段做形态自检（W8 收口）：发现假容器就报错并给可重跑的修复 SQL。
+ * 只查 seed 数据，不碰别人的探针段（那句 SQL 的 handle 白名单同上）。
+ */
+async function assertSeededAudioReal(client, items, log) {
+  const me = await call(client, 'GET', '/api/auth/me', {}, [200], '读会话');
+  const myId = me?.user?.id ?? null;
+  const offenders = [];
+  let checked = 0;
+  for (const item of items) {
+    if (!Array.isArray(item.mySegmentIndexes) || item.mySegmentIndexes.length === 0) continue;
+    const detail = await detailOf(client, item.id);
+    const segments = (detail?.segments ?? []).filter(
+      (segment) => segment.ownerId === myId && item.mySegmentIndexes.includes(segment.index),
+    );
+    for (const segment of segments) {
+      checked += 1;
+      const bytes = await fetchSegmentBytes(client, segment.id);
+      const verdict = inspectSegmentAudio(bytes);
+      if (!verdict.ok) offenders.push(`${item.id.slice(0, 8)}… 第 ${String(segment.index)} 段（${verdict.reason}）`);
+    }
+  }
+  if (offenders.length > 0) {
+    throw new Error(
+      `演示账号的 ${String(offenders.length)}/${String(checked)} 段不是可解码音频：${offenders.join('、')}\n` +
+        '  用下面三步换成真 fixture（幂等，可重跑）：\n' +
+        '    node tools/record-fixture.mjs\n' +
+        '    docker cp tools/fixtures/demo-segment.webm music-drift-postgres:/tmp/mdb-demo-segment.webm\n' +
+        '    node tools/seed-demo.mjs --print-repair-sql | docker exec -i music-drift-postgres psql -U music_drift -d music_drift -f -',
+    );
+  }
+  log(`音频自检：演示账号的 ${String(checked)} 段全部是可解码的真 WebM/Opus`);
+  return checked;
+}
+
+/** 拉段音频的原始字节（`createApiClient.request` 只解析 json/text，二进制要走这一条）。 */
+async function fetchSegmentBytes(client, segmentId) {
+  const headers = client.cookie === null ? {} : { cookie: client.cookie };
+  const response = await fetch(`${client.base}/api/segments/${encodeURIComponent(segmentId)}/audio`, { headers });
+  if (response.status !== 200 && response.status !== 206) {
+    throw new Error(`读段音频失败：HTTP ${String(response.status)}`);
+  }
+  return new Uint8Array(await response.arrayBuffer());
+}
+
 
 /** 极简 cookie 会话客户端（只用 `node:http` 的 fetch，无依赖）。一次请求一个实例。 */
 export function createApiClient(base = DEFAULT_BASE) {
@@ -181,13 +311,13 @@ function presetFor(song, index) {
 }
 
 /** 传一段（原始二进制协议：`content-type` 就是音频 MIME、时长走 `x-audio-duration-ms`）。 */
-async function uploadSegment(client, bottleId, durationMs, what) {
+async function uploadSegment(client, bottleId, durationMs, what, fixture) {
   return call(
     client,
     'POST',
     `/api/bottles/${encodeURIComponent(bottleId)}/segments`,
     {
-      raw: synthesizeSegmentBytes(),
+      raw: loadSegmentAudio(fixture).bytes,
       contentType: 'audio/webm',
       headers: { 'x-audio-duration-ms': String(Math.round(durationMs)) },
     },
@@ -197,21 +327,24 @@ async function uploadSegment(client, bottleId, durationMs, what) {
 }
 
 /**
- * 往一支已有瓶子里塞一段**合成容器**（EBML 魔数，不可解码）。
- * 走查脚本在"环境给不出假麦克风"时用它做降级，并会在输出里明确标注降级。
+ * 往一支已有瓶子里塞一段**真音频**（内置 fixture，不经浏览器录制）。
+ *
+ * 名字里的 "Synthetic" 是 W8 之前的历史遗留：那时这条路径上传合成容器（见文件头说明），
+ * 走查脚本（`tools/walkthrough.mjs`，归 W7）在环境给不出假麦克风时调用它做"降级"。
+ * W8 起它上传的是**真 WebM/Opus**——降级只是"不录、用内置真音频"，不再是"用假音频"。
  */
 export async function uploadSyntheticSegment(client, bottleId, durationMs) {
-  return uploadSegment(client, bottleId, durationMs, '上传合成段（降级路径）');
+  return uploadSegment(client, bottleId, durationMs, '上传内置真音频段（跳过浏览器录制）');
 }
 
 /** 建瓶 + 录第 1 段（发起者路径）。返回 `{ bottleId, index }`。 */
-async function openBottleWithFirstSegment(client, song) {
+async function openBottleWithFirstSegment(client, song, fixture) {
   const created = await call(client, 'POST', '/api/bottles', { json: { songId: song.id } }, [201], '建瓶');
   const bottleId = created?.id;
   if (typeof bottleId !== 'string' || bottleId === '') {
     throw new Error('建瓶失败：服务端没有返回瓶子 id');
   }
-  const uploaded = await uploadSegment(client, bottleId, presetFor(song, 1), '上传第 1 段');
+  const uploaded = await uploadSegment(client, bottleId, presetFor(song, 1), '上传第 1 段', fixture);
   return { bottleId, index: Number(uploaded.index) };
 }
 
@@ -253,9 +386,9 @@ async function detailOf(client, bottleId) {
  *
  * @returns {Promise<string>} bottleId
  */
-async function buildCompletedSeaBottle(clients, song, log) {
+async function buildCompletedSeaBottle(clients, song, log, fixture) {
   const [first, second, demo, last] = clients;
-  const created = await openBottleWithFirstSegment(first, song);
+  const created = await openBottleWithFirstSegment(first, song, fixture);
   await chooseResolution(first, created.bottleId, 'SEA');
   log(`  建瓶 ${created.bottleId.slice(0, 8)}…（《${String(song.title)}》），第 1 段已录并入海`);
 
@@ -266,7 +399,7 @@ async function buildCompletedSeaBottle(clients, song, log) {
   ]) {
     const taken = await takeTargetedSegment(actor, created.bottleId);
     const index = Number(taken.missingSegmentIndexes?.[0] ?? 0);
-    await uploadSegment(actor, created.bottleId, presetFor(song, index), `${label} 录第 ${String(index)} 段`);
+    await uploadSegment(actor, created.bottleId, presetFor(song, index), `${label} 录第 ${String(index)} 段`, fixture);
     await chooseResolution(actor, created.bottleId, 'SEA');
     log(`  ${label} 补齐第 ${String(index)} 段并入海`);
   }
@@ -284,8 +417,8 @@ function client0(clients) {
 }
 
 /** 演示账号自己发起、投河后**留在河道**的瓶子（「我的」页要能看到"漂流中"的那一支）。 */
-async function buildRiverBottle(demo, song, log) {
-  const created = await openBottleWithFirstSegment(demo, song);
+async function buildRiverBottle(demo, song, log, fixture) {
+  const created = await openBottleWithFirstSegment(demo, song, fixture);
   await chooseResolution(demo, created.bottleId, 'RIVER');
   log(`  演示账号发起 ${created.bottleId.slice(0, 8)}…（《${String(song.title)}》）并投河（河道中）`);
   return created.bottleId;
@@ -298,15 +431,20 @@ function countUnread(notifications) {
 /**
  * 声明式施种：把「我的」页需要的三块内容补齐（幂等）。
  *
- * @param {{ base?: string, log?: (line: string) => void }} [options]
+ * @param {{ base?: string, fixture?: string, log?: (line: string) => void }} [options]
  * @returns {Promise<{ account: typeof DEMO, participated: number, completedSea: number,
  *                     inRiver: number, collections: number, badges: number,
  *                     notifications: number, unread: number, actions: string[] }>}
  */
 export async function ensureDemoData(options = {}) {
   const base = options.base ?? DEFAULT_BASE;
+  const fixture = options.fixture ?? SEGMENT_FIXTURE;
   const log = options.log ?? (() => {});
   const actions = [];
+
+  /** 先读 fixture：缺了/不是真音频就在这里失败，绝不静默降级成合成容器。 */
+  const audio = loadSegmentAudio(fixture);
+  log(`段音频：${audio.path}（${String(audio.bytes.byteLength)} 字节，真 WebM/Opus）`);
 
   const demo = createApiClient(base);
   const relays = RELAYS.map(() => createApiClient(base));
@@ -345,21 +483,26 @@ export async function ensureDemoData(options = {}) {
   // ① 至少一支「我参与过、已完整入海」的作品（= 徽章与通知的来源）
   let seaBottleId = completedSea()?.id ?? null;
   if (seaBottleId === null) {
-    seaBottleId = await buildCompletedSeaBottle([relays[0], relays[1], demo, relays[2]], songs[0], log);
+    seaBottleId = await buildCompletedSeaBottle([relays[0], relays[1], demo, relays[2]], songs[0], log, fixture);
     actions.push('造了一支完整入海的作品（演示账号为接唱者）');
     state = await snapshot();
   }
 
   // ② 至少一支「我发起、还在河道」的作品
   if (riverItem() === null) {
-    await buildRiverBottle(demo, songs[1], log);
+    await buildRiverBottle(demo, songs[1], log, fixture);
     actions.push('造了一支发起后投河的瓶子（河道中）');
     state = await snapshot();
   }
 
   // ③ 至少一条未读通知（被走查消费掉之后才需要再造；见文件头"幂等口径"）
   if (countUnread(state.notifications) === 0) {
-    const fresh = await buildCompletedSeaBottle([relays[0], relays[1], demo, relays[2]], songs[2], log);
+    const fresh = await buildCompletedSeaBottle(
+      [relays[0], relays[1], demo, relays[2]],
+      songs[2],
+      log,
+      fixture,
+    );
     actions.push(`再造一支完整入海的作品 ${fresh.slice(0, 8)}…（补回未读通知）`);
     state = await snapshot();
   }
@@ -392,6 +535,8 @@ export async function ensureDemoData(options = {}) {
   if (unread < 1) {
     throw new Error('施种后仍没有未读通知：通知的未读态无法从公开 API 造出来（见文件头说明）');
   }
+  /** W8 收口：自己造出来的数据必须**真能出声**（形态自检；发现旧合成段就报错并给可重跑 SQL）。 */
+  result.audioChecked = await assertSeededAudioReal(demo, state.items, log);
   return result;
 }
 
@@ -410,8 +555,17 @@ const isMain =
 if (isMain) {
   const args = parseArgs(process.argv.slice(2));
   const base = args.get('base') ?? DEFAULT_BASE;
+  /** 只打印"把旧合成段换成真音频"的 SQL（可重跑），不做任何写操作。 */
+  if (args.has('print-repair-sql')) {
+    console.log(repairSyntheticAudioSql(args.get('container-path') ?? '/tmp/mdb-demo-segment.webm'));
+    process.exit(0);
+  }
   try {
-    const result = await ensureDemoData({ base, log: (line) => console.log(line) });
+    const result = await ensureDemoData({
+      base,
+      fixture: args.get('fixture'),
+      log: (line) => console.log(line),
+    });
     console.log('');
     console.log(`演示账号：${result.account.handle} / ${result.account.email} / ${result.account.password}`);
     console.log(

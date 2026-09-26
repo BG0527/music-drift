@@ -14,7 +14,7 @@
  * - 其余 → `.sd`（别人唱的）；
  * - 顶部段位是缺口时，沉积面（`.iface`）与还漂着的瓶子（`.float .flask`）落在**最高实心层之上**。
  *
- * ⚠️ 已知后端缺口（`docs/ui-review/design-explore/_SCORECARD.md`）：设计稿里「收到回传 → 提示 +
+ *  已知后端缺口（`docs/ui-review/design-explore/_SCORECARD.md`）：设计稿里「收到回传 → 提示 +
  * 状态『等你操作』」需要后端新增通知类型 `BOTTLE_RETURNED`、并让 `GET /api/me/bottles` 能表达"待你操作"。
  * 本轮不改后端，**且当前数据里没有这种通知** ⇒ 本页**不画**那枚暖牌（`.st` / `.due` / 柱口系缆环
  * `.shaft`+`.hoop` 一律不渲染），绝不伪造这个状态。
@@ -415,7 +415,7 @@ async function start() {
             go,
           ]),
         );
-        linkify(go, `/sea-detail.html?id=${encodeURIComponent(row.bottleId)}`);
+        linkify(go, `/bottle.html?id=${encodeURIComponent(row.bottleId)}`);
       }
       if (rows.length > shown.length) {
         collectionPocket.append(
@@ -447,7 +447,7 @@ async function start() {
             go,
           ]),
         );
-        linkify(go, `/sea-detail.html?id=${encodeURIComponent(row.bottleId)}`);
+        linkify(go, `/bottle.html?id=${encodeURIComponent(row.bottleId)}`);
       }
       if (rows.length > shown.length) {
         badgePocket.append(

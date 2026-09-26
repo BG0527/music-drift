@@ -3,6 +3,8 @@
 > 归属：W0 初版（2026-09-23）；W3（2026-09-26）在此之上补：**演示账号种子**（`tools/seed-demo.mjs`）、
 > **端到端走查**（`tools/walkthrough.mjs`）、**评委走查清单**、**两处可测性信号**（`site/app/page.js` 的 `pageReady`、
 > `site/app/dom.js` 的 `stateNode/stateKind`）。
+> W8（2026-09-27）把**段音频从合成容器换成真 WebM/Opus**：新增 `tools/record-fixture.mjs`（录 fixture）与
+> `tools/verify-demo-audio.mjs`（试听真的出声的体检），修复口径见 §2.6.1 / §2.6.2 / §8。
 > 施工图与硬约束见 `docs/deploy-plan-html.md` §7；本文件只写**怎么起、怎么验、坏了怎么查**。
 
 ## 1. 拓扑（一句话）
@@ -82,14 +84,16 @@ node tools/site-server.mjs --port=5173
 ```powershell
 node tools/seed-demo.mjs
 # 期望：
+#   段音频：…\tools\fixtures\demo-segment.webm（321022 字节，真 WebM/Opus）
 #   账号：demo（已存在）；陪练：driftmate1(existing)、driftmate2(existing)、driftmate3(existing)
+#   音频自检：演示账号的 5 段全部是可解码的真 WebM/Opus
 #
 #   演示账号：demo / demo@example.com / SeaDrift2026
-#     「我的」页内容：参与过 4 支（完整入海 3 · 河道/持有中 1） · 收藏 1 · 徽章 3 · 通知 3（未读 1）
+#     「我的」页内容：参与过 5 支（完整入海 4 · 河道/持有中 1） · 收藏 1 · 徽章 4 · 通知 4（未读 1）
 #     本次没有新增任何数据（幂等：状态已满足）
 ```
 
-- 它只走**公开 API**（不写 SQL），把「我的」页需要的三块内容补齐：参与过的瓶子（含"已入海完整"与"还在河道"各一支）、
+- 它只走**公开 API**（施种路径不写 SQL），把「我的」页需要的三块内容补齐：参与过的瓶子（含"已入海完整"与"还在河道"各一支）、
   收藏、徽章、**未读通知**；口令就打印在上面的输出里（本手册 §7 也写了一份）。
 - 上面的数字**以库里现状为准**（`参与过 N 支` 会随走查消费未读通知而增长：每消费掉一条未读，它就会补一支
   "完整入海"的作品；格式与字段不变）。
@@ -98,6 +102,47 @@ node tools/seed-demo.mjs
   （`CANNOT_RECORD_TWICE_IN_BOTTLE`），所以"完整入海的作品"至少需要 4 个不同的人。
 - 唯一会"长数据"的情况：**未读通知被走查消费掉之后**再跑（后端没有"标记未读"的端点）——
   那时它会再造一支"演示账号参与、最终完整入海"的瓶子来补回未读。连跑两次不会触发（状态已满足）。
+
+#### 2.6.1 段音频是**真音频**（W8 起；评委点「试听」必须出声）
+
+- 上传的段字节来自 **`tools/fixtures/demo-segment.webm`**：无头 Chromium 的**假麦克风 + 真 `MediaRecorder`**
+  录的 **WebM/Opus**（20.0 秒墙钟，19.92 秒媒体时长，321022 字节，
+  sha256 `13a301877bc4070caa84b73056d3a968388896ee49d2d280bbc73e8c872a9220`）。浏览器解码器打得开，
+  `<audio>.currentTime` 会真的前进。
+- **为什么不用"合成容器"**：W3 曾在 Node 里拼"EBML 魔数 `1A 45 DF A3` + 伪随机字节"——它能过服务端的
+  容器嗅探与时长校验，但 Chromium 报 `DEMUXER_ERROR_COULD_NOT_OPEN: FFmpegDemuxer: open context failed`，
+  也就是说**点评委点「试听」一片静音**。这条路已经删掉：fixture 缺失时 seed **直接报错**，不退回合成字节。
+- fixture 是**二进制交付物**，随仓库走（不入 `.gitignore`；`.tmp-*` 才是临时产物）。重建/重录：
+  ```powershell
+  node tools/record-fixture.mjs            # 已存在则跳过（幂等）；--force 重录；--seconds=N 改时长
+  ```
+  它录完会**当场自证**（同一个页面里用 `<audio>` 播 1.2 秒，`currentTime` 必须前进、`error` 必须为空），
+  自证不过就**不落地**。
+- seed 末尾会对演示账号自己的每一段做**形态自检**（真 WebM 必有 DocType `webm` + CodecID `A_OPUS`）：
+  发现旧合成段就报错，并把"换成真音频"的三步打在屏幕上（见 2.6.2）。
+
+#### 2.6.2 库里遗留的合成段怎么清理（只清 seed 范围，可重跑）
+
+W3 时代施进去的合成段（公海里那批作品 + 演示账号的瓶子）**不会自己变真**——公开 API 没有"替换段"端点，
+所以要直接改数据（SQL，bytea 替换；**不删行、不动别人的探针数据**）：
+
+```powershell
+node tools/record-fixture.mjs                                                              # 1) 真音频
+docker cp tools/fixtures/demo-segment.webm music-drift-postgres:/tmp/mdb-demo-segment.webm # 2) 送进库容器
+node tools/seed-demo.mjs --print-repair-sql | docker exec -i music-drift-postgres psql -U music_drift -d music_drift -f -   # 3) 替换
+# 期望：synthetic_segments = 0（第一次跑是 17）、UPDATE 17、COMMIT；**再跑一次必须 UPDATE 0（幂等）**
+```
+
+- 定位三重条件（缺一不可，写在 `repairSyntheticAudioSql()` 里）：① 瓶子由 seed 账号 `demo`/`driftmate1..3` 发起；
+  ② 段字节数 ∈ {4096, 8192}（旧合成体的体量）；③ 字节里没有 DocType `webm`。
+- 其它 agent 的探针段（`aamud*`/`ccmud*`/`smoke*`/`layoutmud*` 造的同类合成容器）**不在**这条 SQL 的范围里，
+  按纪律不代改；需要一起清就把 `u.handle IN (…)` 放宽——那是**captain 的裁决**，不是随手改。
+- 全库体检（可复跑，含 Chromium 真解码）：
+  ```powershell
+  node tools/verify-demo-audio.mjs          # 自己起站点服务器（5188）并在结束时杀掉
+  # 期望结尾：结论：0 项不达标（他人探针段会以 WARN 列出，不是本次范围的缺陷）
+  ```
+
 
 ### 2.7 一键端到端走查（W3）
 
@@ -168,7 +213,11 @@ curl.exe -s -i -c .tmp-w0-cookies.txt -X POST http://127.0.0.1:5173/api/auth/log
 | `seed-demo` 报连不上 / `fetch failed` | API 没起（它默认打 `http://127.0.0.1:8787`） | 起 2.4；或 `--base=http://127.0.0.1:5173`（经站点同源反代） |
 | `walkthrough` 报「找不到 playwright（npx 缓存里没有）」 | 本机从没跑过 playwright | 跑一次 `npx playwright --version` 让它落到 `_npx` 缓存（**不要**装成项目依赖） |
 | `walkthrough` 报「站点服务器没起来」/ 端口占用 | 5188 被别的进程占着 | 换端口 `--port=5189`（它会自己起服务器；已在跑则复用） |
-| `walkthrough` 打出 `WARN 录音降级为合成容器` | 该环境给不出假麦克风/`MediaRecorder` | 断言仍会跑完（走合成容器）；要真音频就在本机（localhost）重跑 |
+| `walkthrough` 打出 `WARN 录音降级为（旧）合成容器` | 该环境给不出假麦克风/`MediaRecorder` | W8 起这条"降级"上传的是**内置真音频 fixture**（不再有哑音频）；文案里的"合成容器"是 W7 待改的旧措辞 |
+| `seed-demo` 报「找不到段音频 fixture」/「不是可解码的 WebM/Opus」 | `tools/fixtures/demo-segment.webm` 缺失或被换成了假音频 | `node tools/record-fixture.mjs`（或 `--force` 重录）；详见 §2.6.1 |
+| `seed-demo` 报「演示账号的 N/M 段不是可解码音频」 | 库里还留着 W3 时代的合成段 | 按 §2.6.2 的三步替换（幂等，可重跑） |
+| `verify-demo-audio` 报 `DEMUXER_ERROR_COULD_NOT_OPEN` / `currentTime 0 → 0` | 该段是合成容器（或 fixture 被换成了假音频） | 先修数据（§2.6.2），再确认 fixture 的 sha256 与 §2.6.1 一致 |
+| `verify-demo-audio` 的 `WARN 不在本次修复范围…` | 别的探针账号造的合成段（`aamud*`/`ccmud*` 等） | **不是本次范围的缺陷**；要一起清走 captain 裁决（放宽 §2.6.2 的 handle 白名单） |
 | `walkthrough` 的「我的」断言未读=0 | 上一次走查把未读消费掉了 | 正常：先跑 `node tools/seed-demo.mjs`（会自动补一支完整入海的作品造出未读） |
 | `probe-fit` 偶发 `✗ … 没有 #fit-stage` | **采样竞态**：`/me.html`、`/admin.html` 未登录会跳登录页，350ms 那一刻可能正好落在"新文档已建、脚本还没跑"的窗口里 | 不是内容被裁（同一轮里 `被裁内容` 恒为 0）；重跑一次即可。判据是 `被裁内容=0` |
 
@@ -218,6 +267,10 @@ git status --porcelain -- site tools/site-server.mjs docs/site-runbook.md   # �
 node --check tools/site-server.mjs                                          # 语法自检
 node --check tools/seed-demo.mjs                                            # W3
 node --check tools/walkthrough.mjs                                          # W3
+node --check tools/record-fixture.mjs                                       # W8（录真音频 fixture）
+node --check tools/verify-demo-audio.mjs                                    # W8（演示音频体检）
+node tools/record-fixture.mjs                                               # W8：确认真音频 fixture 在位（幂等）
+node tools/verify-demo-audio.mjs                                            # W8：试听真的出声（自己起/收站点服务器）
 node tools/site-guard.mjs                                                   # 静态站守卫（期望「✓ 全部通过」）
 node tools/probe-fit.mjs                                                    # 一屏适配（先起一个站点服务器；期望「被裁内容=0」）
 ```
@@ -228,6 +281,13 @@ node tools/probe-fit.mjs                                                    # �
 它是**普通用户**（不是管理员）；它名下已经有一支"完整入海"的作品、一支"还在河道"的瓶子、1 件收藏、≥1 枚徽章、≥1 条未读通知。
 
 进场前提：§2 的 2.1 → 2.5 都起来了，且 2.6 跑过一次。
+
+> **站点重构进行中（W8 记录，2026-09-27 00:19 实测）**：`site/sea-detail.html` 已被删（作品详情并入
+> `/bottle.html?id=…`），但 `site/app/page-me.js`（收藏/作品两行的跳转）与 `site/app/demo-nav.js`（「公海详情」）
+> 仍指向 `/sea-detail.html` ⇒ 这两条入口现在会落到 404 页；`tools/probe-fit.mjs` 的 `PAGES` 也还含
+> `sea-detail`（会报"没有就绪信号"）。同刻 `tools/site-guard.mjs` 报 `site/app/page-login.js 含 emoji`，
+> 且登录页把「账号」当 handle 提交 ⇒ `probe-fit`/`walkthrough` 用邮箱登录会收到 401 `INVALID_CREDENTIALS`
+> （API 直连邮箱登录是 200）。**这些都不在 W8（段音频）范围**，归对应 owner 修。
 
 | # | 怎么走 | 应该看到什么（判据） |
 | --- | --- | --- |
@@ -253,6 +313,11 @@ node tools/probe-fit.mjs                                                    # �
 | --- | --- | --- |
 | `demo` / `demo@example.com` | **评委用这个登录** | `SeaDrift2026` |
 | `driftmate1/2/3` / `driftmateN@example.com` | 陪练：一支 4 段的作品需要 4 个不同的人 | `SeaDrift2026` |
+
+**W8 的口径**（段音频）：库里**只清 seed 范围的合成段**（`demo`/`driftmate*` 名下的 17 段，见 §2.6.2），
+**不删任何行、不删任何瓶子**——只把 `bottle_segments.audio` 的 bytea 换成真 fixture；`demo` 与它的演示数据照旧保留。
+别的 agent 的探针账号（`aamud*`/`ccmud*`/`smoke*`/`layoutmud*`/`w3walk*`…）名下的合成段**一律不动**
+（即使它们是公海里的哑作品）——那需要 captain 裁决后放宽 §2.6.2 的 handle 白名单。
 
 `node tools/walkthrough.mjs` 每次跑会**临时造**两个账号（`w3walk<时间戳>` / `w3relay<时间戳>`）与它们经手的两支瓶子。
 它们是探针数据，随时可以清（**只删这两类，别动 `demo`/`driftmate*`**）：

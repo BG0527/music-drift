@@ -23,7 +23,7 @@ export const DEMO_PAGES = [
   { path: '/bottle.html', label: '瓶子', source: 'p-bottle-record.html' },
   { path: '/drift-log.html', label: '漂流日志', source: 'p-driftlog-record.html' },
   { path: '/sea.html', label: '公海', source: 'p-sea-hall.html' },
-  { path: '/sea-detail.html', label: '公海详情', source: 'p-sea-detail-record.html' },
+  { path: '/bottle.html', label: '公海详情', source: 'p-sea-detail-record.html' },
   { path: '/me.html', label: '我的', source: 'p-profile-record.html' },
   { path: '/settings.html', label: '设置', source: 'p-settings-record.html' },
   { path: '/login.html', label: '登录 / 注册', source: 'p-login-record.html' },
