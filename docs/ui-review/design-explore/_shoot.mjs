@@ -62,6 +62,13 @@ const { chromium } = await loadPlaywright();
  * 两个进程写同一个 PNG 会报 `UNKNOWN: unknown error, open ...`（实测反复出现，重试救不了）。
  * 所以在这里串行化：拿不到锁就等；持有者超过 5 分钟没心跳，视为死锁抢过来。
  */
+/** 读 PNG 的 IHDR 取真实像素：`scrollHeight` 会漏判（实测某页 scrollHeight=900 而实际截出 907）。 */
+function pngSize(path) {
+  const buf = readFileSync(path).subarray(0, 24);
+  if (buf.length < 24 || buf.readUInt32BE(0) !== 0x89504e47) return null;
+  return { width: buf.readUInt32BE(16), height: buf.readUInt32BE(20) };
+}
+
 const LOCK = join(DIR, '.shoot.lock');
 async function acquireLock() {
   for (let i = 0; i < 180; i += 1) {
@@ -152,6 +159,13 @@ for (const name of shots) {
   const over = [];
   if (measured.width > VIEWPORT.width) over.push(`横向 +${String(measured.width - VIEWPORT.width)}px`);
   if (measured.height > VIEWPORT.height) over.push(`纵向 +${String(measured.height - VIEWPORT.height)}px`);
+  // 真判据：PNG 的实际像素必须是 2880x1800（1440x900 @2x）。scrollHeight 会说谎。
+  const shot2x = pngSize(out);
+  if (shot2x && (shot2x.width !== VIEWPORT.width * 2 || shot2x.height !== VIEWPORT.height * 2)) {
+    over.push(
+      `实际像素 ${String(shot2x.width)}x${String(shot2x.height)}（应为 ${String(VIEWPORT.width * 2)}x${String(VIEWPORT.height * 2)}）`,
+    );
+  }
   const verdict = over.length ? `  ⚠ 超出一屏：${over.join(' / ')}` : '  ✓ 一屏内';
   console.log(
     `shot ${name}  →  ${out}  (${String(measured.width)}x${String(measured.height)} @1x, h1 font: ${measured.font})${verdict}`,

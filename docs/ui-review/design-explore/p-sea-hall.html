@@ -70,19 +70,28 @@
       /* ---- 水线：一条横切全页的浅色刻度线 + 左上角一小段冷光 ---- */
       .waterline { position:relative; height:1px;
         background:linear-gradient(90deg, rgba(127,209,217,.62) 0 300px, rgba(243,249,250,.13) 300px 100%); }
+      /* 水线以上：透下来的光（很淡，是"水"不是"渐变装饰"） */
+      .sheet { position:absolute; left:0; right:0; top:72px; height:180px;
+        background:radial-gradient(120% 100% at 46% 0%, rgba(127,209,217,.055) 0 30%, rgba(127,209,217,0) 72%); }
       /* 更深一层的水线：让下半页那片空白是"水"，不是没画完。
          单层 hairline（不做两线平行——那种"丝带"不属这套语言） */
       .deep { position:relative; height:1px; margin-top:38px;
         background:linear-gradient(90deg, rgba(243,249,250,.13) 0 300px,
           rgba(127,209,217,.3) 300px 640px, rgba(243,249,250,.07) 640px 100%); }
-      .deep i { position:absolute; left:0; right:0; top:1px; height:132px;
-        background:linear-gradient(180deg, rgba(6,22,29,.5) 0%, rgba(5,15,20,0) 100%); }
+      .deep i { position:absolute; left:0; right:0; top:1px; height:150px;
+        background:
+          linear-gradient(180deg, rgba(8,28,36,.42) 0%, rgba(5,15,20,0) 100%),
+          repeating-linear-gradient(99deg, rgba(228,247,252,.026) 0 3px, transparent 3px 66px); }
+      /* 台账末尾那几行沉进水里 */
+      .log::after { content:''; display:block; height:64px;
+        background:linear-gradient(180deg, rgba(5,15,20,.5) 0%, rgba(5,15,20,0) 100%); }
 
       /* ---- 台面：左边是登记项，右边是条目 ---- */
       .desk { display:grid; grid-template-columns:272px 1fr; gap:56px; padding-top:36px; }
       .seal .cat { display:block; }
-      .seal .big { margin-top:12px; font-size:104px; line-height:1; color:rgba(243,249,250,.11); }
-      .seal p { margin-top:18px; font-size:14px; line-height:1.95; color:var(--muted); }
+      .seal .big { margin-top:12px; font-size:104px; line-height:1; color:rgba(243,249,250,.115); }
+      .seal .bigsub { margin-top:14px; font-size:11.5px; line-height:1.8; color:rgba(169,199,207,.66); }
+      .seal p { margin-top:20px; font-size:14px; line-height:1.95; color:var(--muted); }
 
       .zone { display:flex; align-items:baseline; gap:18px; height:18px; }
       .zone .cat { color:rgba(243,249,250,.34); }
@@ -93,14 +102,14 @@
 
       ul.log { list-style:none; margin-top:22px; }
       li.entry { display:grid; grid-template-columns:48px 130px 142px 1fr 164px; gap:22px;
-        align-items:start; padding-top:15px; height:60px;
+        align-items:start; padding-top:17px; height:64px;
         border-bottom:1px solid rgba(243,249,250,.075); }
       li.entry:first-child { border-top:1px solid rgba(243,249,250,.075); }
       li.entry[data-zone='INCOMPLETE'] { border-bottom:1px dashed rgba(246,215,154,.24); }
       .tk { font-size:12px; line-height:1.9; color:rgba(243,249,250,.34); }
       .tk.cur { color:var(--coral); }
       .job { display:flex; flex-direction:column; gap:7px; }
-      .song { font-size:17px; line-height:1.35; color:var(--paper); }
+      .song { font-size:17px; line-height:1.4; color:var(--paper); }
       li.entry[data-zone='INCOMPLETE'] .song { color:var(--warm); }
       .seg { display:flex; gap:5px; align-items:center; height:4px; }
       .cell { width:22px; height:4px; }
@@ -152,6 +161,7 @@
   <body>
     <div class="clip">
       <div class="surface"></div>
+      <div class="sheet"></div>
       <div class="glint"></div>
       <div class="sink"></div>
     </div>
@@ -201,6 +211,7 @@
         <div class="seal">
           <span class="cat">到港登记 · REGISTER</span>
           <p class="big mono">MDB</p>
+          <p class="bigsub">母版号前缀。支 · 段 · 号 <span class="mono">A1</span></p>
           <p>入海之后不再漂流。每支作品在这里编上母版号、记下最近一次更新。</p>
         </div>
 
