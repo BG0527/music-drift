@@ -30,8 +30,8 @@
       .glint { position:absolute; inset:0; mix-blend-mode:screen;
         background:linear-gradient(101deg, transparent 28%, rgba(228,247,252,.045) 45%, rgba(228,247,252,.065) 50%, rgba(228,247,252,.028) 55%, transparent 72%); }
 
-      /* 唱片盘心 (1040,416) r336：左半张压在封套背后，右半张抽在外面；水线从 y=646 横切过去，
-         盘面下缘 106px 沉在水里 —— 唱片刻在沟槽上的水，和河道里的水是同一条 */
+      /* 唱片盘心 (1040,416) r336：左半张压在封套背后，右半张抽在外面；
+         水线从 y=580 横切过去，盘面下缘 172px 落在水里 —— 沟槽里流的就是这条河的水 */
       .disc { position:absolute; left:704px; top:80px; width:672px; height:672px; border-radius:50%;
         background:
           repeating-radial-gradient(circle at 50% 50%, rgba(216,243,246,.055) 0 1.2px, transparent 1.2px 6.5px),
@@ -52,58 +52,68 @@
       .label::after { content:''; position:absolute; left:50%; top:50%; width:26px; height:26px;
         margin:-13px 0 0 -13px; border-radius:50%; background:var(--ink); }
 
-      /* 封套：不透明，遮住唱片左半张；右缘是开口。**下沿正好落在水线上**，所以它是浮着的 */
-      .sleeve { position:absolute; left:64px; top:56px; width:816px; height:590px; border-radius:2px;
+      /* 封套：不透明，遮住唱片左半张；右缘是开口。下沿正好落在水线上，所以它是浮着的 */
+      .sleeve { position:absolute; left:64px; top:56px; width:816px; height:524px; border-radius:2px;
         background:linear-gradient(158deg, #0a2733 0%, #061a22 58%, #04121a 100%);
         border:1px solid rgba(243,249,250,.16); }
-      .mouth-dark { position:absolute; left:872px; top:56px; width:4px; height:590px; background:rgba(3,12,17,.5); }
-      .mouth { position:absolute; left:878px; top:56px; width:1px; height:590px; background:rgba(243,249,250,.34); }
+      .mouth-dark { position:absolute; left:872px; top:56px; width:4px; height:524px; background:rgba(3,12,17,.5); }
+      .mouth { position:absolute; left:878px; top:56px; width:1px; height:524px; background:rgba(243,249,250,.34); }
       /* 开口上的半圆指孔：真的从封套上咬掉一块，所以这里露出的是盘面底 */
       .notch { position:absolute; left:853px; top:61px; width:27px; height:54px;
         background:radial-gradient(circle 27px at 100% 50%,
           var(--ink) 0 26px, rgba(243,249,250,.24) 26px 27px, transparent 27px); }
 
-      /* ── 水面：y=646 一条横贯全页的水线 ───────────────────────────
-         线上 = 别人看到的那一面（封套、抽出的大半张盘、代号）；
-         线下 = 这只瓶子真正的样子（沉在水里的盘缘、认领线、水下的瓶）。 */
-      .below { position:absolute; left:0; right:0; top:646px; height:254px; overflow:hidden; }
+      /* ── 水面：y=580 一条横贯全页的水线 ───────────────────────────
+         线上 = 别人看到的那一面（封套、抽出的大半张盘、代号签条）；
+         线下 = 这只瓶子真正的样子（沉进水里的盘缘、折光、认领线与横躺的那只瓶）。 */
+      .below { position:absolute; left:0; right:0; top:580px; height:320px; overflow:hidden; }
       .veil { position:absolute; inset:0;
-        background:linear-gradient(180deg, rgba(160,226,236,.13), rgba(127,209,217,.055) 34%, rgba(5,15,20,0) 86%); }
-      /* 封套被水面截断后的倒影：越深越淡 */
-      .rf-sleeve { position:absolute; left:64px; top:0; width:816px; height:116px; opacity:.34;
-        background:linear-gradient(180deg, #04121a, #061a22 44%, #0a2733);
+        background:linear-gradient(180deg, rgba(160,226,236,.26), rgba(127,209,217,.12) 24%,
+          rgba(127,209,217,.04) 56%, rgba(5,15,20,0) 92%); }
+      /* 封套贴着水线的那道倒影：越深越淡，两侧留住 1px 亮边才读得出是个方东西 */
+      .rf-sleeve { position:absolute; left:64px; top:0; width:816px; height:130px; opacity:.5;
+        background:linear-gradient(180deg, #0d3341, #061a22 46%, #04121a);
+        border-left:1px solid rgba(203,238,246,.08); border-right:1px solid rgba(203,238,246,.14);
         -webkit-mask-image:linear-gradient(180deg, rgba(255,255,255,.95), rgba(255,255,255,0));
         mask-image:linear-gradient(180deg, rgba(255,255,255,.95), rgba(255,255,255,0)); }
-      /* 盘面沉入水里的那一段：整张盘沿水线镜像下来，只露 254px */
-      .rf-disc { position:absolute; left:704px; top:-566px; width:672px; height:672px; border-radius:50%; opacity:.17;
+      /* 盘面沉进水里的那一段：整张盘沿水线镜像下来 */
+      .rf-disc { position:absolute; left:704px; top:-500px; width:672px; height:672px; border-radius:50%; opacity:.24;
         background:
-          repeating-radial-gradient(circle at 50% 50%, rgba(216,243,246,.055) 0 1.2px, transparent 1.2px 6.5px),
+          repeating-radial-gradient(circle at 50% 50%, rgba(216,243,246,.06) 0 1.2px, transparent 1.2px 6.5px),
           radial-gradient(76% 76% at 34% 26%, rgba(10,48,60,.5), rgba(3,17,23,.78));
-        transform:translateY(460px) scaleY(-1);
+        transform:translateY(328px) scaleY(-1);
         -webkit-mask-image:linear-gradient(180deg, rgba(255,255,255,0) 6%, rgba(255,255,255,.9) 34%, rgba(255,255,255,.95));
         mask-image:linear-gradient(180deg, rgba(255,255,255,0) 6%, rgba(255,255,255,.9) 34%, rgba(255,255,255,.95)); }
-      /* 贴水面的折光：只在最上面几十像素，越深越少 */
-      .caustics span { position:absolute; height:1px; background:rgba(203,238,246,.13); }
-      .bub { position:absolute; border:1px solid rgba(203,238,246,.3); border-radius:50%; }
-      .surface { position:absolute; left:0; right:0; top:645px; height:2px; }
+      /* 泡在水里的那道盘缘：暖光被水吃了一半，只剩贴着水线的一截弧 */
+      .wet-rim { position:absolute; left:704px; top:-500px; width:672px; height:672px; border-radius:50%;
+        border:1px solid transparent; border-bottom-color:rgba(246,215,154,.3); }
+      /* 水面折光：横着切过没入水里的那半张盘 */
+      .streaks span { position:absolute; height:1px; }
+      .glow { position:absolute; left:640px; top:-60px; width:800px; height:420px; border-radius:50%;
+        background:radial-gradient(50% 50% at 50% 50%, rgba(127,209,217,.16), rgba(127,209,217,0) 72%); }
+      .caustics span { position:absolute; height:1px; background:rgba(203,238,246,.14); }
+      .bub { position:absolute; border:1px solid rgba(203,238,246,.34); border-radius:50%; }
+      .surface { position:absolute; left:0; right:0; top:578px; height:3px; }
       .surface::before { content:''; position:absolute; inset:0;
-        background:linear-gradient(90deg, rgba(203,238,246,.05) 0%, rgba(203,238,246,.5) 17%, rgba(203,238,246,.2) 43%,
-          rgba(246,215,154,.44) 66%, rgba(203,238,246,.15) 88%, rgba(203,238,246,.05) 100%); }
-      .surface::after { content:''; position:absolute; left:0; right:0; top:2px; height:10px;
-        background:linear-gradient(180deg, rgba(203,238,246,.12), rgba(5,15,20,0)); }
+        background:linear-gradient(90deg, rgba(203,238,246,.08) 0%, rgba(203,238,246,.62) 15%, rgba(203,238,246,.28) 42%,
+          rgba(246,215,154,.56) 65%, rgba(203,238,246,.2) 88%, rgba(203,238,246,.08) 100%); }
+      .surface::after { content:''; position:absolute; left:0; right:0; top:3px; height:18px;
+        background:linear-gradient(180deg, rgba(203,238,246,.16), rgba(5,15,20,0)); }
 
-      /* ── 认领装置：漂在水面上的是一张代号签条，一根线从它的孔里垂下去，
-            系在水下的那只瓶上 —— 线上头是人人都看得到的代号，线下头才是你的瓶子 ── */
-      .tag { position:absolute; left:153px; top:596px; width:84px; height:62px; border-radius:2px;
-        border:1px solid rgba(243,249,250,.26);
-        background:linear-gradient(174deg, rgba(243,249,250,.11), rgba(243,249,250,.03)); }
+      /* ── 认领装置：漂在水面上的是一张代号签条，一根线从签条的孔里垂下去，
+            栓在水下那只横躺着的瓶的瓶颈上 —— 线上头人人都看得到，线下头才是你的瓶 ── */
+      .tag { position:absolute; left:626px; top:556px; width:84px; height:62px; border-radius:2px;
+        border:1px solid rgba(243,249,250,.3);
+        background:linear-gradient(174deg, rgba(243,249,250,.13), rgba(243,249,250,.035)); }
       .tag b { position:absolute; left:11px; top:12px; width:62px; font-size:11px; font-weight:400;
         letter-spacing:.14em; color:var(--paper); }
-      .tag i { position:absolute; left:50%; top:44px; width:7px; height:7px; margin-left:-3.5px;
-        border:1px solid rgba(243,249,250,.42); border-radius:50%; }
-      .line { position:absolute; left:194px; top:646px; width:1px; height:46px;
-        background:linear-gradient(180deg, rgba(203,238,246,.55), rgba(203,238,246,.2)); }
+      .tag i { position:absolute; left:50%; top:50px; width:7px; height:7px; margin-left:-3.5px;
+        border:1px solid rgba(243,249,250,.46); border-radius:50%; }
+      .line { position:absolute; left:667px; top:613px; width:1px; height:81px;
+        background:linear-gradient(180deg, rgba(203,238,246,.6), rgba(203,238,246,.22)); }
       .dev { position:absolute; inset:0; }
+      /* 盘缘破开水面那一处：两圈从这里散出去的涟漪 —— 一眼看出这张盘有一半在水里 */
+      .edgewave { position:absolute; border:1px solid rgba(203,238,246,.32); border-radius:50%; }
 
       main { position:relative; z-index:2; }
       .cat { position:absolute; left:116px; top:92px; font-size:11px; letter-spacing:.24em;
@@ -115,13 +125,12 @@
       .rule { position:absolute; left:116px; width:712px; height:1px; background:var(--line); }
 
       /* 模式切换 = 压在封套左栏顶上的一对制式页签（源码里的 Tabs） */
-      .modes { position:absolute; left:116px; top:320px; display:flex; gap:26px; }
+      .modes { position:absolute; left:116px; top:314px; display:flex; gap:26px; }
       .mode { padding:0 0 9px; font-family:inherit; font-size:15px; font-weight:700; letter-spacing:.14em;
         color:var(--muted); background:transparent; border:0; border-bottom:1px solid rgba(243,249,250,.22);
         cursor:pointer; }
       .mode.on { color:var(--coral); border-bottom:2px solid var(--coral); }
-      /* 两种模式差在哪一行字段：写出来，而不是让人猜 */
-      .modesnote { position:absolute; left:480px; top:330px; width:348px; font-size:12px; line-height:1.6;
+      .modesnote { position:absolute; left:480px; top:326px; width:348px; font-size:12px; line-height:1.6;
         color:rgba(243,249,250,.42); }
 
       /* 表单 = 一张印在封套左栏的规格表：字段名与控件 · 页边注说明 · 字段级错误的落位 */
@@ -142,32 +151,29 @@
       .frow .errcell .v { font-size:11px; line-height:1.6;
         text-decoration:underline; text-decoration-thickness:1px; text-underline-offset:3px; }
 
-      .r-handle { top:384px; }
-      .r-email { top:464px; }
-      .r-password { top:544px; }
+      .r-handle { top:376px; }
+      .r-password { top:456px; }
 
       /* 主行动 = 封套开口上的拉片：一半在封套里，一半压在唱片上，脚底就贴着水面 */
-      .tab { position:absolute; left:828px; top:588px; width:238px; height:52px; padding:0;
+      .tab { position:absolute; left:828px; top:528px; width:238px; height:52px; padding:0;
         font-family:inherit; font-size:15px; font-weight:700; letter-spacing:.06em;
         color:var(--paper); background:var(--coral); border:0; border-radius:2px; cursor:pointer; }
       .tab::before { content:''; position:absolute; left:0; top:5px; right:0; height:1px;
         background:rgba(243,249,250,.32); }
       /* 拉片底下压出来的涟漪：按下去，它就进水了 */
-      .rip { position:absolute; border:1px solid rgba(203,238,246,.26); border-radius:50%; }
-      .rip.a { left:827px; top:648px; width:240px; height:18px; }
-      .rip.b { left:867px; top:651px; width:160px; height:12px; border-color:rgba(203,238,246,.16); }
+      .rip { position:absolute; border:1px solid rgba(203,238,246,.3); border-radius:50%; }
+      .rip.a { left:827px; top:581px; width:240px; height:18px; }
+      .rip.b { left:867px; top:585px; width:160px; height:12px; border-color:rgba(203,238,246,.18); }
 
-      /* 装置的图注：一条在水上、一条在水下 */
+      /* 装置的图注：一条在水上（贴住签条左沿），一条在水下（指向瓶里那枚标签盘） */
       .devlab { position:absolute; font-size:12.5px; line-height:1.7; color:var(--muted); }
-      .devlab.up { left:253px; top:614px; }
-      .devlab.dn { left:268px; top:782px; width:220px; }
-      .leader { position:absolute; left:224px; top:812px; width:38px; height:1px;
-        background:linear-gradient(90deg, rgba(203,238,246,.44), rgba(203,238,246,.14)); transform:rotate(-17deg); }
-      /* 匿名承诺写在水面之下 */
-      .etiquette { position:absolute; left:520px; top:692px; width:262px; font-size:13.5px;
+      .devlab.up { left:498px; top:558px; width:113px; text-align:right; }
+      .devlab.dn { left:250px; top:806px; width:220px; }
+      /* 匿名承诺写在水面之下：它管的是每个瓶子里的那个代号 */
+      .etiquette { position:absolute; left:790px; top:610px; width:290px; font-size:13.5px;
         line-height:1.9; color:var(--muted); }
 
-      .band { position:absolute; left:396px; right:64px; top:816px; padding-top:20px;
+      .band { position:absolute; left:64px; right:64px; top:834px; padding-top:18px;
         border-top:1px solid var(--line); display:flex; align-items:baseline; gap:22px; }
       .band .said { font-size:13px; color:var(--muted); }
       .go { margin-left:auto; font-size:14px; color:var(--glass);
@@ -189,64 +195,93 @@
       <div class="mouth"></div>
       <div class="notch"></div>
 
-      <!-- 水线以下：封套与唱片的倒影、贴水面的折光、稀疏上升的气泡 -->
+      <!-- 水线以下：倒影、泡在水里的盘缘、折光、稀疏上升的气泡 -->
       <div class="below">
         <div class="veil"></div>
+        <div class="glow"></div>
         <div class="rf-sleeve"></div>
         <div class="rf-disc"></div>
-        <div class="caustics">
-          <span style="left:96px; top:26px; width:180px"></span>
-          <span style="left:352px; top:44px; width:118px"></span>
-          <span style="left:644px; top:20px; width:262px"></span>
-          <span style="left:1052px; top:38px; width:152px"></span>
-          <span style="left:212px; top:96px; width:206px"></span>
-          <span style="left:702px; top:122px; width:298px"></span>
-          <span style="left:1156px; top:88px; width:168px"></span>
+        <div class="wet-rim"></div>
+        <div class="streaks">
+          <span style="left:784px; top:14px; width:420px; background:rgba(203,238,246,.3)"></span>
+          <span style="left:912px; top:36px; width:328px; background:rgba(203,238,246,.2)"></span>
+          <span style="left:700px; top:62px; width:500px; background:rgba(203,238,246,.13)"></span>
+          <span style="left:1042px; top:88px; width:266px; background:rgba(203,238,246,.1)"></span>
+          <span style="left:96px; top:44px; width:330px; background:rgba(203,238,246,.14)"></span>
+          <span style="left:88px; top:112px; width:214px; background:rgba(203,238,246,.08)"></span>
+          <span style="left:492px; top:182px; width:262px; background:rgba(203,238,246,.07)"></span>
         </div>
-        <div class="bub" style="left:438px; top:70px; width:5px; height:5px"></div>
-        <div class="bub" style="left:452px; top:122px; width:3px; height:3px"></div>
-        <div class="bub" style="left:640px; top:160px; width:4px; height:4px"></div>
-        <div class="bub" style="left:1102px; top:104px; width:4px; height:4px"></div>
-        <div class="bub" style="left:1188px; top:178px; width:3px; height:3px"></div>
-        <div class="bub" style="left:296px; top:150px; width:3px; height:3px"></div>
+        <div class="caustics">
+          <span style="left:352px; top:18px; width:118px"></span>
+          <span style="left:644px; top:40px; width:262px"></span>
+          <span style="left:1156px; top:28px; width:168px"></span>
+          <span style="left:212px; top:140px; width:206px"></span>
+          <span style="left:702px; top:168px; width:298px"></span>
+          <span style="left:1140px; top:114px; width:150px"></span>
+        </div>
+        <div class="bub" style="left:438px; top:78px; width:5px; height:5px"></div>
+        <div class="bub" style="left:452px; top:146px; width:3px; height:3px"></div>
+        <div class="bub" style="left:640px; top:206px; width:4px; height:4px"></div>
+        <div class="bub" style="left:1102px; top:130px; width:4px; height:4px"></div>
+        <div class="bub" style="left:1188px; top:218px; width:3px; height:3px"></div>
+        <div class="bub" style="left:320px; top:46px; width:3px; height:3px"></div>
+        <div class="bub" style="left:106px; top:158px; width:4px; height:4px"></div>
       </div>
 
       <!-- 漂在水面上的代号签条：别人只看到它 -->
       <div class="tag"><b class="meta">匿名代号</b><i></i></div>
       <div class="line"></div>
 
-      <!-- 水下那只瓶：玻璃剖面，瓶里泡着一枚珊瑚色标签盘 —— 认领的那一枚 */
+      <!-- 水下那只瓶：横躺着沉在水里（比例照漂流瓶详情页那只：大圆底 + 直肩收颈 + 口沿与瓶塞），
+           瓶颈栓着上面那根线，瓶里泡着一枚珊瑚色标签盘 -->
       <svg class="dev" width="1440" height="900" viewBox="0 0 1440 900" fill="none" aria-hidden="true">
         <defs>
-          <linearGradient id="gl" x1="139" y1="690" x2="251" y2="896" gradientUnits="userSpaceOnUse">
-            <stop offset="0" stop-color="#cbeef6" stop-opacity=".18" />
-            <stop offset=".52" stop-color="#7fd1d9" stop-opacity=".07" />
-            <stop offset="1" stop-color="#cbeef6" stop-opacity=".04" />
+          <linearGradient id="gl" x1="150" y1="645" x2="716" y2="795" gradientUnits="userSpaceOnUse">
+            <stop offset="0" stop-color="#cbeef6" stop-opacity=".16" />
+            <stop offset=".4" stop-color="#7fd1d9" stop-opacity=".075" />
+            <stop offset=".74" stop-color="#7fd1d9" stop-opacity=".045" />
+            <stop offset="1" stop-color="#cbeef6" stop-opacity=".09" />
+          </linearGradient>
+          <linearGradient id="lip" x1="225" y1="650" x2="640" y2="650" gradientUnits="userSpaceOnUse">
+            <stop offset="0" stop-color="#cbeef6" stop-opacity=".06" />
+            <stop offset=".18" stop-color="#d8f3f6" stop-opacity=".34" />
+            <stop offset=".7" stop-color="#cbeef6" stop-opacity=".12" />
+            <stop offset="1" stop-color="#cbeef6" stop-opacity=".22" />
           </linearGradient>
         </defs>
-        <path d="M178 717 L178 744 C178 764 139 766 139 788 L139 878 C139 888 148 894 158 894
-                 L232 894 C242 894 251 888 251 878 L251 788 C251 766 212 764 212 744 L212 717 Z"
+        <!-- 玻璃：整只瓶是一层薄薄的高光，不是一根粗线 -->
+        <path d="M225 645 L540 645 L640 696 L704 696 L704 744 L640 744 L540 795 L225 795
+                 A75 75 0 0 1 225 645 Z"
           fill="url(#gl)" stroke="#cbeef6" stroke-opacity=".26" />
-        <!-- 瓶壁：左侧受光的那道厚玻璃，右侧回光 -->
-        <path d="M152 800 L152 872" stroke="#cbeef6" stroke-opacity=".22" />
-        <path d="M238 800 L238 872" stroke="#cbeef6" stroke-opacity=".12" />
-        <!-- 瓶塞与口沿：塞子还在，说明这只瓶子还没被人拿走 -->
-        <rect x="176" y="692" width="38" height="22" rx="2" fill="#f6d79a" fill-opacity=".32"
-          stroke="#f6d79a" stroke-opacity=".52" />
-        <rect x="171" y="712" width="48" height="6" rx="1" fill="#cbeef6" fill-opacity=".15"
+        <path d="M227 651 L536 651" stroke="url(#lip)" />
+        <path d="M227 789 L536 789" stroke="#cbeef6" stroke-opacity=".1" />
+        <path d="M258 668 L512 668" stroke="#cbeef6" stroke-opacity=".07" />
+        <path d="M256 772 L514 772" stroke="#cbeef6" stroke-opacity=".05" />
+        <!-- 瓶颈那道箍与口沿：口沿是窄窄一片立起来的玻璃，口是暗的 -->
+        <path d="M648 702 L700 702" stroke="#cbeef6" stroke-opacity=".13" />
+        <rect x="702" y="692" width="7" height="56" rx="1" fill="#cbeef6" fill-opacity=".18"
+          stroke="#cbeef6" stroke-opacity=".4" />
+        <ellipse cx="715" cy="720" rx="4" ry="24" fill="rgba(3,14,20,.55)"
           stroke="#cbeef6" stroke-opacity=".3" />
-        <circle cx="195" cy="700" r="2.8" stroke="#cbeef6" stroke-opacity=".45" />
+        <!-- 瓶塞还塞在口里，所以这只瓶子还没被人拿走；线从上面栓在瓶颈上 -->
+        <path d="M708 704 L726 708 L726 732 L708 736 Z" fill="#f6d79a" fill-opacity=".36"
+          stroke="#f6d79a" stroke-opacity=".54" />
+        <circle cx="668" cy="694" r="2.6" stroke="#cbeef6" stroke-opacity=".55" />
         <!-- 瓶里那一枚标签盘：唱片落在水里，标签落在瓶里 -->
-        <circle cx="195" cy="828" r="30" fill="#d4553a" />
-        <circle cx="195" cy="828" r="23" stroke="#f3f9fa" stroke-opacity=".26" />
-        <circle cx="195" cy="828" r="5.5" fill="#050f14" />
-        <circle cx="168" cy="792" r="2.4" stroke="#cbeef6" stroke-opacity=".3" />
-        <circle cx="222" cy="764" r="1.8" stroke="#cbeef6" stroke-opacity=".26" />
-        <circle cx="228" cy="668" r="2" stroke="#cbeef6" stroke-opacity=".28" />
-        <path d="M224 812 L262 796" stroke="#cbeef6" stroke-opacity=".3" />
+        <circle cx="400" cy="720" r="42" fill="#d4553a" />
+        <circle cx="400" cy="720" r="34" stroke="#f3f9fa" stroke-opacity=".28" />
+        <circle cx="400" cy="720" r="8" fill="#050f14" />
+        <!-- 玻璃里外那几颗泡 -->
+        <circle cx="498" cy="678" r="2.4" stroke="#cbeef6" stroke-opacity=".3" />
+        <circle cx="300" cy="770" r="2" stroke="#cbeef6" stroke-opacity=".26" />
+        <circle cx="520" cy="768" r="1.8" stroke="#cbeef6" stroke-opacity=".24" />
+        <circle cx="470" cy="600" r="2.2" stroke="#cbeef6" stroke-opacity=".3" />
+        <circle cx="516" cy="566" r="1.6" stroke="#cbeef6" stroke-opacity=".26" />
+        <circle cx="286" cy="608" r="2.6" stroke="#cbeef6" stroke-opacity=".3" />
+        <path d="M400 762 L400 802" stroke="#cbeef6" stroke-opacity=".3" />
       </svg>
 
-      <!-- 水面线：压在倒影、签条与瓶子之上，一条线把这一页切成两面 -->
+      <!-- 水面线：压在倒影、签条、认领线与瓶子之上，一条线把这一页切成两面 -->
       <div class="surface"></div>
     </div>
 
@@ -255,25 +290,19 @@
       <h1>每一段旋律，<br />都在寻找下一个声音</h1>
       <p class="lede">这是一个由歌声、回音和宿命组成的角落。<br />你只录一段，剩下的交给漂流。</p>
 
-      <div class="rule" style="top:362px"></div>
+      <div class="rule" style="top:354px"></div>
 
       <div class="modes">
         <button class="mode" type="button">登录</button>
         <button class="mode on" type="button">注册</button>
       </div>
-      <p class="modesnote meta">注册要三项：用户名、邮箱、密码；登录只要邮箱和密码。</p>
+      <p class="modesnote meta">登录和注册都只用这两项：账号、密码。</p>
 
       <div class="frow r-handle">
-        <label class="lbl meta fname" for="handle">用户名</label>
+        <label class="lbl meta fname" for="handle">账号</label>
         <input id="handle" name="handle" type="text" autocomplete="username" />
         <p class="note">2–32 个字符，别人看到的是每个瓶子里单独的匿名代号。</p>
-        <p class="errcell" role="alert"><span class="lbl meta">HANDLE_TAKEN</span><span class="v">用户名已被占用。</span></p>
-      </div>
-
-      <div class="frow r-email bad">
-        <label class="lbl meta fname" for="email">邮箱</label>
-        <input id="email" name="email" type="email" autocomplete="email" aria-invalid="true" />
-        <p class="errcell" role="alert"><span class="lbl meta">EMAIL_TAKEN</span><span class="v">该邮箱已注册。</span></p>
+        <p class="errcell" role="alert"><span class="lbl meta">HANDLE_TAKEN</span><span class="v">这个账号已被占用。</span></p>
       </div>
 
       <div class="frow r-password bad">
@@ -286,9 +315,13 @@
       <button class="tab" type="button">注册并进入</button>
       <span class="rip a"></span>
       <span class="rip b"></span>
+      <!-- 盘缘破水处：左右各两圈 -->
+      <span class="edgewave" style="left:709px; top:574px; width:76px; height:20px"></span>
+      <span class="edgewave" style="left:685px; top:569px; width:124px; height:30px; border-color:rgba(203,238,246,.16)"></span>
+      <span class="edgewave" style="left:1295px; top:574px; width:76px; height:20px"></span>
+      <span class="edgewave" style="left:1271px; top:569px; width:124px; height:30px; border-color:rgba(203,238,246,.16)"></span>
 
       <p class="devlab up">别人只看到匿名代号</p>
-      <span class="leader"></span>
       <p class="devlab dn">账号只用于认领自己的漂流瓶</p>
 
       <p class="etiquette">不用真名，不用露脸，只要一段声音。同一个瓶子里，不同的人看到的是不同的匿名代号。</p>
