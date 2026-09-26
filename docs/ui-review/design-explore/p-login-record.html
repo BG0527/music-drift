@@ -42,50 +42,53 @@
       h1 { font-size:56px; font-weight:700; line-height:1.12; letter-spacing:.005em; }
       .lede { width:500px; margin-top:18px; font-size:14.5px; line-height:1.85; color:var(--muted); }
 
-      /* 装置：一根认领线。一枚代号牌坠在这根线的上端，线的另一头是只有你认领得到的东西 */
-      .device { position:absolute; left:968px; top:212px; width:300px; height:688px; }
-      .tag { position:absolute; left:132px; top:0; width:88px; height:104px; border-radius:2px;
-        border:1px solid rgba(243,249,250,.34); transform:rotate(1.5deg);
+      /* 装置：一根认领线。一枚代号牌坠在线头上，线的另一头是只有你认领得到的那只瓶 —— 
+         瓶只被画到画面的角上，读到的是"它在那儿"，不是"它长什么样"。 */
+      .device { position:absolute; left:1100px; top:152px; width:244px; height:748px; }
+      .tag { position:absolute; left:156px; top:0; width:88px; height:94px; border-radius:2px;
+        border:1px solid rgba(243,249,250,.34);
         background:linear-gradient(168deg, rgba(243,249,250,.11), rgba(243,249,250,.025)); }
       .tag::before { content:''; position:absolute; left:50%; top:13px; width:7px; height:7px; margin-left:-3.5px;
         border:1px solid rgba(243,249,250,.5); border-radius:50%; background:var(--ink); }
-      .tag b { position:absolute; left:50%; top:32px; width:16px; margin-left:-8px;
-        font-size:11px; font-weight:400; line-height:1.55; letter-spacing:.1em; text-align:center;
+      .tag b { position:absolute; left:50%; top:31px; width:88px; margin-left:-44px;
+        font-size:11px; font-weight:400; line-height:1.5; letter-spacing:.12em; text-align:center;
         color:rgba(243,249,250,.92); text-shadow:0 1px 0 rgba(5,15,20,.6); }
-      .thread { position:absolute; left:176px; top:104px; width:1px; height:466px;
-        background:linear-gradient(180deg, rgba(203,238,246,.2), rgba(203,238,246,.6)); }
-      .devnote { position:absolute; left:-96px; top:126px; width:236px; font-size:12.5px;
+      .thread { position:absolute; left:196px; top:94px; width:1px; height:602px;
+        background:linear-gradient(180deg, rgba(203,238,246,.18), rgba(203,238,246,.42) 40%, rgba(203,238,246,.6)); }
+      .devnote { position:absolute; left:0; top:132px; width:264px; font-size:12.5px;
         line-height:1.85; color:var(--muted); }
 
       /* 线的另一头：只露一角 —— 玻璃口沿（近唇亮、远唇暗）、瓶肩、栓在口里的线头 */
-      .mouth { position:absolute; left:1010px; top:784px; }
+      .mouth { position:absolute; left:1184px; top:848px; }
 
-      .form { display:flex; flex-direction:column; gap:24px; }
+      .form { display:flex; flex-direction:column; margin-top:auto; }
       .modes { display:flex; gap:26px; }
       .mode { padding:0 0 8px; font-family:inherit; font-size:15px; font-weight:700; letter-spacing:.14em;
         color:var(--muted); background:transparent; border:0;
         border-bottom:1px solid rgba(243,249,250,.22); cursor:pointer; }
       .mode.on { color:var(--coral); border-bottom:2px solid var(--coral); }
-      .tip { max-width:452px; font-size:12.5px; line-height:1.8; color:rgba(243,249,250,.46); }
+      .tip { max-width:452px; margin-top:24px; font-size:12.5px; line-height:1.8; color:rgba(243,249,250,.46); }
 
-      .field { display:flex; flex-direction:column; gap:9px; }
-      .field input { width:452px; height:32px; padding:0 1px 6px; font-family:inherit; font-size:16px;
+      .field { display:flex; flex-direction:column; }
+      .f-handle { margin-top:52px; }
+      .f-pass { margin-top:44px; }
+      .field input { width:440px; height:32px; margin-top:8px; padding:0 1px 6px; font-family:inherit; font-size:16px;
         color:var(--paper); background:transparent; border:0;
         border-bottom:1px solid rgba(243,249,250,.26); }
-      .msg { font-size:12px; line-height:1.7; color:var(--error); }
-      .msg .code { font-size:10px; letter-spacing:.14em; opacity:.82; }
-      .msg.bad { color:var(--coral); }
-      .field.bad input { border-bottom-width:2px; border-bottom-color:var(--coral); }
-      .hint { font-size:12px; line-height:1.7; color:var(--muted); }
-      .hint .code { font-size:10px; letter-spacing:.14em; color:rgba(243,249,250,.5); }
+      .msg { margin-top:8px; font-size:12px; line-height:1.7; color:var(--coral); }
+      .msg .code { letter-spacing:.14em; color:rgba(243,249,250,.56); }
+      .field.bad input { border-bottom-color:var(--coral); }
+      .field.strong input { border-bottom-width:2px; }
+      .hint { margin-top:4px; font-size:12px; line-height:1.7; color:var(--muted); }
+      .hint .code { letter-spacing:.14em; color:rgba(243,249,250,.5); }
 
-      .act { align-self:flex-start; margin-top:10px; width:238px; height:50px; padding:0;
+      .act { align-self:flex-start; margin-top:56px; width:238px; height:50px; padding:0;
         font-family:inherit; font-size:15px; font-weight:700; letter-spacing:.05em;
         color:var(--paper); background:var(--coral); border:0; border-radius:2px; cursor:pointer; }
-      .oath { margin-top:26px; width:500px; font-size:13.5px; line-height:1.9; color:var(--muted); }
+      .oath { margin-top:64px; width:508px; font-size:13.5px; line-height:1.9; color:var(--muted); }
 
-      .foot { margin-top:auto; padding-bottom:36px; border-top:1px solid var(--line); }
-      .foot .row { display:flex; align-items:baseline; gap:20px; padding-top:20px; }
+      .foot { margin-top:auto; padding-bottom:12px; border-top:1px solid var(--line); }
+      .foot .row { display:flex; align-items:baseline; gap:20px; padding-top:16px; }
       .foot .said { font-size:13px; color:var(--muted); }
       .go { margin-left:auto; font-size:14px; color:var(--glass);
         text-decoration:underline; text-underline-offset:5px; }
@@ -114,16 +117,16 @@
         </div>
         <p class="tip">登录和注册都只用这两项：账号、密码。</p>
 
-        <div class="field bad">
+        <div class="field f-handle bad">
           <label class="lbl meta" for="handle">账号</label>
           <input id="handle" name="handle" type="text" autocomplete="username" aria-invalid="true" aria-describedby="handle-err" />
-          <p class="msg bad" id="handle-err" role="alert"><span class="code meta">HANDLE_TAKEN</span>　这个账号已被占用。</p>
+          <p class="msg" id="handle-err" role="alert"><span class="code meta">HANDLE_TAKEN</span>　这个账号已被占用。</p>
         </div>
 
-        <div class="field bad">
+        <div class="field f-pass bad strong">
           <label class="lbl meta" for="password">密码</label>
           <input id="password" name="password" type="password" autocomplete="new-password" aria-invalid="true" aria-describedby="password-err password-hint" />
-          <p class="msg bad" id="password-err" role="alert"><span class="code meta">WEAK_PASSWORD</span>　口令强度不够。</p>
+          <p class="msg" id="password-err" role="alert"><span class="code meta">WEAK_PASSWORD</span>　口令强度不够。</p>
           <p class="hint" id="password-hint"><span class="code meta">密码规则</span>　至少 8 位，同时含字母和数字。</p>
         </div>
 
@@ -137,27 +140,20 @@
         <p class="devnote">线上那枚代号，是别人在瓶里看到的全部；线那头串着的瓶，只有你认领得到。</p>
       </div>
 
-      <svg class="mouth" width="380" height="120" viewBox="0 0 380 120" fill="none" aria-hidden="true">
-        <defs>
-          <linearGradient id="water" x1="54" y1="14" x2="330" y2="104" gradientUnits="userSpaceOnUse">
-            <stop offset="0" stop-color="#cbeef6" stop-opacity=".13" />
-            <stop offset=".44" stop-color="#7fd1d9" stop-opacity=".05" />
-            <stop offset="1" stop-color="#cbeef6" stop-opacity=".1" />
-          </linearGradient>
-        </defs>
-        <!-- 瓶肩：口沿以下只留两侧的玻璃壁，中间不画，避免出现任何横贯的线 -->
-        <path d="M152 46 L134 120" stroke="#cbeef6" stroke-opacity=".34" />
-        <path d="M232 46 L250 120" stroke="#cbeef6" stroke-opacity=".26" />
-        <path d="M148 60 L127 120" stroke="#cbeef6" stroke-opacity=".1" />
-        <path d="M236 60 L257 120" stroke="#cbeef6" stroke-opacity=".08" />
-        <!-- 玻璃口：暗的开口；近唇在口沿之上，线头从这里进去 -->
-        <ellipse cx="192" cy="46" rx="40" ry="13" fill="rgba(3,14,20,.6)" />
-        <ellipse cx="192" cy="46" rx="40" ry="13" stroke="#cbeef6" stroke-opacity=".2" />
-        <path d="M152 46 A40 13 0 0 1 232 46" stroke="#cbeef6" stroke-opacity=".6" />
-        <path d="M232 46 A40 13 0 0 1 152 46" stroke="#cbeef6" stroke-opacity=".3" />
+      <svg class="mouth" width="200" height="52" viewBox="0 0 200 52" fill="none" aria-hidden="true">
+        <!-- 瓶肩：口沿以下只留两侧玻璃壁，中间不画 —— 全页没有一条横贯的线 -->
+        <path d="M92 26 L74 52" stroke="#cbeef6" stroke-opacity=".34" />
+        <path d="M172 26 L190 52" stroke="#cbeef6" stroke-opacity=".26" />
+        <path d="M88 40 L67 52" stroke="#cbeef6" stroke-opacity=".1" />
+        <path d="M176 40 L197 52" stroke="#cbeef6" stroke-opacity=".08" />
+        <!-- 玻璃口：暗的开口；近唇亮、远唇暗，只露这半边 */
+        <ellipse cx="132" cy="26" rx="40" ry="13" fill="rgba(3,14,20,.6)" />
+        <ellipse cx="132" cy="26" rx="40" ry="13" stroke="#cbeef6" stroke-opacity=".2" />
+        <path d="M92 26 A40 13 0 0 1 172 26" stroke="#cbeef6" stroke-opacity=".62" />
+        <path d="M172 26 A40 13 0 0 1 92 26" stroke="#cbeef6" stroke-opacity=".32" />
         <!-- 口里的线头：认领线终止在这只瓶里 -->
-        <path d="M192 48 L192 70" stroke="#cbeef6" stroke-opacity=".28" />
-        <circle cx="192" cy="48" r="2.6" stroke="#cbeef6" stroke-opacity=".66" />
+        <path d="M132 28 L132 52" stroke="#cbeef6" stroke-opacity=".28" />
+        <circle cx="132" cy="28" r="2.6" stroke="#cbeef6" stroke-opacity=".66" />
       </svg>
 
       <div class="foot">

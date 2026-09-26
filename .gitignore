@@ -37,3 +37,6 @@ playwright-report/
 # 成员的一次性批量修改脚本（临时产物，不入库）
 .t*-*.py
 .t*-tests.py
+
+# 设计探索渲染器的运行时锁（并发跑 _shoot.mjs 时生成，不该入库）
+docs/ui-review/design-explore/.shoot.lock
