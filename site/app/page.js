@@ -41,7 +41,20 @@ export function definePage(config) {
     const scope = owner === '' ? '' : `（归属 ${owner}）`;
     const list = endpoints.length === 0 ? '无端点依赖（纯静态页）' : endpoints.join('、');
     console.info(`[page:${name}] W0 空壳已加载${scope} —— W1 在本页接入：${list}${note === null ? '' : `；${note}`}`);
-    if (typeof init === 'function') await init();
+    try {
+      if (typeof init === 'function') await init();
+    } catch (error) {
+      /**
+       * 接线失败 ⇒ **不**自称 ready（测试据此判红，而不是靠某个 class 抢跑）。
+       * 只加信号：`void pageInit()` 的未捕获 rejection 语义与之前一致。
+       */
+      document.documentElement.dataset.pageError = name;
+      console.error(`[page:${name}] init 失败：`, error);
+      throw error;
+    }
+    /** 接线完成的可用信号（W3 可测性；不涉及任何视觉）：`init()` 全部 await 完才置上。 */
+    document.documentElement.dataset.pageReady = name;
+    window.__pageReady = name;
   }
 
   if (document.readyState === 'loading') {
