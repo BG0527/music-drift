@@ -67,7 +67,7 @@ async function call(method: string, path: string, body?: unknown, raw?: Uint8Arr
   const setCookie = response.headers.getSetCookie();
   if (setCookie.length > 0) cookie = setCookie.map((c) => c.split(';')[0]).join('; ');
   const text = await response.text();
-  let json: unknown = null;
+  let json: unknown;
   try {
     json = text === '' ? null : JSON.parse(text);
   } catch {
@@ -148,14 +148,24 @@ await run([
 ]);
 
 // ── 2. 注册（顺带拿到会话 cookie）──────────────────────────────────
-const handle = `smoke${stamp}`;
+// W6：注册只要「账号 + 密码」（账号不是邮箱，也没有用户名）—— 冒烟走**新契约**，
+// 旧写法（`{handle, email}`）由 `/api/auth/*` 的集成测试单独钉住（向后兼容）。
+const account = `smoke${stamp}`;
 await run([
   {
     label: 'POST /api/auth/register',
     method: 'POST',
     path: '/api/auth/register',
-    body: { handle, email: `${handle}@example.com`, password: 'Bottle2026' },
+    body: { account, password: 'Bottle2026' },
     expect: [201],
+    schemas: ['SessionResponseSchema'],
+  },
+  {
+    label: 'POST /api/auth/login（账号 + 密码）',
+    method: 'POST',
+    path: '/api/auth/login',
+    body: { account, password: 'Bottle2026' },
+    expect: [200],
     schemas: ['SessionResponseSchema'],
   },
 ]);

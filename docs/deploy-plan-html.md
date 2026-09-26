@@ -735,3 +735,158 @@ W8 的 §2.6.2 修复三步仍然有效，可用于将来 seed 出错时的回�
 ### 24.4 为什么不让 W9 直接删 `page-sea.js`
 `site/app/page-sea.js` **归 W7**，而 W7 可能仍在写它（W7 的第二封中途回报就在同一时段）⇒ 两人同时改同一文件必撞车。
 这正是本会话反复付出代价的那条纪律：**同一时刻同一文件只有一个写者**。
+
+---
+
+## 25. W9 执行记录（收口四件事，2026-09-27）
+
+> 归属：W9。本节只记事实与原始输出。**§24 我读到了**：§24.3 假设我"收不到裁决"（`send_message` 对 subagent 不可寻址这
+> 条属实），但任务书写明"本轮计划与裁决全在 `docs/deploy-plan-html.md`" ⇒ 我按任务书读了文档，并按 **§24.2 的 B**
+> 执行：删死代码、零规则放宽。`page-sea.js` 按 §24.4 **没动**（W7 单写者），只留一条**指向本节**的窄例外。
+
+### 25.1 改动文件与 sha256
+
+| 文件 | 改动面 |
+| --- | --- |
+| `eslint.config.mjs` | `.tmp-*` ignore；`site/app/**` 浏览器全局 + U+3000 `skipTemplates`；`tools/**` Node ESM；两个"回调注入浏览器执行"的文件补全局；`page-sea.js` 一条待撤窄例外 |
+| `site/app/page-login.js` | **注释级**：删掉行内 emoji（`site-guard` 红）；删掉随配置变更后冗余的 `/* global Node, location */` |
+| `site/app/page-settings.js` | 无邮箱不显示那一段（不再印 `（null）`）；`let user = null` → `let user`（`no-useless-assignment`） |
+| `site/app/page-me.js` | `BOTTLE_RETURNED` 中文文案 + 设计稿 hero 记号 + 动作「去看看」；**消费 `awaitingMyAction`**（「等你操作」实心暖牌 + 柱口系缆环 + 立在环里的瓶子，点暖牌到 `/bottle.html?id=…`） |
+| `tools/probe-fit.mjs` | 按 §24.2 删死代码：`let covered = 0;` 与 `if (m.covers) covered += 1; else …` → `if (!m.covers) …` |
+| `tools/contract-smoke.ts` | 按 §24.2 删死代码：`let json: unknown = null;` → `let json: unknown;` |
+| `docs/deploy-plan-html.md` | 本节 |
+
+`.gitignore` **未改**：`.tmp-*`（第 45 行）与 `_tmp*`（第 46 行）早已覆盖脚手架目录与**根目录**的 `.tmp-*.mjs` 文件；
+"已覆盖"由 lint 前后对比证明（约 480 problems 随 ignore 一起消失）。
+
+### 25.2 第 1 件：`pnpm lint` 675/676 errors → **0 errors**
+
+修改前原始输出末尾：`✖ 770 problems (676 errors, 94 warnings)`。按来源分类（探针实测，非推测）：
+
+| 来源 | 量 | 性质 |
+| --- | --- | --- |
+| `.tmp-*` 脚手架（含 `.tmp-w1c-verify.mjs`、`.tmp-w3-login-debug.mjs` 这类**根目录文件**） | 约 480 problems | 不属于任何交付层；`.gitignore` 已覆盖 ⇒ **加 ignore，不删别人的东西** |
+| `site/app/**/*.js` | 约 100 errors（`document`/`window`/`location`/`Node`/`getComputedStyle`/`MediaRecorder`） | 环境没声明，不是代码错 |
+| `tools/walkthrough.mjs`（49）+ `tools/probe-user-viewport.mjs`（1） | 50 errors | 同上是**注入浏览器执行**的回调（`page.waitForFunction`/`page.evaluate`） |
+| 真·代码问题 | 7 errors | 见 §24.1；按 §24.2 全数**改代码**解决（`page-bottle.js` 的 3 处 U+3000 属排版分隔符，走 `skipTemplates` 声明意图） |
+
+配置改动（`eslint.config.mjs`）：
+1. `ignores` 增 `'**/.tmp-*/**'` 与 `'**/.tmp-*'`（目录与叶子两种形态都要写）；
+2. 新 override `files: ['site/app/**/*.js']` → `globals.browser` + `no-irregular-whitespace: ['error', { skipTemplates: true }]`，
+   注释写明"全角空格是设计稿的排版分隔符（与 `page-login.js` 的 `SEPARATOR` 同口径）"；
+3. 新 override `files: ['tools/**/*.mjs', 'tools/**/*.js']` → `sourceType: 'module'` + `globals.node`；
+4. `tools/walkthrough.mjs` → `node + browser` 两套全局（它的回调在页面里跑）；
+   `tools/probe-user-viewport.mjs` → 只补它缺的那一个 `getComputedStyle`（该文件自己已 `/* global document, window */`，
+   再叠 `globals.browser` 会撞 `no-redeclare`）；
+5. 唯一残留窄例外：`files: ['site/app/page-sea.js']` + `no-unused-vars: off`（§24.4 的 W7 单写者），**它的注释里写明
+   "captain 删完那两处死代码后整块删除本块"**。
+
+最终原始输出：`✖ 10 problems (0 errors, 10 warnings)`，`LINT_EXIT=0`。10 条 warning 全是**既有**的 `no-console`
+（`docs/ui-review/design-explore/_deploy20.mjs` 2 + `_tokens.mjs` 3 + `site/app/page.js` 1 + `tools/site-server.mjs` 4）；
+该规则本身就是 `warn`、本轮**未改也未放宽**，且不影响退出码（`LINT_EXIT=0`）。
+
+### 25.3 第 2 件：`site/app/page-login.js` 的 emoji
+
+**显式声明：这是注释级改动**——`page-login.js:15` 的行内 emoji 换成「注意：」，正文一字未动
+（`site-guard` 对 JS 的 emoji 检查**不剥注释**，与仓库口径一致）。同文件另删了一行 `/* global Node, location */`：
+这是**配置变更的连带后果**（浏览器全局一旦声明，该注释就触发 `no-redeclare`），不是"顺手改"。
+
+`node tools/site-guard.mjs` → `✓ 全部通过`（`GUARD_EXIT=0`）。
+
+### 25.4 第 3 件：`page-settings.js` 的「（null）」
+
+无邮箱账号实测（探针账号，`email = null`）：
+- 改前：`.l-wet .alt .v = "已登录：w9probe_…_noemail（null）· 角色 USER（普通用户）"`
+- 改后：`.l-wet .alt .v = "已登录：w9probe_…_noemail · 角色 USER（普通用户）"`
+同页另查：无其它 `null` 兜底（契约版本走 `/healthz.contractVersion ?? '未知'`，署名走 `licensedSource ?? '未标注'`）；
+顺带修掉该页 `no-useless-assignment`（`let user = null` 的初值从不被读）。
+
+### 25.5 第 4 件：回传到发起者的"最后一公里"（端到端，红 → 绿）
+
+探针：`.tmp-w9-verify/probe.mjs`（脚手架，见 25.7）。场景**全走公开 API**：demo 发起并录第 1 段 → 入海
+→ 3 个陪练账号依次「指定接唱」补齐第 2/3/4 段（末棒 `RETURN`）→ 逐棒 `RETURN` 两跳 ⇒ 瓶子落到 demo 手里。
+
+- **红（改代码前）**：`失败 6 项`，其中通知标题实测是 `BOTTLE_RETURNED`（未翻译）、hero 记号 0 个、
+  「等你操作」标记 0 个、设置页出现字面 `null`；服务端侧两条已 PASS（证明 W6 后端确实到位）。
+- **绿（改代码后）**：`全部通过`，`EXIT=0`；关键实测：
+  - 服务端：`该瓶通知 ["BOTTLE_RETURNED"]`，`payload={"bottleId":"e7831bdb…","songTitle":"占位曲目 · 一","awaitingMyAction":true}`；
+    `/api/me/bottles` 的 `awaitingMyAction=true`；
+  - `/me.html` 通知区首条：`《占位曲目 · 一》回传到你手里了 / 去看看`，`[hero]`，说明
+    「完整版本已经沿父链回到发起者手里 —— 你只能把它送进公海。」；
+  - 沉积格：服务端 `awaitingMyAction=true` 的位次 `[0]`，DOM 上有「等你操作」标记的位次 `[0]`（**一一对应**，
+    其余 5 格一个都不带 = 负面控制）；
+  - 点那枚暖牌 → `http://127.0.0.1:5195/bottle.html?id=e7831bdb-7af1-48dd-b2ae-1d20866c66a3`（**id 与该行 id 相等**）。
+- `node tools/walkthrough.mjs --port=5195` → `PASS 32 / FAIL 0`、`结论：0 项不达标`、`EXIT=0`（§15 起法：
+  `Start-Process` → 跑 → `Stop-Process`）。它的第 10 步**本来就**在等这个实现（`page-me.js` 的 `openReturned`：
+  先标已读再跳瓶子页），所以它按 `.msgs li:not(.hero)` 挑样本、仍然全绿。
+
+**不画的**：定稿那行 `.due`「回传决策时限 48 小时」。契约里没有该字段、`apps/api/src` 里也没有"超时自动入海"的
+实现（全库 grep 无命中）⇒ 画了就是替系统许一个不会兑现的诺（本仓对"接真后会说假话的文案"一律不写）。
+若要补这一行，需要**先加契约字段 + 实现超时**，或由 captain 明确裁决"这是静态规则文本"。
+
+### 25.6 环境与残留
+
+- 站点独占端口 **5195**（probe / walkthrough / smoke 各自「同一个前台命令里起 → 跑 → 杀」，收工实测
+  `5195`、`5199` 监听数均为 0）；API 8787 全程是 captain 起的那个（`contractVersion=0.2.0-s1`，**未重启、未杀**）。
+- 探针数据**已清**：`delete from bottles where id in (3 个探针瓶)` + `delete from users where handle ~ '^w9probe_'`
+  （`DELETE 3` / `DELETE 12`）+ 5 条指向已删瓶子的通知（`DELETE 5`，复查 `stale_left=0`）。
+  清完复跑冒烟（`.tmp-w9-verify/smoke.mjs`）：卡片数=服务端前 6 支、**没有 `awaitingMyAction` 数据 ⇒ 一个标记都不画**、
+  消息区无"未识别类型"、无字面 `null`、零页面级 JS 错误 ⇒ `冒烟通过 EXIT=0`。
+- 残留（**如实报**）：`.tmp-w9-verify/`（`probe.mjs`、`smoke.mjs`、3 张 png），全部落在 `.gitignore` 的 `.tmp-*` 下、
+  且被 eslint ignore；它是我这套证据的**可复跑件**。DB 侧另有 `w3walk*`/`w3relay*`（**walkthrough 自己的**探针账号与
+  瓶子，它每次运行都自行声明"跑完可清"），不属本轮数据、未动。
+- 说明：`probe-fit.mjs` 复跑 `结论：0 项不达标`、`EXIT=0`（证明 §24.2 的删代码没弄坏它）。
+
+### 25.7 待 captain 收尾（一步）
+
+1. 删 `site/app/page-sea.js:117` 的未使用 `firstPageOf`、`:204` 的 `renderFleet(zoneKey)` 参数（→ `_zoneKey`）；
+2. 删掉 `eslint.config.mjs` 里那条 `files: ['site/app/page-sea.js']` 的窄例外（注释已标好）；
+3. 复跑 `pnpm lint`（应仍 0 errors）。
+
+---
+
+### 25.8 最终状态与 sha256（本节写成后再跑了一遍全量）
+
+收尾还做了两处**外观级**改动（都不是功能）：`site/app/page-me.js` 把我自己写超 `printWidth=100` 的一行折开；
+`eslint.config.mjs` 的**行尾从 CRLF 归一为 LF**（`.prettierrc.json` 写的是 `endOfLine: lf`；该文件原本整文件 CRLF，
+仓库里另有 86 个 CRLF 文件，都是既存状态，我只动了自己写的这一个）。
+
+| 文件 | sha256 | 字节 / 行尾 |
+| --- | --- | --- |
+| `eslint.config.mjs` | `b77a92e4375b61c57c4fe124f22ab4f23a57926024081434bacc24fa9e7069e6` | 7601 · LF |
+| `site/app/page-login.js` | `efa4b92309cf30963cfad6a12c209228797bfb943df0dc035580b1152c42044f` | 10739 · LF |
+| `site/app/page-settings.js` | `366365f189797776ee37684c31e651b2b1f7b0ac114d2d819f2e37a29355a8ec` | 4955 · LF |
+| `site/app/page-me.js` | `274f2091ebfcc96e23750d2d8d80eb17f40dccfd0d5fbd061615f34c05962567` | 24580 · LF |
+| `tools/probe-fit.mjs` | `d4a0cf19369f7999f3667ca6d5262f78949b2c6ccf2d87548d809b7569c52004` | 10682 · LF |
+| `tools/contract-smoke.ts` | `dafc6f47f2e5a68a488da2139145729c891b7981046b8feac6c0d9236032c1a5` | 10691 · LF |
+| `docs/deploy-plan-html.md` | （随本节改变，记在 W9 汇报里，不回填） | — · LF |
+
+**未改**（对照，供复核"我确实没碰"）：`.gitignore` = `2baefdff2488c1498ebf09363d86e281ac98daa2e4e17f4e694409d9cd24e4a1`、
+`site/app/page-sea.js` = `11ab1c02bd0b09db1d2628e326f5a7d6ac0bcaccc4d82edd8a8cee5000f536a8`、
+`site/me.html` = `fdb163b086baef1aa287c1d8cc8c7e4fa9d68fd995fad1095e786d8d3a67c7b2`、
+`site/app/page-bottle.js` = `48f73240522cb3c0c8a0f8c08f7daaac36c025e15e4d5c4dd9462dec1dff7643`。
+
+最终复跑（都在**最后一次改文件之后**）：
+
+| 命令 | 结果 |
+| --- | --- |
+| `pnpm lint` | `✖ 10 problems (0 errors, 10 warnings)` · `LINT_EXIT=0` |
+| `pnpm -r typecheck` | `TYPECHECK_EXIT=0`（`apps/web` 那次假红在 00:43:20 自愈，见 §26） |
+| `pnpm -r test` | `shared EXIT=0` · `api 180 passed EXIT=0`；`apps/web` 是**并发写者**改坏又改好，最终 `typecheck EXIT=0` |
+| `node tools/site-guard.mjs` | `✓ 全部通过` · `GUARD_EXIT=0` |
+| `node tools/walkthrough.mjs --port=5195` | `PASS 32 / FAIL 0` · `结论：0 项不达标` · `WALK_EXIT=0` |
+| `node tools/probe-fit.mjs --port=5199` | `结论：0 项不达标` · `EXIT=0`（证明 §24.2 的删代码没弄坏它） |
+| `.tmp-w9-verify/probe.mjs --port=5195` | `全部通过` · `EXIT=0`（11 项断言，含红→绿对照） |
+| `.tmp-w9-verify/smoke.mjs --port=5195` | `冒烟通过` · `EXIT=0`（清库后交付状态） |
+| 清理复查 | `probe_users=0` · `orphan_notifs=0` · 端口 5195/5199 监听数 `0` |
+
+---
+
+## 26. W9 期间的写者边界（供后续 agent 对表）
+
+W9 改了：`eslint.config.mjs`、`site/app/page-login.js`（注释）、`site/app/page-settings.js`、`site/app/page-me.js`、
+`tools/probe-fit.mjs`（按 §24.2 删死代码）、`tools/contract-smoke.ts`（同上）、本文件。
+**没有**碰 `site/app/page-sea.js`（§24.4），也没碰 `site/*.html`、`packages/**`、`apps/**`。
+另记一条实测：W9 跑验收时 `apps/web/src/pages/login-page.tsx` 正在被**另一个 agent（同会话外写者）**改
+（00:42:40 那次写入让 `pnpm -r typecheck` / `pnpm -r test` 短暂变红：`email`/`setEmail` 未定义 + JSX 三元未闭合；
+00:43:20 写入后自愈 ⇒ 复跑 `pnpm -r typecheck EXIT=0`）。**那与我无关**，但下次派活请记住这段 2 分钟的假红。

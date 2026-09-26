@@ -28,7 +28,7 @@ async function renderIdentity() {
   const who = q('.l-wet .who');
   const alt = q('.l-wet .alt .v');
   showLoading('正在读取身份…');
-  let user = null;
+  let user;
   try {
     // 未登录 → requireUser() 自动跳 /login.html?next=/settings.html，并返回 null。
     user = await requireUser();
@@ -43,7 +43,10 @@ async function renderIdentity() {
     // 契约里的 role 是 `USER`/`ADMIN` 枚举：原值照显，后面补一个中文读法。
     const label = ROLE_LABEL[user.role];
     const role = label === undefined ? user.role : `${user.role}（${label}）`;
-    alt.textContent = `已登录：${user.handle}（${user.email}）· 角色 ${role}`;
+    // W6 起 email 是**可空**的（账号注册的用户根本没有邮箱）：没有就不显示这一段，
+    // 不能把 `null` 直接印在界面上（`（null）` 是"接真没接干净"的典型痕迹）。
+    const mail = typeof user.email === 'string' && user.email !== '' ? `（${user.email}）` : '';
+    alt.textContent = `已登录：${user.handle}${mail} · 角色 ${role}`;
   }
 }
 

@@ -96,7 +96,6 @@ const { chromium } = await loadPlaywright();
 mkdirSync(OUT, { recursive: true });
 const browser = await chromium.launch();
 let failed = 0;
-let covered = 0;
 const contained = [];
 
 try {
@@ -195,8 +194,7 @@ try {
       // 是"宁可有留白也不裁内容"的正确退回 —— 记为提示，不计失败。
       const ok = m.cut === 0;
       if (!ok) failed += 1;
-      if (m.covers) covered += 1;
-      else contained.push(`${String(w)}x${String(h)}/${slug}`);
+      if (!m.covers) contained.push(`${String(w)}x${String(h)}/${slug}`);
       console.log(
         `${ok ? '✓' : '✗'} ${String(w).padStart(4)}x${String(h).padEnd(4)} dpr${String(dpr)} ${slug.padEnd(10)} ` +
           `mode=${m.mode.padEnd(7)} 铺满=${m.covers ? '是' : '否'} 被裁内容=${String(m.cut)}` +

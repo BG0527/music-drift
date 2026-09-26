@@ -134,8 +134,10 @@ async function start() {
    * 立在环里的瓶子（`svg.float.fstand`）、文字区那枚实心暖牌（`.st`）。结构模板取的是第 4 格
    * （干净的沉积柱），所以要在清空之前把它们抄下来。
    */
-  const stateMarkTemplate = cardNodes.map((node) => q('.txt > .st', node)).find((node) => node != null) ?? null;
-  const standTemplate = cardNodes.map((node) => q('svg.float.fstand', node)).find((node) => node != null) ?? null;
+  const stateMarkTemplate =
+    cardNodes.map((node) => q('.txt > .st', node)).find((node) => node !== null && node !== undefined) ?? null;
+  const standTemplate =
+    cardNodes.map((node) => q('svg.float.fstand', node)).find((node) => node !== null && node !== undefined) ?? null;
   /** 消息区那条「回传」用的是同一枚记号（环 + 立瓶），也从冻结稿里抄。 */
   const heroMarkTemplate =
     messageList === null ? null : (q(':scope > li.hero .mrow > svg', messageList)?.cloneNode(true) ?? null);
@@ -382,6 +384,16 @@ async function start() {
     const pill = q('.mrow .pill', item);
     const read = q('.mrow .read', item);
     const unread = row.readAt === null;
+    // 「回传」这条是**要你动手**的：定稿给它同一个记号（暖引线 + 暖底牌 + 「去看看」），
+    // 所以换上那枚环+立瓶的暖色图标、给它 `hero` 类 —— 全页只有这一条是暖的。
+    const isReturn = row.type === 'BOTTLE_RETURNED';
+    if (isReturn) {
+      item.classList.add('hero');
+      const icon = q('.mrow svg', item);
+      if (icon !== null && heroMarkTemplate !== null) {
+        icon.replaceWith(heroMarkTemplate.cloneNode(true));
+      }
+    }
     if (unread) {
       read?.remove();
       if (pill !== null) pill.textContent = '未读';
@@ -393,7 +405,21 @@ async function start() {
     }
     const go = q('.mrow .go', item);
     if (go !== null) {
-      if (unread) {
+      if (isReturn && bottleId !== null) {
+        // 定稿这条消息的动作是「去看看」而不是「标记已读」：点它先标已读（副作用），再打开那一支瓶子。
+        go.textContent = '去看看';
+        go.setAttribute('role', 'button');
+        go.setAttribute('tabindex', '0');
+        go.style.cursor = 'pointer';
+        const openReturnedBottle = () => void openReturned(item, row, go, bottleId);
+        on(go, 'click', openReturnedBottle);
+        on(go, 'keydown', (event) => {
+          if (event.key === 'Enter' || event.key === ' ') {
+            event.preventDefault();
+            openReturnedBottle();
+          }
+        });
+      } else if (unread) {
         go.textContent = '标记已读';
         go.setAttribute('role', 'button');
         go.setAttribute('tabindex', '0');
@@ -412,6 +438,15 @@ async function start() {
       }
     }
     return item;
+  }
+
+  /**
+   * 回传消息的动作：**先**标已读（失败也不挡路 —— 已读是副作用，不是去看的前提），再打开那一支瓶子。
+   * `bottleId` 只来自服务端 payload，不在前端拼。
+   */
+  async function openReturned(item, row, go, bottleId) {
+    if (row.readAt === null) await readNotification(item, row, go);
+    location.assign(`/bottle.html?id=${encodeURIComponent(bottleId)}`);
   }
 
   /** 就地更新未读态（`POST /api/notifications/:id/read`）：不跳页、不重排整块消息区。 */
