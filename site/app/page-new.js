@@ -1,18 +1,18 @@
 /**
- * 页面模块：`site/new.html`（W1-a 接线；W1-b 补上段上传）
+ * 页面模块：`site/new.html`（W1-a 接线；W4-a 改流程）
  *
- * 端点（顺序不可反：段挂在下好的瓶上）：
+ * 端点：
  *   - `GET /api/songs`（裸数组，见 `packages/shared/src/contracts/songs.ts`）→ 替换页面的 5 条演示曲目；
  *   - `POST /api/bottles`（请求体 `{ songId }`，见 `bottles.ts` 的 `CreateBottleRequestSchema`）
- *     → 建瓶（`DRAFT`）；
- *   - `POST /api/bottles/:id/segments`（**原始二进制**：`Content-Type` = 音频 MIME、body = 字节流、
- *     时长走 `x-audio-duration-ms`；见 `bottles.ts:277`）→ 把刚录的这一段真的放进瓶里；
- *   - 两步都成功 → `/bottle.html?id=<瓶 id>`。
+ *     → 建瓶（`DRAFT`）。
  *
- * 为什么瓶 id 要记在本次录音会话里：上传失败重试**只重传段**——
- * 瓶已经在了，再发一次 `POST /api/bottles` 就会多出一只空瓶。
- * 录音规则（容器协商、麦克风失败文案、时长＝开始/停止的时间戳差值）走共享层 `./recorder.js`，
- * 本页不再自己抄一份；明显不合格的录制（<15s / >30s）仍在本地就拦下，不占用一次 422。
+ * **W4-a 需求 4：本页不再录音。** 用户第 2 轮要求「投瓶：选好歌后进入接唱页，不直接在选歌页唱」，
+ * 所以这里的动作是「选这首，去接唱」：建一只 DRAFT 瓶 → 跳 `/bottle.html?id=<新瓶 id>`，
+ * 录音（第 N 段）与「选择去向」都发生在**瓶子详情页**（那里本来就有唯一的缺口格与去向）。
+ * 因此：
+ *   - 本页**不再 import `./recorder.js`**，也不再申请麦克风（点按钮不会占用麦克风）；
+ *   - 上传段的端点是 `/bottle.html` 的事，本页不再 `POST /api/bottles/:id/segments`。
+ * 为什么比以前更省：接唱页已经有一套完整的「缺口 → 录一段 → 选去向」实现，复用它是零新增。
  *
  * 本文件**不改 HTML**（`site/*.html` 是发布副本，由 `tools/sync-site.mjs` 生成）：
  *   - 卡片：克隆页面第 1 格（`.bay`）当模板，位置/盆沿错位照抄页面各格自己的 inline style；
@@ -21,7 +21,7 @@
  *     —— 设计稿的语义是「盆里的水位＝这首已切好的段位」，所以盆必须跟着数据走；
  *   - 文本一律 `textContent`，不拼 HTML。
  */
-import { get, post, postAudio } from './api.js';
+import { get, post } from './api.js';
 import {
   clearState,
   hide,
@@ -36,7 +36,6 @@ import {
 } from './dom.js';
 import { requireUser } from './session.js';
 import { definePage } from './page.js';
-import { SEGMENT_MAX_MS, SEGMENT_MIN_MS, startRecordingSession } from './recorder.js';
 
 const SONGS_ENDPOINT = '/api/songs';
 const BOTTLES_ENDPOINT = '/api/bottles';
@@ -45,26 +44,20 @@ const MAX_SLOTS = 5;
 /** 设计稿的两行「状态示例」是演示文案：本页没有把它们接上任何东西，所以在页面上标出来。 */
 const SAMPLE_SUFFIX = ' · 示例';
 /**
- * 每段时长区间（`RecordSegmentRequestSchema.durationMs`：15–30 秒）：本地先把明显不合格的录制拦下。
- * 这两个常量来自共享层 `./recorder.js`（源头是 `packages/shared/src/audio/constants.ts`），本页不再抄。
+ * 按钮文案（W4-a 需求 4）。
+ *
+ * 定稿写死的是「选这首，录第 1 段」，但本页现在**已经不能录音**了
+ * （录第几段由服务端在接唱页决定，见 `docs/deploy-plan-html.md` §13 需求 4）
+ * —— 留着那句话就是"按钮说 A、实际做 B"。所以运行期换成真实动作；
+ * 图标仍是定稿的麦克风（它表示"你要开唱了"，不是"现在就在这里录"）。
  */
-/** 区间文案只有一处来源，注记行与提示语都用它。 */
-const SEGMENT_SECONDS = `${SEGMENT_MIN_MS / 1000}–${SEGMENT_MAX_MS / 1000}`;
+const ACTION_LABEL = '选这首，去接唱';
 const TEXT = {
   checking: '正在确认登录状态…',
-  requesting: '正在请求麦克风…',
-  stop: '停止录音',
-  submit: '发起这支瓶子',
-  retryCreate: '重试发起',
-  retryUpload: '重试上传',
-  uploading: '上传中：正在把这一段放进瓶子…',
-  uploaded: '上传成功：正在打开这支瓶子…',
+  creating: '正在发起这支瓶子…',
+  going: '瓶子开好了，正在带你进接唱页…',
+  retry: '重试：去接唱',
 };
-
-/** `POST /api/bottles/:id/segments`（瓶 id 必须过 `encodeURIComponent`）。 */
-function segmentsEndpoint(bottleId) {
-  return `${BOTTLES_ENDPOINT}/${encodeURIComponent(bottleId)}/segments`;
-}
 
 /** 从页面自身抄下来的模板与视觉值（不新增任何设计值）。 */
 const design = {
@@ -73,15 +66,15 @@ const design = {
   note: null,
   dish: { wet: null, dry: null },
   dishTransforms: [],
-  labels: { record: '', dry: '' },
+  dryLabel: '',
   dryNote: '',
   samples: { noMatch: '', empty: '' },
 };
 
 let songs = [];
 let query = '';
-/** 当前录音会话（同一时刻只录一格）。 */
-let take = null;
+/** 正在发起的那一格（同一时刻只允许一次建瓶，避免连点出两只空瓶）。 */
+let pendingBay = null;
 
 // ────────────────────────────────────────────────────────────── 设计稿取样（只跑一次）
 
@@ -94,8 +87,7 @@ function captureDesign() {
   }));
   const dryBay = bays.find((bay) => bay.querySelector('.note') !== null) ?? null;
   design.note = dryBay?.querySelector('.note') ?? null;
-  design.labels.record = bays[0]?.querySelector('.act')?.textContent.trim() ?? '';
-  design.labels.dry = dryBay?.querySelector('.act')?.textContent.trim() ?? '';
+  design.dryLabel = dryBay?.querySelector('.act')?.textContent.trim() ?? '';
   design.dryNote = design.note?.textContent ?? '';
 
   const dishes = qa('svg.art > g');
@@ -199,7 +191,6 @@ function renderStates(shownCount) {
 function renderRack(shown) {
   const rack = q('.rack');
   if (rack === null) return;
-  if (take !== null) abortTake();
   const slots = Math.min(shown.length, design.slotStyles.length, MAX_SLOTS);
   const cards = [];
   const dishes = [];
@@ -239,18 +230,18 @@ function buildBay(song, slot) {
   bay.dataset.songId = String(song.id ?? '');
 
   if (isSplit(song)) {
-    setActLabel(act, design.labels.record);
+    setActLabel(act, ACTION_LABEL);
     act.disabled = false;
     note.textContent = '';
     hide(note);
-    bay.dataset.recordState = 'idle';
-    on(act, 'click', () => void onAct(bay, song));
+    bay.dataset.actionState = 'idle';
+    on(act, 'click', () => void chooseForBottle(bay, song));
   } else {
-    setActLabel(act, design.labels.dry);
+    setActLabel(act, design.dryLabel);
     act.disabled = true;
     note.textContent = design.dryNote;
     setVisible(note, true);
-    bay.dataset.recordState = 'dry';
+    bay.dataset.actionState = 'dry';
   }
   return bay;
 }
@@ -299,7 +290,7 @@ function setActLabel(act, text) {
   else act.append(document.createTextNode(text));
 }
 
-// ────────────────────────────────────────────────────────────── 录音 → 发起
+// ────────────────────────────────────────────────────────────── 选歌 → 建瓶 → 去接唱
 
 function setNoteText(bay, text) {
   const note = ensureNote(bay);
@@ -308,161 +299,63 @@ function setNoteText(bay, text) {
   setVisible(note, typeof text === 'string' && text !== '');
 }
 
-/** `retryLabel`：失败后要按的动作不一样（还没建瓶 = 重试发起；瓶已在 = 重试上传）。 */
-function setBayState(bay, state, text, retryLabel = TEXT.retryCreate) {
-  bay.dataset.recordState = state;
+function setBayState(bay, state) {
+  bay.dataset.actionState = state;
   const act = bay.querySelector('.act');
-  setNoteText(bay, text ?? null);
   if (act === null) return;
-  if (state === 'recording') {
-    setActLabel(act, TEXT.stop);
-    act.disabled = false;
-  } else if (state === 'requesting') {
-    setActLabel(act, TEXT.requesting);
+  if (state === 'creating') {
+    setActLabel(act, TEXT.creating);
     act.disabled = true;
-  } else if (state === 'uploading') {
-    setActLabel(act, TEXT.submit);
+  } else if (state === 'going') {
+    setActLabel(act, TEXT.going);
     act.disabled = true;
-  } else if (state === 'recorded') {
-    setActLabel(act, TEXT.submit);
-    act.disabled = false;
   } else if (state === 'failed') {
-    setActLabel(act, retryLabel);
+    setActLabel(act, TEXT.retry);
     act.disabled = false;
   } else {
-    setActLabel(act, design.labels.record);
+    setActLabel(act, ACTION_LABEL);
     act.disabled = false;
   }
-}
-
-function recordingText(seconds) {
-  return `录制中 ${seconds} 秒（每段 ${SEGMENT_SECONDS} 秒）· 点「${TEXT.stop}」结束`;
-}
-
-function recordedText(durationMs) {
-  const seconds = Math.max(1, Math.round(durationMs / 1000));
-  return `已录 ${seconds} 秒 · 点「${TEXT.submit}」上传这一段并建瓶`;
 }
 
 /**
- * 本地门（契约 15–30 秒）：录太短/太长在**提交前**就拦下并就地提示，
- * 不浪费一次往返去换后端的 `AUDIO_DURATION_OUT_OF_RANGE`。
- * 返回 `null` = 这次录制可以提交（是否合该段曲库预设由服务端权威判定，服务端的话原样显示）。
+ * `选这首，去接唱`：建一只 DRAFT 瓶，然后跳接唱页。
+ *
+ * 建瓶**只发一次**：拿到 id 之前失败可以重试；拿到 id 之后在这里只会跳转，
+ * 不再有"重试又建一只空瓶"的路径（本页已无段上传，建瓶成功即离开本页）。
  */
-function localDurationIssue(durationMs) {
-  const seconds = (durationMs / 1000).toFixed(1);
-  if (durationMs < SEGMENT_MIN_MS) {
-    return `录太短：这次只录了 ${seconds} 秒，每段要 ${SEGMENT_SECONDS} 秒，请重新录制。`;
-  }
-  if (durationMs > SEGMENT_MAX_MS) {
-    return `录太长：这次录了 ${seconds} 秒，每段要 ${SEGMENT_SECONDS} 秒，请重新录制。`;
-  }
-  return null;
-}
-
-function abortTake() {
-  if (take === null) return;
-  if (take.ticker !== null) clearInterval(take.ticker);
-  /** `cancel()` 会松开麦克风且**不**触发 `onStop`：被放弃的这一段不该再上传（已停下的会话是 null）。 */
-  take.session?.cancel();
-  take = null;
-}
-
-async function onAct(bay, song) {
-  const state = bay.dataset.recordState;
-  if (state === 'idle') await startRecording(bay, song);
-  else if (state === 'recording') stopRecording();
-  else if (state === 'recorded' || state === 'failed') await submit(bay, song);
-  // requesting / uploading / dry：进行中或不可用，忽略点击（按钮已 disabled）
-}
-
-async function startRecording(bay, song) {
-  if (take !== null) return;
-  setBayState(bay, 'requesting', TEXT.checking);
+async function chooseForBottle(bay, song) {
+  if (pendingBay !== null) return;
+  pendingBay = bay;
+  setBayState(bay, 'creating');
+  setNoteText(bay, TEXT.checking);
   try {
     const user = await requireUser();
     if (user === null) {
+      // 已跳登录页；把这一格恢复成可点，免得用户返回时看到一张卡住的卡片。
+      pendingBay = null;
       setBayState(bay, 'idle');
+      setNoteText(bay, '');
       return;
     }
-  } catch (error) {
-    setBayState(bay, 'failed', `读取登录状态失败：${error.message}`);
-    return;
-  }
-
-  setNoteText(bay, TEXT.requesting);
-
-  const started = await startRecordingSession({
-    onStop: ({ blob, durationMs }) => {
-      if (take === null || take.bay !== bay) return;
-      if (take.ticker !== null) clearInterval(take.ticker);
-      const issue = localDurationIssue(durationMs);
-      if (issue !== null) {
-        // 不合格的录制直接丢掉（会话清空 ⇒ 按钮回到「录音」，可以立刻重录）。
-        take = null;
-        setBayState(bay, 'idle', issue);
-        return;
-      }
-      take.ticker = null;
-      take.session = null;
-      take.durationMs = durationMs;
-      take.blob = blob;
-      setBayState(bay, 'recorded', recordedText(durationMs));
-    },
-  });
-  if (!started.ok) {
-    setBayState(bay, 'failed', started.message);
-    return;
-  }
-
-  take = {
-    bay,
-    song,
-    session: started.session,
-    ticker: null,
-    blob: null,
-    durationMs: 0,
-    /** 建瓶成功后写进来：上传失败重试时靠它只重传段。 */
-    bottleId: null,
-  };
-  take.ticker = setInterval(() => {
-    if (take === null || take.bay !== bay) return;
-    setNoteText(bay, recordingText(Math.round(take.session.elapsedMs() / 1000)));
-  }, 1000);
-  setBayState(bay, 'recording', recordingText(0));
-}
-
-function stopRecording() {
-  take?.session?.stop();
-}
-
-/**
- * 建瓶 → 传段 → 跳转。瓶 id 记在 `take.bottleId`：失败重试时它已非空，
- * 于是**跳过建瓶**只重传段（否则每次重试都会多出一只空瓶）。
- */
-async function submit(bay, song) {
-  const current = take;
-  if (current === null || current.blob === null) return;
-  setBayState(bay, 'uploading', TEXT.uploading);
-  try {
-    if (current.bottleId === null) {
-      const bottle = await post(BOTTLES_ENDPOINT, { songId: song.id });
-      const id = bottle?.id ?? null;
-      if (typeof id !== 'string' || id === '') {
-        setBayState(bay, 'failed', '发起失败：服务端没有返回瓶子 id。', TEXT.retryCreate);
-        return;
-      }
-      current.bottleId = id;
+    setNoteText(bay, TEXT.creating);
+    const bottle = await post(BOTTLES_ENDPOINT, { songId: song.id });
+    const id = bottle?.id ?? null;
+    if (typeof id !== 'string' || id === '') {
+      pendingBay = null;
+      setBayState(bay, 'failed');
+      setNoteText(bay, '发起失败：服务端没有返回瓶子 id。');
+      return;
     }
-    const bottleId = current.bottleId;
-    await postAudio(segmentsEndpoint(bottleId), current.blob, { durationMs: current.durationMs });
-    setNoteText(bay, TEXT.uploaded);
-    location.assign(`/bottle.html?id=${encodeURIComponent(bottleId)}`);
+    setBayState(bay, 'going');
+    setNoteText(bay, TEXT.going);
+    location.assign(`/bottle.html?id=${encodeURIComponent(id)}`);
   } catch (error) {
+    pendingBay = null;
     // 业务错误照原样显示服务端 message（本页不重写它的文案）。
-    const retryLabel = current.bottleId === null ? TEXT.retryCreate : TEXT.retryUpload;
-    setBayState(bay, 'failed', error.message, retryLabel);
-    if (error?.isServiceDown === true) showWaking(null, { onRetry: () => void submit(bay, song) });
+    setBayState(bay, 'failed');
+    setNoteText(bay, error?.message ?? '发起失败，请重试。');
+    if (error?.isServiceDown === true) showWaking(null, { onRetry: () => void chooseForBottle(bay, song) });
   }
 }
 
@@ -483,7 +376,7 @@ function wire() {
 export const { init } = definePage({
   name: 'new',
   owner: 'W1-a',
-  endpoints: ['GET /api/songs', 'POST /api/bottles', 'POST /api/bottles/:id/segments'],
-  note: '曲库/计数/盆位接真数据；录制 → 建瓶 → 传这一段 → 跳 bottle.html',
+  endpoints: ['GET /api/songs', 'POST /api/bottles'],
+  note: '曲库/计数/盆位接真数据；选曲 → 建 DRAFT 瓶 → 跳 bottle.html 接唱（W4-a：本页不再录音）',
   init: wire,
 });

@@ -20,9 +20,33 @@
  *   GET /api/segments/:id/audio → 试听（存库 bytea + Range）
  *   GET /api/songs              → 第 N 段的**曲库预设时长**（t29：录音时长以它为准，±2s）。
  *                                 前端不许写死 20 秒，也不该猜：曲库是唯一权威来源。
+ *
+ * W4-a（用户第 2 轮需求 2/3/5，见 §13/§14.2）改了三件事：
+ *   1. **接唱只能唱下一段**：可录段位唯一 = 服务端 `replacementContext.gapIndex`
+ *      （缺失时退回 `missingSegmentIndexes[0]`，两者同源：都是 `gaps(state)[0]`）。
+ *      页面上**没有任何"选段位来录"的控件** —— `.cap .listen` 是**试听**选段（试听与投票要用它），
+ *      录制入口只有 `.gapBox .cta` 一个，且它的位置与文案都由服务端段号决定。
+ *   2. **去向在接唱完之后才出现**：`.destCol` 默认 `hidden`，只有"我在这支瓶子里已经录过一段"
+ *      （DTO 的 `segments` 里出现 `state.me.id`）才显示 —— 见 `renderDestinationGate()`。
+ *      选完去向给出**说清结果的提示**（共享层状态条 + 页内留痕）再跳 `/river.html`。
+ *   3. **试听全部**：把已录的段**按段号连播**（缺口跳过，不做混音 —— 后端没有混音端点），
+ *      0 段时按钮不存在。运行期建控件（§10.2 已批准的既有模式）。
  */
 import { ApiError, get, post, postAudio } from './api.js';
-import { clearState, el, hide, on, q, qa, show, showError, showLoading, showRequestFailure } from './dom.js';
+import {
+  clearState,
+  el,
+  hide,
+  on,
+  q,
+  qa,
+  setVisible,
+  show,
+  showError,
+  showLoading,
+  showRequestFailure,
+  showState,
+} from './dom.js';
 import { currentUser } from './session.js';
 import { definePage } from './page.js';
 import { countdown, startRecordingSession } from './recorder.js';
@@ -48,6 +72,19 @@ const DISLIKE_THRESHOLD_FALLBACK = 0.8;
 /** 每 5 秒上报一次已听覆盖率（服务端按墙上时间限速，更密没有意义）。 */
 const LISTEN_REPORT_INTERVAL_MS = 5_000;
 
+/**
+ * 选完去向之后：先把提示留在页面上，再跳回河道（W4-a 需求 3：不许"只跳转了事"）。
+ * 2.2 秒够看清一句话，也让"提示曾经出现过"这件事可被外部观测到。
+ */
+const RESOLUTION_REDIRECT_DELAY_MS = 2_200;
+
+/** 三条水路各自的"发生了什么"（W4-a 需求 3）：文案要说结果，不能只说"操作成功"。 */
+const RESOLUTION_NOTICE = {
+  RIVER: '已投进河道，等下一个陌生人接住。',
+  RETURN: '已回传给投给你的那个人，由他决定下一步。',
+  SEA: '已入海：这支瓶子进了公海，之后谁都能听到。',
+};
+
 /** 瓶身剖面在页面里的几何真值（取自定稿：格位从 76 到 1000，水面带高 24，切面斜 93/71）。 */
 const PROFILE_LEFT = 76;
 const PROFILE_RIGHT = 1000;
@@ -72,6 +109,8 @@ const state = {
   /** 正在进行的录音会话（`recorder.js` 的 `startRecordingSession` 句柄）；不在录音时为 null。 */
   session: null,
   recordTimer: null,
+  /** 选去向请求进行中（防连点第二条水路）。 */
+  resolving: false,
 };
 
 // ------------------------------------------------------------------ 渲染小工具
@@ -100,6 +139,37 @@ function announce(message) {
 
 function segmentByIndex(index) {
   return state.detail?.segments.find((segment) => segment.index === index) ?? null;
+}
+
+/**
+ * **可录段位只有一个**（W4-a 需求 2）：服务端给的下一段。
+ *
+ * 两个字段同源（`queries.ts`：`replacementContext().gapIndex === gaps(state)[0]`、
+ * `missingSegmentIndexes() === gaps(state)`），所以优先用更明确的 `replacementContext.gapIndex`
+ * （它同时带出"缺口前一段是谁"），缺失时退回 `missingSegmentIndexes[0]`。
+ * `null` = 没缺口（作品完整或已损坏）⇒ 谁都不能录。
+ *
+ * 段号**不从前端选择**：请求体里根本没有 index（契约 §16.8），段号由服务端 `nextRecordIndex` 决定。
+ */
+function recordTargetIndex() {
+  const detail = state.detail;
+  if (detail === null) return null;
+  return detail.replacementContext?.gapIndex ?? detail.missingSegmentIndexes[0] ?? null;
+}
+
+/**
+ * 我在这支瓶子里**已经录过一段**吗（= 接唱完了）。
+ *
+ * 用途（W4-a 需求 3）：`.destCol` 的门槛。为什么不用 `availableResolutions.length > 0`：
+ * 发起者的 DRAFT 瓶子**还没录第 1 段时**服务端就已经给出 `['RIVER','SEA']`
+ *（`resolution.ts`：DRAFT + 发起者 + 未完整 ⇒ RIVER/SEA）⇒ 那个条件会把去向提前放出来。
+ * "我的段"用 `segments` 判：§9.1 的可见性保证**自己那一棒一定看得到**（含刚录完的那一段）。
+ */
+function hasSung() {
+  const detail = state.detail;
+  const me = state.me;
+  if (detail === null || me === null) return false;
+  return detail.segments.some((segment) => segment.ownerId === me.id);
 }
 
 /**
@@ -169,11 +239,14 @@ function render() {
   renderHeader();
   renderProfile();
   renderResolution();
+  /** 顺序要紧：先把去向行按服务端选项画好，再决定整列显不显示（W4-a 需求 3）。 */
+  renderDestinationGate();
   renderPutBack();
   renderLinks();
   state.selectedIndex = null;
   /** 先把「没有可试听段」的列清干净（否则定稿里的演示进度/计数会留在页面上）。 */
   renderListenColumn();
+  renderListenAll();
   const first = state.detail.segments[0];
   if (first !== undefined) void selectSegment(first.index);
 }
@@ -256,6 +329,14 @@ function renderProfile() {
   const parent = templates.parent;
   if (parent === null) return;
 
+  /**
+   * **幂等**（W4-a 修的真 bug，见 `docs/deploy-plan-html.md` §14.3）：
+   * 每次渲染前先把上一次渲染出来的格子撤干净，再按这一次的数据重建。
+   * `captureTemplates()` 只在第一次跑时移除冻结 HTML 的样板；之后 `.segNum`/`.segLab`/`.cap`
+   * 就全是本函数的产物 —— 不清就每渲染一次再 append 一遍（4 → 8 → 12），
+   * 而两批节点的 `text/left/top/width` 完全重合 ⇒ **视觉看不出来**，只有计数能戳破。
+   */
+  for (const node of qa('.segNum, .segLab, .cap', parent)) node.remove();
   templates.gapBox.remove();
   templates.selMark?.remove();
   state.capNodes.clear();
@@ -304,8 +385,8 @@ function renderProfile() {
     state.capNodes.set(index, cap);
   }
 
-  // 缺口盒长在**第一个缺口**那一格（就是服务端下一次会录的段号）
-  const gapIndex = detail.missingSegmentIndexes[0] ?? null;
+  // 缺口盒长在**服务端给的那一格**（= 下一次会录的段号，需求 2 的"只有一个可录段位"就落在这里）
+  const gapIndex = recordTargetIndex();
   if (gapIndex !== null) {
     const slot = cellSlot(gapIndex);
     const gapBox = templates.gapBox;
@@ -356,12 +437,13 @@ function renderGapBox(gapIndex) {
     note.textContent = '这一段只有发起者（尚未投河时）或当前持有者能录：你看得到缺口，但录不了它。';
     return;
   }
+  /** 需求 2：把"不许自选"写在接唱区里（页面上没有任何选段位的控件，这句是唯一的解释位）。 */
+  const head = `接唱只能唱这一段：第 ${gapIndex} 段是服务端给你的下一段。`;
   if (preset === null) {
-    note.textContent =
-      '这一段的曲库预设时长缺失，服务端会拒绝上传（没有权威时长就核不了录音长度），先在曲库补上这一段。';
+    note.textContent = `${head}这一段的曲库预设时长缺失，服务端会拒绝上传（没有权威时长就核不了录音长度），先在曲库补上这一段。`;
     return;
   }
-  note.textContent = `这一段按曲库预设 ${formatClock(preset)} 录，录完再选去向。不点开就不会占用你的麦克风。`;
+  note.textContent = `${head}按曲库预设 ${formatClock(preset)} 录，录完再选去向。不点开就不会占用你的麦克风。`;
 }
 
 /** 水位只画到「连续录满」的那一段；没有一段录满时整片水都不画（瓶子是干的）。 */
@@ -450,11 +532,29 @@ function renderResolution() {
   }
 }
 
+/**
+ * **去向在接唱完之后才出现**（W4-a 需求 3）。
+ *
+ * 判据只有一条：我在这支瓶子里录过一段（`hasSung()`）—— 因为"接唱完"这件事的唯一痕迹
+ * 就是"段链里有我的段"。刚到一支还没唱过的瓶子（含自己刚建立、还没录的 DRAFT），
+ * 整列 `hidden`：用户第 2 轮原话是「选择去向我记得是在接唱完之后才出现的」。
+ *
+ * 为什么不是"本会话录完才显示"：录完刷新页面就不能定去向了 ⇒ 瓶子会卡死在 DRAFT/HELD。
+ * 服务端的 `availableResolutions` 仍是权威：不可用**禁用不隐藏**（`renderResolution()` 照旧）。
+ */
+function renderDestinationGate() {
+  const col = q('.destCol');
+  if (col === null) return;
+  setVisible(col, hasSung());
+}
+
 // ------------------------------------------------------------------ 试听 / 投票
 
 async function selectSegment(index, options = {}) {
   const segment = segmentByIndex(index);
   if (segment === null) return;
+  /** 换段试听＝中断连播（需求 5 的"可中断"）。 */
+  if (listenAll.playing) stopListenAll();
   state.selectedIndex = index;
 
   qa('.segLab').forEach((lab, position) => {
@@ -548,6 +648,7 @@ function updateTransport(currentMs, totalMs) {
 async function playAudio() {
   const audio = state.audio;
   if (audio === null || state.selectedIndex === null) return;
+  if (listenAll.playing) stopListenAll();
   if (audio.paused === false) {
     audio.pause();
     return;
@@ -659,6 +760,147 @@ function renderCellCounts(index) {
   if (index === state.selectedIndex) renderVoteButtons();
 }
 
+// ------------------------------------------------------------------ 试听全部（W4-a 需求 5）
+
+/**
+ * 「试听全部」＝把**已录的段按段号连播**，缺口跳过。
+ *
+ * 为什么不是"先拼成一条音频"：后端没有混音/导出端点（§13 需求 5 原文：「不需要导出」），
+ * 前端也不该伪造 —— 串行播放在听感上就是"按顺序把这首歌听完"，代价只是段与段之间有一道接缝，
+ * 且不引入任何依赖。
+ *
+ * 落位：定稿自己那一行 `.votes`（赞 / 踩）的尾部。为什么是这里：
+ *   - 那一行是 `display:flex`，横向还剩 ~280px ⇒ 加一枚按钮**不动任何纵向坐标**；
+ *     `.listenCol` 从 630 排到 851，离底栏分隔线（852）只剩 1px，另起一行的方案必然压到底栏；
+ *   - 形态直接借页面自己的 `.voteBtn`（边框/高度/字号全部照抄既有类，不新造视觉值）。
+ * 借用类名安全：`renderVoteButtons()` 只认 `.voteBtn .n`（本按钮没有 `.n`），
+ * 而 `wire()` 的 `qa('.voteBtn')` 在 init 时就抓完了定稿里的赞/踩两枚。
+ *
+ * 0 段时**按钮不存在**（需求 5：不要留一个点了没反应的按钮）。
+ */
+const listenAll = { button: null, audio: null, queue: [], cursor: 0, playing: false };
+
+/** 已录的段（按段号升序）：缺口天然不在里面，所以"缺口跳过"是构造出来的，不需要额外判断。 */
+function playableSegments() {
+  return [...(state.detail?.segments ?? [])].sort((left, right) => left.index - right.index);
+}
+
+function ensureListenAllButton() {
+  const row = q('.votes');
+  if (row === null) return null;
+  if (listenAll.button !== null && listenAll.button.isConnected) return listenAll.button;
+  const button = el('button', { class: 'voteBtn w4a-listenAll', type: 'button' });
+  on(button, 'click', () => {
+    if (listenAll.playing) stopListenAll();
+    else startListenAll();
+  });
+  row.append(button);
+  listenAll.button = button;
+  return button;
+}
+
+function ensureListenAllAudio() {
+  if (listenAll.audio !== null) return listenAll.audio;
+  const audio = el('audio', { class: 'w4a-listenAllAudio', preload: 'auto' });
+  on(audio, 'ended', () => advanceFrom(listenAll.cursor));
+  on(audio, 'timeupdate', () => {
+    if (!listenAll.playing) return;
+    const segment = listenAll.queue[listenAll.cursor];
+    if (segment === undefined || typeof segment.durationMs !== 'number' || segment.durationMs <= 0) return;
+    /**
+     * `MediaRecorder` 的 webm 常常**不写 Duration**（占位 0:00 的分母问题同源）⇒ `ended` 不保证来。
+     * 服务端记的段时长是权威值，用它兜底推进（250ms 容差）。
+     */
+    if (audio.currentTime * 1000 >= segment.durationMs - 250) advanceFrom(listenAll.cursor);
+  });
+  on(audio, 'error', () => {
+    if (!listenAll.playing) return;
+    setText('.votesNote', '连播中断：有一段音频取不到。');
+    stopListenAll();
+  });
+  document.body.append(audio);
+  listenAll.audio = audio;
+  return audio;
+}
+
+/** 只有"还在同一段上"才推进：`ended` 与 `timeupdate` 可能对同一段各报一次。 */
+function advanceFrom(cursor) {
+  if (!listenAll.playing || listenAll.cursor !== cursor) return;
+  playQueueAt(cursor + 1);
+}
+
+function playQueueAt(index) {
+  const audio = listenAll.audio;
+  const segment = listenAll.queue[index];
+  if (audio === null || segment === undefined) {
+    stopListenAll();
+    return;
+  }
+  listenAll.cursor = index;
+  audio.src = `/api/segments/${encodeURIComponent(segment.id)}/audio`;
+  renderListenAllLabel();
+  const started = audio.play();
+  if (started !== undefined && typeof started.catch === 'function') {
+    started.catch(() => {
+      setText('.votesNote', '浏览器拦下了连播：再点一次「试听全部」重试。');
+      stopListenAll();
+    });
+  }
+}
+
+function startListenAll() {
+  const segments = playableSegments();
+  if (segments.length === 0) return;
+  stopListenAll();
+  /** 与单段试听互斥：两个都在放就成了两条声道。 */
+  const single = state.audio;
+  if (single !== null && single.paused === false) single.pause();
+  listenAll.queue = segments;
+  listenAll.playing = true;
+  ensureListenAllAudio();
+  playQueueAt(0);
+}
+
+/** 停止（可中断）：再点一次按钮、或换段试听时都会走这里。 */
+function stopListenAll() {
+  const audio = listenAll.audio;
+  if (audio !== null && audio.paused === false) audio.pause();
+  listenAll.playing = false;
+  listenAll.queue = [];
+  listenAll.cursor = 0;
+  renderListenAllLabel();
+}
+
+function renderListenAllLabel() {
+  const button = listenAll.button;
+  if (button === null || !button.isConnected) return;
+  const total = playableSegments().length;
+  if (listenAll.playing && listenAll.queue.length > 0) {
+    const current = listenAll.queue[listenAll.cursor];
+    button.textContent = `停止试听（${listenAll.cursor + 1}/${listenAll.queue.length}）`;
+    button.setAttribute('aria-label', `停止试听连播：正在播第 ${current?.index ?? 0} 段（共 ${listenAll.queue.length} 段）`);
+    button.title = '再点一次停止连播';
+    return;
+  }
+  button.textContent = '试听全部';
+  button.setAttribute('aria-label', `试听全部：按段号顺序连播这 ${total} 段，缺口跳过，不做混音`);
+  button.title = '按段号顺序连播已录的段；缺口跳过（不做混音、不导出）';
+}
+
+/** 每次渲染都过一遍：有段就有按钮（并且标签回到"试听全部"），0 段就把按钮摘掉。 */
+function renderListenAll() {
+  const row = q('.votes');
+  if (row === null) return;
+  if (playableSegments().length === 0) {
+    stopListenAll();
+    listenAll.button?.remove();
+    listenAll.button = null;
+    return;
+  }
+  ensureListenAllButton();
+  renderListenAllLabel();
+}
+
 function renderPutBack() {
   const detail = state.detail;
   const button = q('.putBack .ghost');
@@ -711,7 +953,8 @@ function presetDurationFor(index) {
 }
 
 async function startRecording() {
-  const gapIndex = state.detail?.missingSegmentIndexes[0] ?? null;
+  /** 段号只从服务端来（需求 2）：页面上没有任何控件能改它。 */
+  const gapIndex = recordTargetIndex();
   if (gapIndex === null) return;
   /** 这一段该录多久：唯一来源是曲库（`GET /api/songs`）；拿不到权威预设就只报已录时长、不自动停。 */
   const targetMs = presetDurationFor(gapIndex);
@@ -770,10 +1013,16 @@ async function uploadRecording({ blob, elapsedMs, gapIndex }) {
     clearState();
     state.detail = response.bottle;
     render();
+    /**
+     * 上传成功＝"接唱完了"⇒ 去向此刻才出现（`renderDestinationGate()`）。提示要说清两者，
+     * 否则用户看不到去向是**刚出现的**。同一人在一支瓶子里只能唱一次，所以这里不再提"下一段"。
+     */
     announce(
-      `第 ${response.index} 段已经录好了（本段时长 ${formatClock(elapsedMs)}）。${
-        response.nextRecordIndex === null ? '作品已经完整，接下来选去向。' : `下一段该录第 ${response.nextRecordIndex} 段。`
-      }`,
+      `第 ${response.index} 段已经录好了（本段时长 ${formatClock(elapsedMs)}）。` +
+        (response.nextRecordIndex === null
+          ? '作品已经完整：'
+          : `歌里还缺第 ${response.nextRecordIndex} 段等别人接，你的这一棒到此为止：`) +
+        '现在选去向。',
     );
   } catch (error) {
     const message = error instanceof ApiError ? error.message : '上传失败，请重试。';
@@ -945,7 +1194,8 @@ function wire() {
     const spec = RESOLUTION_ROWS[position];
     if (spec === undefined) return;
     on(row, 'click', async () => {
-      if (row.disabled) return;
+      if (row.disabled || state.resolving) return;
+      state.resolving = true;
       try {
         const detail = await post(`/api/bottles/${encodeURIComponent(state.id)}/resolution`, {
           resolution: spec.code,
@@ -953,8 +1203,20 @@ function wire() {
         clearState();
         state.detail = detail;
         render();
-        announce(`已按「${spec.label}」处置这支瓶子。`);
+        const notice = RESOLUTION_NOTICE[spec.code] ?? `已按「${spec.label}」处置这支瓶子。`;
+        /**
+         * 成功提示（需求 3）：共享层状态条说清"发生了什么"，页内那一行同样留痕 ——
+         * 状态条是底部居中的浮层（`dom.js` 里非错误态到点会自己淡出），
+         * 页内文案跟着页面走，跳转前一定读得到。
+         * 状态种类只有 loading/empty/error/waking（共享层是冻结的），成功用中性的 `empty`：
+         * 它的点是 muted 色 —— 不是错误色，也不是"正在加载"的脉冲。
+         */
+        setText('.destCol .sub', notice);
+        showState('empty', notice);
+        await new Promise((resolve) => setTimeout(resolve, RESOLUTION_REDIRECT_DELAY_MS));
+        location.assign('/river.html');
       } catch (error) {
+        state.resolving = false;
         showError(error instanceof ApiError ? error.message : '选去向失败。');
       }
     });

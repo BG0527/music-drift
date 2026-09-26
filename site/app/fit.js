@@ -69,9 +69,15 @@ function contentBox(root) {
   };
 }
 
-/** 把 `value` 夹进 `[min, max]`；`min > max` 时取中点（无解时尽量居中）。 */
-function clamp(value, min, max) {
-  if (min > max) return (min + max) / 2;
+/**
+ * 把 `value` 夹进 `[min, max]`；**无解时返回 `null`**（而不是取中点）。
+ *
+ * 为什么这里必须返回 null：中点是一个"看起来居中、实则内容被裁"的假解 —— 实测
+ * 登录态下的 `/me.html` 就因此被切掉最后一行（`p`「徽章是派生的（不落库）…」底边 1031 > 视口 1019）。
+ * 无解时正确的动作是**退回 contain**（宁可有留白，不裁内容），由调用方处理。
+ */
+function clampOrNull(value, min, max) {
+  if (min > max) return null;
   return Math.min(Math.max(value, min), max);
 }
 
@@ -145,12 +151,25 @@ export function installFit() {
       }
     }
 
-    // 平移：默认居中；若有内容安全框，则把偏移夹到"内容不越界"的区间里
-    let x = (vw - CANVAS_WIDTH * scale) / 2;
-    let y = (vh - CANVAS_HEIGHT * scale) / 2;
+    // 平移：默认居中；若有内容安全框，则把偏移夹到"内容不越界"的区间里。
+    // **区间为空（无解）时必须退回 contain** —— 取中点会得到一个"看起来居中、实则内容被裁"的假解
+    //（实测登录态 /me.html 的最后一行就是这样被切掉的）。
+    const centerX = (vw - CANVAS_WIDTH * scale) / 2;
+    const centerY = (vh - CANVAS_HEIGHT * scale) / 2;
+    let x = centerX;
+    let y = centerY;
     if (content !== null) {
-      x = clamp(x, vw - content.right * scale, -content.left * scale);
-      y = clamp(y, vh - content.bottom * scale, -content.top * scale);
+      const clampedX = clampOrNull(centerX, vw - content.right * scale, -content.left * scale);
+      const clampedY = clampOrNull(centerY, vh - content.bottom * scale, -content.top * scale);
+      if (clampedX === null || clampedY === null) {
+        // 铺满放不下内容 ⇒ 退回"装得下"，并重新按 contain 居中
+        scale = Math.min(vw / CANVAS_WIDTH, vh / CANVAS_HEIGHT);
+        x = (vw - CANVAS_WIDTH * scale) / 2;
+        y = (vh - CANVAS_HEIGHT * scale) / 2;
+      } else {
+        x = clampedX;
+        y = clampedY;
+      }
     }
 
     stage.style.transform = `scale(${String(scale)})`;
