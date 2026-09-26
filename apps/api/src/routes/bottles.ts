@@ -9,6 +9,7 @@ import {
   canChooseResolution,
   canPutBack,
   chooseResolution,
+  isAwaitingMyAction,
   putBack,
   recordSegment,
   type Clock,
@@ -219,6 +220,11 @@ export function registerBottleRoutes(app: FastifyInstance, options: BottleRoutes
           .filter((segment) => segment.deletedAt === null && segment.ownerId === actor.user.id)
           .map((segment) => segment.index)
           .sort((left, right) => left - right),
+        /**
+         * 「待你操作」（W6 / CONTEXT §4.2）：瓶子回到我手里、且我**只能入海**
+         * （发起者收到回传的典型场景）。判据取内核导出，不在这里重写「发起者 + origin=RETURN」。
+         */
+        awaitingMyAction: isAwaitingMyAction(state, { userId: actor.user.id }),
       });
     }
     return reply.send({ items, nextCursor: null });

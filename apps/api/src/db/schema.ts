@@ -42,8 +42,18 @@ export const users = pgTable(
   'users',
   {
     id: uuid('id').primaryKey().defaultRandom(),
+    /**
+     * **账号**（W6 正名 = `account`）：2–32 字符、非邮箱，注册/登录都只用它。
+     *
+     * 为什么账号不新加一列而直接复用 `handle`：**迁移越大越危险** ——
+     * 这一列本来就满足「2–32 字符、非邮箱」，加列会同时带来回填、双写、旧数据兜底三件事。
+     */
     handle: text('handle').notNull(),
-    email: text('email').notNull(),
+    /**
+     * 邮箱（W6 起**可空**）：账号注册的用户没有邮箱；旧的 `{handle, email, password}`
+     * 注册写法仍会把邮箱存进来（迁移 0007 只 DROP NOT NULL，旧数据原样保留）。
+     */
+    email: text('email'),
     passwordHash: text('password_hash').notNull(),
     role: text('role').notNull().default('USER'),
     /**
@@ -55,6 +65,7 @@ export const users = pgTable(
   },
   (table) => [
     uniqueIndex('users_handle_uniq').on(table.handle),
+    // 唯一索引保留：PG 里多个 NULL 互不冲突，因此"没有邮箱"的账号可以有很多个。
     uniqueIndex('users_email_uniq').on(table.email),
     check('users_role_check', sql`${table.role} in ('USER', 'ADMIN')`),
   ],

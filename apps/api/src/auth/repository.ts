@@ -15,8 +15,10 @@ import type { Db } from '../db/client.js';
 
 export interface UserRow {
   id: string;
+  /** **账号**（W6 正名 = `account`）：注册/登录都只用它。 */
   handle: string;
-  email: string;
+  /** 邮箱可空（账号注册的用户没有邮箱）；旧注册写法仍会写入。 */
+  email: string | null;
   passwordHash: string;
   role: 'USER' | 'ADMIN';
   /** 封禁时间（t12 审核台）；非空 = 被封禁，身份解析层直接拒绝（401）。 */
@@ -37,8 +39,10 @@ export type AssignAnonCodeResult =
   { ok: true; code: string; created: boolean } | { ok: false; code: 'ANON_CODE_TAKEN' };
 
 export interface CreateUserInput {
+  /** 账号（= `users.handle`）。 */
   handle: string;
-  email: string;
+  /** 邮箱可省略（`null` = 账号注册，没有邮箱）。 */
+  email: string | null;
   passwordHash: string;
   role?: 'USER' | 'ADMIN' | undefined;
   /** 仅供测试/种子指定 id（幂等重放）；缺省由 DB 生成。 */
@@ -60,6 +64,9 @@ export interface SessionWithUser {
 
 export interface AuthRepository {
   createUser(input: CreateUserInput): Promise<CreateUserResult>;
+  /** 按**账号**（= `handle`，大小写敏感）查用户：W6 起登录/注册的主路径。 */
+  findUserByHandle(handle: string): Promise<UserRow | null>;
+  /** 按邮箱查用户：仅旧登录写法（`{ email, password }`）使用。 */
   findUserByEmail(email: string): Promise<UserRow | null>;
   findUserById(id: string): Promise<UserRow | null>;
   createSession(input: CreateSessionInput): Promise<void>;
@@ -80,7 +87,7 @@ export interface AuthRepository {
 interface UserDbRow {
   id: string;
   handle: string;
-  email: string;
+  email: string | null;
   password_hash: string;
   role: string;
   banned_at: Date | null;
@@ -150,6 +157,15 @@ export function createAuthRepository(db: Db): AuthRepository {
         }
         throw error;
       }
+    },
+
+    async findUserByHandle(handle: string): Promise<UserRow | null> {
+      const rows = await db.query<UserDbRow>(
+        `select id, handle, email, password_hash, role, banned_at, created_at from users where handle = $1`,
+        [handle],
+      );
+      const row = rows[0];
+      return row === undefined ? null : toUserRow(row);
     },
 
     async findUserByEmail(email: string): Promise<UserRow | null> {

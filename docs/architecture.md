@@ -4023,3 +4023,59 @@ g3 的作者在自检时遇到一次真实的 red：它的"真实字体落地"�
 保留：`f4-groove.*`、`g3-underwater.*`（两个候选）、`f0-sequence.*`（捞/投 三段分镜——这是用户第 ④⑤ 条的书面记录，不是候选）、`_shoot.mjs`（渲染器）。
 ⚠️ 上一轮我曾**误删整个 design-explore 与 ui-review 顶层的评审文档**（从 HEAD 恢复并重做了三处未提交修改，无永久损失）；
 这次删除**先列名单、后执行、执行后复核**，并把"删了什么/留了什么"写进汇报。
+
+---
+
+## 104. W6 落地：账号 + 密码（账号不是邮箱）+「收到回传 → 通知 + 待你操作」
+
+用户第 2 轮需求 7（`docs/deploy-plan-html.md` §13 表格第 7 行；§14.1 已解禁后端改动）。
+本节只记**决策与其代价**，字段级口径见 `docs/api.md` §2.2 与 §2.4。
+
+### 104.1 账号复用 `users.handle`，**不加列**
+
+「账号」在库里就是 `users.handle`（本来就 2–32 字符、非邮箱）。加一列账号会同时带来
+**回填 / 双写 / 旧数据兜底**三件事；迁移越大越危险（本仓已因此撤回过一次迁移批准，见 §59.2 / §60）。
+因此：契约层把 `account` 定为正名、`handle` 保留为等价旧名，DB 层一个字都不改。
+
+### 104.2 `users.email` 改为可空 —— 唯一的 DDL
+
+`0007_users_email_nullable.sql`：`ALTER TABLE "users" ALTER COLUMN "email" DROP NOT NULL;`。
+- **旧数据原样保留**（迁移不动任何一行）；已注册用户的邮箱还在，旧登录写法照样能用。
+- `users_email_uniq` **保留**：PG 里多个 NULL 互不冲突，因此"没有邮箱"的账号可以有任意多个。
+- ⚠️ **`db:generate` 在本仓是坏的**（`meta/0005_snapshot.json` / `0006_snapshot.json` 与 `0004` 的
+  `id`/`prevId` 完全相同 ⇒ drizzle-kit 报 "collision" 直接退出）。0005–0007 都是**手写迁移 + 手写
+  `_journal.json` 条目**；`when` 必须单调递增，否则 migrator 会跳过。
+
+### 104.3 「待你操作」的判据只有一份
+
+`CONTEXT.md` §4.2 的原文是「A 收到完整版本，且 A 只能选择入海」。落地方式：
+内核新增 `isAwaitingMyAction(state, { userId })` = `availableResolutions(...)` 恰好只剩 `['SEA']`，
+`GET /api/me/bottles` 的 `awaitingMyAction` 与通知 `BOTTLE_RETURNED` 的**写入条件**都调它。
+⇒ 不写第二份「发起者 + origin === 'RETURN'」：将来去向集合一改（例如允许"再投一次"），
+提示与状态会**同时**改变，不会留下一句撒谎的提示。这也是 §104.5 那条纪律的正例。
+
+### 104.4 ⚠️ 新契约字段必须对「旧载荷缺字段」宽容（本轮真实踩到）
+
+`apps/web`（本轮冻结、不归 W6 改）用**同一份 zod schema** 解析真实响应**和它自己的测试夹具**
+（`features/api/queries.ts` 的 `useMyBottles`、`mutations.ts` 的登录/注册）。
+第一版把 `AuthUser.account` 与 `MyBottle.awaitingMyAction` 写成**必填**，`pnpm -r test` 里
+`apps/web` 立刻 **14 个用例整片红**（夹具没有新字段 ⇒ 解析抛错 ⇒ 列表/已登录态根本不渲染）。
+处置：`account` 输入侧可选 + `transform` 补成 `handle`；`awaitingMyAction` 用 `default(false)`。
+⇒ 新判据：**"响应里新增字段"在本仓不是纯增量** —— 只要客户端拿 schema 校验自己的夹具，
+就必须给默认值，否则等于对冻结客户端做破坏性变更。
+
+### 104.5 ⚠️ 前端「账号」框的类型换了，脚本没跟着换（W7/W8 必须知道）
+
+`site/app/page-login.js` 现在把账号框原样送成 `{ account, password }`（**按 handle 查**）。
+旧的走查脚本往同一个框里填的是 **email**（`account.email`）—— 那是方案 C 时代的映射，
+现在会 401（`account` 查不到这个 handle）。受影响且**本轮不许改**的文件：
+`tools/walkthrough.mjs`（第 150 行填 email、第 151 行填 `[data-username-row="true"]` —— 该行已随方案 C 删除）
+与 `tools/probe-fit.mjs`（第 69 行填 email）。修法：两处都改填 `account.handle`，并删掉 username-row 那一行。
+`tools/seed-demo.mjs` / `tools/contract-smoke.ts` 走 API 且用旧/新形状都合法，不受影响。
+
+### 104.6 前端接线的一处取舍
+
+`site/app/session.js` 是 W0 冻结的共享层（本轮不在允许改动清单里），它发送的是旧形状
+（`login(email, …)` → `{ email }`）。因此 `page-login.js` **直接**用 `api.js` 的 `post()` 送
+`{ account, password }`，映射只在这一处。等 `session.js` 补上新形状，这一页可以退回共享层 helper。
+

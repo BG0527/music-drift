@@ -114,7 +114,6 @@ async function start() {
   const zones = new Map(ZONES.map((zone) => [zone.key, { pages: [], index: 0, loaded: false }]));
   let current = ZONES[0].key;
 
-  const firstPageOf = (zoneKey) => zones.get(zoneKey)?.pages[0] ?? null;
   const lastPageOf = (zoneKey) => {
     const pages = zones.get(zoneKey)?.pages ?? [];
     return pages.length === 0 ? null : pages[pages.length - 1];
@@ -201,7 +200,7 @@ async function start() {
     if (pagesNav !== null) show(pagesNav);
   }
 
-  function renderFleet(zoneKey) {
+  function renderFleet(_zoneKey) {
     const state = zones.get(current);
     const page = state.pages[state.index];
     const zone = ZONES.find((candidate) => candidate.key === current);

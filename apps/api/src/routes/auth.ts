@@ -1,8 +1,13 @@
 /**
- * 账号路由（t6 落地 `docs/api.md` §2.2）。
+ * 账号路由（t6 落地 `docs/api.md` §2.2；W6 改为「账号 + 密码」）。
  *
  * 分层：路由**薄** —— 校验（zod 契约）→ 纯策略（口令强度）→ 持久化/会话（`auth/*`）→ 响应。
  * 规则不写在这里，错误语义集中走 `sendAuthError`（码 → 状态 → envelope）。
+ *
+ * W6 身份口径（`docs/deploy-plan-html.md` §13 需求 7 / §14.1）：
+ * - **账号 = `users.handle`**（本来就 2–32 字符、非邮箱），正名 `account`，`handle` 仍是等价旧名；
+ * - 注册/登录都只要两项；邮箱变成可选项（旧的 `{handle, email}` / `{email}` 写法继续可用）；
+ * - 账号查找**大小写敏感**（与 `users_handle_uniq` 口径一致；否则两个账号可能同时命中）。
  *
  * 安全纪律（ADR-008）：
  * - 响应体**永不**出现口令或会话令牌（令牌只进 `Set-Cookie`）；
@@ -87,7 +92,14 @@ export function registerAuthRoutes(app: FastifyInstance, options: AuthRouteOptio
 
   function sessionPayload(user: UserRow, expiresAt: Date) {
     return SessionResponseSchema.parse({
-      user: { id: user.id, handle: user.handle, email: user.email, role: user.role },
+      user: {
+        id: user.id,
+        // 正名 = 账号；`handle` 是同一列的旧名，两者都返回（改名不掉字段）
+        account: user.handle,
+        handle: user.handle,
+        email: user.email,
+        role: user.role,
+      },
       expiresAt: expiresAt.toISOString(),
     });
   }
@@ -137,18 +149,20 @@ export function registerAuthRoutes(app: FastifyInstance, options: AuthRouteOptio
     if (!parsed.success) {
       return sendValidationError(reply, parsed.error.issues);
     }
-    const email = parsed.data.email.trim().toLowerCase();
-    const handle = parsed.data.handle.trim();
-    if (handle.length < 2) {
-      return sendValidationError(reply, [{ path: ['handle'] }]);
+    // 正名 `account` 优先；旧的 `handle` 是等价别名（两者都给时以 account 为准）
+    const account = (parsed.data.account ?? parsed.data.handle ?? '').trim();
+    if (account.length < 2) {
+      return sendValidationError(reply, [{ path: ['account'] }]);
     }
-    const weak = checkPassword(parsed.data.password, { handle, email });
+    // 邮箱是可选的：账号注册没有邮箱（契约里为 null，库列可空，见迁移 0007）
+    const email = parsed.data.email === undefined ? null : parsed.data.email.trim().toLowerCase();
+    const weak = checkPassword(parsed.data.password, { handle: account, email });
     if (weak !== null) {
       return sendAuthError(reply, weak);
     }
 
     const created = await repo.createUser({
-      handle,
+      handle: account,
       email,
       passwordHash: hashPassword(parsed.data.password, { params: options.passwordParams }),
     });
@@ -165,8 +179,17 @@ export function registerAuthRoutes(app: FastifyInstance, options: AuthRouteOptio
     if (!parsed.success) {
       return sendValidationError(reply, parsed.error.issues);
     }
-    const email = parsed.data.email.trim().toLowerCase();
-    const user = await repo.findUserByEmail(email);
+    /**
+     * 两种身份写法各走各的查找（**不做「email 查不到再当 handle 查」的兜底**）：
+     * 那种隐式回退会让「账号恰好长得像别人的邮箱」变成歧义，而且把两种语义混成一种，
+     * 出问题时没人能说清是哪条路径命中的。
+     */
+    const account = parsed.data.account?.trim();
+    const email = parsed.data.email?.trim().toLowerCase();
+    const user =
+      account !== undefined && account !== ''
+        ? await repo.findUserByHandle(account)
+        : await repo.findUserByEmail(email ?? '');
     const matched = verifyPassword(parsed.data.password, user?.passwordHash ?? TIMING_DUMMY_HASH);
     if (user === null || !matched) {
       return sendAuthError(reply, 'INVALID_CREDENTIALS');

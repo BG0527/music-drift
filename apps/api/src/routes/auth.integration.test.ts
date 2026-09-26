@@ -388,3 +388,111 @@ describe('GET /api/me/anonymous-codes', () => {
     expect(codes).toEqual([codeA, codeB].sort());
   });
 });
+
+/**
+ * W6（`docs/deploy-plan-html.md` §13 需求 7 / §14.1）：**登录与注册都只要「账号 + 密码」**，
+ * 不要用户名、**账号不是邮箱**；旧写法（`{handle, email}` / `{email}`）必须继续跑。
+ */
+describe('W6 账号 + 密码（账号 = handle，不是邮箱）', () => {
+  function registerWithAccount(account: string, password = PASSWORD) {
+    return app.inject({
+      method: 'POST',
+      url: '/api/auth/register',
+      payload: { account, password },
+    });
+  }
+
+  function loginWithAccount(account: string, password = PASSWORD) {
+    return app.inject({
+      method: 'POST',
+      url: '/api/auth/login',
+      payload: { account, password },
+    });
+  }
+
+  it('注册只要「账号 + 密码」：201 + 会话，且没有邮箱时 user.email 为 null、user.account 有值', async () => {
+    const account = uniqueHandle();
+
+    const response = await registerWithAccount(account);
+
+    expect(response.statusCode).toBe(201);
+    expect(SessionResponseSchema.safeParse(response.json()).success).toBe(true);
+    expect(response.json().user.account).toBe(account);
+    expect(response.json().user.handle).toBe(account);
+    expect(response.json().user.email).toBeNull();
+    // 没有邮箱的用户照样能被 /me 认出来（会话链路不依赖 email）
+    const meResponse = await me(cookieFrom(response));
+    expect(meResponse.statusCode).toBe(200);
+    expect(meResponse.json().user.account).toBe(account);
+  });
+
+  it('登录只要「账号 + 密码」：200 + 新会话（账号按 handle 查，不经过 email 列）', async () => {
+    const account = uniqueHandle();
+    await registerWithAccount(account);
+
+    const response = await loginWithAccount(account);
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json().user.account).toBe(account);
+    expect(response.json().user.email).toBeNull();
+  });
+
+  it('账号重复 → 409 HANDLE_TAKEN（账号才是身份；EMAIL_TAKEN 在新流程下不再触发）', async () => {
+    const account = uniqueHandle();
+    await registerWithAccount(account);
+
+    const response = await registerWithAccount(account);
+
+    expect(response.statusCode).toBe(409);
+    expect(response.json().error.violations[0].code).toBe('HANDLE_TAKEN');
+  });
+
+  it('口令错 → 401 INVALID_CREDENTIALS（账号对、口令不对）', async () => {
+    const account = uniqueHandle();
+    await registerWithAccount(account);
+
+    const response = await loginWithAccount(account, 'wrong-passw0rd');
+
+    expect(response.statusCode).toBe(401);
+    expect(response.json().error.violations[0].code).toBe('INVALID_CREDENTIALS');
+  });
+
+  it('账号大小写敏感（与 users_handle_uniq 口径一致）：换个大小写登录是「没有这个账号」', async () => {
+    const account = uniqueHandle();
+    await registerWithAccount(account);
+
+    expect((await loginWithAccount(account.toUpperCase())).statusCode).toBe(401);
+  });
+
+  it('旧的 { handle, email, password } 注册与 { email, password } 登录**依然可用**（向后兼容）', async () => {
+    const handle = uniqueHandle();
+    const email = uniqueEmail();
+
+    const registered = await register({ handle, email });
+    expect(registered.statusCode).toBe(201);
+    expect(registered.json().user.email).toBe(email);
+
+    // 旧登录写法：按 email 查
+    const byEmail = await app.inject({
+      method: 'POST',
+      url: '/api/auth/login',
+      payload: { email: email.toUpperCase(), password: PASSWORD },
+    });
+    expect(byEmail.statusCode).toBe(200);
+
+    // 新写法也能登进**旧账号**（handle 就是它的账号）
+    expect((await loginWithAccount(handle)).statusCode).toBe(200);
+  });
+
+  it('结构错误：账号字段缺失 → 422（violations 为空，靠 message 点名字段）', async () => {
+    const response = await app.inject({
+      method: 'POST',
+      url: '/api/auth/register',
+      payload: { password: PASSWORD },
+    });
+
+    expect(response.statusCode).toBe(422);
+    expect(response.json().error.violations).toEqual([]);
+    expect(response.json().error.message).toContain('account');
+  });
+});

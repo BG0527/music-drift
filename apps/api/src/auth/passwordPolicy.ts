@@ -32,8 +32,10 @@ const COMMON_WEAK_PASSWORDS = new Set([
 ]);
 
 export interface PasswordIdentity {
+  /** 账号（= `users.handle`）。 */
   handle: string;
-  email: string;
+  /** 邮箱（可省略：账号注册的用户没有邮箱，此时只用 `handle` 做包含判定）。 */
+  email?: string | null | undefined;
 }
 
 /** 合规返回 `null`；否则返回稳定错误码（不抛异常、不返回裸布尔）。 */
@@ -48,7 +50,7 @@ export function checkPassword(password: string, identity: PasswordIdentity): Aut
   if (COMMON_WEAK_PASSWORDS.has(lowered)) {
     return 'WEAK_PASSWORD';
   }
-  const localPart = identity.email.split('@')[0] ?? '';
+  const localPart = (identity.email ?? '').split('@')[0] ?? '';
   for (const fragment of [identity.handle, localPart]) {
     const normalized = fragment.trim().toLowerCase();
     if (normalized.length >= IDENTITY_MIN_LENGTH && lowered.includes(normalized)) {

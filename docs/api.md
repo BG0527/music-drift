@@ -40,7 +40,7 @@
 | ---- | ---------- | ---- | ---------------------- |
 | GET  | `/healthz` | —    | `HealthResponseSchema` |
 
-### 2.2 账号（t6 落地）
+### 2.2 账号（t6 落地；W6 改为「账号 + 密码」）
 
 | 方法 | 路径                      | 请求                    | 响应                                                          |
 | ---- | ------------------------- | ----------------------- | ------------------------------------------------------------- |
@@ -50,21 +50,34 @@
 | GET  | `/api/auth/me`            | —                       | `SessionResponseSchema`                                       |
 | GET  | `/api/me/anonymous-codes` | —                       | `AnonymousCodeSchema[]`（同用户不同瓶不同代号）               |
 
+**W6 身份口径（`docs/deploy-plan-html.md` §13 需求 7 / §14.1；用户原话见 §13 表格第 7 行）**
+
+- **账号就是账号，不是邮箱**：`account` 是正名，值 = 数据库 `users.handle`（2–32 字符、**非邮箱**，
+  **大小写敏感**，与唯一索引 `users_handle_uniq` 口径一致 —— 否则 `Demo` 与 `demo` 会同时命中）。
+- **注册**：`{ account, password }`（两项就够）。**兼容旧写法** `{ handle, email, password }`：
+  此时 `account` 取 `handle`，`email` 照旧存进 `email` 列；两者都给时**以 `account` 为准**。
+- **登录**：`{ account, password }` → 按账号（`handle`）查；**兼容旧写法** `{ email, password }` → 按 email 查。
+  **不做「email 查不到再当账号查」的隐式兜底**：那会让「账号恰好长得像别人的邮箱」变成歧义。
+- **邮箱自 W6 起可空**（迁移 `0007_users_email_nullable`）：账号注册的用户没有邮箱，
+  `SessionResponse.user.email` 为 `null`，`user.account` 与 `user.handle` 同值（旧名保留，改名不掉字段）。
+- 会话载体不变：cookie `mdb_session`，`Path=/; HttpOnly; SameSite=Lax; Max-Age=<TTL>`。
+
 **会话载体**：cookie `mdb_session`，`Path=/; HttpOnly; SameSite=Lax; Max-Age=<TTL>`（默认 30 天，**仅生产**加 `Secure`）。
 库内只存 `sha256(token)`；明文 token 只出现在 `Set-Cookie`（响应体与日志永不出现）。
 
 **账号错误码**（`AUTH_ERROR_CODES`，`AuthErrorResponseSchema`，envelope 与 `ErrorResponseSchema` 同形）：
 
-| 码                    | 状态 | 触发                                                                                          |
-| --------------------- | ---- | --------------------------------------------------------------------------------------------- |
-| `EMAIL_TAKEN`         | 409  | 注册邮箱已存在（大小写不敏感）                                                                |
-| `HANDLE_TAKEN`        | 409  | 注册用户名已存在                                                                              |
-| `INVALID_CREDENTIALS` | 401  | 登录凭证错误（**不区分**账号不存在与口令错误，防账号枚举）                                    |
-| `UNAUTHENTICATED`     | 401  | 未登录 / cookie 缺失或畸形                                                                    |
-| `SESSION_EXPIRED`     | 401  | 会话过期（`now >= expires_at` 即失效，过期行在被访问时删除）                                  |
-| `WEAK_PASSWORD`       | 422  | 口令强度不足（长度 8..128，且需同时含字母与数字，不含自己的 handle/邮箱名，不在弱口令黑名单） |
+| 码                    | 状态 | 触发                                                                                            |
+| --------------------- | ---- | ----------------------------------------------------------------------------------------------- |
+| `EMAIL_TAKEN`         | 409  | 注册邮箱已存在（大小写不敏感）。**W6 后新流程不再触发**（邮箱不再是身份），码保留不删（避免连带破坏） |
+| `HANDLE_TAKEN`        | 409  | 注册账号已存在（= 旧文档里的「用户名」，W6 起就是**账号**）                                     |
+| `INVALID_CREDENTIALS` | 401  | 登录凭证错误（**不区分**账号不存在与口令错误，防账号枚举）                                      |
+| `UNAUTHENTICATED`     | 401  | 未登录 / cookie 缺失或畸形                                                                      |
+| `SESSION_EXPIRED`     | 401  | 会话过期（`now >= expires_at` 即失效，过期行在被访问时删除）                                    |
+| `WEAK_PASSWORD`       | 422  | 口令强度不足（长度 8..128，且需同时含字母与数字，不含自己的账号/邮箱名，不在弱口令黑名单）      |
 
-`422` 的请求体结构错误（例如邮箱格式非法）返回 `violations: []` + 中文 `message`（结构错误没有对应的 auth 码）。
+`422` 的请求体结构错误（例如缺 `account`、或给了不合法的 `email`）返回 `violations: []` + 中文 `message`
+（结构错误没有对应的 auth 码，`message` 里点名字段）。
 
 **已知未做项（demo 范围内明确接受，不要当成漏掉的 bug）**：
 
@@ -97,6 +110,10 @@
   只是 `mySegmentIndexes` 里不再有它（缺口由 `missingSegmentIndexes` 表达）。
 - `role: 'INITIATOR' | 'SINGER'` 只有两种取值：发起者不可能再接唱自己的瓶子（内核 `hasEverSung` 拦着），
   因此**没有第三种状态**，前端不必为不存在的状态写分支。
+- **`awaitingMyAction`（W6）**：这支瓶子回到我手里、且我**只能选入海** —— 即 CONTEXT §4.2 的
+  「发起者收到回传」。判据取自内核 `isAwaitingMyAction`（= `availableResolutions` 恰好只剩 `['SEA']`），
+  与通知 `BOTTLE_RETURNED` 用的是**同一个判据**，两个入口不可能自相矛盾。契约里 `default(false)`
+  （缺字段 = 没有待你操作的事，不确定时不弹提示）。
 - 未登录 `401`；只返回自己的；每行含 状态 / 段数 / `missingSegmentIndexes` / `updatedAt`（最近活跃）/ 曲名。
 - 集成测试用 `MyBottleListSchema.parse` 校验**真响应**（`apps/api/src/routes/myBottles.integration.test.ts`）。
 
@@ -211,12 +228,16 @@
 | `MESSAGE_DELIVERED`   | 全链回传后入海，留言由 PENDING 转 DELIVERED          | **发起者**（留言接收者）                                  | `bottleId`、`messageId`                                        |
 | `MESSAGE_UNDELIVERED` | 中途入海 / 回传链断（作品损坏），留言永远送不到      | **发送者**（「你的留言未送达」§5.2）                      | `bottleId`、`messageId`                                        |
 | `BOTTLE_COMPLETED`    | 作品**完整**并入海（完整性由内核 `isComplete` 判定） | **所有参与者**（发起者 + 每位唱过的人，含被斩浪者 §16.7） | `bottleId`、`songTitle`、`isComplete`、`missingSegmentIndexes` |
+| `BOTTLE_RETURNED`     | **回传落到发起者手里**（§4.2：他此刻只能入海，W6）   | **发起者**（只有他一个人）                                | `bottleId`、`songTitle`、`awaitingMyAction: true`              |
 
-两条口径（都有真库集成测试钉住）：
+三条口径（都有真库集成测试钉住）：
 
 1. **留言在 PENDING 期间不发通知** —— 留言此时对发起者不可见（§5.1），提前通知等于泄露未公开内容；
 2. **未完成作品进公海（「等待接力」区）不发 `BOTTLE_COMPLETED`** —— 那时说"已完成"是撒谎；
    完整性由**内核**判定（读事件流 + `replayBottle` + `isComplete`），投影层不数段数、不重写规则。
+3. **`BOTTLE_RETURNED` 与 `awaitingMyAction` 同源**：投影时不判"事件类型对不对"，而是看
+   **本事件生效后收件人是否处在「只能入海」那一态**（内核 `isAwaitingMyAction`）——
+   这样"通知说等你操作、列表说你没得操作"这种自相矛盾在两个入口之间不可能出现。
 
 `type` 在契约里是自由字符串（`NotificationSchema.type`），展示层必须对未知类型兜底，不得把码当文案。
 
@@ -366,6 +387,7 @@ pnpm --filter @music-drift/api test:integration
 
 | 版本       | 变更                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
 | ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `0.2.0-s1` | **W6 账号 + 密码 + 回传通知（§13 需求 7）**：`RegisterRequestSchema` / `LoginRequestSchema` 改为 `{ account, password }`（账号 = `users.handle`，不是邮箱）**并保留旧写法**（`{handle, email}` / `{email}`）；`AuthUserSchema` 改为 `account`（正名，**输入侧可选、缺省取 `handle`**）+ `handle`（旧名）+ `email` **可空**；迁移 `0007_users_email_nullable`（`users.email` DROP NOT NULL，旧数据原样保留）；`MyBottleSchema` 新增 `awaitingMyAction`（`default(false)`）；通知新增类型 `BOTTLE_RETURNED`（收件人 = 发起者，与 `awaitingMyAction` 同一内核判据）。**新字段一律对"旧载荷缺字段"宽容**：`apps/web` 用同一份 schema 解析自己的夹具，写成必填会让冻结客户端的 14 个用例当场变红（本轮真实踩到并修掉） |
 | `0.2.0-s1` | **t24 公海真分页（§46.2）**：`/api/sea` 复用契约 `BottleListQuerySchema`（**删掉内联 schema**；旧参数名 `zone` 保留为等价别名，避免"改名后被静默忽略"）；`cursor` 真消费、`nextCursor` 真实（末页 `null`）、排序键 `(updated_at DESC, id DESC)` 键集分页；默认「只看已完成区」的过滤改由 store 交给内核 `seaZoneOf` 判定（SQL 只做候选预筛 + 超取），修掉「先取 limit 再过滤 ⇒ 空页/少给行」的静默损失 |
 | `0.2.0-s1` | **t20 已听覆盖率服务端化**：新增 `POST /api/segments/:id/listen`（`SubmitListenProgressRequestSchema` / `ListenProgressResponseSchema`）与表 `listen_progress`（只增不减、跨会话保留）；点踩门槛改读持久化覆盖率（阈值取内核策略），不足返回 `422 LISTEN_THRESHOLD_NOT_REACHED`；`CastVoteRequest.listenedRatio` 废弃为可选且被忽略，`CastVoteResponse` 新增服务端 `listenedRatio`；集成测试对真响应做 `Schema.parse`。既有字段零破坏（新增字段 + 可选化） |
 | `0.2.0-s1` | **t19 追补（captain 裁决）**：live-check 增加**第 27 步** `GET /api/me/bottles` 端到端检查（覆盖 `role` / `mySegmentIndexes`，含"斩浪后仍算参与过、段号变空"）；外部模式改为**不可能被误当验收证据**（开头醒目横幅 + 非确定性步骤单列「未复现（数据不受控）」不计 pass + 本文 §2.9 写死「验收证据只认 hermetic 模式」）；全文步数口径同步为 **27 步**                                                                                                                                                                                                                                                                                                                                                                                                  |

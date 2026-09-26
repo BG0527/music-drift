@@ -518,7 +518,16 @@ async function main() {
     );
     await relay.page.locator('form.w1b-panel button[type="button"]').click();
 
-    const beforeResolution = relayAfterRecord.status;
+    /**
+     * 「处置生效」的判据＝**状态签名**（status / 持有者 / 当前投掷者 / 回传是否走完）里的任意一项变化。
+     *
+     * 为什么不用单一字段：
+     *   - `status` 单独用会把**成功的回传**判成失败（回传＝沿父链交回，status 仍是 `HELD`，只是换持有者）；
+     *   - `revision` 单独用也不行：**实测服务器在处置时不改 revision**（`revision 2 → 2`，而 status 已
+     *     `HELD → IN_RIVER`）—— 我第一版就是拿它当判据，被这一步当场戳破。
+     * 签名变化则对三条水路都成立（投河 → status；入海 → status/seaZone；回传 → holderId）。
+     */
+    const beforeResolution = resolutionSignature(relayAfterRecord);
     const enabledRow = await relay.page.evaluate(() => {
       const all = [...document.querySelectorAll('.destRow')];
       return {
@@ -526,12 +535,13 @@ async function main() {
         labels: all.map((row) => (row.querySelector('.t')?.textContent ?? '').trim()),
       };
     });
+    const chosenLabel = String(enabledRow.labels[Math.max(0, enabledRow.index)]);
     await relay.page.locator('.destRow').nth(Math.max(0, enabledRow.index)).click({ timeout: 20000 });
-    const resolved = await waitForStatusChange(relayClient, drawnId, beforeResolution);
+    const afterResolution = await waitForResolutionEffect(relayClient, drawnId, beforeResolution);
     check(
-      '三选一去向：按服务端给出的第一项可用水路处置成功（状态真的变了）',
-      resolved !== beforeResolution,
-      `${beforeResolution} → ${resolved}（点的是「${String(enabledRow.labels[Math.max(0, enabledRow.index)])}」）`,
+      '三选一去向：按服务端给出的第一项可用水路处置成功（作品状态/持有者真的变了）',
+      resolutionSignature(afterResolution) !== beforeResolution,
+      `${beforeResolution} → ${resolutionSignature(afterResolution)}（点的是「${chosenLabel}」）`,
     );
 
     // ─────────────────────────────────────────────────────────── 7. 漂流日志
@@ -655,45 +665,68 @@ async function main() {
     const unreadBefore = (await api(judgeClient, 'GET', '/api/notifications')).items.filter(
       (row) => row.readAt === null,
     );
-    const unreadRow = judge.page.locator('.msgs li').filter({ has: judge.page.locator('.mrow .pill') }).first();
-    await unreadRow.locator('.mrow .go').click({ timeout: 20000 });
+    /**
+     * ⚠️ W7 修（数据形状变了会让这一步误判）：`BOTTLE_RETURNED`（回传到手里）那一条的动作是
+     * 「去看看」= **先标已读再 `location.assign` 到瓶子页**（`page-me.js` 的 `openReturned`），
+     * 而这一步要验的是**就地**标记已读。演示账号的通知会随各片走查增长，最新一条可能正好是回传行
+     * （实测：点它以后页面已经跳到 `/bottle.html`，本步的「未读少 1」与随后的 reload 全被带偏）。
+     * ⇒ 只挑**不是回传行**（`.hero` 只在回传那条上）的未读消息；若当下没有这种样本，如实 WARN 跳过，
+     * 不静默算通过。
+     */
+    const inPlaceUnread = judge.page
+      .locator('.msgs li:not(.hero)')
+      .filter({ has: judge.page.locator('.mrow .pill') });
+    const inPlaceCount = await inPlaceUnread.count();
+    let domAfter = { pills: meDom.unreadPills, readLabels: [], goLabels: [] };
     let becameRead = false;
-    try {
-      await judge.page.waitForFunction(
-        (expected) => document.querySelectorAll('.msgs .mrow .pill').length === expected - 1,
-        meDom.unreadPills,
-        { timeout: 10000 },
-      );
-      becameRead = true;
-    } catch {
-      becameRead = false;
+    if (inPlaceCount === 0) {
+      warn('演示账号此刻没有「就地标记已读」类的未读消息（未读全是「回传 · 去看看」，点它会跳瓶子页）⇒ 本步无样本，跳过');
+    } else {
+      await inPlaceUnread.first().locator('.mrow .go').click({ timeout: 20000 });
+      try {
+        await judge.page.waitForFunction(
+          (expected) => document.querySelectorAll('.msgs .mrow .pill').length === expected - 1,
+          meDom.unreadPills,
+          { timeout: 10000 },
+        );
+        becameRead = true;
+      } catch {
+        becameRead = false;
+      }
+      /** 点完必须**还在 /me.html**：跳到别处说明点错了行（这正是改前的失效方式）。 */
+      if (new URL(judge.page.url()).pathname !== '/me.html') {
+        warn(`就地标记已读这一步把页面带到了 ${new URL(judge.page.url()).pathname}（点到了会跳转的行）`);
+      }
+      domAfter = await judge.page.evaluate(() => ({
+        pills: document.querySelectorAll('.msgs .mrow .pill').length,
+        readLabels: [...document.querySelectorAll('.msgs .mrow .read')].map((node) => node.textContent ?? ''),
+        goLabels: [...document.querySelectorAll('.msgs .mrow .go')].map((node) => node.textContent ?? ''),
+      }));
     }
-    const domAfter = await judge.page.evaluate(() => ({
-      pills: document.querySelectorAll('.msgs .mrow .pill').length,
-      readLabels: [...document.querySelectorAll('.msgs .mrow .read')].map((node) => node.textContent ?? ''),
-      goLabels: [...document.querySelectorAll('.msgs .mrow .go')].map((node) => node.textContent ?? ''),
-    }));
     const unreadAfter = (await api(judgeClient, 'GET', '/api/notifications')).items.filter(
       (row) => row.readAt === null,
     );
     const readIds = unreadBefore
       .filter((row) => !unreadAfter.some((candidate) => candidate.id === row.id))
       .map((row) => row.id);
-    check(
-      '点击后就地变已读（未读标记消失 + 服务端 read_at 落库，条数恰好少 1）',
-      becameRead &&
-        readIds.length === 1 &&
-        unreadAfter.length === unreadBefore.length - 1 &&
-        domAfter.pills === meDom.unreadPills - 1,
-      `未读 ${String(unreadBefore.length)} → ${String(unreadAfter.length)} · 落库 id=${readIds[0]?.slice(0, 8) ?? '-'}` +
-        ` 页面未读标记=${String(domAfter.pills)} · go 文案=${domAfter.goLabels.slice(0, 3).join('/')}`,
-    );
-    await judge.page.reload();
-    await judge.page.waitForFunction(() => document.documentElement.dataset.pageReady === 'me');
-    const persisted = (await api(judgeClient, 'GET', '/api/notifications')).items.filter(
-      (row) => row.id === readIds[0] && row.readAt !== null,
-    ).length;
-    check('刷新后仍是已读（不是只改了页面）', persisted === 1, `持久化已读 id=${readIds[0]?.slice(0, 8) ?? '-'}`);
+    if (inPlaceCount === 0) {
+      /** 没有样本 ⇒ 这一步无从验起：如实 WARN（上方已打印），**不计失败也不静默算通过**。 */
+      warn('第 10 步「就地标记已读」本次无样本：跳过它的两条断言（未读 → ' + String(unreadAfter.length) + '）');
+    } else {
+      check(
+        '点击后就地变已读（未读标记消失 + 服务端 read_at 落库，条数恰好少 1）',
+        becameRead && readIds.length === 1 && unreadAfter.length === unreadBefore.length - 1 &&
+          domAfter.pills === meDom.unreadPills - 1,
+        `未读 ${String(unreadBefore.length)} → ${String(unreadAfter.length)} · 落库 id=${readIds[0]?.slice(0, 8) ?? '-'}` +
+          ` 页面未读标记=${String(domAfter.pills)} · go 文案=${domAfter.goLabels.slice(0, 3).join('/')}`,
+      );
+      await judge.page.reload();
+      await judge.page.waitForFunction(() => document.documentElement.dataset.pageReady === 'me');
+      const persisted = (await api(judgeClient, 'GET', '/api/notifications')).items.filter(
+        (row) => row.id === readIds[0] && row.readAt !== null,
+      ).length;
+      check('刷新后仍是已读（不是只改了页面）', readIds.length === 1 && persisted === 1, `持久化已读 id=${readIds[0]?.slice(0, 8) ?? '-'}`);
+    }
 
     step('收尾：整轮无页面级错误与 5xx');
     check('零 5xx 响应', badResponses.length === 0, badResponses.join(' · ') || '无');
@@ -765,14 +798,27 @@ async function waitForStatus(client, bottleId, expected) {
   return (await api(client, 'GET', `/api/bottles/${bottleId}`)).status;
 }
 
-/** 轮询详情直到 status 与之前不同（有界）。 */
-async function waitForStatusChange(client, bottleId, before) {
+/**
+ * 「处置生效」的签名：这四项里任意一项变化都说明服务端真的动了这支瓶子
+ *（投河/入海改 `status`，回传换 `holderId`），而**不依赖**某一项单独变化。
+ */
+function resolutionSignature(detail) {
+  return [
+    detail.status,
+    detail.holderId ?? '-',
+    detail.currentCasterId ?? '-',
+    String(detail.returnCompleted),
+  ].join('|');
+}
+
+/** 轮询详情直到「处置签名」与之前不同（有界）。 */
+async function waitForResolutionEffect(client, bottleId, before) {
   for (let attempt = 0; attempt < 40; attempt += 1) {
     const detail = await api(client, 'GET', `/api/bottles/${bottleId}`);
-    if (detail.status !== before) return detail.status;
+    if (resolutionSignature(detail) !== before) return detail;
     await new Promise((done) => setTimeout(done, 250));
   }
-  return (await api(client, 'GET', `/api/bottles/${bottleId}`)).status;
+  return await api(client, 'GET', `/api/bottles/${bottleId}`);
 }
 
 /** 轮询某一段的点赞数（有界）。 */

@@ -48,6 +48,18 @@ export function availableResolutions(state: BottleState, cmd: { userId: string }
   return options;
 }
 
+/**
+ * 「**待我操作**」（`CONTEXT.md` §4.2）：这支瓶子回到了我手里，且我**只能选入海**。
+ *
+ * 判据即 `availableResolutions(state, { userId })` 恰好只剩 `['SEA']` ——
+ * 用它而不是再写一遍「发起者 + origin === 'RETURN'」，是为了让 §4.2 只有一份实现：
+ * 将来去向集合一改（例如加"再投一次"），这个状态会自动跟着变，不会留下一句撒谎的提示。
+ */
+export function isAwaitingMyAction(state: BottleState, cmd: { userId: string }): boolean {
+  const options = availableResolutions(state, cmd);
+  return options.length === 1 && options[0] === 'SEA';
+}
+
 export function canChooseResolution(
   state: BottleState,
   cmd: { userId: string; resolution: Resolution },

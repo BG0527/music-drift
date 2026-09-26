@@ -74,6 +74,16 @@ export const MyBottleSchema = BottleSummarySchema.extend({
   role: z.enum(['INITIATOR', 'SINGER']),
   /** 我在这个瓶子里**当前有效**的段号（升序）；被斩的段不出现（缺口由 `missingSegmentIndexes` 表达）。 */
   mySegmentIndexes: z.array(z.number().int().min(1)),
+  /**
+   * 「**待你操作**」（W6，`CONTEXT.md` §4.2）：这支瓶子回到了我手里，且我只能选「入海」。
+   *
+   * 典型场景：我发起 → 别人接唱 → 作品完整地**回传**到我手里 ⇒ 界面要提示「收到回传，等你操作」。
+   * 判据不在这里重写：服务端用内核 `isAwaitingMyAction`（`availableResolutions` 恰好只剩 `['SEA']`）。
+   *
+   * `default(false)` 是**向后兼容**（`apps/web` 用这份 schema 解析自己的测试夹具，本轮冻结不改）：
+   * 缺字段 = 「没有待你操作的事」，这是安全的默认值（不确定时宁可不弹提示，也不要误报）。
+   */
+  awaitingMyAction: z.boolean().default(false),
 });
 
 export const MyBottleListSchema = PageSchema(MyBottleSchema);

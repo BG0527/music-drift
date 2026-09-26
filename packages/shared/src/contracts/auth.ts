@@ -1,27 +1,76 @@
-/** 账号契约（t6 落地；本任务只定义形状）。 */
+/** 账号契约（t6 落地；W6 改为「账号 + 密码」，账号不是邮箱）。 */
 import { z } from 'zod';
 import { UuidSchema } from './common';
 
 export const RoleSchema = z.enum(['USER', 'ADMIN']);
 
-export const AuthUserSchema = z.object({
-  id: UuidSchema,
-  handle: z.string().min(1).max(32),
-  email: z.email(),
-  role: RoleSchema,
-});
+/**
+ * 会话里的用户（W6）。
+ *
+ * - **`account` 是正名**，值 = 数据库 `users.handle`（2–32 字符、非邮箱）；
+ * - `handle` 是同一列的**旧名**，继续返回，避免"改名把前端字段改掉"这类静默损失；
+ * - `email` 变成**可空**：账号注册的用户根本没有邮箱（旧的注册写法仍可带邮箱）。
+ *
+ * ⚠️ 为什么 `account` 在**输入侧**是可选的：`apps/web`（本轮冻结、不归 W6 改）
+ * 用**这份 schema** 解析真实响应与自己的测试夹具（`queries.ts` / `mutations.ts`），
+ * 夹具里没有新字段 ⇒ 若把 `account` 写成必填，冻结的客户端会**当场解析失败**（本仓真实踩过：
+ * `pnpm -r test` 里 apps/web 的 my-bottles / profile / login 用例整片红）。
+ * 因此旧载荷"缺 `account`"照收，`transform` 再把它补成 `handle`（账号本来就等于 handle）。
+ */
+export const AuthUserSchema = z
+  .object({
+    id: UuidSchema,
+    /** @deprecated 旧名；等价关系由下方 `transform` 兜底（缺 `account` 时取它）。 */
+    handle: z.string().min(1).max(32),
+    /** 正名：账号（= `users.handle`）。服务端**总是**返回；旧载荷可以没有。 */
+    account: z.string().min(1).max(32).optional(),
+    email: z.email().nullable(),
+    role: RoleSchema,
+  })
+  .transform((user) => ({ ...user, account: user.account ?? user.handle }));
 
-export const RegisterRequestSchema = z.object({
-  handle: z.string().min(2).max(32),
-  email: z.email(),
-  /** 口令只在这一层出现：响应体与日志中禁止回显（ADR-008）。 */
-  password: z.string().min(8).max(128),
-});
+/**
+ * 注册请求（W6）：**只要「账号 + 密码」**（没有用户名，账号不是邮箱）。
+ *
+ * 向后兼容：旧的 `{ handle, email, password }` 写法继续可用 ——
+ * 此时 `account` 取 `handle`，`email` 存进 `email` 列（W7/W8 的脚本不用改就能跑）。
+ * 两者都给时**以 `account` 为准**（新名优先，避免"两个身份字段打架"）。
+ */
+export const RegisterRequestSchema = z
+  .object({
+    /** 正名：账号（2–32 字符，非邮箱；大小写敏感）。 */
+    account: z.string().min(2).max(32).optional(),
+    /** @deprecated 旧名，等价于 `account`。 */
+    handle: z.string().min(2).max(32).optional(),
+    /** @deprecated 邮箱不再是身份，可省略；给了就照旧存进 `email` 列。 */
+    email: z.email().optional(),
+    /** 口令只在这一层出现：响应体与日志中禁止回显（ADR-008）。 */
+    password: z.string().min(8).max(128),
+  })
+  .refine((body) => body.account !== undefined || body.handle !== undefined, {
+    path: ['account'],
+    message: '注册需要账号（account）',
+  });
 
-export const LoginRequestSchema = z.object({
-  email: z.email(),
-  password: z.string().min(1).max(128),
-});
+/**
+ * 登录请求（W6）：`{ account, password }`（按账号 = `handle` 查用户）。
+ *
+ * 向后兼容：`{ email, password }` 继续可用，此时**按 email 查**
+ * （`tools/seed-demo.mjs` / `tools/verify-demo-audio.mjs` 走这条；
+ * `tools/contract-smoke.ts` 已改为新写法）。
+ */
+export const LoginRequestSchema = z
+  .object({
+    /** 正名：账号（= `users.handle`；大小写敏感，与 `users_handle_uniq` 口径一致）。 */
+    account: z.string().min(1).max(32).optional(),
+    /** @deprecated 旧写法，按 `email` 查用户。 */
+    email: z.email().optional(),
+    password: z.string().min(1).max(128),
+  })
+  .refine((body) => body.account !== undefined || body.email !== undefined, {
+    path: ['account'],
+    message: '登录需要账号（account）或邮箱（email）',
+  });
 
 export const SessionResponseSchema = z.object({
   user: AuthUserSchema,

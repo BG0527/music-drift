@@ -8,13 +8,14 @@
  * - `applyOutcome` 的顺序是「媒体 → **通知** → 瓶子行 → 持有者 → 事件」：
  *   通知必须在 `projectBottleRow` **之前**读 `messages`，因为后者会把 PENDING 一次性改掉。
  *
- * 三类写入（每类都有真库集成测试，断言"真的写了一行 + 收件人正确"）：
+ * 四类写入（每类都有真库集成测试，断言"真的写了一行 + 收件人正确"）：
  *
  * | 触发 | 收件人 | 类型 |
  * | --- | --- | --- |
  * | 留言由 PENDING 转 **DELIVERED**（= **目标**当轮拿到瓶子） | **留言的目标**（`toUserId`；不再固定是发起者） | `MESSAGE_DELIVERED` |
  * | 留言由 PENDING 转 **UNDELIVERED**（目标段被斩 / 瓶子 DAMAGED / 完整入海仍未送到） | **留言的发送者**（§5.2「你的留言未送达」） | `MESSAGE_UNDELIVERED` |
  * | 作品入海 | **所有参与者**（发起者 + 每位唱过的人，**含被斩浪的人** §16.7） | `BOTTLE_REACHED_SEA` |
+ * | **回传落到发起者手里**（§4.2：他只能选入海） | **发起者** | `BOTTLE_RETURNED` |
  *
  * 两条边界：
  * 1. **PENDING 不发通知**：留言在漂流窗口里是私密的（§5.1），此刻通知发起者相当于泄露未公开内容；
@@ -22,10 +23,12 @@
  *    （不新建唯一索引，避免为去重改 schema）。
  */
 import {
+  isAwaitingMyAction,
   isComplete,
   missingSegmentIndexes,
   participants,
   replayBottle,
+  type BottleState,
   type DomainEvent,
 } from '@music-drift/shared/domain';
 import type { Queryable } from '../db/client.js';
@@ -44,6 +47,15 @@ export const NOTIFICATION_TYPES = {
    * 未完成的作品进公海是常态（等指定接唱补位），那时说"已完成"会对用户撒谎。
    */
   BOTTLE_COMPLETED: 'BOTTLE_COMPLETED',
+  /**
+   * **回传落到了发起者手里**（W6 / CONTEXT §4.2：A 收到完整版本，且 A 只能选择入海）。
+   *
+   * 为什么需要它（`docs/deploy-plan-html.md` §11.3 注 / §16.3）：这条是用户明确要的
+   * 「收到回传 → 提示 + 等你操作」，此前**后端从来没有这个类型**，连演示数据都造不出来。
+   * 收件人只有发起者；`payload.awaitingMyAction === true` 与 `/api/me/bottles` 的
+   * `awaitingMyAction` 说的是同一件事（同一内核判据），前端可以两者都用。
+   */
+  BOTTLE_RETURNED: 'BOTTLE_RETURNED',
 } as const;
 
 export type NotificationType = (typeof NOTIFICATION_TYPES)[keyof typeof NOTIFICATION_TYPES];
@@ -151,9 +163,22 @@ async function songTitleOf(tx: Queryable, bottleId: string): Promise<string | nu
   return rows[0]?.title ?? null;
 }
 
+/** 「本事件**生效之后**」的状态（已落库事件 + 这个还没落库的事件），判定一律交给内核。 */
+async function stateAfter(
+  tx: Queryable,
+  bottleId: string,
+  event: Record<string, unknown>,
+): Promise<BottleState | null> {
+  const events = await readDomainEvents(tx, bottleId);
+  if (events.length === 0) {
+    return null;
+  }
+  return replayBottle([...events, event as unknown as DomainEvent]);
+}
+
 /**
  * 事件的**通知投影**（在 `applyOutcome` 的事务里、`projectBottleRow` 之前调用）。
- * 只处理两个终局事件；其它事件不产生通知。
+ * 三类事件会产生通知（留言状态转移 / 回传到发起者 / 作品入海）；其余事件不产生通知。
  */
 export async function projectNotifications(
   tx: Queryable,
@@ -197,6 +222,30 @@ export async function projectNotifications(
         });
       }
     }
+  }
+
+  if (type === 'BOTTLE_RETURNED') {
+    /**
+     * ③ **回传落到发起者手里** → 通知发起者，并明确「等你操作」（W6 / CONTEXT §4.2）。
+     *
+     * 判据不是"事件类型对上了"，而是**本事件生效后，收件人是不是处在「只能入海」那一态** ——
+     * 与 `GET /api/me/bottles` 的 `awaitingMyAction` 用的是**同一个内核判据**
+     * （`isAwaitingMyAction`）。这样"通知说等你操作、列表却说你没得操作"这种自相矛盾
+     * 在两个入口之间**不可能出现**：它们要么同时为真，要么同时为假。
+     */
+    const state = await stateAfter(tx, bottleId, event);
+    const toUserId = String(event['toUserId']);
+    if (state !== null && isAwaitingMyAction(state, { userId: toUserId })) {
+      await insertNotification(tx, {
+        userId: toUserId,
+        type: NOTIFICATION_TYPES.BOTTLE_RETURNED,
+        bottleId,
+        songTitle: await songTitleOf(tx, bottleId),
+        at,
+        extra: { awaitingMyAction: true },
+      });
+    }
+    return;
   }
 
   if (type === 'BOTTLE_WENT_TO_SEA') {

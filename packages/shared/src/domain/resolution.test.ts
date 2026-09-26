@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { chooseResolution } from './bottle';
-import { availableResolutions, canChooseResolution } from './resolution';
+import { availableResolutions, canChooseResolution, isAwaitingMyAction } from './resolution';
 import {
   castToRiverBy,
   createHarness,
@@ -73,6 +73,35 @@ describe('CONTEXT §3.3 / §4.3 — 接唱完成后的去向三选一', () => {
     expectRejected(chooseResolution(state, { userId: 'u:A', resolution: 'RETURN' }, ctx), [
       'RESOLUTION_NOT_AVAILABLE',
     ]);
+  });
+
+  /**
+   * CONTEXT §4.2：「A 收到完整版本，且 A 只能选择入海」—— 这就是用户要的**「等你操作」**状态。
+   * 判据不复写规则：`availableResolutions` 恰好只剩 `['SEA']` 即成立。
+   */
+  it('规则1（§4.2）：回传落到发起者手里 ⇒ isAwaitingMyAction 为真（前端据此显示「等你操作」）', () => {
+    const harness = createHarness();
+    const ctx = harness.ctx;
+    let state = castToRiverBy(startBottle(ctx), ctx, 'u:A');
+    state = drawAndSing(state, ctx, 'u:B');
+    state = resolve(state, ctx, 'u:B', 'RETURN'); // B 回传给父节点 A
+
+    expect(isAwaitingMyAction(state, { userId: 'u:A' })).toBe(true);
+    // 同一状态换个人看都不算「等**我**操作」
+    expect(isAwaitingMyAction(state, { userId: 'u:B' })).toBe(false);
+  });
+
+  it('规则1（§4.2）：「持有」本身不等于「等你操作」 —— 还能继续投河/回传时一律为假', () => {
+    const harness = createHarness();
+    const holdingLast = driftWithSingers(
+      castToRiverBy(startBottle(harness.ctx), harness.ctx, 'u:A'),
+      harness.ctx,
+      ['u:B', 'u:C', 'u:D'],
+    );
+    const drafted = startBottle(harness.ctx);
+
+    expect(isAwaitingMyAction(holdingLast, { userId: 'u:D' })).toBe(false);
+    expect(isAwaitingMyAction(drafted, { userId: 'u:A' })).toBe(false);
   });
 
   it('规则1：非当前持有者无法选择去向', () => {
