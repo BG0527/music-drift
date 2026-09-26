@@ -72,13 +72,22 @@ for (const name of shots) {
   // 字体不落地就截图 = 拿系统衬线评排版（对比会失真），所以显式等字体
   await page.evaluate(() => document.fonts.ready);
   await page.waitForTimeout(250);
+  // 尺寸与字体一样要报出来：`fullPage: true` 的 PNG 宽高**就是** scrollWidth/scrollHeight，
+  // 所以"一屏装不下 / 横向溢出"在这里是机器可判的，不该量了却丢掉（此前只打印字体，等于没查）。
   const measured = await page.evaluate(() => ({
     font: getComputedStyle(document.querySelector('h1') ?? document.body).fontFamily,
     height: document.documentElement.scrollHeight,
+    width: document.documentElement.scrollWidth,
   }));
   const out = join(DIR, name.replace(/\.html$/, '.png'));
   await page.screenshot({ path: out, fullPage: true });
-  console.log(`shot ${name}  →  ${out}  (h1 font: ${measured.font})`);
+  const over = [];
+  if (measured.width > VIEWPORT.width) over.push(`横向 +${String(measured.width - VIEWPORT.width)}px`);
+  if (measured.height > VIEWPORT.height) over.push(`纵向 +${String(measured.height - VIEWPORT.height)}px`);
+  const verdict = over.length ? `  ⚠ 超出一屏：${over.join(' / ')}` : '  ✓ 一屏内';
+  console.log(
+    `shot ${name}  →  ${out}  (${String(measured.width)}x${String(measured.height)} @1x, h1 font: ${measured.font})${verdict}`,
+  );
 }
 
 await browser.close();

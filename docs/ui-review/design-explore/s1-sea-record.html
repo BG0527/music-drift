@@ -1,0 +1,155 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <title>S1 · 公海大厅（F4 唱片架语言）</title>
+    <style>
+      @import url('/node_modules/.pnpm/lxgw-wenkai-webfont@1.7.0/node_modules/lxgw-wenkai-webfont/lxgwwenkai-regular.css');
+      @import url('/node_modules/.pnpm/lxgw-wenkai-webfont@1.7.0/node_modules/lxgw-wenkai-webfont/lxgwwenkai-bold.css');
+      @import url('/node_modules/.pnpm/@fontsource+quattrocento@5.3.0/node_modules/@fontsource/quattrocento/400.css');
+      @import url('/node_modules/.pnpm/@fontsource+quattrocento@5.3.0/node_modules/@fontsource/quattrocento/700.css');
+      :root { --ink:#050f14; --paper:#f3f9fa; --muted:#a9c7cf; --glass:#7fd1d9; --coral:#c7452c; --line:rgba(243,249,250,.13); }
+      * { box-sizing:border-box; margin:0; padding:0; }
+      html,body { width:1440px; height:900px; }
+      html { overflow:hidden; }
+      .clip { position:absolute; inset:0; overflow:hidden; }
+      body { position:relative; overflow:hidden; background:var(--ink); color:var(--paper);
+        font-family:'LXGW WenKai',serif; -webkit-font-smoothing:antialiased; }
+      .mono { font-family:Quattrocento,serif; font-variant-numeric:tabular-nums; }
+      /* 盘面：沿用 F4 标定后的密沟槽参数（列表页不需要那颗巨大圆心，只要"这一页是一张唱片"的材质） */
+      .surface { position:absolute; inset:0; opacity:.9;
+        background:
+          repeating-radial-gradient(circle at 1420px 960px, rgba(216,243,246,.055) 0 1.2px, transparent 1.2px 6.5px),
+          radial-gradient(circle at 1420px 960px, rgba(127,209,217,.05) 0 30%, transparent 68%); }
+      .glint { position:absolute; inset:0; mix-blend-mode:screen;
+        background:linear-gradient(101deg, transparent 28%, rgba(228,247,252,.045) 45%, rgba(228,247,252,.065) 50%, rgba(228,247,252,.028) 55%, transparent 72%); }
+      /* 外缘：这一页是"唱片的另一面"，所以外缘压在页面上沿，像唱片的边 */
+      .rim { position:absolute; left:-40px; right:-40px; top:-820px; height:900px; border-radius:50%;
+        border:2px solid rgba(207,233,238,.16); }
+
+      main { position:relative; z-index:2; padding:64px 76px 0; }
+      .cat { font-family:Quattrocento,serif; font-size:11px; letter-spacing:.24em; color:rgba(243,249,250,.5); }
+      header h1 { margin-top:12px; font-size:62px; font-weight:700; line-height:1; }
+      header .sub { margin-top:14px; font-size:15.5px; line-height:1.9; color:var(--muted); max-width:600px; }
+      header .right { position:absolute; right:76px; top:64px; text-align:right; }
+      header .right .big { font-family:Quattrocento,serif; font-size:30px; color:var(--glass); }
+
+      /* 两个 Tab 做成唱片的两面：A 面 / B 面 */
+      .sides { display:flex; gap:34px; margin-top:30px; border-bottom:1px solid var(--line); }
+      .side { padding-bottom:12px; font-size:15px; color:var(--muted); display:flex; align-items:baseline; gap:10px; }
+      .side b { font-weight:700; }
+      .side .n { font-family:Quattrocento,serif; font-size:13px; opacity:.7; }
+      .side[aria-selected='true'] { color:var(--paper); border-bottom:2px solid var(--coral); margin-bottom:-1px; }
+
+      /* 列表：每一行 = 一张唱片的封套背（曲名 + 段位刻度 + 状态 + 时间） */
+      ul.list { list-style:none; margin-top:6px; }
+      li.row { display:grid; grid-template-columns:64px 1fr auto; gap:22px; align-items:center;
+        padding:18px 0; border-bottom:1px solid rgba(243,249,250,.07); }
+      li.row:hover { background:rgba(127,209,217,.03); }
+      .cover { width:64px; height:64px; border-radius:2px; position:relative;
+        background:linear-gradient(150deg, #0d3b4a 0%, #123e52 45%, #061a22 100%);
+        box-shadow:0 8px 18px rgba(0,0,0,.45), inset 0 0 0 1px rgba(243,249,250,.09); }
+      .cover i { position:absolute; left:50%; top:50%; width:17px; height:17px; margin:-8.5px 0 0 -8.5px;
+        border-radius:50%; background:var(--coral); opacity:.85; }
+      .cover i::after { content:''; position:absolute; inset:5.5px; border-radius:50%; background:var(--ink); }
+      .title { font-size:19px; font-weight:700; }
+      /* 段位刻度：4 格 = 4 段，已录的亮 —— 这是唱片语言里能编码真实数据的一处 */
+      .ticks { display:flex; align-items:center; gap:6px; margin-top:9px; }
+      .ticks i { width:26px; height:3px; background:rgba(243,249,250,.15); display:block; }
+      .ticks i.on { background:var(--glass); }
+      .ticks .prog { margin-left:8px; font-size:13px; color:var(--muted); }
+      .note { margin-top:7px; font-size:13px; color:var(--muted); }
+      .note.warn { color:#e8c07a; }
+      .note.ok { color:#8fd6bb; }
+      .meta { text-align:right; display:flex; flex-direction:column; align-items:flex-end; gap:7px; }
+      .state { font-size:12.5px; letter-spacing:.1em; color:var(--muted); }
+      .state.on { color:var(--glass); }
+      .time { font-family:Quattrocento,serif; font-size:12px; color:rgba(169,199,207,.7); }
+      .go { font-size:13px; color:var(--glass); text-decoration:underline; text-underline-offset:4px; }
+
+      /* 分页：做成沟槽索引 */
+      .pages { display:flex; align-items:center; gap:14px; margin-top:26px; }
+      .pages b { width:30px; height:30px; border-radius:50%; display:grid; place-items:center;
+        font-family:Quattrocento,serif; font-size:13px; font-weight:400; color:var(--muted);
+        border:1px solid rgba(243,249,250,.16); }
+      .pages b[aria-current='true'] { background:var(--coral); border-color:var(--coral); color:var(--paper); }
+      .pages span { font-size:12.5px; color:var(--muted); }
+
+      footer { position:absolute; left:76px; right:76px; bottom:30px; z-index:2; display:flex; align-items:center; }
+      footer .go2 { font-size:13px; color:var(--glass); text-decoration:none; letter-spacing:.06em; }
+      footer .cat { margin-left:auto; }
+    </style>
+  </head>
+  <body>
+    <div class="clip">
+      <div class="surface"></div>
+      <div class="glint"></div>
+      <div class="rim"></div>
+    </div>
+
+    <main>
+      <header>
+        <div class="cat">SIDE B · 已入海</div>
+        <h1>公海大厅</h1>
+        <p class="sub">作品一旦入海，就不再漂流 —— 这里只能听，不能接。</p>
+        <div class="right">
+          <div class="big">12</div>
+          <div class="cat" style="margin-top:2px">支作品</div>
+        </div>
+      </header>
+
+      <div class="sides">
+        <div class="side" aria-selected="true"><b>完整作品</b><span class="n">12</span></div>
+        <div class="side"><b>等待接力</b><span class="n">5</span></div>
+      </div>
+
+      <ul class="list">
+        <li class="row">
+          <div class="cover"><i></i></div>
+          <div>
+            <p class="title">占位曲目 · 一</p>
+            <div class="ticks"><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><span class="prog">已录 4 / 4 段</span></div>
+            <p class="note ok">全部段位都有人唱过</p>
+          </div>
+          <div class="meta"><span class="state on">已入海</span><span class="time">最近更新 2026/9/23 22:47</span><a class="go" href="#">听这支作品</a></div>
+        </li>
+        <li class="row">
+          <div class="cover"><i></i></div>
+          <div>
+            <p class="title">占位曲目 · 二</p>
+            <div class="ticks"><i class="on"></i><i class="on"></i><i class="on"></i><i></i><span class="prog">已录 3 / 4 段</span></div>
+            <p class="note warn">缺第 4 段（成品里这段时间是静音）</p>
+          </div>
+          <div class="meta"><span class="state">等待接力</span><span class="time">最近更新 2026/9/23 21:10</span><a class="go" href="#">听这支作品</a></div>
+        </li>
+        <li class="row">
+          <div class="cover"><i></i></div>
+          <div>
+            <p class="title">占位曲目 · 三</p>
+            <div class="ticks"><i class="on"></i><i class="on"></i><i></i><i></i><span class="prog">已录 2 / 4 段</span></div>
+            <p class="note warn">缺第 3、4 段（成品里这段时间是静音）</p>
+          </div>
+          <div class="meta"><span class="state">等待接力</span><span class="time">最近更新 2026/9/22 09:03</span><a class="go" href="#">听这支作品</a></div>
+        </li>
+        <li class="row">
+          <div class="cover"><i></i></div>
+          <div>
+            <p class="title">夜航</p>
+            <div class="ticks"><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><span class="prog">已录 4 / 4 段</span></div>
+            <p class="note ok">全部段位都有人唱过</p>
+          </div>
+          <div class="meta"><span class="state on">已入海</span><span class="time">最近更新 2026/9/21 18:22</span><a class="go" href="#">听这支作品</a></div>
+        </li>
+      </ul>
+
+      <nav class="pages" aria-label="分页">
+        <b aria-current="true">1</b><b>2</b><b>3</b><span>共 3 页</span>
+      </nav>
+    </main>
+
+    <footer>
+      <a class="go2" href="#">去河道捞一个，自己把它补完</a>
+      <span class="cat">共 12 支 · 每页 4 支</span>
+    </footer>
+  </body>
+</html>

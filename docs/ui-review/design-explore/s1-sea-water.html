@@ -1,0 +1,150 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <title>S1 · 公海大厅（g3 水底仰视语言）</title>
+    <style>
+      @import url('/node_modules/.pnpm/lxgw-wenkai-webfont@1.7.0/node_modules/lxgw-wenkai-webfont/lxgwwenkai-regular.css');
+      @import url('/node_modules/.pnpm/lxgw-wenkai-webfont@1.7.0/node_modules/lxgw-wenkai-webfont/lxgwwenkai-bold.css');
+      @import url('/node_modules/.pnpm/@fontsource+quattrocento@5.3.0/node_modules/@fontsource/quattrocento/400.css');
+      @import url('/node_modules/.pnpm/@fontsource+quattrocento@5.3.0/node_modules/@fontsource/quattrocento/700.css');
+      :root { --void:#04141a; --paper:#eaf4f6; --dim:#a9c7cf; --glass:#7fd1d9; --warm:#f6d79a; --line:rgba(228,249,252,.16); }
+      * { box-sizing:border-box; margin:0; padding:0; }
+      html,body { width:1440px; height:900px; }
+      html { overflow:hidden; }
+      .clip { position:absolute; inset:0; overflow:hidden; }
+      body { position:relative; overflow:hidden; background:var(--void); color:var(--paper);
+        font-family:'LXGW WenKai',serif; -webkit-font-smoothing:antialiased; }
+      .mono { font-family:Quattrocento,serif; font-variant-numeric:tabular-nums; }
+
+      /* 头顶的水面：一条弯下来的天光带 + 被水揉过的光斑（沿用 g3 标定后的做法） */
+      .sea { position:absolute; inset:0;
+        background:radial-gradient(120% 80% at 30% 6%, #0b3340 0%, #04141a 58%, #020d12 100%); }
+      .light { position:absolute; left:-60px; right:-60px; top:-30px; height:300px; filter:blur(10px);
+        background:
+          radial-gradient(60% 100% at 26% 40%, rgba(220,246,251,.20), transparent 70%),
+          radial-gradient(50% 90% at 62% 24%, rgba(220,246,251,.14), transparent 72%),
+          radial-gradient(40% 80% at 86% 46%, rgba(220,246,251,.10), transparent 74%); }
+      .surface { position:absolute; left:-40px; right:-40px; top:158px; height:2px;
+        background:linear-gradient(90deg, transparent, rgba(234,252,255,.5) 18%, rgba(234,252,255,.5) 82%, transparent); }
+      .caustic { position:absolute; left:0; right:0; top:60px; height:210px; opacity:.5; filter:blur(14px);
+        background:
+          linear-gradient(96deg, transparent 12%, rgba(234,252,255,.10) 22%, transparent 30%),
+          linear-gradient(84deg, transparent 40%, rgba(234,252,255,.08) 52%, transparent 62%),
+          linear-gradient(100deg, transparent 68%, rgba(234,252,255,.07) 78%, transparent 88%); }
+
+      main { position:relative; z-index:3; padding:236px 76px 0; }
+      .cat { font-family:Quattrocento,serif; font-size:11px; letter-spacing:.24em; color:rgba(169,199,207,.75); }
+      header h1 { margin-top:10px; font-size:44px; font-weight:700; line-height:1; text-shadow:0 3px 26px rgba(2,12,17,.9); }
+      header .sub { margin-top:12px; font-size:15px; line-height:1.85; color:var(--dim); max-width:640px; }
+      header .right { position:absolute; right:76px; top:236px; text-align:right; }
+      header .right .big { font-family:Quattrocento,serif; font-size:30px; color:var(--glass); }
+
+      .sides { display:flex; gap:34px; margin-top:18px; border-bottom:1px solid var(--line); }
+      .side { padding-bottom:11px; font-size:15px; color:var(--dim); display:flex; align-items:baseline; gap:10px; }
+      .side b { font-weight:700; } .side .n { font-family:Quattrocento,serif; font-size:13px; opacity:.7; }
+      .side[aria-selected='true'] { color:var(--paper); border-bottom:2px solid var(--glass); margin-bottom:-1px; }
+
+      /* 列表：每一行是"浮在水里的一件东西"—— 深色半透面 + 亮边（g3 的材质语言） */
+      ul.list { list-style:none; margin-top:8px; }
+      li.row { position:relative; display:grid; grid-template-columns:1fr auto; gap:26px; align-items:center;
+        padding:13px 20px; margin-top:9px; border-radius:3px;
+        background:radial-gradient(80% 140% at 22% 18%, rgba(10,48,60,.5), rgba(3,17,23,.78));
+        border:1px solid var(--line); box-shadow:inset 0 1px 16px rgba(160,226,240,.06); }
+      li.row i.top { position:absolute; left:8%; right:8%; top:0; height:1px;
+        background:linear-gradient(90deg, transparent, rgba(234,252,255,.34), transparent); }
+      li.row .bub { position:absolute; border-radius:50%; border:1px solid rgba(234,252,255,.4); opacity:.5; }
+      .title { font-size:19px; font-weight:700; }
+      .ticks { display:flex; align-items:center; gap:6px; margin-top:7px; }
+      .ticks i { width:24px; height:2px; background:rgba(228,249,252,.16); display:block; }
+      .ticks i.on { background:var(--glass); }
+      .ticks .prog { margin-left:8px; font-size:13px; color:var(--dim); }
+      .note { margin-top:5px; font-size:13px; color:var(--dim); }
+      .note.ok { color:#8fd6bb; } .note.warn { color:#e8c07a; }
+      .meta { text-align:right; display:flex; flex-direction:column; align-items:flex-end; gap:7px; }
+      .state { font-size:12.5px; letter-spacing:.1em; color:var(--dim); } .state.on { color:var(--glass); }
+      .time { font-family:Quattrocento,serif; font-size:12px; color:rgba(169,199,207,.7); }
+      .go { font-size:13px; color:var(--glass); text-decoration:underline; text-underline-offset:4px; }
+
+      .pages { display:flex; align-items:center; gap:14px; margin-top:16px; }
+      .pages b { width:30px; height:30px; border-radius:50%; display:grid; place-items:center;
+        font-family:Quattrocento,serif; font-size:13px; font-weight:400; color:var(--dim); border:1px solid var(--line); }
+      .pages b[aria-current='true'] { background:rgba(127,209,217,.18); border-color:rgba(203,238,246,.7); color:var(--paper); }
+      .pages span { font-size:12.5px; color:var(--dim); }
+
+      footer { position:absolute; left:76px; right:76px; bottom:28px; z-index:3; display:flex; align-items:center; }
+      footer .go2 { font-size:13px; color:var(--glass); text-decoration:none; letter-spacing:.06em; }
+      footer .cat { margin-left:auto; }
+    </style>
+  </head>
+  <body>
+    <div class="clip">
+      <div class="sea"></div>
+      <div class="light"></div>
+      <div class="caustic"></div>
+      <div class="surface"></div>
+    </div>
+
+    <main>
+      <header>
+        <div class="cat">SURFACE · 已入海</div>
+        <h1>公海大厅</h1>
+        <p class="sub">聆听那些经历漂流与合唱、完全绽放的终极乐章。作品一旦入海就不再漂流 —— 这里只能听，不能接。</p>
+        <div class="right"><div class="big">12</div><div class="cat" style="margin-top:2px">支作品</div></div>
+      </header>
+
+      <div class="sides">
+        <div class="side" aria-selected="true"><b>完整作品</b><span class="n">12</span></div>
+        <div class="side"><b>等待接力</b><span class="n">5</span></div>
+      </div>
+
+      <ul class="list">
+        <li class="row">
+          <i class="top"></i><i class="bub" style="left:20px; top:-9px; width:11px; height:11px"></i><i class="bub" style="left:42px; top:-16px; width:6px; height:6px"></i>
+          <div>
+            <p class="title">占位曲目 · 一</p>
+            <div class="ticks"><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><span class="prog">已录 4 / 4 段</span></div>
+            <p class="note ok">全部段位都有人唱过</p>
+          </div>
+          <div class="meta"><span class="state on">已入海</span><span class="time">最近更新 2026/9/23 22:47</span><a class="go" href="#">听这支作品</a></div>
+        </li>
+        <li class="row">
+          <i class="top"></i><i class="bub" style="left:28px; top:-8px; width:8px; height:8px"></i>
+          <div>
+            <p class="title">占位曲目 · 二</p>
+            <div class="ticks"><i class="on"></i><i class="on"></i><i class="on"></i><i></i><span class="prog">已录 3 / 4 段</span></div>
+            <p class="note warn">缺第 4 段（成品里这段时间是静音）</p>
+          </div>
+          <div class="meta"><span class="state">等待接力</span><span class="time">最近更新 2026/9/23 21:10</span><a class="go" href="#">听这支作品</a></div>
+        </li>
+        <li class="row">
+          <i class="top"></i>
+          <div>
+            <p class="title">占位曲目 · 三</p>
+            <div class="ticks"><i class="on"></i><i class="on"></i><i></i><i></i><span class="prog">已录 2 / 4 段</span></div>
+            <p class="note warn">缺第 3、4 段（成品里这段时间是静音）</p>
+          </div>
+          <div class="meta"><span class="state">等待接力</span><span class="time">最近更新 2026/9/22 09:03</span><a class="go" href="#">听这支作品</a></div>
+        </li>
+        <li class="row">
+          <i class="top"></i><i class="bub" style="left:34px; top:-10px; width:9px; height:9px"></i>
+          <div>
+            <p class="title">夜航</p>
+            <div class="ticks"><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><span class="prog">已录 4 / 4 段</span></div>
+            <p class="note ok">全部段位都有人唱过</p>
+          </div>
+          <div class="meta"><span class="state on">已入海</span><span class="time">最近更新 2026/9/21 18:22</span><a class="go" href="#">听这支作品</a></div>
+        </li>
+      </ul>
+
+      <nav class="pages" aria-label="分页">
+        <b aria-current="true">1</b><b>2</b><b>3</b><span>共 3 页</span>
+      </nav>
+    </main>
+
+    <footer>
+      <a class="go2" href="#">去河道捞一个，自己把它补完</a>
+      <span class="cat">共 12 支 · 每页 4 支</span>
+    </footer>
+  </body>
+</html>
