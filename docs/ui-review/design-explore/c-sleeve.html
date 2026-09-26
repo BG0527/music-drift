@@ -1,0 +1,180 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <title>C · 唱片套 Record Sleeve</title>
+    <style>
+      @import url('/node_modules/.pnpm/lxgw-wenkai-webfont@1.7.0/node_modules/lxgw-wenkai-webfont/lxgwwenkai-regular.css');
+      @import url('/node_modules/.pnpm/lxgw-wenkai-webfont@1.7.0/node_modules/lxgw-wenkai-webfont/lxgwwenkai-bold.css');
+      @import url('/node_modules/.pnpm/@fontsource+quattrocento@5.3.0/node_modules/@fontsource/quattrocento/400.css');
+      @import url('/node_modules/.pnpm/@fontsource+quattrocento@5.3.0/node_modules/@fontsource/quattrocento/700.css');
+
+      :root {
+        --void: #061a22;
+        --wall: #08222b;
+        --paper: #f3f9fa;
+        --muted: #a9c7cf;
+        --line: rgba(243, 249, 250, 0.14);
+        --teal: #0f6d80;
+        --glass: #7fd1d9;
+        --coral: #c7452c;
+      }
+      * { box-sizing: border-box; margin: 0; padding: 0; }
+      html, body { width: 1440px; height: 900px; }
+      body {
+        background: radial-gradient(120% 90% at 50% -10%, #0d3947 0%, var(--void) 60%);
+        color: var(--paper);
+        font-family: 'LXGW WenKai', serif;
+        display: flex;
+        flex-direction: column;
+        -webkit-font-smoothing: antialiased;
+      }
+      .num { font-family: Quattrocento, serif; font-feature-settings: 'tnum'; }
+
+      /* ── 顶栏（这一版把侧栏换成顶栏：横向的取景框） ── */
+      header.bar { display: flex; align-items: center; gap: 36px; padding: 22px 44px; border-bottom: 1px solid var(--line); }
+      .brand { display: flex; align-items: center; gap: 10px; font-size: 15px; font-weight: 700; letter-spacing: .06em; }
+      .bar nav { display: flex; gap: 28px; }
+      .bar nav a { color: var(--muted); text-decoration: none; font-size: 14px; letter-spacing: .06em; }
+      .bar nav a[aria-current] { color: var(--paper); }
+      .bar .me { margin-left: auto; display: flex; align-items: center; gap: 10px; font-size: 13px; color: var(--muted); }
+      .bar .me i { width: 30px; height: 30px; border-radius: 50%; background: rgba(127, 209, 217, 0.16); display: block; }
+
+      main { flex: 1; display: grid; grid-template-columns: 600px 1fr; gap: 56px; padding: 30px 44px 26px; align-items: center; }
+
+      /* ── 封面：整页的胆量花在这里 ── */
+      .sleeve { position: relative; width: 600px; height: 600px; overflow: hidden; box-shadow: 0 30px 70px rgba(0, 0, 0, .55); }
+      .sleeve .sky { position: absolute; inset: 0; background: linear-gradient(180deg, #04202a 0%, #0a3b49 34%, #10596b 52%, #0a2e3a 60%, #061c25 100%); }
+      .sleeve .moon { position: absolute; left: 47%; top: 26%; width: 132px; height: 132px; margin: -66px 0 0 -66px; border-radius: 50%; background: radial-gradient(circle at 40% 38%, #fdf6e8 0%, #d8ecf0 58%, rgba(168, 214, 222, 0.15) 100%); filter: blur(.4px); }
+      .sleeve .glow { position: absolute; left: 50%; top: 54%; width: 760px; height: 260px; margin: -130px 0 0 -380px; background: radial-gradient(ellipse at center, rgba(242, 240, 226, .5) 0%, rgba(127, 209, 217, .16) 42%, transparent 70%); }
+      .sleeve .horizon { position: absolute; left: 0; right: 0; top: 54%; height: 1px; background: linear-gradient(90deg, transparent, rgba(253, 246, 232, .85) 22%, rgba(253, 246, 232, .85) 78%, transparent); }
+      .sleeve svg.waves { position: absolute; left: 0; bottom: 0; width: 100%; height: 46%; }
+      .sleeve .grain { position: absolute; inset: 0; opacity: .5; mix-blend-mode: overlay; }
+      .sleeve .cat { position: absolute; left: 22px; top: 20px; font-family: Quattrocento, serif; font-size: 12px; letter-spacing: .22em; color: rgba(243, 249, 250, .72); }
+      .sleeve .seal { position: absolute; right: 22px; bottom: 22px; width: 62px; height: 62px; border-radius: 50%; background: var(--coral); display: grid; place-items: center; }
+      .sleeve .seal svg { display: block; }
+      .sleeve .caption { position: absolute; left: 22px; bottom: 22px; font-size: 12px; letter-spacing: .06em; color: rgba(243, 249, 250, .8); }
+
+      /* ── 编辑栏 ── */
+      .edit { display: flex; flex-direction: column; gap: 20px; padding-top: 6px; }
+      h1 { font-size: 68px; font-weight: 700; line-height: 1.02; }
+      .sub { font-size: 16px; color: var(--muted); }
+      .rule { height: 1px; background: var(--line); }
+      .tracks { display: flex; flex-direction: column; }
+      .tracks li { list-style: none; display: grid; grid-template-columns: 30px 1fr auto auto; align-items: center; gap: 14px; padding: 11px 0; border-bottom: 1px solid var(--line); font-size: 14px; color: var(--muted); }
+      .tracks li .n { font-family: Quattrocento, serif; color: rgba(243, 249, 250, .45); }
+      .tracks li.filled { color: var(--paper); }
+      .tracks li .t { font-family: Quattrocento, serif; font-size: 13px; }
+      .tracks li .s { font-size: 12px; letter-spacing: .1em; }
+      .tracks li.filled .s { color: var(--glass); }
+      .meter { display: flex; gap: 4px; }
+      .meter i { width: 22px; height: 3px; background: rgba(243, 249, 250, .16); display: block; }
+      .meter i.on { background: var(--glass); }
+
+      .acts { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; margin-top: 4px; }
+      .act { display: flex; flex-direction: column; gap: 10px; }
+      .act button { height: 58px; border: 0; cursor: pointer; font-family: inherit; font-size: 17px; font-weight: 700; letter-spacing: .08em; display: flex; align-items: center; justify-content: center; gap: 10px; color: #fff; }
+      .act.draw button { background: var(--teal); }
+      .act.cast button { background: var(--coral); }
+      .act p { font-size: 13px; line-height: 1.7; color: var(--muted); }
+
+      footer { display: flex; align-items: center; gap: 12px; padding: 0 44px 24px; }
+      .tag { background: transparent; border: 1px solid var(--line); color: var(--muted); font-family: inherit; font-size: 12px; padding: 7px 14px; cursor: pointer; letter-spacing: .08em; }
+      .tag[aria-pressed='true'] { border-color: rgba(127, 209, 217, .5); color: var(--paper); }
+      footer .hint { margin-left: auto; font-size: 12px; color: var(--muted); }
+    </style>
+  </head>
+  <body>
+    <header class="bar">
+      <div class="brand">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#7fd1d9" stroke-width="2" stroke-linecap="round">
+          <path d="M2 9c2.5-3 5-3 7.5 0s5 3 7.5 0 4.5-2.5 5 0" />
+          <path d="M2 16c2.5-3 5-3 7.5 0s5 3 7.5 0 4.5-2.5 5 0" />
+        </svg>
+        音乐漂流瓶
+      </div>
+      <nav>
+        <a href="#" aria-current="page">河道</a>
+        <a href="#">公海</a>
+        <a href="#">我的</a>
+        <a href="#">设置</a>
+      </nav>
+      <div class="me"><i></i>layoutmui6k36v</div>
+    </header>
+
+    <main>
+      <div class="sleeve">
+        <div class="sky"></div>
+        <div class="glow"></div>
+        <div class="moon"></div>
+        <div class="horizon"></div>
+        <svg class="waves" viewBox="0 0 540 250" preserveAspectRatio="none">
+          <defs>
+            <linearGradient id="w1" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0" stop-color="#2a9db1" stop-opacity=".55" />
+              <stop offset="1" stop-color="#0b3a4a" stop-opacity=".1" />
+            </linearGradient>
+            <linearGradient id="w2" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0" stop-color="#7fd1d9" stop-opacity=".38" />
+              <stop offset="1" stop-color="#0b3a4a" stop-opacity="0" />
+            </linearGradient>
+            <linearGradient id="w3" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0" stop-color="#f3f9fa" stop-opacity=".22" />
+              <stop offset="1" stop-color="#0b3a4a" stop-opacity="0" />
+            </linearGradient>
+          </defs>
+          <path d="M0 70 C 90 40, 150 96, 240 84 C 330 72, 380 30, 470 44 C 505 49, 528 60, 540 66 L540 250 L0 250 Z" fill="url(#w2)" />
+          <path d="M0 116 C 80 92, 160 140, 250 128 C 340 116, 400 78, 480 92 C 512 98, 530 106, 540 110 L540 250 L0 250 Z" fill="url(#w1)" />
+          <path d="M0 168 C 100 148, 170 190, 262 180 C 350 170, 412 136, 500 150 L540 156 L540 250 L0 250 Z" fill="url(#w3)" />
+        </svg>
+        <svg class="grain" viewBox="0 0 540 540">
+          <filter id="g"><feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="3" /></filter>
+          <rect width="540" height="540" filter="url(#g)" opacity="0.14" />
+        </svg>
+        <div class="cat">MDB—0001 · DRIFT SERIES</div>
+        <div class="caption">第 1 段 · 待录</div>
+        <div class="seal">
+          <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round">
+            <path d="M2 9c2.5-3 5-3 7.5 0s5 3 7.5 0 4.5-2.5 5 0" />
+            <path d="M2 16c2.5-3 5-3 7.5 0s5 3 7.5 0 4.5-2.5 5 0" />
+          </svg>
+        </div>
+      </div>
+
+      <div class="edit">
+        <h1>暖流河道</h1>
+        <p class="sub">拾起那些搁浅在黑夜里的声线。你只录一段，剩下的交给漂流。</p>
+        <div class="rule"></div>
+
+        <ol class="tracks">
+          <li class="filled"><span class="n">01</span><span>第 1 段 · 发起者的声线</span><span class="t">00:22</span><span class="s">待录</span></li>
+          <li><span class="n">02</span><span>第 2 段 · 陌生人接棒</span><span class="t">00:22</span><span class="s">空位</span></li>
+          <li><span class="n">03</span><span>第 3 段 · 陌生人接棒</span><span class="t">00:22</span><span class="s">空位</span></li>
+          <li><span class="n">04</span><span>第 4 段 · 收尾</span><span class="t">00:22</span><span class="s">空位</span></li>
+        </ol>
+
+        <div class="meter"><i class="on"></i><i></i><i></i><i></i></div>
+
+        <div class="acts">
+          <div class="act draw">
+            <button>捞取 · 接住漂来的</button>
+            <p>捞取深海深处传来的匿名哼唱，接续她的下一句旋律。捞到即持有：同一时刻，同一条河道上只有你拿着它。</p>
+          </div>
+          <div class="act cast">
+            <button>投下 · 放进河道</button>
+            <p>选一首歌，录下第 1 段（时长以该段为准），然后投进河道等一个陌生人接下一棒。</p>
+          </div>
+        </div>
+      </div>
+    </main>
+
+    <footer>
+      <button class="tag" aria-pressed="true">全部</button>
+      <button class="tag">深夜</button>
+      <button class="tag">通勤</button>
+      <button class="tag">告白</button>
+      <button class="tag">雨天</button>
+      <span class="hint">河道只能随机打捞；心情标签这一版只作展示 · 先去公海听听已经完成的作品</span>
+    </footer>
+  </body>
+</html>

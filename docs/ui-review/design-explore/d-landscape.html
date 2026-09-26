@@ -1,0 +1,148 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <title>D · 波形地形 Waveform Landscape</title>
+    <style>
+      @import url('/node_modules/.pnpm/lxgw-wenkai-webfont@1.7.0/node_modules/lxgw-wenkai-webfont/lxgwwenkai-regular.css');
+      @import url('/node_modules/.pnpm/lxgw-wenkai-webfont@1.7.0/node_modules/lxgw-wenkai-webfont/lxgwwenkai-bold.css');
+      @import url('/node_modules/.pnpm/@fontsource+quattrocento@5.3.0/node_modules/@fontsource/quattrocento/400.css');
+      @import url('/node_modules/.pnpm/@fontsource+quattrocento@5.3.0/node_modules/@fontsource/quattrocento/700.css');
+
+      :root {
+        --void: #04141a;
+        --stone: #f3f9fa;
+        --muted: #a9c7cf;
+        --glass: #7fd1d9;
+        --lagoon: #2a9db1;
+        --coral: #c7452c;
+        --line: rgba(243, 249, 250, 0.14);
+      }
+      * { box-sizing: border-box; margin: 0; padding: 0; }
+      html, body { width: 1440px; height: 900px; }
+      body {
+        position: relative;
+        overflow: hidden;
+        background: linear-gradient(180deg, #061f28 0%, var(--void) 46%, #021014 100%);
+        color: var(--stone);
+        font-family: 'LXGW WenKai', serif;
+        -webkit-font-smoothing: antialiased;
+      }
+
+      /* ── 极简顶栏：只留品牌与四个入口，不抢画面 ── */
+      .bar { position: absolute; left: 0; right: 0; top: 0; height: 62px; display: flex; align-items: center; gap: 40px; padding: 0 48px; border-bottom: 1px solid var(--line); }
+      .brand { display: flex; align-items: center; gap: 10px; font-size: 15px; font-weight: 700; letter-spacing: .06em; }
+      .bar nav { display: flex; gap: 30px; margin-left: auto; }
+      .bar nav a { color: var(--muted); text-decoration: none; font-size: 14px; letter-spacing: .08em; }
+      .bar nav a[aria-current] { color: var(--stone); border-bottom: 1px solid var(--glass); padding-bottom: 3px; }
+
+      /* ── 声波地形：上峰是声，倒影是水 ── */
+      .scene { position: absolute; left: 0; right: 0; top: 470px; height: 430px; }
+      .scene svg { position: absolute; left: 0; width: 1440px; }
+      .crest { top: 0; height: 220px; }
+      .mirror { top: 220px; height: 300px; transform: scaleY(-1); opacity: .3;
+        -webkit-mask-image: linear-gradient(to top, transparent 0%, #000 78%);
+        mask-image: linear-gradient(to top, transparent 0%, #000 78%); }
+      .baseline { position: absolute; left: 0; right: 0; top: 219px; height: 1px;
+        background: linear-gradient(90deg, transparent, rgba(127, 209, 217, .55) 12%, rgba(127, 209, 217, .55) 88%, transparent); }
+
+      /* ── 标题 ── */
+      .title { position: absolute; left: 48px; top: 108px; }
+      .title h1 { font-size: 96px; font-weight: 700; line-height: .98; letter-spacing: .01em; }
+      .title p { margin-top: 12px; font-size: 18px; color: var(--muted); }
+      .title .num { font-family: Quattrocento, serif; }
+      .meta { position: absolute; right: 48px; top: 128px; text-align: right; font-size: 13px; color: var(--muted); line-height: 2; }
+      .meta b { font-family: Quattrocento, serif; font-size: 22px; color: var(--glass); font-weight: 400; display: block; }
+
+      /* ── 两个泊位：文字在岸上，钥匙骑在波峰上，等大等权 ── */
+      .berth { position: absolute; top: 244px; width: 340px; text-align: center; }
+      .berth.left { left: 100px; }
+      .berth.right { right: 100px; }
+      .key { width: 104px; height: 104px; border-radius: 50%; margin: 14px auto 0; display: grid; place-items: center;
+        font-family: inherit; font-size: 17px; font-weight: 700; letter-spacing: .12em; cursor: pointer; border: 0; color: #fff; position: relative; }
+      .key::after { content: ''; position: absolute; inset: -14px; border-radius: 50%; border: 1px solid rgba(243, 249, 250, .28); }
+      .key.draw { background: linear-gradient(180deg, #12798d, #0b4e5b); }
+      .key.cast { background: linear-gradient(180deg, #d2502f, #9d4125); }
+      .berth b { display: block; font-size: 19px; font-weight: 700; margin-bottom: 6px; }
+      .berth p { font-size: 13px; line-height: 1.75; color: var(--muted); }
+      .stem { width: 1px; height: 22px; background: var(--line); margin: 12px auto 0; }
+
+      /* ── 水面上的一行浮标与出口 ── */
+      .float { position: absolute; left: 48px; right: 48px; bottom: 30px; display: flex; align-items: center; gap: 10px; }
+      .tag { background: rgba(4, 20, 26, .55); border: 1px solid var(--line); color: var(--muted); font-family: inherit; font-size: 12px; padding: 8px 15px; cursor: pointer; letter-spacing: .1em; backdrop-filter: blur(3px); }
+      .tag[aria-pressed='true'] { border-color: rgba(127, 209, 217, .6); color: var(--stone); }
+      .float .go { margin-left: auto; font-size: 13px; color: var(--glass); text-decoration: none; letter-spacing: .06em; }
+    </style>
+  </head>
+  <body>
+    <header class="bar">
+      <div class="brand">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#7fd1d9" stroke-width="2" stroke-linecap="round">
+          <path d="M2 9c2.5-3 5-3 7.5 0s5 3 7.5 0 4.5-2.5 5 0" />
+          <path d="M2 16c2.5-3 5-3 7.5 0s5 3 7.5 0 4.5-2.5 5 0" />
+        </svg>
+        音乐漂流瓶
+      </div>
+      <nav>
+        <a href="#" aria-current="page">河道</a>
+        <a href="#">公海</a>
+        <a href="#">我的</a>
+        <a href="#">设置</a>
+      </nav>
+    </header>
+
+    <div class="title">
+      <h1>暖流河道</h1>
+      <p>拾起那些搁浅在黑夜里的声线 · 你只录一段，剩下的交给漂流</p>
+    </div>
+
+    <div class="meta">
+      河道中待接棒<b>03</b>
+      上一棒 2 小时前
+    </div>
+
+    <div class="scene">
+      <svg class="crest" viewBox="0 0 1440 220" preserveAspectRatio="none">
+        <defs>
+          <linearGradient id="fillc" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stop-color="#7fd1d9" stop-opacity=".5" />
+            <stop offset=".55" stop-color="#2a9db1" stop-opacity=".3" />
+            <stop offset="1" stop-color="#0b3a4a" stop-opacity=".06" />
+          </linearGradient>
+        </defs>
+        <path d="M0 150 C 60 150, 100 60, 160 56 C 220 52, 260 158, 330 168 C 400 178, 430 20, 500 16 C 570 12, 600 150, 670 162 C 740 174, 780 6, 850 2 C 920 -2, 950 140, 1020 152 C 1090 164, 1130 76, 1200 72 C 1270 68, 1330 120, 1440 108 L1440 220 L0 220 Z" fill="url(#fillc)" />
+        <path d="M0 150 C 60 150, 100 60, 160 56 C 220 52, 260 158, 330 168 C 400 178, 430 20, 500 16 C 570 12, 600 150, 670 162 C 740 174, 780 6, 850 2 C 920 -2, 950 140, 1020 152 C 1090 164, 1130 76, 1200 72 C 1270 68, 1330 120, 1440 108" fill="none" stroke="#7fd1d9" stroke-width="1.6" />
+        <g fill="#c7452c">
+          <circle cx="160" cy="56" r="4" /><circle cx="500" cy="16" r="4" />
+          <circle cx="850" cy="2" r="4" /><circle cx="1200" cy="72" r="4" />
+        </g>
+      </svg>
+      <svg class="mirror" viewBox="0 0 1440 220" preserveAspectRatio="none">
+        <path d="M0 150 C 60 150, 100 60, 160 56 C 220 52, 260 158, 330 168 C 400 178, 430 20, 500 16 C 570 12, 600 150, 670 162 C 740 174, 780 6, 850 2 C 920 -2, 950 140, 1020 152 C 1090 164, 1130 76, 1200 72 C 1270 68, 1330 120, 1440 108 L1440 220 L0 220 Z" fill="url(#fillc)" />
+      </svg>
+      <div class="baseline"></div>
+    </div>
+
+    <div class="berth left">
+      <b>捞一个漂流瓶</b>
+      <p>捞取深海深处传来的匿名哼唱，接续她的下一句旋律。捞到即持有。</p>
+      <div class="stem"></div>
+      <button class="key draw">捞取</button>
+    </div>
+    <div class="berth right">
+      <b>投下一支漂流瓶</b>
+      <p>选一首歌，录下第 1 段，然后投进河道等一个陌生人接下一棒。</p>
+      <div class="stem"></div>
+      <button class="key cast">投下</button>
+    </div>
+
+    <div class="float">
+      <button class="tag" aria-pressed="true">全部</button>
+      <button class="tag">深夜</button>
+      <button class="tag">通勤</button>
+      <button class="tag">告白</button>
+      <button class="tag">雨天</button>
+      <a class="go" href="#">先去公海听听已经完成的作品</a>
+    </div>
+  </body>
+</html>
