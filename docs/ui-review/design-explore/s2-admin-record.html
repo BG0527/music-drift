@@ -8,7 +8,9 @@
       @import url('/node_modules/.pnpm/lxgw-wenkai-webfont@1.7.0/node_modules/lxgw-wenkai-webfont/lxgwwenkai-bold.css');
       @import url('/node_modules/.pnpm/@fontsource+quattrocento@5.3.0/node_modules/@fontsource/quattrocento/400.css');
       @import url('/node_modules/.pnpm/@fontsource+quattrocento@5.3.0/node_modules/@fontsource/quattrocento/700.css');
-      :root { --ink:#050f14; --paper:#f3f9fa; --muted:#a9c7cf; --glass:#7fd1d9; --coral:#c7452c; --line:rgba(243,249,250,.13); }
+      :root { --ink:#050f14; --paper:#f3f9fa; --muted:#a9c7cf; --glass:#7fd1d9; --coral:#d4553a; --line:rgba(243,249,250,.13);
+  --warm: #f6d79a;
+}
       * { box-sizing:border-box; margin:0; padding:0; }
       html,body { width:1440px; height:900px; }
       html { overflow:hidden; }
@@ -46,13 +48,13 @@
       /* 裁决印章：把"结论"做成一个盖上去的印（唱片厂质检就盖这个） */
       .stamp { width:132px; height:52px; display:grid; place-items:center; border-radius:3px;
         font-size:12.5px; letter-spacing:.16em; }
-      .stamp.pending { border:1.5px dashed rgba(199,69,44,.75); color:#e8967c; }
+      .stamp.pending { border:1.5px dashed rgba(212,85,58,.75); color:#e8967c; }
       .stamp.done { border:1.5px solid rgba(203,238,246,.5); color:var(--glass); }
       .stamp.restored { border:1.5px solid rgba(246,215,154,.55); color:#e8c07a; }
       .acts { display:flex; gap:9px; justify-content:flex-end; }
       .acts button { font-family:inherit; font-size:12.5px; padding:8px 13px; cursor:pointer;
         background:transparent; color:var(--paper); border:1px solid rgba(243,249,250,.24); border-radius:2px;  white-space:nowrap;}
-      .acts button.primary { border-color:rgba(199,69,44,.7); color:#f0b7a6; }
+      .acts button.primary { border-color:rgba(212,85,58,.7); color:#f0b7a6; }
       .acts button.icy { border-color:rgba(203,238,246,.5); color:var(--glass); }
 
       footer { position:absolute; left:76px; right:76px; bottom:28px; z-index:2; display:flex; align-items:center; }

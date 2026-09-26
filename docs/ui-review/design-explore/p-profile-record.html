@@ -13,7 +13,7 @@
         --paper:#f3f9fa;
         --muted:#a9c7cf;
         --glass:#7fd1d9;
-        --coral:#c7452c;
+        --coral:#d4553a;
         --warm:#f6d79a;
         --line:rgba(243,249,250,.13);
       }
@@ -32,7 +32,10 @@
         background:linear-gradient(101deg, transparent 28%, rgba(228,247,252,.045) 45%, rgba(228,247,252,.065) 50%, rgba(228,247,252,.028) 55%, transparent 72%); }
 
       main { position:relative; z-index:2; height:900px; padding:64px 76px 0; }
-      .cat { font-family:Quattrocento,serif; font-size:11px; letter-spacing:.24em; color:rgba(243,249,250,.5); }
+      .cat { font-family:Quattrocento,'LXGW WenKai',serif; font-size:11px; letter-spacing:.24em; color:rgba(243,249,250,.5); }
+      /* 水面光带：世界的"上方"，瓶子来的方向 */
+      .waterlight { position:absolute; left:-8%; top:-4%; width:118%; height:290px; mix-blend-mode:screen;
+        background:linear-gradient(186deg, rgba(203,238,246,.10) 0%, rgba(203,238,246,.042) 32%, transparent 70%); }
       h1 { margin-top:14px; font-size:58px; font-weight:700; line-height:1; letter-spacing:.02em; }
       .sub { margin-top:14px; font-size:15px; line-height:1.85; color:var(--muted); max-width:740px; }
 
@@ -42,12 +45,25 @@
       .chead h2 { font-size:17px; font-weight:700; }
       .chead .cat { margin-left:auto; }
       .csub { margin-top:8px; font-size:13px; line-height:1.6; color:var(--muted); max-width:660px; }
-      .window { margin-top:20px; height:240px; overflow:hidden; border:1px solid rgba(243,249,250,.16);
-        border-radius:2px; background:rgba(3,17,23,.42); display:flex; align-items:flex-end; }
-      .window ul { list-style:none; display:flex; width:100%; height:300px; }
-      .window li { flex:1; height:300px; display:flex; flex-direction:column; justify-content:flex-end;
-        padding:46px 18px 16px; background:rgba(243,249,250,.035); border-right:1px solid rgba(243,249,250,.1); }
+      /* 柜口就是一道水面：作品已完整的被抬到水线之上（靠岸），
+         还缺段的半沉在水里（还在漂）。水位线因此是一条可读的判据，不是纹理。 */
+      .window { position:relative; margin-top:20px; height:260px; overflow:hidden;
+        border:1px solid rgba(243,249,250,.16); border-radius:2px; background:rgba(3,17,23,.42);
+        display:flex; align-items:flex-end; }
+      .window ul { list-style:none; display:flex; width:100%; height:320px; }
+      .window li { position:relative; flex:1; height:320px; display:flex; flex-direction:column; justify-content:flex-end;
+        padding:46px 18px 36px; background:rgba(243,249,250,.035); border-right:1px solid rgba(243,249,250,.1); }
       .window li:last-child { border-right:0; }
+      .window li.landed { height:286px; }
+      .water { position:absolute; left:0; right:0; bottom:0; height:24px; z-index:2; pointer-events:none;
+        background:linear-gradient(180deg, rgba(127,209,217,.13), rgba(127,209,217,.035));
+        border-top:1px solid rgba(203,238,246,.34); }
+      .water i { position:absolute; border-radius:50%; border-top:1px solid rgba(203,238,246,.16); }
+      .water i:nth-child(1) { left:72px; right:46%; top:7px; height:7px; }
+      .water i:nth-child(2) { left:40%; right:86px; top:14px; height:6px; }
+      .bottle { position:absolute; right:18px; bottom:20px; z-index:3; transform:rotate(-12deg); }
+      .rip { position:absolute; right:8px; bottom:18px; width:58px; height:8px; border-radius:50%;
+        border-top:1px solid rgba(203,238,246,.22); z-index:3; }
       .r1 { display:flex; align-items:center; gap:9px; }
       .slot { font-family:Quattrocento,serif; font-size:10.5px; letter-spacing:.1em; color:rgba(243,249,250,.5); }
       .role { padding:2px 8px; border-radius:2px; font-size:11.5px; letter-spacing:.04em;
@@ -62,7 +78,7 @@
       /* ── 内袋：从柜里抽出来，压在柜口上。中心孔是纸被挖掉的一块，
             透出来的标签盘还没印字 —— 这张唱片上不存在"你的代号" ─────── */
       .bleed { position:absolute; inset:0; overflow:hidden; z-index:5; pointer-events:none; }
-      .sleeve { position:absolute; right:26px; top:16px; width:470px; height:344px; border-radius:2px;
+      .sleeve { position:absolute; right:26px; top:16px; width:470px; height:336px; border-radius:2px;
         border:1px solid rgba(243,249,250,.18);
         background:linear-gradient(158deg, rgba(243,249,250,.085), rgba(243,249,250,.022) 62%, rgba(243,249,250,.055)); }
       .sleeve .stop { position:absolute; left:30px; top:16px; }
@@ -79,13 +95,13 @@
       .who .handle { font-size:20px; font-weight:700; line-height:1.2; }
       .who .mail { margin-top:6px; font-family:Quattrocento,serif; font-size:12px; color:var(--muted); }
       .who .stamp { display:inline-block; margin-top:12px; padding:4px 10px; border-radius:2px;
-        border:1px solid rgba(199,69,44,.62); background:rgba(199,69,44,.14);
+        border:1px solid rgba(212,85,58,.62); background:rgba(212,85,58,.14);
         color:var(--paper); font-size:12px; letter-spacing:.06em; }
       .codeslot { position:absolute; left:30px; right:50px; top:224px; }
       .codeslot .field { margin-top:8px; height:30px; border:1px solid rgba(243,249,250,.2); border-radius:2px; }
 
       /* ── 柜下：左边消息条，右边两个内袋口（收藏 / 徽章） ────── */
-      .bottom { position:absolute; left:76px; right:76px; top:580px; height:304px; }
+      .bottom { position:absolute; left:76px; right:76px; top:596px; height:288px; }
       .msgs { position:absolute; left:0; top:0; width:624px; }
       .msgs h2 { font-size:17px; font-weight:700; }
       .msgs .msub { margin-top:8px; font-size:12.5px; line-height:1.6; color:var(--muted); max-width:600px; }
@@ -101,7 +117,7 @@
       .mrow .go { margin-left:auto; font-size:12.5px; color:var(--glass); }
       .mdet { font-size:12.5px; line-height:1.55; color:var(--muted); }
 
-      .pockets { position:absolute; left:664px; top:0; width:624px; height:304px;
+      .pockets { position:absolute; left:664px; top:0; width:624px; height:288px;
         display:flex; flex-direction:column; gap:20px; }
       .pocket { position:relative; flex:1; border:1px solid var(--line); border-top:0;
         border-radius:0 0 4px 4px; background:rgba(243,249,250,.028); padding:34px 24px 24px; }
@@ -115,6 +131,7 @@
     <div class="clip">
       <div class="platter"></div>
       <div class="glint"></div>
+      <div class="waterlight"></div>
     </div>
 
     <main>
@@ -151,7 +168,7 @@
         <p class="csub">我发起的、以及我唱过一段的瓶子都会在这里（按最近活跃排序，时间线来自服务端）。</p>
         <div class="window">
           <ul>
-            <li>
+            <li class="landed">
               <div class="r1"><span class="slot">01</span><span class="role mine">我发起的</span></div>
               <p class="t">占位曲目 · 一</p>
               <p class="d">已录 4 / 4 段</p>
@@ -166,6 +183,8 @@
               <p class="d">我唱的：第 2 段</p>
               <p class="d warn">缺第 4 段</p>
               <p class="lk"><span>去看这个瓶子</span><span>漂流日志</span></p>
+              <svg class="bottle" width="22" height="34" viewBox="0 0 22 34" fill="none" aria-hidden="true"><rect x="7.2" y="1.2" width="7.6" height="5" rx="2" fill="rgba(246,215,154,.5)"/><path d="M8.4 6.4v4.4M13.6 6.4v4.4" stroke="rgba(203,238,246,.5)" stroke-width="1.1"/><rect x="4.2" y="10.8" width="13.6" height="21.4" rx="4" fill="rgba(127,209,217,.1)" stroke="rgba(203,238,246,.58)" stroke-width="1.2"/><rect x="7.4" y="14.6" width="7.2" height="13.6" rx="2" fill="rgba(246,215,154,.2)" stroke="rgba(246,215,154,.45)" stroke-width="1"/></svg>
+              <i class="rip"></i>
             </li>
             <li>
               <div class="r1"><span class="slot">03</span><span class="role">我接唱的</span></div>
@@ -174,8 +193,10 @@
               <p class="d">我唱的：第 2 段</p>
               <p class="d warn">缺第 3、4 段</p>
               <p class="lk"><span>去看这个瓶子</span><span>漂流日志</span></p>
+              <svg class="bottle" width="22" height="34" viewBox="0 0 22 34" fill="none" aria-hidden="true"><rect x="7.2" y="1.2" width="7.6" height="5" rx="2" fill="rgba(246,215,154,.5)"/><path d="M8.4 6.4v4.4M13.6 6.4v4.4" stroke="rgba(203,238,246,.5)" stroke-width="1.1"/><rect x="4.2" y="10.8" width="13.6" height="21.4" rx="4" fill="rgba(127,209,217,.1)" stroke="rgba(203,238,246,.58)" stroke-width="1.2"/><rect x="7.4" y="14.6" width="7.2" height="13.6" rx="2" fill="rgba(246,215,154,.2)" stroke="rgba(246,215,154,.45)" stroke-width="1"/></svg>
+              <i class="rip"></i>
             </li>
-            <li>
+            <li class="landed">
               <div class="r1"><span class="slot">04</span><span class="role">我接唱的</span></div>
               <p class="t">夜航</p>
               <p class="d">已录 4 / 4 段</p>
@@ -190,8 +211,11 @@
               <p class="d warn">我唱的那一段被斩浪删除了（仍算参与过）</p>
               <p class="d warn">缺第 2 段</p>
               <p class="lk"><span>去看这个瓶子</span><span>漂流日志</span></p>
+              <svg class="bottle" width="22" height="34" viewBox="0 0 22 34" fill="none" aria-hidden="true"><rect x="7.2" y="1.2" width="7.6" height="5" rx="2" fill="rgba(246,215,154,.5)"/><path d="M8.4 6.4v4.4M13.6 6.4v4.4" stroke="rgba(203,238,246,.5)" stroke-width="1.1"/><rect x="4.2" y="10.8" width="13.6" height="21.4" rx="4" fill="rgba(127,209,217,.1)" stroke="rgba(203,238,246,.58)" stroke-width="1.2"/><rect x="7.4" y="14.6" width="7.2" height="13.6" rx="2" fill="rgba(246,215,154,.2)" stroke="rgba(246,215,154,.45)" stroke-width="1"/></svg>
+              <i class="rip"></i>
             </li>
           </ul>
+          <div class="water" aria-hidden="true"><i></i><i></i></div>
         </div>
       </section>
 

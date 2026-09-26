@@ -78,11 +78,21 @@ for (const name of files) {
     found.length === IMPORTS.length && IMPORTS.every((want, i) => (found[i] ?? '').endsWith(want));
   checks.push(['@import 四行保序', orderOk, `${String(found.length)} 行`]);
 
-  const radii = [...src.matchAll(/border-radius:\s*([^;]+)/g)].map((m) => m[1].trim());
-  const badRadius = radii.filter((value) =>
-    value.split(/\s+/).some((part) => part.endsWith('px') && Number.parseFloat(part) > 4),
-  );
-  checks.push(['圆角仅 50% / ≤4px', badRadius.length === 0, badRadius.join(' , ') || 'ok']);
+  // 逐规则块判：>4px 只允许「50%」或**半圆**（radius = 该块 height/2 ±1）—— 否则会把合法的半圆误判成违规
+  const badRadius = [];
+  for (const block of src.split('}')) {
+    const radius = /border-radius:\s*([^;]+)/.exec(block);
+    if (!radius) continue;
+    const height = /height:\s*(\d+(?:\.\d+)?)px/.exec(block);
+    for (const part of radius[1].trim().split(/\s+/)) {
+      if (!part.endsWith('px')) continue;
+      const value = Number.parseFloat(part);
+      if (value <= 4) continue;
+      const halfCircle = height !== undefined && Math.abs(value - Number.parseFloat(height[1]) / 2) <= 1;
+      if (!halfCircle) badRadius.push(`${part}${height ? ` (height ${height[1]}px)` : ''}`);
+    }
+  }
+  checks.push(['圆角仅 50% / ≤4px / 半圆', badRadius.length === 0, badRadius.join(' , ') || 'ok']);
 
   const canvasOk =
     /html\s*,\s*body\s*\{[^}]*width\s*:\s*1440px/.test(src) &&
@@ -92,6 +102,18 @@ for (const name of files) {
 
   const clipOk = /\.clip\s*\{[^}]*overflow\s*:\s*hidden/.test(src);
   checks.push(['出血装饰有 .clip 容器', clipOk, clipOk ? 'ok' : '缺 .clip']);
+
+  // ↓ 三项来自某 agent 的临时校验器 _check-sea-hall.mjs，现并入统一守卫，避免每人各写一份
+  const CONTRACT_COLORS = ['#050f14', '#f3f9fa', '#a9c7cf', '#7fd1d9', '#d4553a', '#f6d79a'];
+  const missingColors = CONTRACT_COLORS.filter((c) => !src.includes(c));
+  checks.push(['七色变量原样', missingColors.length === 0, missingColors.join(' ') || 'ok']);
+
+  const tags = (src.match(/<(img|script|link)\b/gi) ?? []).length;
+  checks.push(['无 img/script/link', tags === 0, `${String(tags)} 个`]);
+
+  const open = (src.match(/<(div|ul|ol|li|span|p|section|nav|header|footer|button|a)\b/g) ?? []).length;
+  const close = (src.match(/<\/(div|ul|ol|li|span|p|section|nav|header|footer|button|a)>/g) ?? []).length;
+  checks.push(['标签配平', open === close, `开 ${String(open)} / 闭 ${String(close)}`]);
 
   const png = html.replace(/\.html$/, '.png');
   let pngNote = '无 png';

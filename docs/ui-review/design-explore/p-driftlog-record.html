@@ -13,7 +13,7 @@
         --paper:#f3f9fa;
         --muted:#a9c7cf;
         --glass:#7fd1d9;
-        --coral:#c7452c;
+        --coral:#d4553a;
         --warm:#f6d79a;
         --line:rgba(243,249,250,.13);
       }
@@ -31,8 +31,12 @@
       .glint { position:absolute; inset:0; mix-blend-mode:screen;
         background:linear-gradient(101deg, transparent 28%, rgba(228,247,252,.045) 45%, rgba(228,247,252,.065) 50%, rgba(228,247,252,.028) 55%, transparent 72%); }
 
+      .cat { font-family:Quattrocento,'LXGW WenKai',serif; font-size:11px; letter-spacing:.24em; color:rgba(243,249,250,.5); }
+      /* 水面光带：世界的"上方"，瓶子来的方向 */
+      .waterlight { position:absolute; left:-8%; top:-4%; width:118%; height:290px; mix-blend-mode:screen;
+        background:linear-gradient(186deg, rgba(203,238,246,.10) 0%, rgba(203,238,246,.042) 32%, transparent 70%); }
+
       main { position:relative; z-index:2; height:900px; padding:64px 76px 0; }
-      .cat { font-family:Quattrocento,serif; font-size:11px; letter-spacing:.24em; color:rgba(243,249,250,.5); }
 
       /* ── 页头 ───────────────────────────────────────────── */
       .crumb { display:inline-flex; align-items:center; gap:7px; height:28px; padding:0 12px;
@@ -73,6 +77,7 @@
     <div class="clip">
       <div class="platter"></div>
       <div class="glint"></div>
+      <div class="waterlight"></div>
     </div>
 
     <main>
@@ -120,7 +125,7 @@
           <figcaption>完成</figcaption>
         </figure>
         <figure>
-          <svg width="44" height="30" viewBox="0 0 44 30" fill="none" aria-hidden="true"><path d="M8.2 21 A15 15 0 0 1 17.7 0.6" stroke="rgba(199,69,44,1)" stroke-width="2.4" stroke-linecap="round"/></svg>
+          <svg width="44" height="30" viewBox="0 0 44 30" fill="none" aria-hidden="true"><path d="M8.2 21 A15 15 0 0 1 17.7 0.6" stroke="rgba(212,85,58,1)" stroke-width="2.4" stroke-linecap="round"/></svg>
           <figcaption>入海</figcaption>
         </figure>
       </div>
@@ -129,7 +134,28 @@
         <!-- 刻痕盘：这一笔的弧长＝这一笔的重量；十一条短弧首尾相望（间隔固定 10°），
              拼成一圈半的螺旋 —— 内圈最早，往外走就是往后走；缺口朝上＝还没走完。 -->
         <svg class="lathe" width="480" height="540" viewBox="0 0 480 540" fill="none" aria-hidden="true">
+          <defs>
+            <linearGradient id="river" x1="0" y1="0" x2="1" y2="0">
+              <stop offset="0" stop-color="#cbeef6" stop-opacity="0"/>
+              <stop offset=".12" stop-color="#cbeef6" stop-opacity=".3"/>
+              <stop offset=".66" stop-color="#cbeef6" stop-opacity=".26"/>
+              <stop offset="1" stop-color="#cbeef6" stop-opacity="0"/>
+            </linearGradient>
+            <linearGradient id="riverFill" x1="0" y1="0" x2="1" y2="0">
+              <stop offset="0" stop-color="#7fd1d9" stop-opacity="0"/>
+              <stop offset=".12" stop-color="#7fd1d9" stop-opacity=".06"/>
+              <stop offset=".66" stop-color="#7fd1d9" stop-opacity=".05"/>
+              <stop offset="1" stop-color="#7fd1d9" stop-opacity="0"/>
+            </linearGradient>
+          </defs>
           <g transform="translate(8 4)">
+            <!-- 河道：盘面半沉在水里；内圈那道涟漪标出"把它投下去的那一下" -->
+            <rect x="-8" y="470" width="484" height="66" fill="url(#riverFill)"/>
+            <line x1="-8" y1="470" x2="476" y2="470" stroke="url(#river)"/>
+            <ellipse cx="150" cy="496" rx="118" ry="5" stroke="url(#river)"/>
+            <ellipse cx="332" cy="522" rx="150" ry="6" stroke="url(#river)" stroke-opacity=".7"/>
+            <ellipse cx="218.5" cy="195.8" rx="20" ry="6" stroke="#cbeef6" stroke-opacity=".26"/>
+            <ellipse cx="218.5" cy="195.8" rx="30" ry="9" stroke="#cbeef6" stroke-opacity=".12"/>
             <g fill="none" stroke-linecap="round">
               <path d="M210.5 191.8 A52 52 0 0 1 228.3 200.5" stroke="rgba(127,209,217,.95)" stroke-width="2.4"/>
               <path d="M251.9 190.8 A75 75 0 0 1 271.9 245.9" stroke="rgba(243,249,250,.85)" stroke-width="1.8"/>
@@ -142,7 +168,7 @@
               <path d="M225.8 7.8 A236 236 0 0 1 394.9 113.5" stroke="rgba(246,215,154,.9)" stroke-width="1.8"/>
               <path d="M435.4 140.8 A259 259 0 0 1 435.4 343.2" stroke="rgba(243,249,250,1)" stroke-width="1.6"/>
               <path d="M439.6 139.0 A263.5 263.5 0 0 1 439.6 345.0" stroke="rgba(243,249,250,1)" stroke-width="1.6"/>
-              <path d="M433.5 395.6 A282 282 0 0 1 69.0 493.3" stroke="rgba(199,69,44,1)" stroke-width="2.4"/>
+              <path d="M433.5 395.6 A282 282 0 0 1 69.0 493.3" stroke="rgba(212,85,58,1)" stroke-width="2.4"/>
             </g>
             <circle cx="197" cy="242" r="2.6" fill="rgba(127,209,217,.5)"/>
             <g font-family="Quattrocento,serif" font-size="10" fill="rgba(243,249,250,.5)">
@@ -157,6 +183,13 @@
               <text x="315.2" y="52.9" dy="0.34em" text-anchor="middle">#09</text>
               <text x="443.0" y="242.0" dy="0.34em" text-anchor="middle">#10</text>
               <text x="266.6" y="501.8" dy="0.34em" text-anchor="middle">#11</text>
+            </g>
+            <!-- 瓶子就停在最新的一笔（入海）上 —— 螺旋的缺口朝上，因为这条水路还没走完 -->
+            <g transform="translate(58 466) rotate(-16)">
+              <rect x="-3.6" y="-20" width="7.2" height="5" rx="2" fill="rgba(246,215,154,.5)"/>
+              <path d="M-1.8-14.4v4.2M1.8-14.4v4.2" stroke="rgba(203,238,246,.5)" stroke-width="1.1"/>
+              <rect x="-7" y="-10.2" width="14" height="22" rx="4" fill="rgba(127,209,217,.1)" stroke="rgba(203,238,246,.58)" stroke-width="1.2"/>
+              <rect x="-4" y="-6.6" width="8" height="14" rx="2" fill="rgba(246,215,154,.2)" stroke="rgba(246,215,154,.45)" stroke-width="1"/>
             </g>
           </g>
         </svg>

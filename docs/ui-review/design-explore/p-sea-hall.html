@@ -11,7 +11,7 @@
 
       :root {
         --ink:#050f14; --paper:#f3f9fa; --muted:#a9c7cf; --glass:#7fd1d9;
-        --coral:#c7452c; --warm:#f6d79a; --line:rgba(243,249,250,.13);
+        --coral:#d4553a; --warm:#f6d79a; --line:rgba(243,249,250,.13);
       }
       * { box-sizing:border-box; margin:0; padding:0; }
       html,body { width:1440px; height:900px; }
@@ -82,31 +82,31 @@
         background:
           linear-gradient(180deg, rgba(8,28,36,.42) 0%, rgba(5,15,20,0) 100%),
           repeating-linear-gradient(99deg, rgba(228,247,252,.026) 0 3px, transparent 3px 66px); }
-      /* 台账末尾那几行沉进水里 */
-      .log::after { content:''; display:block; height:64px;
-        background:linear-gradient(180deg, rgba(5,15,20,.5) 0%, rgba(5,15,20,0) 100%); }
+      /* 台账末尾沉进水里（用 mask 淡出，不加高度 —— 一屏是硬门） */
+      ul.log { -webkit-mask-image:linear-gradient(180deg, #fff 88%, rgba(255,255,255,.35) 100%);
+        mask-image:linear-gradient(180deg, #fff 88%, rgba(255,255,255,.35) 100%); }
 
       /* ---- 台面：左边是登记项，右边是条目 ---- */
       .desk { display:grid; grid-template-columns:272px 1fr; gap:56px; padding-top:36px; }
       .seal .cat { display:block; }
-      .seal .big { margin-top:12px; font-size:104px; line-height:1; color:rgba(243,249,250,.115); }
-      .seal .bigsub { margin-top:14px; font-size:11.5px; line-height:1.8; color:rgba(169,199,207,.66); }
-      .seal p { margin-top:20px; font-size:14px; line-height:1.95; color:var(--muted); }
+      .seal .big { margin-top:10px; font-size:100px; line-height:1; color:rgba(243,249,250,.115); }
+      .seal .bigsub { margin-top:12px; font-size:11.5px; line-height:1.8; color:rgba(169,199,207,.66); }
+      .seal p { margin-top:18px; font-size:14px; line-height:1.95; color:var(--muted); }
 
       .zone { display:flex; align-items:baseline; gap:18px; height:18px; }
-      .zone .cat { color:rgba(243,249,250,.34); }
-      .tab { font-size:15px; letter-spacing:.04em; color:rgba(243,249,250,.46); }
+      .zone .cat { color:rgba(243,249,250,.5); }
+      .tab { font-size:15px; letter-spacing:.04em; color:rgba(243,249,250,.56); }
       .tab .n { font-size:12px; margin-left:6px; }
       .tab[aria-selected='true'] { color:var(--paper); }
       .tab[aria-selected='true'] .n { color:var(--glass); }
 
       ul.log { list-style:none; margin-top:22px; }
       li.entry { display:grid; grid-template-columns:48px 130px 142px 1fr 164px; gap:22px;
-        align-items:start; padding-top:17px; height:64px;
+        align-items:start; padding-top:13px; height:60px;
         border-bottom:1px solid rgba(243,249,250,.075); }
       li.entry:first-child { border-top:1px solid rgba(243,249,250,.075); }
       li.entry[data-zone='INCOMPLETE'] { border-bottom:1px dashed rgba(246,215,154,.24); }
-      .tk { font-size:12px; line-height:1.9; color:rgba(243,249,250,.34); }
+      .tk { font-size:12px; line-height:1.9; color:rgba(243,249,250,.5); }
       .tk.cur { color:var(--coral); }
       .job { display:flex; flex-direction:column; gap:7px; }
       .song { font-size:17px; line-height:1.4; color:var(--paper); }
@@ -142,7 +142,7 @@
         background:rgba(243,249,250,.09); }
       .footrow { display:flex; justify-content:space-between; align-items:center; }
       .tail { font-family:Quattrocento,'LXGW WenKai',serif; font-size:11px; line-height:1;
-        letter-spacing:.2em; color:rgba(243,249,250,.34); }
+        letter-spacing:.2em; color:rgba(243,249,250,.5); }
       .tail .dot { display:inline-block; width:4px; height:4px; background:var(--coral);
         margin-right:9px; vertical-align:2px; }
       .tail .code { color:rgba(243,249,250,.5); }
@@ -152,8 +152,8 @@
       .pages a { display:flex; align-items:center; justify-content:center; width:26px; height:22px;
         border:1px solid rgba(243,249,250,.16); border-radius:2px;
         font-family:Quattrocento,serif; font-size:12px; color:rgba(243,249,250,.66); }
-      .pages a[aria-current='page'] { position:relative; border-color:rgba(199,69,44,.62);
-        background:rgba(199,69,44,.16); color:var(--paper); }
+      .pages a[aria-current='page'] { position:relative; border-color:rgba(212,85,58,.62);
+        background:rgba(212,85,58,.16); color:var(--paper); }
       .pages a[aria-current='page']::after { content:''; position:absolute; left:-1px; right:-1px;
         bottom:-4px; height:1px; background:var(--coral); }
     </style>
