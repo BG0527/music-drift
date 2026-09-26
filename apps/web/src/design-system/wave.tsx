@@ -53,15 +53,29 @@ export function RiverLine({ progress = 0, className }: DecorProps & { progress?:
   );
 }
 
-/** 漂流瓶标记：唯一可被"追踪"的具象元素（瓶身 + 瓶塞 + 涟漪）。 */
-export function BottleMark({ className, size = 48 }: DecorProps & { size?: number }) {
+/**
+ * 漂流瓶标记：唯一可被"追踪"的具象元素（瓶身 + 瓶塞 + 涟漪）。
+ *
+ * `tone` 是**真实需要**而不是预留：瓶子同时出现在浅底（`peacock`，5.13:1 on foam）
+ * 与深水（`sea-glass`，7.00:1 on deep-current）两种底上。
+ * 深底上用 `peacock` 只有 2.05:1 —— 那会让用户点名的母题变成一块看不出的污渍（实测发生过）。
+ */
+export function BottleMark({
+  className,
+  size = 48,
+  tone = 'peacock',
+}: DecorProps & { size?: number; tone?: 'peacock' | 'sea-glass' }) {
   return (
     <svg
       aria-hidden="true"
       width={size}
       height={size}
       viewBox="0 0 48 48"
-      className={cn('pointer-events-none text-peacock', className)}
+      className={cn(
+        'pointer-events-none',
+        tone === 'sea-glass' ? 'text-sea-glass' : 'text-peacock',
+        className,
+      )}
     >
       <ellipse cx="24" cy="41" rx="13" ry="3.2" fill="var(--color-lagoon)" opacity="0.28" />
       <path
@@ -72,7 +86,7 @@ export function BottleMark({ className, size = 48 }: DecorProps & { size?: numbe
         strokeLinejoin="round"
       />
       <rect x="21" y="3" width="6" height="5" rx="1.5" fill="var(--color-coral)" />
-      <path d="M17 30h14" stroke="var(--color-sea-glass)" strokeWidth="2" strokeLinecap="round" />
+      <path d="M17 30h14" stroke="var(--color-wave-white)" strokeWidth="2" strokeLinecap="round" />
     </svg>
   );
 }
@@ -150,7 +164,99 @@ export function TideLine({ className }: DecorProps) {
   return (
     <span
       aria-hidden="true"
-      className={cn('tide-line pointer-events-none absolute inset-x-0 bottom-0 z-underlay', className)}
+      className={cn(
+        'tide-line pointer-events-none absolute inset-x-0 bottom-0 z-underlay',
+        className,
+      )}
     />
+  );
+}
+
+/* ── 河道剖面（本轮）：水线 / 光柱 / 主流 / 漂过的瓶 ─────────────────────────────
+   为什么新增这四个：用户本轮指令是「必须高级符合人类审美地好看，因为这是参赛作品」。
+   河道页原来的组织方式是**两张同规格的深色卡片**，读起来是两个并列功能；
+   剖面把它改成**同一条河上的两个位置**（下游接住 / 上游放下），
+   并把「音乐」与「水」画成同一条曲线（主流 = 声波包络）。
+   构图与逐条反默认自检：`docs/ui-review/design-plan-river.md`；契约：`DESIGN.md` 的 `## Composition`。
+   四个构件与上面几件同一纪律：`aria-hidden` + `pointer-events-none` + 绝对定位（零布局高度）。 */
+
+/** 水线：岸与水体的分界，全页**唯一**一条横向实线。宿主负责给位置（`inset-x-0` + 一个 top/bottom）。 */
+export function SurfaceLine({ className }: DecorProps) {
+  return (
+    <span
+      aria-hidden="true"
+      className={cn('surface-line pointer-events-none absolute inset-x-0 z-underlay', className)}
+    />
+  );
+}
+
+/** 水下光柱：只在水体里出现；「越深越淡」由 CSS 的 mask 负责（强度取 `lightShaftAlpha`）。 */
+export function LightShafts({ className }: DecorProps) {
+  return (
+    <span
+      aria-hidden="true"
+      className={cn('water-lights pointer-events-none absolute inset-0 z-underlay', className)}
+    />
+  );
+}
+
+/**
+ * 河道主流：**声波包络形状**的曲线（音乐母题），位置在水里（河道母题），并编码**流向**。
+ * 形状写死在内联 SVG 里、颜色取 `var(--color-*)`、强度取 `.river-current`（`currentLineAlpha`）。
+ */
+export function CurrentLines({ className }: DecorProps) {
+  return (
+    <span
+      aria-hidden="true"
+      className={cn('river-current pointer-events-none absolute inset-x-0 z-underlay', className)}
+    >
+      <svg viewBox="0 0 1200 96" preserveAspectRatio="none" className="block h-full w-full">
+        {/* 主声波：两端收窄、中段最大 —— 读起来是"一段正在播放的声音"，不是一条装饰波浪 */}
+        <path
+          d="M0 48 C 40 48, 60 44, 100 43 C 140 42, 160 52, 200 56 C 240 60, 260 34, 300 30 C 340 26, 360 66, 400 70 C 440 74, 460 22, 500 18 C 540 14, 560 78, 600 80 C 640 82, 660 18, 700 20 C 740 22, 760 72, 800 68 C 840 64, 860 30, 900 32 C 940 34, 960 60, 1000 58 C 1040 56, 1060 44, 1100 45 C 1140 46, 1170 48, 1200 48"
+          fill="none"
+          stroke="var(--color-sea-glass)"
+          strokeWidth="2"
+          strokeLinecap="round"
+          vectorEffect="non-scaling-stroke"
+        />
+        {/* 两条更淡、波长更长的水流线：让"声波"底下仍然是"水" */}
+        <path
+          d="M0 62 C 150 54, 300 70, 450 62 S 750 54, 900 62 S 1150 70, 1200 62"
+          fill="none"
+          stroke="var(--color-lagoon)"
+          strokeWidth="1.5"
+          strokeOpacity="0.55"
+          vectorEffect="non-scaling-stroke"
+        />
+        <path
+          d="M0 34 C 150 42, 300 26, 450 34 S 750 42, 900 34 S 1150 26, 1200 34"
+          fill="none"
+          stroke="var(--color-lagoon)"
+          strokeWidth="1.5"
+          strokeOpacity="0.35"
+          vectorEffect="non-scaling-stroke"
+        />
+      </svg>
+    </span>
+  );
+}
+
+/**
+ * 沿主流漂过河道的漂流瓶 —— 全站**唯一**一个会"走完一段路"的装饰，因为这一页就是河道。
+ *
+ * 结构是**两层**：外层只负责定位（`className` 由页面给），内层才是被动画的位移载体。
+ * 上一版把两者合成一层，结果 `passage-drift` 的 ±`passageShift` 直接叠加在 `left` 上 ⇒
+ * 瓶子有一半行程漂到容器外面，**静帧里根本看不见**（等于用户点名的母题没落地）。
+ * 动效参数取契约 token，只动 `transform`，由 CSS 动画实现 ⇒ 被 `motion.css` 的全局
+ * reduced-motion 重置冻结。
+ */
+export function DriftingBottle({ className, size = 34 }: DecorProps & { size?: number }) {
+  return (
+    <span aria-hidden="true" className={cn('pointer-events-none absolute z-underlay', className)}>
+      <span className="passage-drift block">
+        <BottleMark size={size} tone="sea-glass" />
+      </span>
+    </span>
   );
 }

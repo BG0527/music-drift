@@ -108,6 +108,16 @@
   --section-gap: clamp(4rem, 8vw, 8rem);
   --touch-target-min: 44px;
 
+  /* ── 渐变（本轮新增；契约在 DESIGN.md 的 `gradients:` 块）────────────
+     规则：只允许由既有 `--color-*` 组合 —— 不得借"加渐变"发明新颜色。
+     `gradient.river` = 河道剖面的水体：水面 → 中层 → 河底（越往下越深）。 */
+  --gradient-river: linear-gradient(
+    180deg,
+    var(--color-peacock-deep) 0%,
+    var(--color-deep-current) 44%,
+    var(--color-trench) 100%
+  );
+
   /* ── z-index 契约 ───────────────────────────────── */
   --z-base: 0;
   --z-sticky: 100;
@@ -145,6 +155,9 @@
   /* t46：水流漂移（走 motion 契约；只动 transform） */
   --motion-drift-duration: 24000ms;
   --motion-drift-shift: 10px;
+  /* 本轮：漂流瓶沿河道通过（与 drift 的区别见 DESIGN.md 的 motion 块注释） */
+  --motion-passage-duration: 46000ms;
+  --motion-passage-shift: 160px;
   /* t44 增强：水感（双线距干涉 + 左右渐隐）+ 浅底强度上限 + 航迹虚线 */
   --motif-texture-line-gap-alt: 27px;
   --motif-texture-fade: 22%;
@@ -152,6 +165,10 @@
   --motif-wake-dash: 7px;
   --motif-wake-gap: 11px;
   --motif-wake-alpha: 0.45;
+  /* 本轮河道剖面三件：主流的强度 / 水下光柱的强度 / 水线的强度（契约在 DESIGN.md 的 motif 块） */
+  --motif-current-line-alpha: 0.42;
+  --motif-light-shaft-alpha: 0.05;
+  --motif-surface-line-alpha: 0.7;
 }
 
 /* ── z-index 契约落成 utilities（Tailwind v4 无 z-index 命名空间）── */

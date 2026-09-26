@@ -139,4 +139,64 @@
     );
     opacity: var(--motif-wake-alpha);
   }
+
+  /* ── 河道剖面（本轮）───────────────────────────────────────────────────────
+     把「水」从底纹升级为一幅**有深度的画面**：一条水线把页面切成岸与水，
+     水体里有一束光、一条主流（形状是声波 = 音乐母题）、和一只漂过河道的瓶子。
+     构图与逐条反默认自检：DESIGN.md 的 `## Composition` + `docs/ui-review/design-plan-river.md`。
+     与上面四个类同一纪律：只引用 `--color-*` / `--motif-*` / `--gradient-*`，不内联视觉值。 */
+
+  /* ⑤ 水体：岸线以下的整片水。渐变只由既有深水色组成（契约 gradients.river）。 */
+  .river-body {
+    background-image: var(--gradient-river);
+  }
+
+  /* ⑥ 水下光柱：几束从水线斜射进水里的光。**越深越淡**（mask 向下渐隐），
+     强度取 lightShaftAlpha —— 极淡是故意的：它只说「这里更深」，不照亮正文。 */
+  .water-lights {
+    background-image: repeating-linear-gradient(
+      104deg,
+      color-mix(in srgb, var(--color-sea-glass) 100%, transparent) 0,
+      color-mix(in srgb, var(--color-sea-glass) 100%, transparent) 2px,
+      transparent 2px,
+      transparent 104px
+    );
+    mask-image: linear-gradient(to bottom, black 0, transparent 82%);
+    -webkit-mask-image: linear-gradient(to bottom, black 0, transparent 82%);
+    opacity: var(--motif-light-shaft-alpha);
+  }
+
+  /* ⑦ 水线：岸与水体的分界 —— 全页**唯一**一条横向实线，两端渐隐。 */
+  .surface-line {
+    height: 1px;
+    background-image: linear-gradient(
+      to right,
+      transparent 0%,
+      color-mix(in srgb, var(--color-sea-glass) 100%, transparent) 14%,
+      color-mix(in srgb, var(--color-sea-glass) 100%, transparent) 86%,
+      transparent 100%
+    );
+    opacity: var(--motif-surface-line-alpha);
+  }
+
+  /* ⑧ 河道主流：强度在这里，形状由 wave.tsx 的内联 SVG 提供（声波包络）。 */
+  .river-current {
+    opacity: var(--motif-current-line-alpha);
+  }
+
+  /* ⑨ 漂过河道的漂流瓶：46s 走一个来回（低速度 ⇒ 不争夺注意力）。
+     与 drift 同一纪律：只动 transform，且必须是 CSS 动画
+     —— 这样 motion.css 的全局 reduced-motion 重置才管得到它（§100.1）。 */
+  @keyframes ocean-passage {
+    from {
+      transform: translate3d(calc(var(--passage-shift) * -1), 0, 0);
+    }
+    to {
+      transform: translate3d(var(--passage-shift), 0, 0);
+    }
+  }
+
+  .passage-drift {
+    animation: ocean-passage var(--passage-duration) ease-in-out infinite alternate;
+  }
 }

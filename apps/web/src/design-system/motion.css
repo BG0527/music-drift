@@ -18,6 +18,8 @@
   --reduced-duration: 150ms;
   --drift-duration: 24000ms;
   --drift-shift: 10px;
+  --passage-duration: 46000ms;
+  --passage-shift: 160px;
 }
 
 @keyframes ocean-rise {

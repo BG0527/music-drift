@@ -39,6 +39,11 @@ colors:
   danger-border: "#EBC3B6"
   info-tint: "#E6F1F4"
   info-border: "#BFDCE3"
+# 渐变（本轮新增）。规则：**只允许由既有 colors 组合**，不得借"加渐变"发明新颜色。
+gradients:
+  # 河道剖面的水体：水面（peacock-deep）→ 中层（deep-current）→ 河底（trench）。
+  # 语义是「越往下越深」——深水暗底硬约束在这里的体现是：它**不是**深色模式，是"这一页是一幅水的剖面"。
+  river: "linear-gradient(180deg, {colors.peacock-deep} 0%, {colors.deep-current} 44%, {colors.trench} 100%)"
 typography:
   hero:
     fontFamily: Quattrocento
@@ -110,6 +115,11 @@ motion:
     # 约束：只动 transform；低幅度低速度不争夺注意力；reduced-motion 下由全局重置冻结。
   driftDuration: 24000ms   # 24s 一个来回的一半（配 alternate）—— 慢到不引人注意
   driftShift: 10px         # 横向位移幅度（±10px）—— 小到只"感觉到"而不是"看到"
+  # 漂流瓶沿河道通过（本轮，河道剖面的主角装饰）。与 drift 的区别：drift 动的是**整面水纹**
+  # （幅度小、周期 24s），passage 动的是**一只瓶子**（幅度大、周期更长）。
+  # 判据仍是"低速度"而不是"低幅度"：46s 走 320px ≈ 7px/s，比水纹还慢 ⇒ 不争夺注意力。
+  passageDuration: 46000ms  # 一个来回（配 alternate）
+  passageShift: 160px       # 单程位移幅度（±160px）
   animatedProperties: [transform, opacity]
 # 水域母题层（2026-09-24 amend · t43）：只在这里定装饰的**强度**与**纹理周期**。
 # 组件只能引用 --motif-*，禁止内联 alpha / px（守卫：__tests__/water-motif.test.tsx）。
@@ -126,6 +136,10 @@ motif:
   wakeDash: 7px            # 航迹虚线的实线段长度
   wakeGap: 11px            # 航迹虚线的空隙长度
   wakeAlpha: 0.45          # 航迹虚线强度
+  # ── 河道剖面（本轮）──────────────────────────────────────────────────
+  currentLineAlpha: 0.42   # 河道主流线的强度。主流线的形状是**声波包络**（音乐母题），位置在水里（河道母题）
+  lightShaftAlpha: 0.05    # 水下光柱强度。极淡是**故意的**：它只说"这里更深"，不照亮正文、不与内容争亮度
+  surfaceLineAlpha: 0.7    # 水线（岸与水体的分界）强度。全页唯一一条横线，故可以比别的装饰更实
 zIndex:
   underlay: -1   # 装饰层：在宿主背景**之上**、内容**之下**（宿主必须 isolate，否则会被背景盖住）
   base: 0
@@ -303,6 +317,39 @@ Scale:
 - 单列优先：一次只让用户做一件事（选歌 → 录制 → 投瓶 → 取瓶 → 交接），接力路径以河道式纵向流呈现。
 - 深水暗底（deep-current / trench）**不是深色模式**：见「Elevation & Depth · 深水暗底硬约束」，全站不提供主题切换与 dark variant。
 
+## Composition
+
+### 河道页（`/river`）· 河道剖面（本轮 t48）
+
+用户本轮指令：「必须高级符合人类审美地好看，因为这是参赛作品」。
+河道页因此**不再用卡片**组织，改用一幅**剖面**：一条水线横贯内容区，岸在上、水在下，
+两个等权的泊位骑在这条河上。方案与逐条反默认自检见 `docs/ui-review/design-plan-river.md`。
+
+```text
+┌ 岸（wave-white + 浅底水层）──────────────────────────────────────┐
+│  暖流河道（hero 档标题）                        我参与过的漂流瓶   │
+│  拾起那些搁浅在黑夜里的声线                                       │
+├──────────────────────── 水 线（唯一横线）────────────────────────┤
+│░ 水体（gradients.river：peacock-deep → deep-current → trench）  ░│
+│░   ◎ 捞取（下游）                     投下 ◎（上游）              ░│
+│░   捞一个漂流瓶                        投下一支漂流瓶             ░│
+│░  ～～～～～～ 河道主流（= 声波包络）～～～～～～  🍾 漂过的瓶子   ░│
+│░  〔全部〕〔深夜〕〔通勤〕〔告白〕〔雨天〕  ← 浮标                ░│
+└──────────────────────────────────────────────────────────────────┘
+```
+
+- **为什么不是两张卡**：同宽同高同圆角同阴影的两张卡片会把「捞」与「投」读成两个并列功能；
+  剖面把两者读成**同一条河上的两个位置**（下游接住 / 上游放下）——这正是产品规则（单支路河道）的形状。
+- **「等权」仍然成立**（用户 2026-09-23 裁决）：两个泊位共用同一份尺寸定义（`PORT_SIZE`），
+  只有颜色与图标不同（`peacock` / `coral`）。**禁止**只改其中一个。
+- **流向由右向左**（上游在右）：`投下` 在右、`捞取` 在左，与阅读顺序一致（新用户的第一动作是「捞」）。
+  方向由航迹与瓶子漂移共同暗示，**不写文字解释**。
+- **四个主题装在一幅画里**：海洋（水体渐变 + 光柱）、河道（水线 + 主流 + 上下游）、
+  漂流瓶（漂过的瓶）、音乐（主流 = 声波包络）。
+- **一屏**：本构图**不**为 900px 砍画面（用户本轮明确豁免该门禁）。
+  ⚠️ **门禁脚本本身没有被放宽**：`apps/web/tools/one-screen-check.mjs` 的阈值一字未改。
+  回滚路径见 `docs/ui-review/design-plan-river.md` §7。
+
 ## Elevation & Depth
 
 Water contours, tide lines, river-channel guides, ripples, drift-bottle silhouettes, glass-water surfaces, subtle gradients, luminous depth cues, delicate restrained animation。装饰只出现在区块边缘与状态切换处，不进入内容区。
@@ -321,6 +368,16 @@ Water contours, tide lines, river-channel guides, ripples, drift-bottle silhouet
   1. **水面光带（water sheen）**：深水暗底顶部的一层极淡渐变，暗示"从水面往下看"；强度 `sheenAlphaDark`（浅底用 `sheenAlphaLight`）。
   2. **水位线肌理（water texture）**：横向细线平铺（周期 `textureTile`，强度 `textureAlpha`），让大块暗底不再像空白模板（`frontend-design` L59：把质量地板做到不喧哗）。
   3. **潮线（tide line）**：`sea-glass → 透明` 的渐隐细线，替代区块之间的硬分隔线（母题见 Overview 的 tide lines）。
+  - **河道剖面四件（本轮新增，t48）** —— 让「水」从底纹升级为一幅**有深度的画面**：
+    4. **水线（surface line）**：岸与水体的**分界**（`surfaceLineAlpha`）。它不是分隔线，是**地平线**：
+       线以上是空气与岸（浅底），线以下是水（`gradients.river`）。全页**唯一**一条横向实线。
+    5. **水下光柱（light shafts）**：从水线斜射进水体的几道光（`lightShaftAlpha`）。只在水体里出现，
+       借「越往下越深」的渐变建立**深度感**；不承载任何文字、不照亮正文。
+    6. **河道主流（current line）**：水体内一条**声波包络形状**的曲线（`currentLineAlpha`）。
+       它是本系统里「音乐」与「水」**共用同一条曲线**的地方——声波即水波；
+       同时它编码**流向**（河道是单支路，见 `CONTEXT.md` §4.1），不是纯装饰。
+    7. **漂过河道的漂流瓶（passage drift）**：`BottleMark` 沿主流缓缓通过（`passageDuration` / `passageShift`）。
+       这是全站**唯一**一个会「走完一段路」的装饰——因为这一页就是河道。
   - **产品理由**：这本就是一个关于"水面之上与深海之下"的产品；这三层让页面有**地点感**，而不是"任何 App 都能用的背景"。
   - **不许喧宾夺主（硬约束，三条同时成立）**：① 一律 `aria-hidden="true"` + `pointer-events-none` + **绝对定位**（零布局高度，因此不会破坏"一屏装下"）；② 只出现在**深水暗底与区块边缘**，不进入内容区、不压在正文之下 —— 浅底上若要用，强度必须降到 `sheenAlphaLight` 并实测文字对比度不退化；③ **含一条低幅度常驻漂移**（water drift，t46 起生效；t47 起**浅底整面水层与深底面板/深底页头的水层共用同一对参数**，不设"深底专用"值）：水面缓缓横向流动，参数取 `driftDuration`（24s）/ `driftShift`（±10px），**只动 `transform`**、由 CSS 动画实现（因此被全局 `reduced-motion` 重置冻结为静止）。`motion-web` §1 的 decoration 三条件逐条成立：① 产品理由＝「静止的水面像贴图」，已写在本条；② 低幅度低速度、不争夺注意力；③ `reduced-motion` 下静止。
 - **漂流瓶母题（bottle motif，t44 补）**：用户点名的第三类母题。已有内联 SVG `BottleMark`（瓶身 + 瓶塞 + 一道水线 + 底部椭圆水影）本批**首次落到页面上**：公海大厅与漂流日志的页头右侧各一枚，骑在潮线上、与标题同高（绝对定位，零布局高度）。产品理由：**公海就是瓶子入海之后的去处**，页头出现"漂着的瓶子"是这个页面最该有的那一件事。

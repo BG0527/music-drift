@@ -16,13 +16,24 @@ import { existsSync, readFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { render } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
-import { BottleMark, TideLine, WakeLine, WaterSheen, WaterTexture } from '../index';
+import {
+  BottleMark,
+  CurrentLines,
+  DriftingBottle,
+  LightShafts,
+  SurfaceLine,
+  TideLine,
+  WakeLine,
+  WaterSheen,
+  WaterTexture,
+} from '../index';
 
 const SRC_DIR = join(process.cwd(), 'src');
 const DS_DIR = join(SRC_DIR, 'design-system');
 const REPO_ROOT = resolve(process.cwd(), '../..');
 
-const readIfPresent = (path: string): string => (existsSync(path) ? readFileSync(path, 'utf8') : '');
+const readIfPresent = (path: string): string =>
+  existsSync(path) ? readFileSync(path, 'utf8') : '';
 /** 读某个页面源码（跨 describe 共用，故放在模块作用域）。 */
 const pageSource = (name: string): string => readIfPresent(join(SRC_DIR, 'pages', name));
 const designMd = readFileSync(resolve(REPO_ROOT, 'DESIGN.md'), 'utf8');
@@ -44,6 +55,10 @@ const MOTIF_TOKENS = [
   'wakeDash',
   'wakeGap',
   'wakeAlpha',
+  // 本轮：河道剖面（主流 / 光柱 / 水线）
+  'currentLineAlpha',
+  'lightShaftAlpha',
+  'surfaceLineAlpha',
 ] as const;
 
 const kebab = (name: string): string =>
@@ -87,6 +102,11 @@ describe('水域母题：装饰层的基本纪律（不喧宾夺主）', () => {
     ['WaterSheen', WaterSheen],
     ['WaterTexture', WaterTexture],
     ['TideLine', TideLine],
+    // 本轮河道剖面四件：同一纪律（否则装饰会被读屏念出来或挡住点击）
+    ['SurfaceLine', SurfaceLine],
+    ['LightShafts', LightShafts],
+    ['CurrentLines', CurrentLines],
+    ['DriftingBottle', DriftingBottle],
   ] as const;
 
   for (const [name, Component] of cases) {
@@ -102,8 +122,7 @@ describe('水域母题：装饰层的基本纪律（不喧宾夺主）', () => {
 });
 
 describe('水域母题：页面确实接入了（不是写了组件没人用）', () => {
-
-  it('河道页的两个深水面板都加了水面光带与水纹', () => {
+  it('河道页的整片水体加了水面光带与水纹', () => {
     const river = pageSource('river-page.tsx');
     expect(river, 'river-page 未接入 WaterSheen').toContain('<WaterSheen');
     expect(river, 'river-page 未接入 WaterTexture').toContain('<WaterTexture');
@@ -215,7 +234,6 @@ describe('t44 漂流瓶与航迹母题', () => {
   });
 });
 
-
 /* ── t46 第三批：全站扩面 ───────────────────────────────────────────────────
    用户第十四轮：「还要更明显：其他页面也加水与瓶子」。
    判据（机器可检）：① 每个页面至少一处母题；② 用整面水层（WaterTexture/WaterSheen）
@@ -225,8 +243,7 @@ const MOTIF_TAGS = ['<BottleMark', '<TideLine', '<WakeLine', '<WaterSheen', '<Wa
 /** 页面里是否出现任一母题组件（用 includes 而不是正则：避免转义坑）。 */
 const hasMotif = (src: string): boolean => MOTIF_TAGS.some((tag) => src.includes(tag));
 const FULL_SURFACE_TAGS = ['<WaterTexture', '<WaterSheen'];
-const hasFullSurface = (src: string): boolean =>
-  FULL_SURFACE_TAGS.some((tag) => src.includes(tag));
+const hasFullSurface = (src: string): boolean => FULL_SURFACE_TAGS.some((tag) => src.includes(tag));
 
 describe('t46 扩面：每个页面至少一处水或漂流瓶母题', () => {
   const PAGES = [
@@ -361,11 +378,17 @@ const darkSurfaceDrifts = (src: string): 'none' | 'all' | 'partial' => {
 };
 
 describe('t47 深底水面也流动（消除"浅底活在流、深底是贴图"）', () => {
-  it('河道页的两个深水面板（bg-deep-current）里都有 drift 水层', () => {
+  /* 本轮河道页从「两张深色卡片」改成「一整片水体」：深底容器数 2 → 1。
+     断言跟着**新结构**走，不删不改意 —— 判据仍是"深底水面必须是活的"。 */
+  it('河道页的整片水体（river-body）里有 drift 水层', () => {
     const src = pageSource('river-page.tsx');
-    expect(src.split('bg-deep-current').length - 1, '河道页深底容器数量变了？').toBe(2);
-    expect(darkSurfaceDrifts(src), '河道页有深水面板没开漂移').toBe('all');
-    expect(countDriftTags(src, 'WaterTexture'), '河道页带 drift 的水层少于 2 处').toBeGreaterThanOrEqual(2);
+    const body = src.split('river-body');
+    expect(body.length - 1, '河道页水体容器数量变了？').toBe(1);
+    expect(body[1]?.slice(0, 1200).includes(' drift'), '河道页水体没开漂移').toBe(true);
+    expect(
+      countDriftTags(src, 'WaterTexture'),
+      '河道页带 drift 的水层少于 1 处',
+    ).toBeGreaterThanOrEqual(1);
   });
 
   it('作品详情深底页头（bg-deep-current）里也有 drift 水层', () => {
@@ -382,5 +405,168 @@ describe('t47 深底水面也流动（消除"浅底活在流、深底是贴图"�
     // 只允许一套漂移参数：motion 块里 drift 参数只能各出现一次
     expect(frontMatter.split('driftDuration:').length - 1, 'driftDuration 出现多次').toBe(1);
     expect(frontMatter.split('driftShift:').length - 1, 'driftShift 出现多次').toBe(1);
+  });
+});
+
+/* ── 本轮：河道剖面（river cross-section）────────────────────────────────────
+   用户本轮指令：「必须高级符合人类审美地好看，因为这是参赛作品」。
+   构图方案与逐条自检见 `docs/ui-review/design-plan-river.md`。本组只把**可机器检的部分**
+   变成会红的契约 —— 具体是五件事：
+
+     ① **契约先补**：`gradients.river` / 三个新 motif 强度 / 一对 passage 动效参数先写进 DESIGN.md，
+        再由 theme.css 暴露、motion.css 同值（禁止组件内联新值）；
+     ② `gradients.river` 只允许引用**既有**深水色（不得借这次机会发明新颜色）；
+     ③ 主流关键帧**只动 transform**，且必须是 **CSS 动画**（这样 motion.css 的全局
+        reduced-motion 重置才管得到它）；
+     ④ 页面**真的接入**了新构件（不是写了组件没人用）；
+     ⑤ 用户裁决「投下与捞起**等权**」仍然成立 —— 两个泊位共用同一份尺寸定义。
+
+   **本组证明不了"好不好看"**。观感只能由人看 `docs/ui-review/` 的截图判定；
+   一屏是否被破坏由 `apps/web/tools/one-screen-check.mjs` 判定（本批不改该脚本）。 */
+
+/** 取 `marker` 之后**配对花括号**内的内容（比 `split('}')[0]` 可靠：后者只拿到第一层）。 */
+function blockAfter(source: string, marker: string): string {
+  const start = source.indexOf(marker);
+  if (start === -1) return '';
+  const open = source.indexOf('{', start);
+  if (open === -1) return '';
+  let depth = 0;
+  for (let index = open; index < source.length; index += 1) {
+    if (source[index] === '{') depth += 1;
+    else if (source[index] === '}') {
+      depth -= 1;
+      if (depth === 0) return source.slice(open + 1, index);
+    }
+  }
+  return '';
+}
+
+/**
+ * 取 `marker` 起、到顶层 `\n}` 为止的整段**函数声明**。
+ * 不能复用 `blockAfter`：TSX 的函数签名里有解构（`{ className, size = 26 }`），
+ * 那个 `{}` 不是函数体 —— 上一版就是这样只拿到参数列表而误判的。
+ */
+function declarationAfter(source: string, marker: string): string {
+  const start = source.indexOf(marker);
+  if (start === -1) return '';
+  const end = source.indexOf('\n}', start);
+  return end === -1 ? source.slice(start) : source.slice(start, end);
+}
+
+describe('河道剖面：契约先补（本轮的构图需要新 token）', () => {
+  it('DESIGN.md 登记了 gradients.river，且只引用既有深水色', () => {
+    const block = /gradients:\n([\s\S]*?)\n[a-zA-Z]+:/.exec(frontMatter)?.[1] ?? '';
+    expect(block, 'DESIGN.md front matter 缺少 gradients: 块').not.toBe('');
+    const river = /river:\s*"([^"]+)"/.exec(block)?.[1] ?? '';
+    expect(river, 'gradients 块缺少 river').not.toBe('');
+    for (const stop of ['peacock-deep', 'deep-current', 'trench']) {
+      expect(river, `gradients.river 未引用既有色 ${stop}`).toContain(stop);
+    }
+    // 不得借这次机会发明新颜色：渐变里只允许出现 {colors.<既有名>} 形式的引用
+    const literals = [...river.matchAll(/#[0-9a-fA-F]{3,8}/g)].map((match) => match[0]);
+    expect(literals, `gradients.river 内联了色值：${literals.join(',')}`).toEqual([]);
+  });
+
+  it('DESIGN.md 登记了 passage（漂流瓶通过河道）的时长与位移', () => {
+    const duration = /passageDuration:\s*(\d+)ms/.exec(frontMatter)?.[1] ?? '';
+    const shift = /passageShift:\s*(\d+)px/.exec(frontMatter)?.[1] ?? '';
+    expect(duration, 'motion 块缺 passageDuration').not.toBe('');
+    expect(shift, 'motion 块缺 passageShift').not.toBe('');
+    // 必须**慢**：低频位移才不争夺注意力（motion-web §1 decoration）
+    expect(
+      Number(duration),
+      'passageDuration 快于 driftDuration ⇒ 会抢注意力',
+    ).toBeGreaterThanOrEqual(24000);
+  });
+
+  it('theme.css 暴露契约值，motion.css 工作变量与契约同值（drift guard）', () => {
+    const motionCss = readFileSync(join(DS_DIR, 'motion.css'), 'utf8');
+    const duration = /passageDuration:\s*(\d+)ms/.exec(frontMatter)?.[1] ?? '';
+    const shift = /passageShift:\s*(\d+)px/.exec(frontMatter)?.[1] ?? '';
+    expect(themeCss, 'theme.css 缺 --motion-passage-duration').toContain(
+      `--motion-passage-duration: ${duration}ms`,
+    );
+    expect(themeCss, 'theme.css 缺 --motion-passage-shift').toContain(
+      `--motion-passage-shift: ${shift}px`,
+    );
+    expect(motionCss, 'motion.css 工作变量 --passage-duration 与契约不同值').toContain(
+      `--passage-duration: ${duration}ms`,
+    );
+    expect(motionCss, 'motion.css 工作变量 --passage-shift 与契约不同值').toContain(
+      `--passage-shift: ${shift}px`,
+    );
+    expect(themeCss, 'theme.css 缺 --gradient-river').toContain('--gradient-river');
+  });
+
+  it('water.css 用契约变量实现水体 / 光柱 / 水线 / 主流（无内联视觉值）', () => {
+    const cases: ReadonlyArray<readonly [string, string]> = [
+      ['.river-body', 'var(--gradient-river)'],
+      ['.water-lights', 'var(--motif-light-shaft-alpha)'],
+      ['.surface-line', 'var(--motif-surface-line-alpha)'],
+      ['.river-current', 'var(--motif-current-line-alpha)'],
+    ];
+    for (const [selector, token] of cases) {
+      const block = blockAfter(waterCss, selector);
+      expect(block, `water.css 缺少 ${selector} 规则`).not.toBe('');
+      expect(block, `${selector} 未引用契约变量 ${token}`).toContain(token);
+    }
+  });
+
+  it('漂流瓶通过河道：CSS 动画、只动 transform、参数取契约、可被 reduced-motion 冻结', () => {
+    const frames = blockAfter(waterCss, '@keyframes ocean-passage');
+    expect(frames, 'water.css 缺 @keyframes ocean-passage').not.toBe('');
+    expect(frames, '通过动画必须动 transform').toContain('transform:');
+    expect(frames, '通过幅度必须取契约 token').toContain('var(--passage-shift)');
+    for (const banned of ['width:', 'height:', 'top:', 'left:', 'margin:', 'padding:']) {
+      expect(frames, `通过动画不得动 ${banned}`).not.toContain(banned);
+    }
+    const passage = blockAfter(waterCss, '.passage-drift');
+    expect(passage, 'water.css 缺 .passage-drift').not.toBe('');
+    expect(passage, '通过时长必须取契约 token').toContain('var(--passage-duration)');
+    // 降级通道唯一：CSS 动画才受 motion.css 的全局重置管辖（§100.1）
+    expect(waterCss, 'water.css 不得出现 JS 动画').not.toContain('.animate(');
+    expect(waterCss, 'water.css 不得用 rAF 驱动').not.toContain('requestAnimationFrame');
+  });
+});
+
+describe('河道剖面：页面真的接入了（不是写了组件没人用）', () => {
+  const river = pageSource('river-page.tsx');
+
+  it('河道页有水体 + 水线 + 光柱 + 主流 + 漂着的瓶子', () => {
+    expect(river, '缺水体容器 river-body').toContain('river-body');
+    expect(river, '缺水线构件').toContain('<SurfaceLine');
+    expect(river, '缺水下光柱构件').toContain('<LightShafts');
+    expect(river, '缺河道主流构件').toContain('<CurrentLines');
+    expect(river, '缺沿主流漂过的漂流瓶').toContain('<DriftingBottle');
+    // 「漂流瓶」是用户点名的母题：漂过河道的那一只里面必须是 `BottleMark`（不另画一个瓶子）
+    const waveSrc = readIfPresent(join(DS_DIR, 'wave.tsx'));
+    expect(
+      declarationAfter(waveSrc, 'export function DriftingBottle'),
+      '漂过的瓶子没有复用 BottleMark',
+    ).toContain('<BottleMark');
+  });
+
+  it('母题宿主是 isolate 容器（否则 z-underlay 看不见）', () => {
+    expect(river, 'river-page 缺 isolate 宿主').toContain('isolate');
+  });
+
+  it('旧契约未被这次改构图顺手丢掉（锚点与可访问名）', () => {
+    expect(river, '缺 river-draw 锚点').toContain('data-anchor="river-draw"');
+    expect(river, '缺 river-drop 锚点').toContain('data-anchor="river-drop"');
+    expect(river, '缺捞取的可访问名').toContain('aria-label="捞一个漂流瓶"');
+    expect(river, '缺投下的可访问名').toContain('aria-label="投下一支漂流瓶"');
+  });
+
+  it('「投下与捞起等权」仍成立：两个泊位共用同一份尺寸定义', () => {
+    // 用共享常量而不是"两处恰好都写了 110px"：后者会在有人只改一处时静默失衡
+    const uses = river.split('PORT_SIZE').length - 1;
+    expect(uses, `PORT_SIZE 只被引用 ${String(uses)} 次（两个泊位都要用）`).toBeGreaterThanOrEqual(
+      3,
+    );
+    const size = /const PORT_SIZE\s*=\s*'([^']+)'/.exec(river)?.[1] ?? '';
+    expect(size, '缺 PORT_SIZE 定义').not.toBe('');
+    expect(size, 'PORT_SIZE 必须定义圆形与桌面尺寸').toContain('rounded-full');
+    expect(size, 'PORT_SIZE 必须定义桌面 110px 档').toContain('md:h-[110px]');
+    expect(size, 'PORT_SIZE 必须定义桌面 110px 档').toContain('md:w-[110px]');
   });
 });

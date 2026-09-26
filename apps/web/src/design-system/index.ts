@@ -23,6 +23,10 @@ export {
   WaterTexture,
   WakeLine,
   TideLine,
+  SurfaceLine,
+  LightShafts,
+  CurrentLines,
+  DriftingBottle,
   type DecorProps,
 } from './wave';
 export { Icon, type IconName, type IconProps } from './icon';
