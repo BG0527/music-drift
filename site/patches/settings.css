@@ -1,0 +1,445 @@
+/*
+ * W5-B 流体补丁 · 设置页（`site/settings.html`）
+ * ============================================================================
+ * 定稿是 1440×900 固定画布：**水线 y=520** 之上是空气、之下是水；水里泡着一张"内袋说明书折页"
+ * （`.leaf`，104,52 → 1232×796），折页上方（干）与下方（湿）各有一块文字；水线两侧各一条图例；
+ * 折页右边浮着一只**跨在水线上的瓶子**（水面之上是瓶身、之下是它的倒影）。
+ *
+ * 换算单位（本补丁的"画布 px"）：
+ *   --ux = 100vw / 1440   --u = 100dvh / 900
+ * 水线本身也流体化：`--wl: calc(520 * var(--u))` —— 于是**水线上下的一切**（空气层、水体、
+ * 光柱、湿纸前沿、图例、瓶子与倒影）都以同一根水线为基准，视口变高变矮时它们一起动，
+ * 而不是各自拉开。
+ *
+ * 两个"刚性物件"（它们内部是 px 子件，跟着视口拉伸会散架）在这里**只换锚点、不换尺寸**：
+ *   · 瓶子：锚点 = (瓶身左沿 1182 → --bx) × (水线 → --wl)，各部件写成 calc(--bx ± Δpx) / calc(--wl ± Δpx)；
+ *   · 折角 `.dogear` 与 die-cut 指孔 `.hole`：定稿里是 41px / 34px 的固定尺寸，保持 px。
+ * 其余位置一律画布比例；字号留在 px（必要时 clamp 一档），所以小窗不糊、大屏不变胖。
+ */
+
+:root {
+  --ux: calc(100vw / 1440);
+  --u: calc(100dvh / 900);
+  --wl: calc(520 * var(--u)); /* 水线（画布 y=520） */
+  --bx: calc(1182 * var(--ux)); /* 瓶身左沿（画布 x=1182） */
+  width: 100%;
+  height: 100%;
+}
+
+html body {
+  width: 100%;
+  height: 100dvh;
+}
+
+/* ── 唱片与水层 ──────────────────────────────────────────────────────────── */
+/* 盘心：定稿在画布 (1420,960)（贴在右下角外），跟着视口走 —— 干盘与湿盘必须**同一个心**，
+ * 否则水线两侧的沟槽会错位。 */
+html .platter {
+  background:
+    repeating-radial-gradient(circle at calc(1420 * var(--ux)) calc(960 * var(--u)), rgba(216, 243, 246, 0.055) 0 1.2px, transparent 1.2px 6.5px),
+    radial-gradient(circle at calc(1420 * var(--ux)) calc(960 * var(--u)), rgba(127, 209, 217, 0.05) 0 30%, transparent 68%);
+}
+
+html .grooves-wet {
+  background: repeating-radial-gradient(circle at calc(1420 * var(--ux)) calc(960 * var(--u)), rgba(216, 243, 246, 0.085) 0 1.2px, transparent 1.2px 6.5px);
+}
+
+html .air {
+  height: var(--wl);
+}
+
+html .sea,
+html .grooves-wet {
+  top: var(--wl);
+}
+
+html .shaft {
+  top: var(--wl);
+  height: calc(380 * var(--u));
+}
+
+html .surf {
+  top: var(--wl);
+  height: calc(30 * var(--u));
+}
+
+html .wline {
+  top: var(--wl);
+}
+
+/* ── 内袋说明书折页：整张纸按视口缩放，纸内的一切跟着纸 ─────────────────── */
+html .leaf {
+  left: calc(104 * var(--ux));
+  top: calc(52 * var(--u));
+  width: calc(1232 * var(--ux));
+  height: calc(796 * var(--u));
+}
+
+html .leaf-dry,
+html .leaf-wet,
+html .tide,
+html .film,
+html .crease-shl,
+html .crease-shr,
+html .crease,
+html .crease-soak {
+  width: 100%; /* 定稿写死 1232px，这里跟着纸走 */
+}
+
+html .leaf-dry {
+  height: calc(468 * var(--u));
+}
+
+html .leaf-wet,
+html .film {
+  left: 0;
+  top: calc(468 * var(--u));
+  height: calc(328 * var(--u));
+}
+
+html .tide {
+  left: 0;
+  top: calc(468 * var(--u));
+  height: calc(12 * var(--u));
+}
+
+html .crease-shl,
+html .crease-shr,
+html .crease {
+  height: 100%;
+}
+
+html .crease-shl {
+  left: calc(588 * var(--ux));
+  width: calc(28 * var(--ux));
+}
+
+html .crease-shr {
+  left: calc(619 * var(--ux));
+  width: calc(28 * var(--ux));
+}
+
+html .crease {
+  left: calc(616 * var(--ux));
+  width: 3px;
+}
+
+html .crease-soak {
+  left: calc(615 * var(--ux));
+  top: calc(468 * var(--u));
+  width: 5px;
+  height: calc(328 * var(--u));
+}
+
+html .wick.mid {
+  left: calc(614 * var(--ux));
+  top: calc(452 * var(--u));
+  width: 6px;
+  height: calc(16 * var(--u));
+}
+
+html .wick.lf {
+  left: 0;
+  top: calc(456 * var(--u));
+  width: 3px;
+  height: calc(12 * var(--u));
+}
+
+html .wick.rt {
+  left: calc(1229 * var(--ux));
+  top: calc(456 * var(--u));
+  width: 3px;
+  height: calc(12 * var(--u));
+}
+
+/* die-cut 指孔：定稿里是 34px 的一个洞 —— 尺寸不跟着视口走（它是个圆，拉伸会变成椭圆），
+ * 位置跟着纸（纸的横向跟着 --ux、纵向跟着 --u）。 */
+html .hole {
+  left: calc(1160 * var(--ux));
+  top: calc(730 * var(--u));
+}
+
+/* ── 水面上的那只瓶子 + 水下的倒影（同一个"刚性装置"） ─────────────────────
+ * 锚点 x = 瓶身左沿 1182 → --bx（跟着视口宽），锚点 y = 水线 → --wl；
+ * 部件的位置与尺寸**一律乘 --ux**（同一个比例）⇒ 瓶子不会被拉扁拉长，而且它与那张纸
+ * （纸宽也是 1232 * --ux）的比例在任何视口下都不变（定稿：瓶宽 = 纸宽的 9.1%）。
+ * 只有 1px 的瓶身高光、边框、字宽保持 px（发丝线与字不该跟着视口变粗变细）。 */
+html .bot-body {
+  left: var(--bx);
+  top: calc(var(--wl) - 104 * var(--ux));
+  width: calc(112 * var(--ux));
+  height: calc(104 * var(--ux));
+}
+
+html .bot-shoulder {
+  left: var(--bx);
+  top: calc(var(--wl) - 120 * var(--ux));
+  width: calc(112 * var(--ux));
+  height: calc(16 * var(--ux));
+}
+
+html .bot-neck {
+  left: calc(var(--bx) + 32 * var(--ux));
+  top: calc(var(--wl) - 164 * var(--ux));
+  width: calc(48 * var(--ux));
+  height: calc(44 * var(--ux));
+}
+
+html .bot-lip {
+  left: calc(var(--bx) + 30 * var(--ux));
+  top: calc(var(--wl) - 174 * var(--ux));
+  width: calc(52 * var(--ux));
+  height: calc(10 * var(--ux));
+}
+
+html .bot-cork {
+  left: calc(var(--bx) + 34 * var(--ux));
+  top: calc(var(--wl) - 188 * var(--ux));
+  width: calc(44 * var(--ux));
+  height: calc(14 * var(--ux));
+}
+
+html .bot-l1 {
+  left: calc(var(--bx) + 9 * var(--ux));
+  top: calc(var(--wl) - 100 * var(--ux));
+  width: 3px;
+  height: calc(96 * var(--ux));
+}
+
+html .bot-l2 {
+  left: calc(var(--bx) + 105 * var(--ux));
+  top: calc(var(--wl) - 100 * var(--ux));
+  height: calc(96 * var(--ux));
+}
+
+html .slip {
+  left: calc(var(--bx) + 22 * var(--ux));
+  top: calc(var(--wl) - 80 * var(--ux));
+  width: calc(68 * var(--ux));
+  height: calc(36 * var(--ux));
+  line-height: calc(36 * var(--ux));
+}
+
+html .wave {
+  left: calc(var(--bx) + 34 * var(--ux));
+  top: calc(var(--wl) - 256 * var(--ux));
+  width: calc(45 * var(--ux));
+  height: calc(48 * var(--ux));
+}
+
+html .contact {
+  left: var(--bx);
+  top: calc(var(--wl) - 4 * var(--ux));
+  width: calc(112 * var(--ux));
+  height: calc(7 * var(--ux));
+}
+
+html .rip.a {
+  left: calc(var(--bx) - 19 * var(--ux));
+  top: calc(var(--wl) - 7 * var(--ux));
+  width: calc(150 * var(--ux));
+  height: calc(13 * var(--ux));
+}
+
+html .rip.b {
+  left: calc(var(--bx) + 8 * var(--ux));
+  top: calc(var(--wl) - 4 * var(--ux));
+  width: calc(96 * var(--ux));
+  height: calc(8 * var(--ux));
+}
+
+/* 水下的倒影：同一个锚点，落在水线以下；内部与瓶身同一把尺 */
+html .refl {
+  left: var(--bx);
+  top: var(--wl);
+  width: calc(112 * var(--ux));
+  height: calc(190 * var(--ux));
+}
+
+html .refl .rb {
+  width: calc(112 * var(--ux));
+  height: calc(104 * var(--ux));
+}
+
+html .refl .rs {
+  top: calc(104 * var(--ux));
+  width: calc(112 * var(--ux));
+  height: calc(16 * var(--ux));
+}
+
+html .refl .rn {
+  left: calc(32 * var(--ux));
+  top: calc(120 * var(--ux));
+  width: calc(48 * var(--ux));
+  height: calc(44 * var(--ux));
+}
+
+html .refl .rl {
+  left: calc(30 * var(--ux));
+  top: calc(164 * var(--ux));
+  width: calc(52 * var(--ux));
+  height: calc(10 * var(--ux));
+}
+
+html .refl .rc {
+  left: calc(34 * var(--ux));
+  top: calc(174 * var(--ux));
+  width: calc(44 * var(--ux));
+  height: calc(14 * var(--ux));
+}
+
+html .refl .rslip {
+  left: calc(22 * var(--ux));
+  top: calc(24 * var(--ux));
+  width: calc(68 * var(--ux));
+  height: calc(36 * var(--ux));
+  line-height: calc(36 * var(--ux));
+}
+
+/* 声波：七根柱子的位置与高度与瓶子同一把尺 */
+html .wave > i:nth-child(1) { left: 0 !important; height: calc(10 * var(--ux)) !important; }
+html .wave > i:nth-child(2) { left: calc(7 * var(--ux)) !important; height: calc(22 * var(--ux)) !important; }
+html .wave > i:nth-child(3) { left: calc(14 * var(--ux)) !important; height: calc(38 * var(--ux)) !important; }
+html .wave > i:nth-child(4) { left: calc(21 * var(--ux)) !important; height: calc(16 * var(--ux)) !important; }
+html .wave > i:nth-child(5) { left: calc(28 * var(--ux)) !important; height: calc(30 * var(--ux)) !important; }
+html .wave > i:nth-child(6) { left: calc(35 * var(--ux)) !important; height: calc(12 * var(--ux)) !important; }
+html .wave > i:nth-child(7) { left: calc(42 * var(--ux)) !important; height: calc(6 * var(--ux)) !important; }
+
+html .wav:nth-child(23) { left: calc(var(--bx) - 32 * var(--ux)) !important; top: calc(var(--wl) + 20 * var(--ux)) !important; width: calc(160 * var(--ux)) !important; }
+html .wav:nth-child(24) { left: calc(var(--bx) - 14 * var(--ux)) !important; top: calc(var(--wl) + 46 * var(--ux)) !important; width: calc(130 * var(--ux)) !important; }
+html .wav:nth-child(25) { left: calc(var(--bx) - 26 * var(--ux)) !important; top: calc(var(--wl) + 78 * var(--ux)) !important; width: calc(150 * var(--ux)) !important; }
+
+html .bub:nth-child(26) { left: calc(var(--bx) - 36 * var(--ux)) !important; top: calc(var(--wl) + 116 * var(--ux)) !important; width: calc(8 * var(--ux)) !important; height: calc(8 * var(--ux)) !important; }
+html .bub:nth-child(27) { left: calc(var(--bx) - 23 * var(--ux)) !important; top: calc(var(--wl) + 83 * var(--ux)) !important; width: calc(6 * var(--ux)) !important; height: calc(6 * var(--ux)) !important; }
+html .bub:nth-child(28) { left: calc(var(--bx) - 46 * var(--ux)) !important; top: calc(var(--wl) + 150 * var(--ux)) !important; width: calc(4 * var(--ux)) !important; height: calc(4 * var(--ux)) !important; }
+
+/* 水线上的刻记（6 段，定稿内联在 .wline 里）：横向画布比例，±1px 的错位保持 px */
+html .wline > i:nth-child(1) { left: calc(148 * var(--ux)) !important; top: -1px !important; width: calc(30 * var(--ux)) !important; }
+html .wline > i:nth-child(2) { left: calc(402 * var(--ux)) !important; top: 1px !important; width: calc(14 * var(--ux)) !important; }
+html .wline > i:nth-child(3) { left: calc(640 * var(--ux)) !important; top: -1px !important; width: calc(44 * var(--ux)) !important; }
+html .wline > i:nth-child(4) { left: calc(872 * var(--ux)) !important; top: 1px !important; width: calc(10 * var(--ux)) !important; }
+html .wline > i:nth-child(5) { left: calc(1010 * var(--ux)) !important; top: -1px !important; width: calc(24 * var(--ux)) !important; }
+html .wline > i:nth-child(6) { left: calc(1300 * var(--ux)) !important; top: 1px !important; width: calc(18 * var(--ux)) !important; }
+
+/* ── 文字层：三块文字挂在纸与水线上 ──────────────────────────────────────── */
+html .l-dry {
+  left: calc(152 * var(--ux));
+  top: calc(92 * var(--u));
+  width: min(528px, calc(528 * var(--ux)));
+}
+
+html .l-wet {
+  left: calc(152 * var(--ux));
+  top: calc(var(--wl) + 32px); /* 定稿 552 = 水线 +32 */
+  width: min(528px, calc(528 * var(--ux)));
+}
+
+html .r-dry {
+  left: calc(760 * var(--ux));
+  top: calc(92 * var(--u));
+  width: min(380px, calc(380 * var(--ux)));
+}
+
+html .cap {
+  left: calc(152 * var(--ux));
+}
+
+html .cap.up {
+  top: calc(var(--wl) - 32px); /* 定稿 488 */
+}
+
+html .cap.dn {
+  top: calc(var(--wl) + 20px); /* 定稿 540 */
+}
+
+/* 两枚小注（`main` 里的第 3、4 个 <p>）：锚在瓶子与水线上，与瓶子同一把尺（定稿是内联 style，故 !important） */
+html .tiny:nth-of-type(3) {
+  left: calc(var(--bx) + 31 * var(--ux)) !important;
+  top: calc(var(--wl) - 282 * var(--ux)) !important;
+}
+
+html .tiny:nth-of-type(4) {
+  left: var(--bx) !important;
+  top: calc(var(--wl) + 198 * var(--ux)) !important;
+}
+
+/* ── 纵向节奏与字号：矮窗收紧到"内容真正需要的下限"，高窗不放大 ─────────── */
+html h1 {
+  font-size: clamp(44px, calc(58 * var(--ux)), 58px);
+}
+
+html .standfirst {
+  margin-top: clamp(10px, calc(16 * var(--u)), 16px);
+}
+
+html .rule {
+  margin-top: clamp(14px, calc(26 * var(--u)), 26px);
+}
+
+html .rows {
+  margin-top: clamp(8px, calc(14 * var(--u)), 14px);
+}
+
+html .row {
+  padding: clamp(9px, calc(17 * var(--u)), 17px) 0;
+}
+
+html h2.after {
+  margin-top: clamp(16px, calc(30 * var(--u)), 30px);
+}
+
+html .who {
+  margin-top: clamp(12px, calc(20 * var(--u)), 20px);
+}
+
+html .alt {
+  margin-top: clamp(6px, calc(10 * var(--u)), 10px);
+}
+
+html .hr {
+  margin-top: clamp(14px, calc(24 * var(--u)), 24px);
+}
+
+html .act {
+  margin-top: clamp(12px, calc(18 * var(--u)), 18px);
+}
+
+html .body {
+  margin-top: clamp(8px, calc(12 * var(--u)), 12px);
+}
+
+html .r-dry .btn {
+  margin-top: clamp(10px, calc(14 * var(--u)), 14px);
+}
+
+html .ver {
+  margin-top: clamp(10px, calc(14 * var(--u)), 14px);
+}
+
+html .env {
+  margin-top: clamp(10px, calc(14 * var(--u)), 14px);
+}
+
+html .l-wet .row {
+  padding: clamp(7px, calc(12 * var(--u)), 12px) 0;
+}
+
+html .l-wet h2.after {
+  margin-top: clamp(14px, calc(24 * var(--u)), 24px);
+}
+
+html .l-wet .who {
+  margin-top: clamp(10px, calc(14 * var(--u)), 14px);
+}
+
+html .l-wet .alt {
+  margin-top: clamp(6px, calc(8 * var(--u)), 8px);
+}
+
+html .l-wet .hr {
+  margin-top: clamp(12px, calc(18 * var(--u)), 18px);
+}
+
+html .l-wet .act {
+  margin-top: clamp(10px, calc(14 * var(--u)), 14px);
+}

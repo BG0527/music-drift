@@ -1,0 +1,203 @@
+/*
+ * W5-B 流体补丁 · 404 页（`site/404.html`）
+ * ============================================================================
+ * 这一页是**一张整幅海报**：`div.clip` 里的水/沟槽/划伤/干河床 + `svg.art`（1440×900 viewBox 的
+ * 整幅插画）+ 文字层，所有元素都注册在插画的特征线上（划伤穿过标题、跳针贴着唱臂、
+ * 水位痕贴着干床、漏水的细流从断口往下落）。所以它不能像其他页那样"横向 % + 纵向 %"地重排 ——
+ * 一旦两个轴用不同比例，标题的裂口就会离开划伤、细流就会离开水面。
+ *
+ * 于是这一页的流体表达是：**画布整体铺满视口**（cover：两个方向取大的那个比例，等比、不拉伸，
+ * 多出来的部分由 `.clip` 的 overflow:hidden 裁掉），所有画布坐标经同一套映射落到视口：
+ *
+ *   --k  = max(100vw, 160dvh) / 1440     画布 1px → 视口 px（= 插画自身的渲染比例，1440:900 = 1.6:1）
+ *   --x0 = 50vw  - 720 * --k             画布 x=0 落在视口的哪儿（画布中心对齐视口中心）
+ *   --y0 = 50dvh - 450 * --k             画布 y=0 落在视口的哪儿
+ *   ⇒ 画布 (X,Y) 写作 left: calc(var(--x0) + X * var(--k)); top: calc(var(--y0) + Y * var(--k))
+ *
+ * 与 fit.js 的等比缩放的区别正是验收要的三条：**铺满**（cover 由 max() 给出，不留白）、
+ * **不裁内容**（文字层全部落在视口内：1280×720 下内容占 y∈[10,585]，2560×1400 下 y∈[0,1150]）、
+ * 以及**字号留在 px**（62px 的标题在任何视口都是 62px，只按画布坐标移动它的位置）。
+ *
+ * 唯一需要"锚在插画而不是自己盒子"的是被划伤切断的标题：它的 clip-path 是自身盒高的百分比
+ * （45.5%/61%），而划伤在屏幕上的厚度是 10×--k。所以标题的 `top` 锚到划伤上沿往下 29px
+ * （定稿里划伤上沿 366 与盒顶 337 的关系），这样 100%→62px 的割口永远落在划伤带里（见下）。
+ *
+ * 凡页面自己写成内联 style 的装饰件（水面短波、干床裂纹、漏水细流）必须 `!important` 才压得住。
+ */
+
+:root {
+  --k: calc(max(100vw, 160dvh) / 1440);
+  --x0: calc(50vw - 720 * var(--k));
+  --y0: calc(50dvh - 450 * var(--k));
+  width: 100%;
+  height: 100%;
+}
+
+html body {
+  width: 100%;
+  height: 100dvh;
+}
+
+/* ── 插画与背景层：整幅画布铺满视口（等比，多出来的由 .clip 裁掉） ───────────── */
+html .clip,
+html .wrap {
+  inset: 0;
+}
+
+html svg.art,
+html .platter,
+html .glint {
+  left: var(--x0);
+  top: var(--y0);
+  right: auto;
+  bottom: auto;
+  width: calc(1440 * var(--k));
+  height: calc(900 * var(--k));
+}
+
+/* ── 水层：画布 y∈[0,365] 的三片（沟槽 / 整片水 / 短波容器） ───────────────── */
+html .groove,
+html .water {
+  left: var(--x0);
+  right: auto;
+  width: calc(1440 * var(--k));
+  top: var(--y0);
+  height: calc(365 * var(--k));
+}
+
+/* 断口前后的四条横带：水位线、亮水线下的暗缝、断口唇、翘边影 */
+html .lip {
+  top: calc(var(--y0) + 312 * var(--k));
+  height: calc(42 * var(--k));
+}
+
+html .edge {
+  top: calc(var(--y0) + 344 * var(--k));
+  height: calc(22 * var(--k));
+}
+
+html .surface {
+  top: calc(var(--y0) + 355 * var(--k));
+  height: calc(2 * var(--k));
+}
+
+html .lintel {
+  top: calc(var(--y0) + 357 * var(--k));
+  height: 1px;
+}
+
+/* ── 干河床：残影沟槽 / 干床 / 水位痕（细线保持 1px，位置跟着画布） ────────── */
+html .ghost,
+html .bed {
+  left: var(--x0);
+  right: auto;
+  width: calc(1440 * var(--k));
+  top: calc(var(--y0) + 365 * var(--k));
+}
+
+html .ghost {
+  height: calc(160 * var(--k));
+}
+
+html .bed {
+  height: calc(430 * var(--k));
+}
+
+html .tidewater {
+  top: calc(var(--y0) + 452 * var(--k));
+  height: 1px;
+}
+
+/* ── 文字层（`div.wrap` 就是视口，所以这里的绝对坐标直接是视口坐标） ────────── */
+html .tl {
+  left: calc(var(--x0) + 76 * var(--k));
+  top: calc(var(--y0) + 64 * var(--k));
+}
+
+html .status {
+  right: calc(76 * var(--k));
+  top: calc(var(--y0) + 58 * var(--k));
+}
+
+/* 被划伤切断的标题：盒顶锚在划伤上沿 −29px（画布 366−337），于是 45.5%/61% 的割口
+ * 永远落在划伤带里 —— 见文件头。宽高留 820×62（定稿），割口只切纵向，与宽度无关。 */
+html h1.torn {
+  left: calc(var(--x0) + 76 * var(--k));
+  top: calc(var(--y0) + 366 * var(--k) - 29px);
+  width: 820px;
+  height: 62px;
+}
+
+html .hurt {
+  left: calc(var(--x0) + 904 * var(--k));
+  top: calc(var(--y0) + 364 * var(--k));
+}
+
+html .skip {
+  right: calc(76 * var(--k));
+  top: calc(var(--y0) + 407 * var(--k));
+}
+
+html .drift {
+  left: calc(var(--x0) + 1096 * var(--k));
+  top: calc(var(--y0) + 186 * var(--k));
+}
+
+html .sub {
+  left: calc(var(--x0) + 76 * var(--k));
+  top: calc(var(--y0) + 460 * var(--k));
+  width: 540px;
+}
+
+html .back {
+  left: calc(var(--x0) + 76 * var(--k));
+  top: calc(var(--y0) + 558 * var(--k));
+}
+
+html .rule {
+  left: calc(var(--x0) + 76 * var(--k));
+  top: calc(var(--y0) + 626 * var(--k));
+  width: calc(684 * var(--k));
+  height: 1px;
+}
+
+html .alt {
+  left: calc(var(--x0) + 76 * var(--k));
+  top: calc(var(--y0) + 650 * var(--k));
+}
+
+html .links {
+  left: calc(var(--x0) + 76 * var(--k));
+  top: calc(var(--y0) + 684 * var(--k));
+}
+
+/* ── 内联定位的装饰件（水面短波 4 / 干床裂纹 8 / 漏水细流 13） ────────────────
+ * 数值逐条来自 `site/404.html` 的 style 属性（选择器在真页面里校验过唯一）；
+ * 1px 的发丝线与 3px 的水珠保持 px，其余按画布比例。 */
+html .flows > span:nth-child(1) { left: calc(var(--x0) + 588 * var(--k)) !important; top: calc(var(--y0) + 302 * var(--k)) !important; width: calc(206 * var(--k)) !important; }
+html .flows > span:nth-child(2) { left: calc(var(--x0) + 872 * var(--k)) !important; top: calc(var(--y0) + 326 * var(--k)) !important; width: calc(300 * var(--k)) !important; }
+html .flows > span:nth-child(3) { left: calc(var(--x0) + 180 * var(--k)) !important; top: calc(var(--y0) + 330 * var(--k)) !important; width: calc(230 * var(--k)) !important; }
+html .flows > span:nth-child(4) { left: calc(var(--x0) + 1216 * var(--k)) !important; top: calc(var(--y0) + 312 * var(--k)) !important; width: calc(200 * var(--k)) !important; }
+
+html .clip > .crack:nth-child(13) { left: calc(var(--x0) + 902 * var(--k)) !important; top: calc(var(--y0) + 506 * var(--k)) !important; width: calc(214 * var(--k)) !important; }
+html .clip > .crack:nth-child(14) { left: calc(var(--x0) + 1064 * var(--k)) !important; top: calc(var(--y0) + 544 * var(--k)) !important; width: calc(236 * var(--k)) !important; }
+html .clip > .crack:nth-child(15) { left: calc(var(--x0) + 938 * var(--k)) !important; top: calc(var(--y0) + 596 * var(--k)) !important; width: calc(160 * var(--k)) !important; }
+html .clip > .crack:nth-child(16) { left: calc(var(--x0) + 1156 * var(--k)) !important; top: calc(var(--y0) + 638 * var(--k)) !important; width: calc(196 * var(--k)) !important; }
+html .clip > .crack:nth-child(17) { left: calc(var(--x0) + 868 * var(--k)) !important; top: calc(var(--y0) + 434 * var(--k)) !important; width: calc(170 * var(--k)) !important; }
+html .clip > .crack:nth-child(18) { left: calc(var(--x0) + 1240 * var(--k)) !important; top: calc(var(--y0) + 472 * var(--k)) !important; width: calc(150 * var(--k)) !important; }
+html .clip > .crack:nth-child(19) { left: calc(var(--x0) + 112 * var(--k)) !important; top: calc(var(--y0) + 748 * var(--k)) !important; width: calc(196 * var(--k)) !important; }
+html .clip > .crack:nth-child(20) { left: calc(var(--x0) + 396 * var(--k)) !important; top: calc(var(--y0) + 776 * var(--k)) !important; width: calc(154 * var(--k)) !important; }
+
+html .drips > span:nth-child(1) { left: calc(var(--x0) + 196 * var(--k)) !important; top: calc(var(--y0) + 360 * var(--k)) !important; height: calc(62 * var(--k)) !important; }
+html .drips > i:nth-child(2) { left: calc(var(--x0) + 195 * var(--k)) !important; top: calc(var(--y0) + 428 * var(--k)) !important; }
+html .drips > span:nth-child(3) { left: calc(var(--x0) + 430 * var(--k)) !important; top: calc(var(--y0) + 362 * var(--k)) !important; height: calc(44 * var(--k)) !important; }
+html .drips > i:nth-child(4) { left: calc(var(--x0) + 429 * var(--k)) !important; top: calc(var(--y0) + 412 * var(--k)) !important; }
+html .drips > span:nth-child(5) { left: calc(var(--x0) + 566 * var(--k)) !important; top: calc(var(--y0) + 360 * var(--k)) !important; height: calc(78 * var(--k)) !important; }
+html .drips > i:nth-child(6) { left: calc(var(--x0) + 565 * var(--k)) !important; top: calc(var(--y0) + 444 * var(--k)) !important; }
+html .drips > span:nth-child(7) { left: calc(var(--x0) + 706 * var(--k)) !important; top: calc(var(--y0) + 362 * var(--k)) !important; height: calc(50 * var(--k)) !important; }
+html .drips > i:nth-child(8) { left: calc(var(--x0) + 705 * var(--k)) !important; top: calc(var(--y0) + 418 * var(--k)) !important; }
+html .drips > span:nth-child(9) { left: calc(var(--x0) + 832 * var(--k)) !important; top: calc(var(--y0) + 362 * var(--k)) !important; height: calc(36 * var(--k)) !important; }
+html .drips > span:nth-child(10) { left: calc(var(--x0) + 1012 * var(--k)) !important; top: calc(var(--y0) + 362 * var(--k)) !important; height: calc(68 * var(--k)) !important; }
+html .drips > i:nth-child(11) { left: calc(var(--x0) + 1011 * var(--k)) !important; top: calc(var(--y0) + 436 * var(--k)) !important; }
+html .drips > span:nth-child(12) { left: calc(var(--x0) + 1252 * var(--k)) !important; top: calc(var(--y0) + 364 * var(--k)) !important; height: calc(48 * var(--k)) !important; }
+html .drips > i:nth-child(13) { left: calc(var(--x0) + 1251 * var(--k)) !important; top: calc(var(--y0) + 418 * var(--k)) !important; }

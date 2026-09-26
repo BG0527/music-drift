@@ -1,0 +1,132 @@
+/*
+ * W5-B 流体补丁 · 登录页（`site/login.html`）
+ * ============================================================================
+ * 定稿是 1440×900 的固定画布（`html,body{width:1440px;height:900px}`，纵向靠 flex 列 + 绝对定位装置）。
+ * 本补丁把画布本身铺满视口，并把**画布坐标换成流体表达**；字号一律留在 px（只在必要时降一档），
+ * 所以小窗不糊、大屏不变胖（与 `docs/deploy-plan-html.md` §20 的选定方案一致）。
+ *
+ * 两个换算单位（本补丁的"画布 px"）：
+ *   --ux = 100vw / 1440   （横向：1440 宽画布上 1px 对应的视口宽度）
+ *   --u  = 100dvh / 900   （纵向：900 高画布上 1px 对应的视口高度）
+ * 于是原来写 64px 的地方写成 clamp(地板, calc(64 * var(--u)), 64px)：随视口缩，但
+ *   · 地板 = 内容真正需要的下限（字号是 px，所以地板多半是"行高 + 内边距"）；
+ *   · 上限 = 定稿值（不再往上涨）。
+ * 只对**内联 style**（补丁打不过它）用 `!important`；结构性规则一律用 `html ` 前缀提一级特异性，
+ * 这样补丁排在页面自带 <style> 之前也照样生效。
+ */
+
+:root {
+  --ux: calc(100vw / 1440);
+  --u: calc(100dvh / 900);
+  width: 100%;
+  height: 100%;
+}
+
+/* 画布 → 视口：body 铺满，`.clip`（inset:0）与背景层自动跟着铺满 */
+html body {
+  width: 100%;
+  height: 100dvh;
+}
+
+/* ── 页框与左右两栏 ──────────────────────────────────────────────────────── */
+html .page {
+  width: 100%;
+  height: 100dvh;
+  padding: clamp(34px, calc(64 * var(--u)), 64px) clamp(24px, calc(96 * var(--ux)), 96px) 0;
+}
+
+/* 左栏：560px 是定稿的阅读宽度，窄窗按比例收（不超定稿） */
+html .col {
+  width: min(560px, calc(560 * var(--ux)));
+}
+
+html .lede {
+  width: min(500px, calc(500 * var(--ux)));
+  margin-top: clamp(10px, calc(16 * var(--u)), 16px);
+}
+
+html .form {
+  margin-top: clamp(22px, calc(56 * var(--u)), 56px);
+}
+
+html .tip {
+  max-width: min(452px, calc(452 * var(--ux)));
+  margin-top: clamp(10px, calc(20 * var(--u)), 20px);
+}
+
+html .field input {
+  width: min(440px, calc(440 * var(--ux)));
+}
+
+html .f-handle {
+  margin-top: clamp(16px, calc(32 * var(--u)), 32px);
+}
+
+html .f-pass {
+  margin-top: clamp(14px, calc(26 * var(--u)), 26px);
+}
+
+/* 主按钮：定稿 238×50；窄/矮窗收到 180×44 —— 44px 是可点面积的下限，不再往下收 */
+html .act {
+  width: min(238px, calc(238 * var(--ux)));
+  height: clamp(44px, calc(50 * var(--u)), 50px);
+  margin-top: clamp(18px, calc(36 * var(--u)), 36px);
+}
+
+html .oath {
+  width: min(452px, calc(452 * var(--ux)));
+  margin-top: clamp(18px, calc(40 * var(--u)), 40px);
+}
+
+html .foot {
+  padding-bottom: clamp(6px, calc(12 * var(--u)), 12px);
+}
+
+/* 定稿 1100px 是"最多铺到画布右内边距"的意思 —— 必须**按比例**收，否则 1280 宽下这一行会顶到
+ * 右下角，被瓶口装置压上（实测 1280×720：链接右端 1185 与瓶口椭圆 1131..1203 相交）。 */
+html .foot .row {
+  max-width: min(1100px, calc(1100 * var(--ux)));
+  padding-top: clamp(8px, calc(14 * var(--u)), 14px);
+}
+
+/* ── 装置：一根认领线（tag 在上，线坠下来，另一头是画外那只瓶） ──────────────
+ * 装置由 `top:124px` 到 `bottom:28px` 框住 = 画布 y∈[124,872]；`872` 正是瓶口 `.mouth` 的上沿，
+ * 所以线永远落在瓶口上方（定稿里线的末端离瓶口还有 76px，这个差在缩放里也守恒）。
+ * 内部三件（tag 88px、devnote 238px、线宽 1px）保持 px —— 它们是"物件"，不是空隙。 */
+html .device {
+  right: calc(96 * var(--ux));
+  top: calc(124 * var(--u));
+  bottom: calc(28 * var(--u));
+  width: calc(364 * var(--ux));
+  height: auto;
+}
+
+html .thread {
+  top: 27.8%; /* 画布 (332-124)/748 */
+  height: 62%; /* 画布 464/748 */
+}
+
+html .devnote {
+  top: 29.9%; /* 画布 (348-124)/748 */
+}
+
+/* 瓶口：右沿锚在装置右沿 −36px（定稿 1380 与 1344 的关系），于是"线的那一头"在任何宽度下
+ * 都相对瓶子落在同一处（线在装置右沿内 44px，瓶口圆心比它再往右 16px）；底贴视口下沿。 */
+html .mouth {
+  left: auto;
+  right: calc(96 * var(--ux) - 36px);
+  top: auto;
+  bottom: 0;
+}
+
+html .colophon {
+  left: calc(1240 * var(--ux));
+  top: calc(88 * var(--u));
+}
+
+/* ── 字号 ──────────────────────────────────────────────────────────────────
+ * 52px 的 H1 在 1280 宽下会顶掉一整行（一行为 52×1.1），所以只在窄窗降一档到 44px；
+ * 高窗不让它长大（上限就是定稿的 52px）。 */
+html h1 {
+  font-size: clamp(44px, calc(52 * var(--ux)), 52px);
+}

@@ -1,0 +1,193 @@
+/*
+ * W5-B 流体补丁 · 审核台（`site/admin.html`）
+ * ============================================================================
+ * 定稿是 1440×900 固定画布，构图的核心是**一根水线 y=540（= 视口高的 60%）**：
+ *   · 水线以上：页眉、两个视图页签、三张"刚从深水里浮上来的压片工单"（`.float .card`，
+ *     绝对定位、底边跨在水线上、脚下牵着出水的那根虚线 `.tether`）；
+ *   · 水线以下：历史裁决列表（`ul.sunk`）、水下的倒影 `.refl`、涟漪 `.ripple`、气泡 `.bub`；
+ *   · 最底：页脚一行。
+ *
+ * 换算单位：--ux = 100vw/1440、--u = 100dvh/900，水线 `--wl: calc(540 * var(--u))`。
+ * 两张"水面上下"的区块因此**挂在水线上**而不是挂在文档流上：
+ *   · `.float`（工单区）用 `top: calc(--wl - 291 * --u)`（定稿：工单区顶 249、水线 540）+
+ *     `height: 287 * --u` ⇒ 它的**底边恒在水线上方 4px**，于是卡片各自的 `bottom:-8/22/38`
+ *     （定稿 px）依旧让三张工单"跨在水线上"，涟漪也就永远在卡片脚下；
+ *   · `ul.sunk`（历史裁决）用 `top: calc(--wl + 37 * --u)`（定稿 577 = 540 + 37）。
+ * 卡片/印章/页签内部的字号与内距保持 px（它们是"单据"，不是空隙），只把**左沿与宽度**换成画布比例。
+ */
+
+:root {
+  --ux: calc(100vw / 1440);
+  --u: calc(100dvh / 900);
+  --wl: calc(540 * var(--u)); /* 水线（画布 y=540） */
+  width: 100%;
+  height: 100%;
+}
+
+html body {
+  width: 100%;
+  height: 100dvh;
+}
+
+/* ── 水面上下两半 + 盘面：盘心跟着视口（干半与水半必须同一个心） ───────────── */
+html .platter {
+  background:
+    repeating-radial-gradient(circle at calc(1420 * var(--ux)) calc(960 * var(--u)), rgba(216, 243, 246, 0.055) 0 1.2px, transparent 1.2px 6.5px),
+    radial-gradient(circle at calc(1420 * var(--ux)) calc(960 * var(--u)), rgba(127, 209, 217, 0.05) 0 30%, transparent 68%);
+}
+
+html .platter.sub {
+  top: calc(-540 * var(--u));
+  background:
+    repeating-radial-gradient(circle at calc(1420 * var(--ux)) calc(960 * var(--u)), rgba(216, 243, 246, 0.1) 0 1.2px, transparent 1.2px 6.5px),
+    radial-gradient(circle at calc(1420 * var(--ux)) calc(960 * var(--u)), rgba(127, 209, 217, 0.1) 0 30%, transparent 68%);
+}
+
+html .dry {
+  height: var(--wl);
+}
+
+html .wet {
+  top: var(--wl);
+}
+
+html .shaft {
+  left: calc(30 * var(--ux));
+  top: calc(-40 * var(--u));
+  width: calc(940 * var(--ux));
+  height: calc(600 * var(--u));
+}
+
+html .caustic {
+  left: calc(-40 * var(--ux));
+  right: calc(-40 * var(--ux));
+  height: calc(330 * var(--u));
+}
+
+html .surface {
+  top: calc(var(--wl) - 1px); /* 定稿 539 = 水线 −1 */
+}
+
+html .surface-haze {
+  top: calc(var(--wl) - 24px); /* 定稿 516 = 水线 −24 */
+  height: calc(46 * var(--u));
+}
+
+html .bed {
+  bottom: clamp(20px, calc(52 * var(--u)), 52px);
+}
+
+html .bed.two {
+  bottom: clamp(26px, calc(66 * var(--u)), 66px);
+}
+
+/* ── 页眉与页签（在文档流里） ───────────────────────────────────────────── */
+html main {
+  padding: clamp(28px, calc(46 * var(--u)), 46px) clamp(24px, calc(76 * var(--ux)), 76px) 0;
+}
+
+html header h1 {
+  font-size: clamp(40px, calc(56 * var(--ux)), 56px);
+}
+
+html header .sub {
+  margin-top: clamp(8px, calc(14 * var(--u)), 14px);
+  max-width: min(820px, calc(820 * var(--ux)));
+}
+
+html .views {
+  margin-top: clamp(12px, calc(20 * var(--u)), 20px);
+  gap: clamp(20px, calc(34 * var(--ux)), 34px);
+}
+
+/* ── 待处理：三张工单（挂在**水线上**，不挂在文档流上） ─────────────────── */
+html .float {
+  position: absolute;
+  left: calc(76 * var(--ux));
+  right: calc(76 * var(--ux));
+  top: calc(var(--wl) - 291 * var(--u));
+  height: calc(287 * var(--u));
+  margin-top: 0;
+}
+
+/* 卡片：左沿与宽度是画布比例，高度只收不放（150→154px 是"内文 + 按钮行"真正需要的下限：
+ * 内文到 y=110，按钮行 31px 高、贴底 12px） */
+html .float .card {
+  height: clamp(154px, calc(160 * var(--u)), 160px) !important;
+}
+
+html .float .card:nth-child(1) {
+  left: 0 !important;
+  width: calc(400 * var(--ux)) !important;
+}
+
+html .float .card:nth-child(2) {
+  left: calc(424 * var(--ux)) !important;
+  width: calc(428 * var(--ux)) !important;
+}
+
+html .float .card:nth-child(3) {
+  left: calc(872 * var(--ux)) !important;
+  width: calc(416 * var(--ux)) !important;
+}
+
+/* ── 历史裁决：也从水线往下量 ───────────────────────────────────────────── */
+html ul.sunk {
+  position: absolute;
+  left: calc(76 * var(--ux));
+  top: calc(var(--wl) + 37 * var(--u));
+  width: min(900px, calc(900 * var(--ux)));
+  margin-top: 0;
+}
+
+html li.rec {
+  padding: clamp(10px, calc(18 * var(--u)), 18px) 0 clamp(12px, calc(24 * var(--u)), 24px);
+  gap: clamp(10px, calc(16 * var(--ux)), 16px);
+}
+
+/* ── 页脚 ───────────────────────────────────────────────────────────────── */
+html footer {
+  left: calc(76 * var(--ux));
+  right: calc(76 * var(--ux));
+  bottom: clamp(14px, calc(28 * var(--u)), 28px);
+}
+
+/* ── 内联定位的装饰件（拖线 2 / 倒影 3 / 涟漪 5 / 那只瓶 1 / 贴水亮痕 3 / 气泡 16） ──
+ * 数值逐条来自 `site/admin.html` 的 style 属性（选择器在真页面里校验过唯一）；
+ * 它们全部落在水线坐标系里（--u），所以水线一动，涟漪、倒影、气泡、亮痕一起动。
+ * `.bottle` 是"物件"（内部是 px 子件），只换位置不换尺寸。 */
+html .clip > .tether:nth-child(6) { left: calc(454 * var(--ux)) !important; top: calc(518 * var(--u)) !important; height: calc(21 * var(--u)) !important; }
+html .clip > .tether:nth-child(7) { left: calc(902 * var(--ux)) !important; top: calc(502 * var(--u)) !important; height: calc(37 * var(--u)) !important; }
+
+html .clip > .refl:nth-child(8) { left: calc(276 * var(--ux)) !important; top: calc(541 * var(--u)) !important; width: calc(380 * var(--ux)) !important; height: calc(38 * var(--u)) !important; }
+html .clip > .refl:nth-child(9) { left: calc(714 * var(--ux)) !important; top: calc(541 * var(--u)) !important; width: calc(320 * var(--ux)) !important; height: calc(28 * var(--u)) !important; }
+html .clip > .refl:nth-child(10) { left: calc(1158 * var(--ux)) !important; top: calc(541 * var(--u)) !important; width: calc(264 * var(--ux)) !important; height: calc(22 * var(--u)) !important; }
+
+html .clip > .ripple:nth-child(11) { left: calc(276 * var(--ux)) !important; top: calc(540 * var(--u)) !important; width: calc(172 * var(--ux)) !important; height: calc(30 * var(--u)) !important; }
+html .clip > .ripple:nth-child(12) { left: calc(714 * var(--ux)) !important; top: calc(540 * var(--u)) !important; width: calc(226 * var(--ux)) !important; height: calc(36 * var(--u)) !important; }
+html .clip > .ripple:nth-child(13) { left: calc(714 * var(--ux)) !important; top: calc(540 * var(--u)) !important; width: calc(300 * var(--ux)) !important; height: calc(46 * var(--u)) !important; }
+html .clip > .ripple:nth-child(14) { left: calc(1158 * var(--ux)) !important; top: calc(540 * var(--u)) !important; width: calc(284 * var(--ux)) !important; height: calc(42 * var(--u)) !important; }
+html .clip > .ripple:nth-child(15) { left: calc(1158 * var(--ux)) !important; top: calc(540 * var(--u)) !important; width: calc(356 * var(--ux)) !important; height: calc(54 * var(--u)) !important; }
+
+html .clip > .bottle:nth-child(16) { left: calc(626 * var(--ux)) !important; top: calc(521 * var(--u)) !important; width: 25px !important; height: 46px !important; }
+
+html .clip > .touch:nth-child(17) { left: calc(276 * var(--ux)) !important; top: calc(539 * var(--u)) !important; width: calc(200 * var(--ux)) !important; }
+html .clip > .touch:nth-child(18) { left: calc(714 * var(--ux)) !important; top: calc(539 * var(--u)) !important; width: calc(250 * var(--ux)) !important; }
+html .clip > .touch:nth-child(19) { left: calc(1158 * var(--ux)) !important; top: calc(539 * var(--u)) !important; width: calc(230 * var(--ux)) !important; }
+
+html .clip > .bub:nth-child(20) { left: calc(520 * var(--ux)) !important; top: calc(494 * var(--u)) !important; width: calc(5 * var(--ux)) !important; height: calc(5 * var(--u)) !important; }
+html .clip > .bub:nth-child(21) { left: calc(540 * var(--ux)) !important; top: calc(514 * var(--u)) !important; width: 3px !important; height: 3px !important; }
+html .clip > .bub:nth-child(22) { left: calc(852 * var(--ux)) !important; top: calc(490 * var(--u)) !important; width: calc(6 * var(--ux)) !important; height: calc(6 * var(--u)) !important; }
+html .clip > .bub:nth-child(23) { left: calc(1322 * var(--ux)) !important; top: calc(500 * var(--u)) !important; width: calc(4 * var(--ux)) !important; height: calc(4 * var(--u)) !important; }
+html .clip > .bub:nth-child(24) { left: calc(1306 * var(--ux)) !important; top: calc(524 * var(--u)) !important; width: 3px !important; height: 3px !important; }
+html .clip > .bub:nth-child(25) { left: calc(196 * var(--ux)) !important; top: calc(600 * var(--u)) !important; width: calc(7 * var(--ux)) !important; height: calc(7 * var(--u)) !important; }
+html .clip > .bub:nth-child(26) { left: calc(238 * var(--ux)) !important; top: calc(658 * var(--u)) !important; width: calc(5 * var(--ux)) !important; height: calc(5 * var(--u)) !important; }
+html .clip > .bub:nth-child(27) { left: calc(164 * var(--ux)) !important; top: calc(718 * var(--u)) !important; width: calc(4 * var(--ux)) !important; height: calc(4 * var(--u)) !important; }
+html .clip > .bub:nth-child(28) { left: calc(640 * var(--ux)) !important; top: calc(590 * var(--u)) !important; width: calc(6 * var(--ux)) !important; height: calc(6 * var(--u)) !important; }
+html .clip > .bub:nth-child(29) { left: calc(706 * var(--ux)) !important; top: calc(648 * var(--u)) !important; width: calc(8 * var(--ux)) !important; height: calc(8 * var(--u)) !important; }
+html .clip > .bub:nth-child(30) { left: calc(630 * var(--ux)) !important; top: calc(724 * var(--u)) !important; width: calc(5 * var(--ux)) !important; height: calc(5 * var(--u)) !important; }
+html .clip > .bub:nth-child(31) { left: calc(1124 * var(--ux)) !important; top: calc(596 * var(--u)) !important; width: calc(5 * var(--ux)) !important; height: calc(5 * var(--u)) !important; }
+html .clip > .bub:nth-child(32) { left: calc(1180 * var(--ux)) !important; top: calc(664 * var(--u)) !important; width: calc(7 * var(--ux)) !important; height: calc(7 * var(--u)) !important; }
+html .clip > .bub:nth-child(33) { left: calc(1096 * var(--ux)) !important; top: calc(742 * var(--u)) !important; width: calc(4 * var(--ux)) !important; height: calc(4 * var(--u)) !important; }
+html .clip > .bub:nth-child(34) { left: calc(1352 * var(--ux)) !important; top: calc(700 * var(--u)) !important; width: calc(6 * var(--ux)) !important; height: calc(6 * var(--u)) !important; }
+html .clip > .bub:nth-child(35) { left: calc(1290 * var(--ux)) !important; top: calc(790 * var(--u)) !important; width: calc(4 * var(--ux)) !important; height: calc(4 * var(--u)) !important; }

@@ -1,0 +1,210 @@
+/*
+ * W5-B 流体补丁 · 我的（`site/me.html`）
+ * ============================================================================
+ * 定稿是 1440×900 固定画布，三块内容各自绝对定位：内袋（右上）、沉积剖面柜（y=250）、
+ * 底部两栏（消息 + 收藏/徽章，y=596）。这一页的**内容高度是数据决定的**（消息条数、
+ * 卡位数都由服务端返回），所以纵向再用绝对坐标钉死必裁内容 ⇒ 这里改成**真流式**：
+ *
+ *   main       = flex 纵向列（页眉 → 柜 → 底部两栏），高度铺满视口
+ *   .crate     = 退出绝对定位，回到文档流（top:250px 变成 margin-top）
+ *   .bottom    = 两列网格（原来 .msgs 左 0 宽 624 / .pockets 左 664 宽 624 = 40px 沟）
+ *   .window    = 高度随视口缩，但有**地板**：卡片的文字是 px，206px 是它真正需要的下限
+ *   .sleeve    = 刚性物件（内袋），只换锚点（right/top），尺寸与内部一律 px
+ *   .lay/.veil = 沉积柱与压暗层是 px 宽的"柱管"，保持 px（li 的左内边距 68px 依赖它们）
+ *
+ * 换算单位：--ux = 100vw/1440、--u = 100dvh/900；纵向一律 clamp(地板, calc(N * var(--u)), Npx)
+ * —— 随视口缩、但不低于内容需要、也不超过定稿值（字号留在 px，故大屏不变胖）。
+ */
+
+:root {
+  --ux: calc(100vw / 1440);
+  --u: calc(100dvh / 900);
+  /* 页面上那几处**纯空隙**（页顶内边距、页眉↔柜、柜↔底部）：`N * --u` 在 720 高只能收到定稿的
+   * 80%，挤不出这一页需要的 35px（实测 1280×720：内容底 755 > 720）⇒ 720↔900 之间单用一条更陡的
+   * 直线（720 落到下限、900 精确还原定稿值），900 以上再回到比例增长
+   * 900 以上钉回定稿值（**不能让页眉—内袋—柜三者的相对关系随比例漂**：实测 1680×1003 下柜子的表头会上移 7px 撞进内袋的代号栏）。 */
+  --gap-page: clamp(28px, calc(28px + (100dvh - 720px) * 0.2), 64px);
+  --gap-crate: clamp(20px, calc(20px + (100dvh - 720px) * 0.156), 48px);
+  --gap-bottom: clamp(8px, calc(8px + (100dvh - 720px) * 0.0889), 24px);
+  /* 消息行只有 20px 高的一行字与一行说明，它的上下内距是纯粹的呼吸位 ⇒ 矮窗先收这里
+   *（卡格与沉积柱必须原样保存，见下面 .window 的说明）。 */
+  --pad-msg-row: clamp(1.5px, calc(1.5px + (100dvh - 720px) * 0.025), 6px);
+  width: 100%;
+  height: 100%;
+}
+
+html body {
+  width: 100%;
+  height: 100dvh;
+}
+
+/* ── 背景：盘心跟着视口（否则 2560 宽下圆心会跑到画面里） ─────────────────── */
+html .platter {
+  background:
+    repeating-radial-gradient(circle at calc(1420 * var(--ux)) calc(960 * var(--u)), rgba(216, 243, 246, 0.055) 0 1.2px, transparent 1.2px 6.5px),
+    radial-gradient(circle at calc(1420 * var(--ux)) calc(960 * var(--u)), rgba(127, 209, 217, 0.05) 0 30%, transparent 68%);
+}
+
+/* 水面光带：横向本来就是 %，纵向跟着视口 */
+html .waterlight {
+  height: calc(290 * var(--u));
+}
+
+/* ── 页框：flex 纵向列 ───────────────────────────────────────────────────── */
+html main {
+  height: 100dvh;
+  padding: var(--gap-page) clamp(24px, calc(76 * var(--ux)), 76px) clamp(10px, calc(16 * var(--u)), 16px);
+  display: flex;
+  flex-direction: column;
+}
+
+html .sub {
+  margin-top: clamp(8px, calc(14 * var(--u)), 14px);
+  max-width: min(740px, calc(740 * var(--ux)));
+}
+
+html h1 {
+  font-size: clamp(40px, calc(58 * var(--ux)), 58px);
+}
+
+/* ── 内袋（横向刚性、纵向只收不放） ───────────────────────────────────────
+ * 它的**内容**（代号栏）在定稿里是空的，接真后会被 page-me.js 填上；而 1280×720 下柜子会往上
+ * 收 48px，内袋若仍按定稿的 296px 刚性挂在顶上，代号栏就会压到第一格卡片的字（实测重叠 4 处）；
+ * 反过来，高窗让它跟着 --u 长大也会压上去（实测 1920×1200 重叠 3 处）。
+ * ⇒ 内袋纵向一律 `clamp(地板, N * --u, Npx)`：矮窗收（洞缩到 140px，仍是能看出来的洞），
+ * 高窗不长大（纸还是那张纸）。 */
+html .sleeve {
+  right: calc(26 * var(--ux));
+  top: calc(8 * var(--u));
+  height: clamp(240px, calc(296 * var(--u)), 296px);
+}
+
+html .sleeve .stop {
+  top: clamp(12px, calc(16 * var(--u)), 16px);
+}
+
+html .hole {
+  top: clamp(30px, calc(38 * var(--u)), 38px);
+  width: clamp(140px, calc(168 * var(--u)), 168px);
+  height: clamp(140px, calc(168 * var(--u)), 168px);
+}
+
+html .who {
+  top: clamp(60px, calc(74 * var(--u)), 74px);
+}
+
+html .who .stamp {
+  margin-top: clamp(8px, calc(12 * var(--u)), 12px);
+}
+
+html .codeslot {
+  top: clamp(172px, calc(224 * var(--u)), 224px);
+}
+
+/* 匿名代号那一栏：page-me.js 会把**全部**代号连成一串塞进这 30px 的框里（实测 17 枚 = 132px 高），
+ * 定稿的框没有 overflow，于是文字溢到柜格上、压住第一格卡片的正文（1440×900 下就能看到）。
+ * 补丁把它收回自己的框内（单行 + 省略号；全量仍在 title 属性里）—— 这是**收容**不是修源，
+ * 源在 site/app/page-me.js（本片不许改 JS），已作为发现上报。 */
+html .codeslot .field {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+/* ── 柜：回到文档流 ─────────────────────────────────────────────────────── */
+html .crate {
+  position: static;
+  margin-top: var(--gap-crate);
+  margin-bottom: var(--gap-bottom);
+}
+
+html .csub {
+  margin-top: clamp(6px, calc(8 * var(--u)), 8px);
+  max-width: min(660px, calc(660 * var(--ux)));
+}
+
+html .window {
+  margin-top: clamp(12px, calc(20 * var(--u)), 20px);
+  /* 高度**保持定稿的 260px**：这一格里的"沉积柱"是 page-me.js 按 `260 / 段数` 内联写死的高度的
+   * 刻度（层位、沉积面 `.iface`、漂在水腔里的那只瓶都用同一把尺），把卡格压矮就会把柱底第 1 段
+   * 连同段号切掉（实测 1280×720：卡格 208px、柱体 260px ⇒ 被 overflow:hidden 切 52px）。
+   * ⇒ 卡格这一格不缩，缩的是它周围的**空隙**（见下面的 --gap-* 与 --pad-msg-row）。 */
+  height: 260px;
+}
+
+html .window li {
+  padding: clamp(10px, calc(16 * var(--u)), 16px) 12px clamp(9px, calc(14 * var(--u)), 14px) 68px;
+}
+
+html .t {
+  margin-top: clamp(4px, calc(7 * var(--u)), 7px);
+}
+
+html .d {
+  margin-top: clamp(3px, calc(5 * var(--u)), 5px);
+}
+
+html .st {
+  margin-top: clamp(5px, calc(8 * var(--u)), 8px);
+}
+
+html .due {
+  margin-top: clamp(4px, calc(6 * var(--u)), 6px);
+}
+
+html .lk {
+  margin-top: clamp(5px, calc(9 * var(--u)), 9px);
+}
+
+/* ── 底部：两列网格（消息 | 收藏 + 徽章） ───────────────────────────────── */
+html .bottom {
+  position: static;
+  height: auto;
+  /* 钉在视口下沿：定稿里底部两栏的末行落在 y=884（= 900 − 16），与 main 的下内边距同一条基线；
+     高窗多出来的高度留给中间那片水，而不是堆成一整块空白压在页面底部。 */
+  margin-top: auto;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  column-gap: calc(40 * var(--ux));
+}
+
+html .msgs {
+  position: static;
+  width: auto;
+}
+
+html .msgs .msub {
+  margin-top: clamp(6px, calc(8 * var(--u)), 8px);
+  /* 说明行是两行字：1280 宽下按定稿的 12.5px 会折成两行（多占 20px），
+     而这一页在 720 高时要省的正是一处说明的呼吸位 ⇒ 字号按宽度收一档（地板 11.5px，不再小）。 */
+  font-size: clamp(11.5px, calc(12.5 * var(--ux)), 12.5px);
+  max-width: min(600px, calc(600 * var(--ux)));
+}
+
+html .msgs ul {
+  margin-top: clamp(8px, calc(12 * var(--u)), 12px);
+}
+
+/* 只收上下内距：`.msgs li.hero` 的 padding-left 是那条引线，不能一起抹掉 */
+html .msgs li {
+  padding-top: var(--pad-msg-row);
+  padding-bottom: var(--pad-msg-row);
+}
+
+html .pockets {
+  position: static;
+  width: auto;
+  height: auto;
+  gap: clamp(10px, calc(20 * var(--u)), 20px);
+}
+
+html .pocket {
+  /* 收藏/徽章两张内袋口：定稿的 34/24px 上下内距是纸袋口的留白，矮窗先收它
+   *（实测 1280×720：两张袋口 245px 比消息栏 211px 还高，把页脚顶出视口） */
+  padding: clamp(12px, calc(12px + (100dvh - 720px) * 0.1222), 34px) clamp(14px, calc(24 * var(--ux)), 24px)
+    clamp(8px, calc(8px + (100dvh - 720px) * 0.0889), 24px);
+}
+
+html .pocket p {
+  margin-top: clamp(6px, calc(10 * var(--u)), 10px);
+}
