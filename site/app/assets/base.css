@@ -12,16 +12,35 @@
   display: none !important;
 }
 
-/* ── 状态条（左下角，全局单例；就地状态块 .app-state--inline 挂在页面元素里） ─────── */
+/*
+ * 浮层落位（两个固定浮层共用；仍然只作用在 .demo-nav* 与 .app-state* 上）。
+ *
+ * 为什么是"贴视口边缘 16px"而不是"贴画布边缘"：画布 1440×900 由 fit.js 等比缩放居中，
+ * 视口上下（或左右）比画布多出来的部分就是**留白带**——它紧挨着视口边缘。
+ * 所以贴着视口边缘落位天然满足"有留白时落在留白侧"：视口比画布高时，
+ * 浮层整块落进上下留白带（例：1440×1080 的留白带是 y∈[0,90] 与 y∈[990,1080]，
+ * 44px 高的触发器与最长两行的状态条都完整落在带内）；同比或无留白时，
+ * 16px 就是一处不压内容的边缘内缩。
+ */
+.demo-nav,
+.app-state {
+  --overlay-inset: 16px;
+}
+
+/* ── 状态条（底部居中，全局单例；就地状态块 .app-state--inline 挂在页面元素里） ───── */
 .app-state {
   position: fixed;
-  left: 20px;
-  bottom: 20px;
+  left: 50%;
+  bottom: var(--overlay-inset);
+  transform: translateX(-50%);
   z-index: 90;
   display: flex;
   align-items: center;
   gap: 10px;
-  max-width: 560px;
+  /* 432px = 底部居中时能用的最宽值：1440×900（画布==视口）下，瓶子页底部左图例
+   * 结束于 x=490、发起页页脚注开始于 x=939 ⇒ 半宽必须 < 939-720=219 ⇒ 宽 < 438。
+   * 取 432 留 6px 余量（共享层自己的唤醒文案 26 字≈394px，仍是一行；更长文案换行）。 */
+  max-width: 432px;
   padding: 10px 14px;
   border: 1px solid var(--line, rgba(243, 249, 250, 0.13));
   border-radius: 12px;
@@ -29,12 +48,22 @@
   color: var(--paper, #f3f9fa);
   font-size: 13px;
   line-height: 1.5;
+  transition: opacity 240ms ease;
 }
 
+/* 非错误态到点后由 dom.js 加这个类淡出，随后**从 DOM 摘掉**——不留透明占位。
+ * 就地产状态块必须把上面那套"视口居中"全部还原，否则整块会被 translateX 挪走。 */
 .app-state--inline {
   position: static;
+  left: auto;
+  bottom: auto;
+  transform: none;
   max-width: none;
   margin: 12px 0;
+}
+
+.app-state--leaving {
+  opacity: 0;
 }
 
 .app-state__dot {
@@ -72,6 +101,10 @@
   .app-state__dot {
     animation: none;
   }
+
+  .app-state {
+    transition: none;
+  }
 }
 
 .app-state__retry {
@@ -85,19 +118,25 @@
   cursor: pointer;
 }
 
-/* ── 演示导航（右下角，默认收起） ─────────────────────────────────────────── */
+/* ── 演示导航（顶部居中，默认收起；面板往下展开） ────────────────────────── */
 .demo-nav {
   position: fixed;
-  right: 20px;
-  bottom: 20px;
+  top: var(--overlay-inset);
+  left: 50%;
+  transform: translateX(-50%);
   z-index: 100;
   display: flex;
-  flex-direction: column;
-  align-items: flex-end;
+  /* DOM 是 [panel, trigger]：`column-reverse` 让触发器在上、面板向下展开
+   *（11 张定稿的顶部中央是空白带，底部在审核台/瓶子详情有真实内容）。
+   * 用 CSS 换向而不是改 DOM 顺序 ⇒ demo-nav.js 的挂载、Escape、aria-current 全不动。 */
+  flex-direction: column-reverse;
+  align-items: center;
   gap: 8px;
 }
 
 .demo-nav__trigger {
+  /* 可点区域仍 ≥44px（原来的 8px 内边距只有 ~35px 高）。 */
+  min-height: 44px;
   padding: 8px 14px;
   border: 1px solid var(--glass, #7fd1d9);
   border-radius: 999px;

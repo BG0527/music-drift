@@ -8,7 +8,8 @@
  *
  * 用法（W1 只消费，不要改本文件）：
  *   import { q, qa, on, bind, bindMany, el, show, hide,
- *            showLoading, showEmpty, showError, showWaking, clearState } from './dom.js';
+ *            showLoading, showEmpty, showError, showWaking, clearState,
+ *            stateNode, stateKind } from './dom.js';
  *
  *   bind('bottle.title', bottle.title);            // 填所有 [data-bind="bottle.title"]
  *   bindMany({ 'bottle.mood': mood, 'bottle.code': code });
@@ -25,6 +26,14 @@ const STATE_FALLBACK_TEXT = {
   error: '出错了，请稍后重试。',
   waking: '正在唤醒服务：第一次请求可能要等十几秒，请不要刷新。',
 };
+
+/**
+ * 全局状态条的自动淡出延时（ms，只对**非错误**态；错误态留给用户处理，永不自动消失）。
+ * `waking` 给 12s：它自己的文案就写着"可能等十几秒"，比文案更早消失等于骗人。
+ */
+const STATE_AUTO_HIDE_MS = { loading: 6000, empty: 6000, waking: 12000 };
+/** 与 base.css 的 `transition: opacity 240ms` 对齐。 */
+const STATE_FADE_MS = 260;
 
 let baseStylesReady = false;
 
@@ -123,6 +132,7 @@ export function el(tag, props = {}, children = []) {
 // ------------------------------------------------------------------ 四种状态
 
 let stateBar = null;
+let stateTimer = null;
 
 function buildStateNode(inline) {
   return el('div', { class: `app-state${inline ? ' app-state--inline' : ''}`, role: 'status', 'aria-live': 'polite' }, [
@@ -132,7 +142,25 @@ function buildStateNode(inline) {
   ]);
 }
 
-/** 全局状态条：固定在左下角，**不占页面构图**（与右下角的演示导航分开）。 */
+function cancelStateTimer() {
+  if (stateTimer !== null) clearTimeout(stateTimer);
+  stateTimer = null;
+}
+
+/** 延后执行，且总是取代上一个待执行的定时器（看门狗只有一个）。 */
+function after(ms, run) {
+  cancelStateTimer();
+  stateTimer = setTimeout(() => {
+    stateTimer = null;
+    run();
+  }, ms);
+}
+
+function prefersReducedMotion() {
+  return typeof window.matchMedia === 'function' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+}
+
+/** 全局状态条：底部居中、不随画布缩放；**没有状态时它根本不在 DOM 里**。 */
 function ensureStateBar() {
   if (stateBar !== null && stateBar.isConnected) return stateBar;
   ensureBaseStyles();
@@ -141,6 +169,30 @@ function ensureStateBar() {
   stateBar.hidden = true;
   document.body.append(stateBar);
   return stateBar;
+}
+
+/** 摘掉全局状态条：清掉待执行的定时器并**从 DOM 移除**（不是留一个透明的空壳）。 */
+function dropStateBar() {
+  cancelStateTimer();
+  if (stateBar === null) return;
+  stateBar.remove();
+  stateBar = null;
+}
+
+/** 非错误态露脸若干秒后淡出再摘掉；错误态不排期（等用户处理）。 */
+function scheduleStateHide(node, kind) {
+  if (STATE_AUTO_HIDE_MS[kind] === undefined) return;
+  after(STATE_AUTO_HIDE_MS[kind], () => {
+    if (node !== stateBar) return; // 期间已被 clearState 摘掉
+    if (prefersReducedMotion()) {
+      dropStateBar();
+      return;
+    }
+    node.classList.add('app-state--leaving');
+    after(STATE_FADE_MS, () => {
+      if (node === stateBar) dropStateBar();
+    });
+  });
 }
 
 /** 就地状态块：挂在 `target` 里面（列表区域用空/出错态时用这个）。 */
@@ -163,7 +215,9 @@ export function showState(kind, message = null, options = {}) {
   if (!STATE_KINDS.includes(kind)) throw new Error(`未知状态：${String(kind)}`);
   const { target = null, onRetry = null } = options;
   const node = target === null ? ensureStateBar() : ensureInlineState(target);
+  if (target === null) cancelStateTimer(); // 新状态接管，作废上一条的淡出排期
   node.dataset.state = kind;
+  node.classList.remove('app-state--leaving');
   node.hidden = false;
   const text = message instanceof Error ? message.message : message;
   node.querySelector('.app-state__text').textContent = toText(text ?? STATE_FALLBACK_TEXT[kind]);
@@ -178,6 +232,7 @@ export function showState(kind, message = null, options = {}) {
     retry.hidden = true;
     retry.onclick = null;
   }
+  if (target === null) scheduleStateHide(node, kind);
   return node;
 }
 
@@ -200,13 +255,14 @@ export function showWaking(message = null, options = {}) {
 }
 
 /**
- * 清掉状态：给 `target` 时移除该元素内的就地状态块，否则隐藏全局状态条。
+ * 清掉状态：给 `target` 时移除该元素内的就地状态块，否则把全局状态条**从 DOM 摘掉**
+ * （没有状态时它不该存在，更不该留一个透明的占位）。
  * @param {{ target?: Element|null }} [options]
  */
 export function clearState(options = {}) {
   const { target = null } = options;
   if (target === null) {
-    if (stateBar !== null) stateBar.hidden = true;
+    dropStateBar();
     return;
   }
   const node = target.querySelector(':scope > .app-state--inline');
@@ -221,4 +277,29 @@ export function clearState(options = {}) {
 export function showRequestFailure(error, options = {}) {
   const down = error !== null && typeof error === 'object' && error.isServiceDown === true;
   return down ? showWaking(null, options) : showError(error, options);
+}
+
+/**
+ * **可测性查询口**：此刻 DOM 里那个状态节点本身（全局状态条，或 `target` 内的就地状态块）。
+ *
+ * 为什么需要它：全局状态条在非错误态会按 `STATE_AUTO_HIDE_MS` 淡出并**从 DOM 移除**
+ * （`dropStateBar()`），测试用选择器去抓必然抢跑或扑空 —— 有这一个口子，测试就能问
+ * 「现在有没有状态、是哪种」，而不必猜时机。返回值与渲染无关，**不影响任何视觉**。
+ *
+ * @param {{ target?: Element|null }} [options] `target` 省略 = 全局状态条
+ * @returns {Element|null} 没有状态时 `null`
+ */
+export function stateNode(options = {}) {
+  const { target = null } = options;
+  if (target === null) return stateBar !== null && stateBar.isConnected ? stateBar : null;
+  return target.querySelector(':scope > .app-state--inline');
+}
+
+/**
+ * 当前状态**种类**：`loading` | `empty` | `error` | `waking`；没有状态时 `null`。
+ * @param {{ target?: Element|null }} [options]
+ */
+export function stateKind(options = {}) {
+  const node = stateNode(options);
+  return node === null ? null : (node.dataset.state ?? null);
 }

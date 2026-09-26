@@ -17,6 +17,20 @@
 const CANVAS_WIDTH = 1440;
 const CANVAS_HEIGHT = 900;
 const STAGE_ID = 'fit-stage';
+/**
+ * 「浮层安全带」——**可翻转的取舍开关，不是随便定的数字**：
+ *
+ * - `0`（当前）＝**铺满优先**：画布按 cover 放大填满视口（用户明确要求过两次「刚好铺满屏幕」）。
+ *   代价：宽高比接近 16:10 时（实测 1680×1003）上下各约 24px 的设计留白被裁掉，
+ *   底部居中的状态条会切到 /bottle.html 的「入海」行约 6px、/drift-log.html 的操作行 6–8px。
+ *   缓解：状态条只在有状态时出现、非错误态 6–12s 自动消失；1440×900 下实测碰撞为 0。
+ * - `80` ＝**不压内容优先**：把上下各 80px 当内容一起保护 ⇒ cover 退回 contain（出现留白带），
+ *   浮层落进留白带、永不压内容，但**屏幕不再铺满**。
+ *
+ * 两者在 16:10 附近**不可能同时成立**：这些页的内容纵向占 832/900px，剩余留白比浮层需要的还少
+ *（底部要 16+61px、顶部要 16+44px）。想换另一种，只改这一个数字。
+ */
+const OVERLAY_SAFE_BAND = 0;
 
 /**
  * 内容安全框：**不在 `aria-hidden="true"` 下的文字/可交互元素**的并集（画布坐标系）。
@@ -46,7 +60,13 @@ function contentBox(root) {
     bottom = Math.max(bottom, rect.bottom);
   }
   if (!Number.isFinite(left)) return null;
-  return { left, top, right, bottom };
+  // 把上下两条「浮层安全带」算进安全带内：宁可退回 contain（留白），也不让浮层盖住内容。
+  return {
+    left,
+    top: Math.max(0, top - OVERLAY_SAFE_BAND),
+    right,
+    bottom: Math.min(CANVAS_HEIGHT, bottom + OVERLAY_SAFE_BAND),
+  };
 }
 
 /** 把 `value` 夹进 `[min, max]`；`min > max` 时取中点（无解时尽量居中）。 */
