@@ -91,6 +91,16 @@
       .float { position:absolute; left:14px; z-index:3; }
       .f200 { bottom:192px; }
       .f133 { bottom:124px; }
+      /* ── 回航泊位：全页只有"沿父链回到我手里、正等我发落"的那一支有 ——
+             水面的光只打在它这一格上（其余四支还沉在水下），
+             柱口套一枚暖色系缆环，瓶子不再斜漂、立在环里；
+             环与文字区那枚暖牌是同一个记号，一个在柱上、一个在字里。 ─────── */
+      .lay .shaft { left:0; top:0; width:50px; height:260px;
+        background:linear-gradient(180deg, rgba(246,215,154,.38), rgba(246,215,154,.20) 52%, rgba(246,215,154,.09)); }
+      .lay .hoop { left:-1px; top:12px; width:52px; height:20px; border-radius:50%; z-index:4;
+        border:2px solid rgba(246,215,154,.9); }
+      .lay .hoop::before { content:''; position:absolute; inset:2px; border-radius:50%; background:rgba(246,215,154,.14); }
+      .fstand { left:17px; top:3px; }
       /* 文字压在暗色渐变上：柱子在左，文字在右，互不打架 */
       .veil { position:absolute; left:52px; right:0; top:0; bottom:0; border-left:1px solid rgba(243,249,250,.13);
         background:linear-gradient(90deg, rgba(3,17,23,.86), rgba(3,17,23,.93)); }
@@ -106,10 +116,17 @@
       .d { margin-top:5px; font-size:12.5px; line-height:1.55; color:var(--muted); }
       .d.ok { color:var(--glass); }
       .d.warn { color:var(--warm); }
+      /* 唯一的"要你动手"状态：全页仅此一枚实心暖牌（其余状态都是灰/冷/暖的纯文字），
+         牌里的环＋立瓶＝柱口那枚系缆环，两处是同一个记号 */
+      .st { margin-top:8px; display:inline-flex; align-items:center; gap:6px; padding:4px 10px; border-radius:2px;
+        background:var(--warm); color:var(--ink); font-size:12.5px; font-weight:700; letter-spacing:.04em; }
+      .st svg { display:block; flex:none; }
+      .due { margin-top:6px; font-family:Quattrocento,'LXGW WenKai',serif; font-size:10.5px;
+        letter-spacing:.08em; color:rgba(246,215,154,.76); }
       .lk { margin-top:9px; display:flex; gap:15px; font-size:12.5px; color:var(--glass); }
 
       /* ── 内袋：从柜里抽出来，压在柜口上。中心孔是纸被挖掉的一块，
-            透出来的标签盘还没印字 —— 这张唱片上不存在"你的代号" ─────── */
+             透出来的标签盘还没印字 —— 这张唱片上不存在"你的代号" ─────── */
       .bleed { position:absolute; inset:0; overflow:hidden; z-index:5; pointer-events:none; }
       .sleeve { position:absolute; right:26px; top:8px; width:470px; height:296px; border-radius:2px;
         border:1px solid rgba(243,249,250,.18);
@@ -138,8 +155,8 @@
       .msgs { position:absolute; left:0; top:0; width:624px; }
       .msgs h2 { font-size:17px; font-weight:700; }
       .msgs .msub { margin-top:8px; font-size:12.5px; line-height:1.6; color:var(--muted); max-width:600px; }
-      .msgs ul { list-style:none; margin-top:14px; }
-      .msgs li { display:flex; flex-direction:column; gap:4px; padding:9px 0;
+      .msgs ul { list-style:none; margin-top:12px; }
+      .msgs li { display:flex; flex-direction:column; gap:3px; padding:6px 0;
         border-bottom:1px solid rgba(243,249,250,.07); }
       .mrow { display:flex; align-items:center; gap:9px; }
       .mrow svg { display:block; flex:none; }
@@ -149,6 +166,14 @@
       .mrow .read { font-size:11px; color:rgba(243,249,250,.5); }
       .mrow .go { margin-left:auto; font-size:12.5px; color:var(--glass); }
       .mdet { font-size:12.5px; line-height:1.55; color:var(--muted); }
+      /* 回传提示：这条是"要你动手"，所以它得跟下面三条读起来不一样 ——
+         引线伸出正文栏、说明更亮、实心暖牌，牌面记号＝柱口那枚系缆环 */
+      .msgs li.hero { margin-left:-12px; padding-left:12px; border-left:2px solid rgba(246,215,154,.85);
+        background:linear-gradient(90deg, rgba(246,215,154,.14), rgba(246,215,154,0) 80%); }
+      .msgs li.hero .lab { color:var(--warm); }
+      .msgs li.hero .mdet { color:rgba(243,249,250,.82); }
+      .msgs li.hero .pill { background:var(--warm); color:var(--ink); }
+      .msgs li.hero .go { color:var(--warm); font-weight:700; }
 
       .pockets { position:absolute; left:664px; top:0; width:624px; height:288px;
         display:flex; flex-direction:column; gap:20px; }
@@ -202,19 +227,23 @@
         <div class="window">
           <ul>
             <li>
-              <span class="lay" aria-hidden="true">
+              <span class="lay ret" aria-hidden="true">
+                <i class="shaft"></i>
                 <i class="b1 sd mine"><b class="no">1</b></i>
                 <i class="b2 sd"><b class="no">2</b></i>
                 <i class="b3 sd"><b class="no">3</b></i>
                 <i class="b4 sd"><b class="no">4</b></i>
+                <i class="hoop"></i>
               </span>
+              <svg class="float fstand" width="16" height="26" viewBox="0 0 22 34" fill="none" aria-hidden="true"><rect x="7.2" y="1.2" width="7.6" height="5" rx="2" fill="rgba(246,215,154,.62)"/><path d="M8.4 6.4v4.4M13.6 6.4v4.4" stroke="rgba(203,238,246,.62)" stroke-width="1.1"/><rect x="4.2" y="10.8" width="13.6" height="21.4" rx="4" fill="rgba(127,209,217,.16)" stroke="rgba(203,238,246,.72)" stroke-width="1.2"/><rect x="7.4" y="14.6" width="7.2" height="13.6" rx="2" fill="rgba(246,215,154,.24)" stroke="rgba(246,215,154,.55)" stroke-width="1"/></svg>
               <span class="veil" aria-hidden="true"></span>
               <div class="txt">
                 <div class="r1"><span class="slot">01</span><span class="role mine">我发起的</span></div>
                 <p class="t">占位曲目 · 一</p>
                 <p class="d">已录 4 / 4 段</p>
                 <p class="d">我唱的：第 1 段</p>
-                <p class="d ok">全部段位都有人唱过</p>
+                <p class="st"><svg width="13" height="13" viewBox="0 0 13 13" fill="none" aria-hidden="true"><ellipse cx="6.5" cy="8.2" rx="5.4" ry="3" stroke="rgba(5,15,20,.88)" stroke-width="1.3"/><rect x="5.6" y="1.7" width="1.8" height="6.3" rx="0.9" fill="rgba(5,15,20,.88)"/></svg>等你操作</p>
+                <p class="due">回传决策时限 48 小时</p>
                 <p class="lk"><span>去看这个瓶子</span><span>漂流日志</span></p>
               </div>
             </li>
@@ -299,6 +328,15 @@
           <h2>消息</h2>
           <p class="msub">只显示你自己的消息（留言送达 / 未送达 · 作品进公海）；别人的消息读不到，权限在服务端判定。</p>
           <ul>
+            <li class="hero">
+              <div class="mrow">
+                <svg width="17" height="17" viewBox="0 0 17 17" fill="none" aria-hidden="true"><ellipse cx="8.5" cy="10.7" rx="7" ry="3.9" stroke="rgba(246,215,154,.88)" stroke-width="1.4"/><rect x="7.3" y="2.2" width="2.4" height="8.2" rx="1.2" fill="rgba(246,215,154,.9)"/></svg>
+                <span class="lab">《占位曲目 · 一》回传到你手里了</span>
+                <span class="pill">未读</span>
+                <span class="go">去看看</span>
+              </div>
+              <p class="mdet">完整版本已经沿父链回到发起者手里 —— 你只能把它送进公海。</p>
+            </li>
             <li>
               <div class="mrow">
                 <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true"><circle cx="8" cy="8" r="6.2" stroke="rgba(127,209,217,.75)" stroke-width="1.3"/><circle cx="8" cy="8" r="1.5" fill="rgba(127,209,217,.75)"/></svg>
@@ -306,7 +344,7 @@
                 <span class="pill">未读</span>
                 <span class="go">去看一眼</span>
               </div>
-              <p class="mdet">《占位曲目 · 一》回传到发起者手里了，留言已送达，去发起者那边可以看到。</p>
+              <p class="mdet">《占位曲目 · 一》里有一条留给你的话，随完整版本一起送到你手里。</p>
             </li>
             <li>
               <div class="mrow">
@@ -315,7 +353,7 @@
                 <span class="read">已读</span>
                 <span class="go">去看一眼</span>
               </div>
-              <p class="mdet">《占位曲目 · 一》已经补齐所有段位并进入公海，可以回听完整接力链。</p>
+              <p class="mdet">《夜航》已经补齐所有段位并进入公海，可以回听完整接力链。</p>
             </li>
             <li>
               <div class="mrow">
