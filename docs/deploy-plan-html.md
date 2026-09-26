@@ -270,3 +270,35 @@ HTML 是源、不许改 ⇒ 只能运行时替换文本。**这四处是"不换�
 ### 9.4 另记两条
 - `violations[]` **没有 `field` 字段**（后端只给 `code`/`message`）⇒ 字段级归位靠三层映射（`field` 若有优先 → 稳定码映射 → 422 文案里点名的字段名），集中在 `fieldKeyFor()`，W1-d 已实现并注释。
 - W1-d 为造可验证数据**只改了库里的数据**（把测试账号设为 ADMIN、造举报与一条自洽的 MESSAGE 举报），并留了可重跑的复位脚本 `.tmp-w1d/reset-reports.sql`；未改任何代码 ✓ 允许。
+
+---
+
+## 10. W1-b 裁决（captain，2026-09-23）
+
+### 10.1 端点映射补登（§7.3 漏了三处，实测用到）
+| 端点 | 谁在用 | 用途 |
+| --- | --- | --- |
+| `GET /api/songs` | 瓶子详情 / 选歌 | 取**该段的曲库预设时长**（前端不许写死 20 秒） |
+| `GET /api/segments/:id/audio` | 瓶子详情 | 试听（支持 Range） |
+| `GET /api/bottles/:id` | 漂流日志 | 曲名 + `actorId → 匿名代号` 映射（`/events` 只给 actorId） |
+
+### 10.2 裁决
+| 事项 | 裁决 | 理由 |
+| --- | --- | --- |
+| 留言/举报**浮层**是运行时新增 DOM（冻结 HTML 里没有任何输入控件） | **批准** | 两个端点真实存在；不许新增浮层的话这两个功能只能退化成"点了报服务端错误"。浮层用的是 DESIGN.md 明文遮罩值 `rgba(water-void,.78)` + `z-index:300`，未自造视觉 |
+| `Segment.note`（附言）从 `.cap` 行移到「试听与投票」说明行 | **批准** | 定稿 `.cap` 行是单行 `0:20 赞 N 踩 N`，放第 4 项会折行破版；信息没丢 |
+| 日志刻号一律画在弧内侧（定稿里 #11 在弧外 15px） | **批准** | 真实条数可变，固定"最后一个在外侧"在 1 条时就会怪；统一内侧是更稳的规则 |
+| `GET /events` 会带出 `VOTE_CAST`/`MESSAGE_ATTACHED`，而日志页文案写"只记核心操作" | **维持实现者的处理**：只刻 11 类漂流/斩浪事件，并在页面上按**实数**标注「另有 N 条段级互动（投票 / 留言）不进刻痕」 | 既不假装没这些事件，也不让刻痕被互动噪声淹没；**若将来产品要显示投票，需要有单独裁决** |
+
+### 10.3 执行者报的两处**后端与契约不一致**（本轮禁改后端 ⇒ 记录待办）
+1. `ACCEPTED_AUDIO_MIME_TYPES` 收了 `audio/wav` / `audio/ogg`，但 `app.ts` 只给 `audio/webm` / `audio/mp4` 注册了 body 解析器 ⇒ **传 wav 直接 400 `INVALID_BODY`**（不是业务错，是传输层拒收）。⇒ 要么补齐解析器，要么把 wav/ogg 从"可接受"名单里去掉（二选一，需后端裁决）。
+2. 同上第 4 行的产品口径（`/events` 含互动事件 vs 页面文案"只记核心操作"）。
+
+### 10.4 执行者自报的未覆盖分支（保留为残留风险）
+`SEGMENT_CUT` / `BOTTLE_GAP_OPENED` / `BOTTLE_DAMAGED` / `BOTTLE_REWOUND`（需 10 次踩才触发斩浪）、`回传` / `入海` 的**持有者路径**、`放回`（持有者 origin=RETURN 时 422）—— 均已实现但**无 e2e 证据**。
+
+### 10.5 需要收口的技术债（captain 派活）
+| 债 | 现状 | 收口 |
+| --- | --- | --- |
+| **二进制上传通道重复** | `page-bottle.js` 在页内直接用了一次 `fetch`（因为 captain 的 `postAudio` 在它开工之后才出现）；`page-new.js` 也抄了一份 | 两页都改用共享层 `api.postAudio`（共享层已带 401 统一处理，页内自写 fetch 会绕过它） |
+| **录音规则被抄成常量** | MIME 协商、`getUserMedia` 失败文案、预设时长倒数，这些规则在 `packages/shared/src/audio/recording.ts` 里是**纯函数**，但浏览器 import 不了 TS ⇒ 两页各抄一份 | 抽 `site/app/recorder.js`（共享层），两页共用；常量集中一处并注明"来源＝packages/shared/src/audio/recording.ts" |
