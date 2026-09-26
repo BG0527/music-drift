@@ -247,8 +247,8 @@
 
       <!-- ══ 河道 = 头顶那条弯曲的天光带（单支） ══ -->
       <g filter="url(#fBand)">
-        <path d="M -60 280 C 320 70 900 18 1510 88 L 1510 140 C 900 92 320 200 -60 440 Z" fill="#dcf6fb" opacity=".3" filter="url(#fSoft)" />
-        <path d="M -60 280 C 320 70 900 18 1510 88 L 1510 140 C 900 92 320 200 -60 440 Z" fill="url(#gBand)" opacity=".88" />
+        <path d="M -60 280 C 320 70 900 18 1510 88 L 1510 140 C 900 92 320 200 -60 440 Z" fill="#dcf6fb" opacity=".22" filter="url(#fSoft)" />
+        <path d="M -60 280 C 320 70 900 18 1510 88 L 1510 140 C 900 92 320 200 -60 440 Z" fill="url(#gBand)" opacity=".76" />
         <g clip-path="url(#clipBand)">
           <g fill="none" stroke="#f8feff" stroke-linecap="round">
             <path d="M -60 306.7 C 320 91.7 900 30.3 1510 96.7" stroke-width="1.1" opacity=".28" />
@@ -257,7 +257,13 @@
             <path d="M -60 386.7 C 320 156.7 900 67.3 1510 122.7" stroke-width="1.2" opacity=".34" />
             <path d="M -60 413.3 C 320 178.3 900 79.7 1510 131.3" stroke-width="1.1" opacity=".26" />
           </g>
-          <path d="M -60 360 C 320 135 900 55 1510 114" fill="none" stroke="#ffffff" stroke-width="9" opacity=".5" filter="url(#fBlur7)" />
+          <!-- 缎面感的根因就是"一条连续的中轴亮线"：改成沿带长分布的斑块，不再读成一条实体缎带 -->
+          <g filter="url(#fBlur7)">
+            <path d="M 0 335 C 70 308 150 282 220 262" fill="none" stroke="#ffffff" stroke-width="16" opacity=".3" />
+            <path d="M 300 254 C 400 220 500 192 620 176" fill="none" stroke="#f8feff" stroke-width="22" opacity=".24" />
+            <path d="M 700 133 C 800 124 900 116 1000 108" fill="none" stroke="#ffffff" stroke-width="18" opacity=".3" />
+            <path d="M 1080 133 C 1200 130 1320 130 1420 130" fill="none" stroke="#f8feff" stroke-width="26" opacity=".2" />
+          </g>
         </g>
         <!-- 落进深水的光柱 -->
         <g>
