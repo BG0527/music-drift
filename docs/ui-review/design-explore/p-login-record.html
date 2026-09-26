@@ -44,22 +44,22 @@
 
       /* 装置：一根认领线。一枚代号牌坠在线头上，线的另一头是只有你认领得到的那只瓶 ——
          瓶只被画到画面的角上，读到的是它在，而不是它长什么样。 */
-      .device { position:absolute; right:96px; top:120px; width:364px; height:758px; }
-      .tag { position:absolute; right:0; top:0; width:88px; height:94px; border-radius:2px;
+      .device { position:absolute; right:96px; top:124px; width:364px; height:698px; }
+      .tag { position:absolute; right:0; top:0; width:88px; height:88px; border-radius:2px;
         border:1px solid rgba(243,249,250,.34);
         background:linear-gradient(168deg, rgba(243,249,250,.11), rgba(243,249,250,.025)); }
-      .tag::before { content:''; position:absolute; left:50%; top:13px; width:7px; height:7px; margin-left:-3.5px;
+      .tag::before { content:''; position:absolute; left:50%; top:12px; width:7px; height:7px; margin-left:-3.5px;
         border:1px solid rgba(243,249,250,.5); border-radius:50%; background:var(--ink); }
-      .tag b { position:absolute; left:50%; top:31px; width:88px; margin-left:-44px;
-        font-size:11px; font-weight:400; line-height:1.5; letter-spacing:.12em; text-align:center;
+      .tag b { position:absolute; left:50%; top:30px; width:88px; margin-left:-44px;
+        font-size:11px; font-weight:400; line-height:1.45; letter-spacing:.12em; text-align:center;
         color:rgba(243,249,250,.92); text-shadow:0 1px 0 rgba(5,15,20,.6); }
-      .thread { position:absolute; right:44px; top:356px; width:1px; height:400px;
-        background:linear-gradient(180deg, rgba(203,238,246,.05), rgba(203,238,246,.46) 42%, rgba(203,238,246,.16)); }
-      .devnote { position:absolute; right:0; top:176px; width:250px; text-align:right;
-        font-size:12.5px; line-height:1.85; color:var(--muted); }
+      .thread { position:absolute; right:44px; top:208px; width:1px; height:464px;
+        background:linear-gradient(180deg, rgba(203,238,246,.06), rgba(203,238,246,.44) 34%, rgba(203,238,246,.22)); }
+      .devnote { position:absolute; right:56px; top:224px; width:238px; text-align:right;
+        font-size:11.5px; line-height:1.8; color:var(--muted); }
 
       /* 线的另一头：只露一角 —— 玻璃口沿（近唇亮、远唇暗）、瓶肩、栓在口里的线头 */
-      .mouth { position:absolute; left:1184px; top:866px; }
+      .mouth { position:absolute; left:1184px; top:872px; }
 
       .form { display:flex; flex-direction:column; margin-top:56px; }
       .modes { display:flex; gap:26px; }
@@ -87,8 +87,8 @@
         color:var(--paper); background:var(--coral); border:0; border-radius:2px; cursor:pointer; }
       .oath { margin-top:40px; width:452px; font-size:13.5px; line-height:1.9; color:var(--muted); }
 
-      .foot { margin-top:auto; padding-bottom:10px; border-top:1px solid var(--line); }
-      .foot .row { display:flex; align-items:baseline; gap:20px; padding-top:14px; }
+      .foot { margin-top:auto; padding-bottom:12px; border-top:1px solid var(--line); }
+      .foot .row { max-width:1100px; display:flex; align-items:baseline; gap:20px; padding-top:14px; }
       .foot .said { font-size:13px; color:var(--muted); }
       .go { margin-left:auto; font-size:14px; color:var(--glass);
         text-decoration:underline; text-underline-offset:5px; }
@@ -142,18 +142,18 @@
 
       <svg class="mouth" width="196" height="28" viewBox="0 0 196 28" fill="none" aria-hidden="true">
         <!-- 瓶肩：口沿以下只留两侧玻璃壁，中间不画 —— 全页没有一条横贯的线 -->
-        <path d="M96 17 L84 28" stroke="#cbeef6" stroke-opacity=".32" />
-        <path d="M168 17 L180 28" stroke="#cbeef6" stroke-opacity=".24" />
-        <path d="M92 22 L78 28" stroke="#cbeef6" stroke-opacity=".09" />
-        <path d="M172 22 L186 28" stroke="#cbeef6" stroke-opacity=".07" />
+        <path d="M96 20 L84 28" stroke="#cbeef6" stroke-opacity=".32" />
+        <path d="M168 20 L180 28" stroke="#cbeef6" stroke-opacity=".24" />
+        <path d="M92 24 L78 28" stroke="#cbeef6" stroke-opacity=".09" />
+        <path d="M172 24 L186 28" stroke="#cbeef6" stroke-opacity=".07" />
         <!-- 玻璃口：暗的开口；近唇亮、远唇暗，只露这半边 -->
-        <ellipse cx="132" cy="17" rx="36" ry="11" fill="rgba(3,14,20,.6)" />
-        <ellipse cx="132" cy="17" rx="36" ry="11" stroke="#cbeef6" stroke-opacity=".2" />
-        <path d="M96 17 A36 11 0 0 1 168 17" stroke="#cbeef6" stroke-opacity=".6" />
-        <path d="M168 17 A36 11 0 0 1 96 17" stroke="#cbeef6" stroke-opacity=".3" />
+        <ellipse cx="132" cy="20" rx="36" ry="11" fill="rgba(3,14,20,.6)" />
+        <ellipse cx="132" cy="20" rx="36" ry="11" stroke="#cbeef6" stroke-opacity=".2" />
+        <path d="M96 20 A36 11 0 0 1 168 20" stroke="#cbeef6" stroke-opacity=".6" />
+        <path d="M168 20 A36 11 0 0 1 96 20" stroke="#cbeef6" stroke-opacity=".3" />
         <!-- 口里的线头：认领线终止在这只瓶里 -->
-        <path d="M132 19 L132 28" stroke="#cbeef6" stroke-opacity=".26" />
-        <circle cx="132" cy="19" r="2.4" stroke="#cbeef6" stroke-opacity=".64" />
+        <path d="M132 22 L132 28" stroke="#cbeef6" stroke-opacity=".26" />
+        <circle cx="132" cy="22" r="2.4" stroke="#cbeef6" stroke-opacity=".64" />
       </svg>
 
 
