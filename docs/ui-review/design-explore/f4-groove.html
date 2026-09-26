@@ -14,12 +14,20 @@
       body { position:relative; overflow:hidden; background:var(--ink); color:var(--paper);
         font-family:'LXGW WenKai',serif; -webkit-font-smoothing:antialiased; }
 
-      /* 沟槽：用 repeating-radial-gradient 一次画出整张唱片（比手写几十个圆更准也更轻） */
+      /* 沟槽：**密度就是唱片的身份证**。44px 一条的稀环会被读成"行星轨道"；
+         真实唱片的沟槽是极密纹理，这里压到 5.5px（再叠一层 17px 让它有疏密），于是从"几十条线"变成"一张表面"。 */
       .grooves { position:absolute; inset:0;
         background:
           repeating-radial-gradient(circle at 1420px 960px,
-            rgba(243,249,250,.075) 0 1px, transparent 1px 44px),
+            rgba(243,249,250,.055) 0 1px, transparent 1px 5.5px),
+          repeating-radial-gradient(circle at 1420px 960px,
+            rgba(243,249,250,.028) 0 1px, transparent 1px 17px),
           radial-gradient(circle at 1420px 960px, rgba(127,209,217,.05) 0 26%, transparent 62%);
+      }
+      /* 黑胶最认得出来的一处：表面被灯扫过的那道反光 */
+      .glint { position:absolute; inset:0; mix-blend-mode:screen;
+        background:linear-gradient(104deg, transparent 24%, rgba(207,233,238,.07) 39%,
+          rgba(240,252,254,.11) 47%, rgba(207,233,238,.05) 55%, transparent 70%);
       }
       svg.canvas { position:absolute; inset:0; width:1440px; height:900px; }
       .ov { position:absolute; }
@@ -56,6 +64,7 @@
   </head>
   <body>
     <div class="grooves"></div>
+    <div class="glint"></div>
     <svg class="canvas" viewBox="0 0 1440 900">
       <defs>
         <radialGradient id="sheen" cx=".99" cy="1" r="1">
@@ -74,18 +83,19 @@
       <!-- 唱片中心（在画布外）：只留一条实的圆心环 + 主轴孔的一点暗示 -->
       <circle cx="1420" cy="960" r="262" fill="none" stroke="rgba(199,69,44,.35)" stroke-width="1.6" />
 
-      <!-- 分流槽：两条略亮的圈，把"这一面"分成几段 -->
-      <circle cx="1420" cy="960" r="1180" fill="none" stroke="rgba(243,249,250,.13)" stroke-width="1.6" />
-      <circle cx="1420" cy="960" r="700" fill="none" stroke="rgba(243,249,250,.11)" stroke-width="1.4" />
+      <!-- 只留**一条外缘**：唱片只有一个边界，其余全是沟槽纹理（再多几圈就变回行星轨道） -->
+      <circle cx="1420" cy="960" r="1276" fill="none" stroke="rgba(207,233,238,.2)" stroke-width="2" />
 
-      <!-- ── 河道 = 那条被点亮的沟槽（只有一条，单支路） ── -->
-      <circle cx="1420" cy="960" r="900" fill="none" stroke="rgba(127,209,217,.14)" stroke-width="18" />
-      <circle cx="1420" cy="960" r="900" fill="none" stroke="#7fd1d9" stroke-width="2.4" opacity=".9" />
-      <!-- 水流：沿沟槽走的漂移虚线 -->
-      <circle cx="1420" cy="960" r="900" fill="none" stroke="rgba(243,249,250,.45)" stroke-width="2"
+      <!-- ── 河道 = 那条被点亮的沟槽：它不是一条线，而是一条**有宽度的水槽**（两条岸 + 中间的水） ── -->
+      <circle cx="1420" cy="960" r="900" fill="none" stroke="rgba(42,157,177,.2)" stroke-width="26" />
+      <circle cx="1420" cy="960" r="900" fill="none" stroke="rgba(159,230,237,.42)" stroke-width="7" />
+      <circle cx="1420" cy="960" r="887" fill="none" stroke="rgba(216,243,246,.5)" stroke-width="1.4" />
+      <circle cx="1420" cy="960" r="913" fill="none" stroke="rgba(216,243,246,.44)" stroke-width="1.4" />
+      <!-- 水流：沿槽走的两道漂移虚线（水在流） -->
+      <circle cx="1420" cy="960" r="900" fill="none" stroke="rgba(243,249,250,.42)" stroke-width="2"
         stroke-dasharray="16 30" stroke-linecap="round" />
-      <!-- 唱针落下的一点微光（暗示"从这里被读出来"） -->
-      <circle cx="943" cy="197" r="34" fill="none" stroke="rgba(199,69,44,.35)" stroke-width="1.4" />
+      <circle cx="1420" cy="960" r="906" fill="none" stroke="rgba(243,249,250,.2)" stroke-width="1.6"
+        stroke-dasharray="10 40" stroke-linecap="round" />
 
       <!-- 灰尘与划痕：让这张唱片"被用过" -->
       <g fill="#eafcff">
@@ -104,14 +114,7 @@
           font-size="10" letter-spacing="1.6">顺槽 · 33⅓</text>
       </g>
 
-      <!-- 唱臂：从右上角伸进来，只画臂管 + 一枚唱针（原来那块灰色"唱头"读成了一块纸片） -->
-      <g opacity=".92">
-        <path d="M1500 30 L 1198 236" stroke="rgba(207,233,238,.42)" stroke-width="14" stroke-linecap="round" />
-        <path d="M1500 30 L 1198 236" stroke="rgba(5,15,20,.88)" stroke-width="8" stroke-linecap="round" />
-        <path d="M1206 232 l -22 16" stroke="rgba(207,233,238,.7)" stroke-width="6" stroke-linecap="round" />
-        <circle cx="1180" cy="252" r="4.6" fill="#c7452c" />
-        <circle cx="1180" cy="252" r="13" fill="none" stroke="rgba(199,69,44,.35)" stroke-width="1.2" />
-      </g>
+      <!-- 唱臂已删：它在右上角读成了一枚火箭，而这里是一张**唱片**（用户裁决） -->
     
       <!-- ── 细节层 2（**删掉这个 g 就回到上一版**）——
            从 g3 借来的四种"感觉"，按唱片主题翻译：尘屑 / 摩尔纹 / 远处尘屑群 / 沟槽调制 -->
@@ -163,7 +166,7 @@
     </div>
 
 
-    <div class="ov" style="left:96px; top:654px; width:330px">
+    <div class="ov" style="left:1150px; top:112px; width:266px; text-align:right">
       <div class="rpm">33⅓</div>
       <div class="cat" style="margin-top:4px">RPM · A 面 · 单支路</div>
       <div class="cat" style="margin-top:14px; letter-spacing:.06em; line-height:2; opacity:.82">
@@ -172,15 +175,15 @@
     </div>
 
     <!-- 圆形按钮：骑在那条被点亮的沟槽上 -->
-    <div class="port draw ov" style="left:496px; top:574px; width:156px; height:156px" role="button" aria-label="捞一个漂流瓶">
+    <div class="port draw ov" style="left:390px; top:500px; width:220px; height:220px" role="button" aria-label="捞一个漂流瓶">
       <i class="r1"></i><i class="r2"></i><i class="r3"></i>
       <span class="core">捞取<span>DRAW</span></span>
-      <span class="cap" style="left:-136px; top:214px; width:300px"><b>捞一个漂流瓶</b>捞到即持有：同一时刻，同一条河道上只有你拿着它。</span>
+      <span class="cap" style="left:-314px; top:-16px; width:300px"><b>捞一个漂流瓶</b>捞到即持有：同一时刻，同一条河道上只有你拿着它。</span>
     </div>
-    <div class="port cast ov" style="left:865px; top:119px; width:156px; height:156px" role="button" aria-label="投下一支漂流瓶">
+    <div class="port cast ov" style="left:400px; top:220px; width:180px; height:180px" role="button" aria-label="投下一支漂流瓶">
       <i class="r1"></i><i class="r2"></i><i class="r3"></i>
       <span class="core">投下<span>CAST</span></span>
-      <span class="cap" style="left:252px; top:58px; width:300px"><b>投下一支漂流瓶</b>选一首歌，录下第 1 段，然后放进上游等一个陌生人接下一棒。</span>
+      <span class="cap" style="left:-324px; top:80px; width:300px"><b>投下一支漂流瓶</b>选一首歌，录下第 1 段，然后放进上游等一个陌生人接下一棒。</span>
     </div>
 
     <footer>
