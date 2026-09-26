@@ -11,6 +11,7 @@
       :root {
         --ink:#050f14; --paper:#f3f9fa; --muted:#a9c7cf; --glass:#7fd1d9;
         --coral:#c7452c; --warm:#f6d79a; --line:rgba(243,249,250,.13);
+        --error:#e2604a;
       }
       * { box-sizing:border-box; margin:0; padding:0; }
       html,body { width:1440px; height:900px; }
@@ -61,30 +62,46 @@
           var(--ink) 0 26px, rgba(243,249,250,.24) 26px 27px, transparent 27px); }
 
       main { position:relative; z-index:2; }
-      .cat { position:absolute; left:116px; top:100px; font-size:11px; letter-spacing:.24em;
+      .cat { position:absolute; left:116px; top:98px; font-size:11px; letter-spacing:.24em;
         color:rgba(243,249,250,.5); }
-      h1 { position:absolute; left:116px; top:128px; width:712px; font-size:56px; font-weight:700;
+      h1 { position:absolute; left:116px; top:124px; width:712px; font-size:56px; font-weight:700;
         line-height:1.12; letter-spacing:.01em; }
-      .lede { position:absolute; left:116px; top:274px; width:620px; font-size:14.5px; line-height:1.85;
+      .lede { position:absolute; left:116px; top:262px; width:620px; font-size:14.5px; line-height:1.85;
         color:var(--muted); }
       .rule { position:absolute; left:116px; width:712px; height:1px; background:var(--line); }
 
+      /* 模式切换 = 压在封套左栏顶上的一对制式页签（源码里的 Tabs） */
+      .modes { position:absolute; left:116px; top:352px; display:flex; gap:26px; }
+      .mode { padding:0 0 9px; font-family:inherit; font-size:15px; font-weight:700; letter-spacing:.14em;
+        color:var(--muted); background:transparent; border:0; border-bottom:1px solid rgba(243,249,250,.22);
+        cursor:pointer; }
+      .mode.on { color:var(--coral); border-bottom:2px solid var(--coral); }
+
       .field { position:absolute; left:116px; width:440px; }
-      .f-handle { top:382px; }
-      .f-password { top:494px; }
+      .f-handle { top:478px; }
+      .f-email { top:568px; height:54px; }
+      .f-password { top:658px; height:54px; }
       .lbl { font-size:11px; letter-spacing:.24em; color:rgba(243,249,250,.5); }
       .field input { display:block; width:100%; height:34px; margin-top:6px; padding:0 0 6px;
         font-family:inherit; font-size:15.5px; color:var(--paper); background:transparent;
         border:0; border-bottom:1px solid rgba(243,249,250,.24); }
+      .field.bad input { border-bottom-width:2px; border-bottom-color:var(--error); }
+
+      /* 字段级错误的落位：一直落在字段列的右侧，靠底色 + 下划线双通道，不靠颜色单独表达 */
+      .err { position:absolute; left:616px; width:212px; color:var(--error); }
+      .err .lbl { color:inherit; }
+      .err .v { margin-top:9px; font-size:12.5px; line-height:1.7;
+        text-decoration:underline; text-decoration-thickness:1px; text-underline-offset:3px; }
+      .err.e-handle { top:504px; }
+      .err.e-password { top:684px; }
 
       /* 字段说明 = 印在栏目右侧的规格小字（表单的页边注） */
-      .spec { position:absolute; left:596px; width:232px; }
-      .spec.s1 { top:400px; }
-      .spec.s2 { top:494px; }
+      .spec { position:absolute; left:616px; width:212px; }
+      .spec.s1 { top:494px; }
       .spec .v { font-size:12.5px; line-height:1.75; color:var(--muted); }
       .spec .lbl + .v { margin-top:9px; }
 
-      .etiquette { position:absolute; left:116px; top:640px; width:420px; font-size:13.5px;
+      .etiquette { position:absolute; left:116px; top:766px; width:420px; font-size:13.5px;
         line-height:1.9; color:var(--muted); }
 
       /* 主行动 = 封套开口上的拉片：一半在封套里，一半压在唱片上 */
@@ -94,7 +111,7 @@
       .tab::before { content:''; position:absolute; left:0; top:5px; right:0; height:1px;
         background:rgba(243,249,250,.32); }
 
-      .band { position:absolute; left:64px; right:64px; top:800px; padding-top:20px;
+      .band { position:absolute; left:64px; right:64px; top:838px; padding-top:20px;
         border-top:1px solid var(--line); display:flex; align-items:baseline; gap:22px; }
       .band .said { font-size:13px; color:var(--muted); }
       .go { margin-left:auto; font-size:14px; color:var(--glass);
@@ -122,7 +139,12 @@
       <h1>每一段旋律，<br />都在寻找下一个声音</h1>
       <p class="lede">这是一个由歌声、回音和宿命组成的角落。<br />你只录一段，剩下的交给漂流。</p>
 
-      <div class="rule" style="top:362px"></div>
+      <div class="rule" style="top:340px"></div>
+
+      <div class="modes">
+        <button class="mode" type="button">登录</button>
+        <button class="mode on" type="button">注册</button>
+      </div>
 
       <div class="field f-handle">
         <label class="lbl meta" for="handle">用户名</label>
@@ -133,17 +155,37 @@
         <p class="v">2–32 个字符，别人看到的是每个瓶子里单独的匿名代号。</p>
       </div>
 
-      <div class="spec s2">
+      <p class="err e-handle" role="alert">
+        <span class="lbl">字段级错误落到用户名</span>
+        <span class="v">HANDLE_TAKEN 用户名已被占用。</span>
+      </p>
+
+      <div class="field f-email bad">
+        <label class="lbl meta" for="email">邮箱</label>
+        <input id="email" name="email" type="email" autocomplete="email" aria-invalid="true" />
+      </div>
+
+      <p class="err e-email" style="top:594px" role="alert">
+        <span class="lbl">字段级错误落到邮箱</span>
+        <span class="v">EMAIL_TAKEN 这个邮箱已经注册过。</span>
+      </p>
+
+      <div class="field f-password bad">
+        <label class="lbl meta" for="password">密码</label>
+        <input id="password" name="password" type="password" autocomplete="new-password" aria-invalid="true" />
+      </div>
+
+      <div class="spec s2" style="top:674px">
         <p class="lbl meta">密码规则</p>
         <p class="v">至少 8 位，且要同时包含字母和数字。</p>
       </div>
 
-      <div class="field f-password">
-        <label class="lbl meta" for="password">密码</label>
-        <input id="password" name="password" type="password" autocomplete="new-password" />
-      </div>
+      <p class="err e-password" role="alert">
+        <span class="lbl">字段级错误落到密码</span>
+        <span class="v">WEAK_PASSWORD 口令强度不够。</span>
+      </p>
 
-      <div class="rule" style="top:620px"></div>
+      <div class="rule" style="top:766px"></div>
 
       <p class="etiquette">不用真名，不用露脸，只要一段声音。同一个瓶子里，不同的人看到的是不同的匿名代号。</p>
 
