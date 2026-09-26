@@ -263,7 +263,8 @@ async function start() {
 
       const listen = q('.entry .listen', column);
       if (listen !== null) {
-        listen.setAttribute('href', `/sea-detail.html?id=${encodeURIComponent(item.id)}`);
+        /** W7：公海详情页已删除 ⇒「听这支作品」**直达瓶子详情**（同一支瓶子的同一个页面）。 */
+        listen.setAttribute('href', `/bottle.html?id=${encodeURIComponent(item.id)}`);
         listen.textContent = '听这支作品';
         listen.style.pointerEvents = 'auto';
       }

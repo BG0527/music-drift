@@ -4,8 +4,11 @@
  * 顺序（任务书给定的顺序，本文件按同一顺序实现）：
  *   预置演示账号 → 登录/注册 → 选歌（/new.html 建 DRAFT 瓶）→ 接唱（真 MediaRecorder，≥15 秒）
  *   → 瓶子详情（试听 / 投票 / 留言）→ 三选一去向 → 河道捞取（换一个接棒账号）→ 接唱 → 真留言
- *   → 漂流日志 → 公海 → 公海详情 → 我的（**演示账号**的收藏/徽章/通知都要 > 0）
+ *   → 漂流日志 → 公海（点「听这支作品」直达瓶子详情）→ 我的（**演示账号**的收藏/徽章/通知都要 > 0）
  *   → 通知「标记已读」就地生效。
+ *
+ * ⚠️ W7 起流程变了（用户第 3 轮需求，`docs/deploy-plan-html.md` §17）：**公海详情页已删除**，
+ * 公海的「听这支作品」直接跳 `/bottle.html?id=…`，那条时间轴复刻进了瓶子详情 ⇒ 第 8 步改在这里走。
  *
  * ⚠️ 与 W4-a 的接口面（本脚本按**当前**页面实现，页面改了要回来对一次）：
  *   - `/new.html` **不再录音**：只建一只 DRAFT 瓶并跳 `/bottle.html?id=…`（"选这首，去接唱"）；
@@ -54,8 +57,15 @@ const STAMP = new Date()
   .toISOString()
   .replace(/[-:TZ.]/g, '')
   .slice(0, 14);
-const WALKER = { handle: `w3walk${STAMP}`, email: `w3walk${STAMP}@walk.local`, password: 'SeaDrift2026' };
-const RELAY = { handle: `w3relay${STAMP}`, email: `w3relay${STAMP}@walk.local`, password: 'SeaDrift2026' };
+/**
+ * 本片临时造的两个探针账号（跑完可清，见 `docs/site-runbook.md` §8）。
+ *
+ * ⚠️ W6 起登录/注册的契约是 `{ account, password }`，**账号 = `users.handle`、不再是邮箱**
+ * （`packages/shared/src/contracts/auth.ts`）；W7 修：本脚本原来按旧形状填「用户名」行 + 用邮箱当账号，
+ * 而登录页早已没有那个输入框 ⇒ 第 1 步的注册填表就卡死（真缺陷，与 W7 的页面改动无关）。
+ */
+const WALKER = { handle: `w3walk${STAMP}`, password: 'SeaDrift2026' };
+const RELAY = { handle: `w3relay${STAMP}`, password: 'SeaDrift2026' };
 /** 录音时长下界（任务书要求 ≥15 秒）；上界由曲库预设 ±2000ms 决定，实测由服务端把关。 */
 const MIN_RECORD_MS = 15_000;
 const RECORD_TIMEOUT_MS = 60_000;
@@ -133,19 +143,18 @@ async function api(client, method, path) {
 }
 
 /**
- * 走真登录页（`/login.html`）：注册 tab 三项、登录 tab 两项。
+ * 走真登录页（`/login.html`）。
  *
- * ⚠️ 选择器为什么要这么写：注册 tab 的「用户名」行是**克隆口令行**造出来的
- * （`page-login.js` 的 `buildUsernameRow()`），**克隆保留了 `f-pass` 类**、只多了
- * `data-username-row="true"` 与 `#username`。用 `.f-pass input` 会先命中克隆行 —— 实测把口令
- * 写进了用户名框（422「请求体不合法：password」）。所以这里一律用**精确**选择器。
+ * ⚠️ W6 起两个 tab 都是**两个输入框**（账号 + 口令），账号 = `users.handle`（不是邮箱）——
+ * 冻结 HTML 里那个 `#handle` 输入框**就是账号**。W7 修：本函数原来按旧形状往「用户名」行
+ * （`[data-username-row="true"]`，W6 已随方案 C 删除）里填 handle、并把邮箱填进账号栏 ⇒
+ * 注册/登录在 W6 之后必然卡在 `locator.fill` 超时。现在只填两个真实存在的输入框。
  */
 async function signInThroughUi(page, account, { next = '/river.html', register }) {
   await page.goto(`${BASE}/login.html?next=${encodeURIComponent(next)}`);
   await page.waitForFunction(() => document.documentElement.dataset.pageReady === 'login');
   await page.locator('.modes .mode').nth(register ? 1 : 0).click();
-  await page.locator('.f-handle input').fill(account.email);
-  if (register) await page.locator('[data-username-row="true"] input').fill(account.handle);
+  await page.locator('.f-handle input').fill(account.handle);
   await page.locator('.f-pass:not([data-username-row]) input').fill(account.password);
   await page.click('button.act');
   await page.waitForURL((url) => !url.pathname.endsWith('/login.html'), { timeout: 20000 });
@@ -258,7 +267,7 @@ async function main() {
     );
 
     // ─────────────────────────────────────────────────────────── 1. 登录
-    step('1. 登录（真登录页 /login.html，注册 tab 三项）');
+    step('1. 登录（真登录页 /login.html，注册 tab 两项：账号 + 口令）');
     const walker = await openSession(browser, 'walker');
     await signInThroughUi(walker.page, WALKER, { register: true });
     const walkerClient = await clientFromContext(walker.context);
@@ -541,8 +550,8 @@ async function main() {
       `刻痕=${String(logInfo.rows)} 标记数=${logInfo.marks} 曲名=${logInfo.song.trim()}`,
     );
 
-    // ─────────────────────────────────────────────────────────── 8. 公海 + 公海详情
-    step('8. 公海（/sea.html）→ 公海详情（/sea-detail.html）');
+    // ─────────────────────────────────────────────────────────── 8. 公海 →「听这支作品」→ 瓶子详情
+    step('8. 公海（/sea.html）→ 点「听这支作品」→ 瓶子详情（/bottle.html?id=…）');
     await relay.page.goto(`${BASE}/sea.html`);
     await relay.page.waitForFunction(() => document.documentElement.dataset.pageReady === 'sea');
     await relay.page.waitForSelector('main > ul.fleet > li', { timeout: 15000 });
@@ -556,26 +565,37 @@ async function main() {
       };
     });
     check(
-      '公海已完成区有真作品（曲名 + 详情链接）',
-      seaInfo.count >= 1 && seaInfo.song.trim() !== '' && seaInfo.href.startsWith('/sea-detail.html?id='),
-      `分区条目=${String(seaInfo.count)} 首项=《${seaInfo.song.trim()}》`,
+      '公海已完成区有真作品，且「听这支作品」**直达瓶子详情**（W7：公海详情页已删除）',
+      seaInfo.count >= 1 && seaInfo.song.trim() !== '' && seaInfo.href.startsWith('/bottle.html?id='),
+      `分区条目=${String(seaInfo.count)} 首项=《${seaInfo.song.trim()}》 链接=${seaInfo.href}`,
     );
     await relay.page.screenshot({ path: join(SHOTS, 'w3-sea.png') });
 
     await relay.page.locator('main > ul.fleet > li .entry .listen').first().click({ timeout: 20000 });
-    await relay.page.waitForURL(/sea-detail\.html\?id=/);
-    await relay.page.waitForFunction(() => document.documentElement.dataset.pageReady === 'sea-detail');
-    const seaDetailId = new URL(relay.page.url()).searchParams.get('id') ?? '';
-    const seaDetail = await relay.page.evaluate(() => ({
-      title: document.querySelector('.hd h1')?.textContent ?? '',
-      chain: document.querySelectorAll('ol.chain > li').length,
-      collect: document.querySelector('.crumb a.cat')?.textContent ?? null,
-    }));
-    const seaSummary = await api(relayClient, 'GET', `/api/sea/${seaDetailId}`);
+    await relay.page.waitForURL(/bottle\.html\?id=/, { timeout: 25000 });
+    await relay.page.waitForFunction(() => document.documentElement.dataset.pageReady === 'bottle');
+    const seaBottleId = new URL(relay.page.url()).searchParams.get('id') ?? '';
+    const seaBottleDom = await relay.page.evaluate(() => {
+      const root = document.querySelector('[data-w7-timeline]');
+      return {
+        title: document.querySelector('.work')?.textContent ?? '',
+        caps: document.querySelectorAll('.cap').length,
+        segments: root === null ? -1 : root.querySelectorAll('.seg').length,
+        empty: root === null ? -1 : root.querySelectorAll('.seg.empty').length,
+        needle: document.querySelector('[data-w7-needle]') !== null,
+      };
+    });
+    const seaBottle = await api(relayClient, 'GET', `/api/bottles/${seaBottleId}`);
     check(
-      '公海详情：曲名/段链/收藏口都按真实数据渲染',
-      seaDetail.title.trim() !== '' && seaDetail.chain === seaSummary.totalSegments,
-      `曲名=${seaDetail.title.trim()} 段链=${String(seaDetail.chain)}/${String(seaSummary.totalSegments)} seaZone=${String(seaSummary.seaZone)} 收藏口=${String(seaDetail.collect)}`,
+      '公海点听直达瓶子详情：曲名 / 段链 / 时间轴（含缺口段与唱针）都按真数据渲染',
+      seaBottleDom.title.trim() !== '' &&
+        seaBottleDom.caps === seaBottle.segments.length &&
+        seaBottleDom.segments === seaBottle.totalSegments &&
+        seaBottleDom.empty === seaBottle.missingSegmentIndexes.length &&
+        seaBottleDom.needle,
+      `曲名=${seaBottleDom.title.trim()} 段链=${String(seaBottleDom.caps)}/${String(seaBottle.segments.length)} ` +
+        `时间轴段=${String(seaBottleDom.segments)}（缺口 ${String(seaBottleDom.empty)} 应=${String(seaBottle.missingSegmentIndexes.length)}）` +
+        ` 唱针=${String(seaBottleDom.needle)}`,
     );
 
     // ─────────────────────────────────────────────────────────── 9. 我的（演示账号）

@@ -14,10 +14,14 @@
  * - 其余 → `.sd`（别人唱的）；
  * - 顶部段位是缺口时，沉积面（`.iface`）与还漂着的瓶子（`.float .flask`）落在**最高实心层之上**。
  *
- *  已知后端缺口（`docs/ui-review/design-explore/_SCORECARD.md`）：设计稿里「收到回传 → 提示 +
- * 状态『等你操作』」需要后端新增通知类型 `BOTTLE_RETURNED`、并让 `GET /api/me/bottles` 能表达"待你操作"。
- * 本轮不改后端，**且当前数据里没有这种通知** ⇒ 本页**不画**那枚暖牌（`.st` / `.due` / 柱口系缆环
- * `.shaft`+`.hoop` 一律不渲染），绝不伪造这个状态。
+ * 「收到回传 → 提示 + 等着你操作」的前端最后一公里（W9 收口，W6 已把后端补齐）：
+ * - `GET /api/notifications` 的 `BOTTLE_RETURNED`（payload 带 `bottleId` / `songTitle`）⇒ 消息区那条用
+ *   **中文**文案 + 设计稿的同一个记号（`li.hero`：暖引线、暖牌、动作「去看看」），点它先标已读再去那一支瓶子；
+ * - `GET /api/me/bottles` 每行的 `awaitingMyAction`（CONTEXT §4.2：回传落到我手里、我只能选入海）⇒ 那一格
+ *   按定稿画「回航泊位」：柱口系缆环（`.shaft` + `.hoop`）+ 立在环里的瓶子 + 文字区那枚实心暖牌「等你操作」，
+ *   暖牌自己就是动作（点它 → `/bottle.html?id=…`）。
+ * - **不画 `.due`**（定稿那行「回传决策时限 48 小时」）：契约里没有该字段、后端也没有"超时自动入海"的实现
+ *   ⇒ 写了就是替系统许一个它不会兑现的诺。**只渲染服务端真给的东西**是本页的判据。
  */
 import { get, post } from './api.js';
 import {
@@ -125,6 +129,16 @@ async function start() {
   // 稿子里的浮瓶就是 `<svg class="float flask f200">` **本身**（不是某个容器里的 svg）⇒ 按 `svg.float` 抄。
   const flaskTemplate =
     cardNodes.map((node) => q('svg.float', node)).find((node) => node !== null && node !== undefined) ?? null;
+  /**
+   * 「回航泊位」的三件装饰只长在**第 1 格**上（定稿里那一格就是回传格）：柱口系缆环（`.hoop`）、
+   * 立在环里的瓶子（`svg.float.fstand`）、文字区那枚实心暖牌（`.st`）。结构模板取的是第 4 格
+   * （干净的沉积柱），所以要在清空之前把它们抄下来。
+   */
+  const stateMarkTemplate = cardNodes.map((node) => q('.txt > .st', node)).find((node) => node != null) ?? null;
+  const standTemplate = cardNodes.map((node) => q('svg.float.fstand', node)).find((node) => node != null) ?? null;
+  /** 消息区那条「回传」用的是同一枚记号（环 + 立瓶），也从冻结稿里抄。 */
+  const heroMarkTemplate =
+    messageList === null ? null : (q(':scope > li.hero .mrow > svg', messageList)?.cloneNode(true) ?? null);
 
   // 先同步抹掉稿子里的假数据（网络没回来之前页面上不能留"午夜的听众"这类演示内容）。
   if (handle !== null) handle.textContent = '载入中…';
@@ -240,7 +254,12 @@ async function start() {
     const title = q('.t', card);
     if (title !== null) title.textContent = item.songTitle;
 
-    // 「等你操作」那一套（`.st` / `.due`）在本轮**没有数据来源**，一律不画。
+    /**
+     * 「等你操作」那一套只服务端**真给了**才画：`awaitingMyAction`（CONTEXT §4.2：回传落到我手里、
+     * 我只能选入海）。模板那一格没有这套节点 ⇒ 先清干净，再在真待我操作的那一支上重建。
+     * **不画 `.due`**（定稿那行「回传决策时限 48 小时」）：契约没有该字段、后端也没有超时自动入海，
+     * 写了就是让界面替系统许一个不会兑现的诺。
+     */
     qa('.txt > .st, .txt > .due', card).forEach((node) => node.remove());
     for (const node of qa('.txt > .d', card)) node.remove();
 
@@ -267,13 +286,37 @@ async function start() {
     const links = q('.lk', card);
     if (links !== null) {
       links.before(...lines);
+      // 定稿的顺序是：正文行 → 暖牌 → 两个链接（所以暖牌要在正文之后插）。
+      if (item.awaitingMyAction === true) appendActionMark(card, item, links);
       const [open, log] = qa('span', links);
       linkify(open ?? null, `/bottle.html?id=${encodeURIComponent(item.id)}`);
       linkify(log ?? null, `/drift-log.html?id=${encodeURIComponent(item.id)}`);
     } else {
       card.append(...lines);
+      if (item.awaitingMyAction === true) appendActionMark(card, item, null);
     }
     return card;
+  }
+
+  /**
+   * 「回航泊位」的可见记号（**只在 `awaitingMyAction === true` 时调用**）：柱口系缆环 + 立在环里的瓶子
+   * + 文字区那枚实心暖牌。暖牌**自己就是动作** —— 点它去那一支瓶子（定稿上它的位置在正文之后、链接之前）。
+   * 文本一律取冻结稿里的原文，这里不新写一个字。
+   */
+  function appendActionMark(card, item, links) {
+    const lay = q('.lay', card);
+    if (lay !== null) {
+      lay.classList.add('ret');
+      lay.prepend(el('i', { class: 'shaft' }));
+      lay.append(el('i', { class: 'hoop' }));
+    }
+    if (standTemplate !== null) card.prepend(standTemplate.cloneNode(true));
+    if (stateMarkTemplate !== null) {
+      const mark = stateMarkTemplate.cloneNode(true);
+      linkify(mark, `/bottle.html?id=${encodeURIComponent(item.id)}`);
+      if (links !== null) links.before(mark);
+      else card.append(mark);
+    }
   }
 
   // ─────────────────────────────────────────────────────────── 消息（只显示自己的）
@@ -302,7 +345,13 @@ async function start() {
     const item = messageTemplate.cloneNode(true);
     const payload = row.payload ?? {};
     const songTitle = typeof payload.songTitle === 'string' ? payload.songTitle : null;
+    const bottleId = typeof payload.bottleId === 'string' ? payload.bottleId : null;
     const labels = {
+      // 回传落到我手里（CONTEXT §4.2）：标题与说明取自定稿「我的」页那一行，动作是「去看看」。
+      BOTTLE_RETURNED: {
+        lab: songTitle === null ? '有一支作品回传到你手里了' : `《${songTitle}》回传到你手里了`,
+        detail: '完整版本已经沿父链回到发起者手里 —— 你只能把它送进公海。',
+      },
       MESSAGE_DELIVERED: {
         lab: '收到一条私密留言',
         detail: songTitle === null ? '有一条留给你的话随作品送到你手里。' : `《${songTitle}》里有一条留给你的话。`,

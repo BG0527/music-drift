@@ -1,9 +1,9 @@
 /**
  * 静态发布站守卫（W2）。退出码可 CI：0 = 全部通过，1 = 有失败项。
  *
- * 管的是"那 11 张设计定稿 + 接线层"有没有在学校里学坏：
+ * 管的是"那 10 张设计定稿 + 接线层"有没有在学校里学坏：
  *  1. **发布副本必须等于源**（`sync-site.mjs --check`）—— 这是"HTML 是源"的机器保证；
- *  2. `site/` 只许有名单内的 11 页，页与 `page-*.js` 一一对应（无孤儿、无自作主张的第 12 页）；
+ *  2. `site/` 只许有名单内的 10 页，页与 `page-*.js` 一一对应（无孤儿、无自作主张的第 11 页）；
  *  3. 每页必须有 viewport 与本页脚本，且**不得**出现静态 HTML 注入面；
  *  4. **禁 emoji / 禁纯黑 / 禁外链**（沿用设计期的三条硬约束）；
  *  5. **禁 HTML 注入通道**（`innerHTML`/`outerHTML`/`insertAdjacentHTML`/`document.write`/`eval(`）——
@@ -29,7 +29,6 @@ const PAGES = [
   'bottle.html',
   'drift-log.html',
   'sea.html',
-  'sea-detail.html',
   'me.html',
   'settings.html',
   'login.html',
@@ -80,7 +79,7 @@ try {
 // ── 2. 名单与页/脚本一一对应 ────────────────────────────────────────
 const actualPages = readdirSync(SITE).filter((n) => n.endsWith('.html'));
 for (const name of actualPages) {
-  if (!PAGES.includes(name)) fail(`site/${name} 不在发布名单内（发布副本只许来自 11 张定稿）`);
+  if (!PAGES.includes(name)) fail(`site/${name} 不在发布名单内（发布副本只许来自 10 张定稿）`);
 }
 for (const name of PAGES) {
   if (!existsSync(join(SITE, name))) fail(`缺页：site/${name}`);

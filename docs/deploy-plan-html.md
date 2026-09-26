@@ -176,7 +176,7 @@
 | `p-bottle-record` | `/bottle.html` | `GET /api/bottles/:id`、`POST /api/bottles/:id/segments`、`POST /api/segments/:id/listen`、`POST /api/segments/:id/votes`、`GET/POST /api/bottles/:id/messages`、`POST /api/bottles/:id/resolution`、`POST /api/bottles/:id/put-back`、`POST /api/reports` |
 | `p-driftlog-record` | `/drift-log.html` | `GET /api/bottles/:id/events` |
 | `p-sea-hall` | `/sea.html` | `GET /api/sea` |
-| `p-sea-detail-record` | `/sea-detail.html` | `GET /api/sea/:id`、`POST /api/sea/:id/targeted-segment`、`POST /api/collections/:bottleId` |
+| `p-sea-detail-record` | `/sea-detail.html` | `GET /api/sea/:id`、`POST /api/sea/:id/targeted-segment`、`POST /api/collections/:bottleId` | ← **已删除（用户第 3 轮需求）**：整页移除、公海点听直达 `/bottle.html?id=…`；其顶部的沟槽时间轴＋唱针已复刻进瓶子详情（见 §22）
 | `p-profile-record` | `/me.html` | `GET /api/me/bottles`、`GET /api/notifications`、`POST /api/notifications/:id/read`、`GET /api/me/collections`、`GET /api/me/badges`、`GET /api/me/anonymous-codes` |
 | `p-settings-record` | `/settings.html` | `GET /api/auth/me`、`POST /api/auth/logout` |
 | `s2-admin-record` | `/admin.html` | `GET /api/admin/reports`、`POST /api/admin/reports/:id/decision` |

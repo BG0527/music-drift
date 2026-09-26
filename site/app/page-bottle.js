@@ -31,6 +31,9 @@
  *      选完去向给出**说清结果的提示**（共享层状态条 + 页内留痕）再跳 `/river.html`。
  *   3. **试听全部**：把已录的段**按段号连播**（缺口跳过，不做混音 —— 后端没有混音端点），
  *      0 段时按钮不存在。运行期建控件（§10.2 已批准的既有模式）。
+ *
+ * W7（用户第 3 轮需求，§17）：公海详情页被删除，它顶部那条**沟槽时间轴 + 唱针**复刻到本页。
+ * 几何与类名照抄那条时间轴（值见本文件 `TIMELINE_STYLE`），落位与三处必要偏离记在 §17.6。
  */
 import { ApiError, get, post, postAudio } from './api.js';
 import {
@@ -247,6 +250,8 @@ function render() {
   /** 先把「没有可试听段」的列清干净（否则定稿里的演示进度/计数会留在页面上）。 */
   renderListenColumn();
   renderListenAll();
+  /** W7：时间轴先按真数据画一次（0 段时也要画成"全空、没有唱针"，不留假进度）。 */
+  paintTimeline();
   const first = state.detail.segments[0];
   if (first !== undefined) void selectSegment(first.index);
 }
@@ -640,6 +645,8 @@ function updateTransport(currentMs, totalMs) {
   if (head !== null) head.style.left = `${Math.round(span * 400) - 2}px`;
   setText('.timecode', `${formatClock(currentMs)} / ${formatClock(totalMs)}`);
   const index = state.selectedIndex;
+  /** W7：时间轴与这条进度条是同一件事的两种画法 —— 每次进度更新都让唱针跟着走。 */
+  paintTimeline();
   if (index === null) return;
   q('.bar')?.setAttribute('aria-label', `第 ${index} 段播放进度 ${formatClock(currentMs)} / ${formatClock(totalMs)}`);
   q('.play')?.setAttribute('aria-label', state.audio?.paused === false ? `暂停第 ${index} 段` : `播放第 ${index} 段`);
@@ -812,6 +819,8 @@ function ensureListenAllAudio() {
      * 服务端记的段时长是权威值，用它兜底推进（250ms 容差）。
      */
     if (audio.currentTime * 1000 >= segment.durationMs - 250) advanceFrom(listenAll.cursor);
+    /** W7：连播时唱针也要跟着走（两个播放源共一条时间轴）。 */
+    paintTimeline();
   });
   on(audio, 'error', () => {
     if (!listenAll.playing) return;
@@ -839,6 +848,7 @@ function playQueueAt(index) {
   listenAll.cursor = index;
   audio.src = `/api/segments/${encodeURIComponent(segment.id)}/audio`;
   renderListenAllLabel();
+  paintTimeline();
   const started = audio.play();
   if (started !== undefined && typeof started.catch === 'function') {
     started.catch(() => {
@@ -869,6 +879,8 @@ function stopListenAll() {
   listenAll.queue = [];
   listenAll.cursor = 0;
   renderListenAllLabel();
+  /** W7：退出连播后唱针回到"正在试听的那一段"（不再停在连播游标上）。 */
+  paintTimeline();
 }
 
 function renderListenAllLabel() {
@@ -899,6 +911,229 @@ function renderListenAll() {
   }
   ensureListenAllButton();
   renderListenAllLabel();
+}
+
+// ------------------------------------------------------------------ W7：播放时间轴 + 唱针（§17.1 需求 2）
+
+/**
+ * 公海详情页（`site/sea-detail.html`）已按用户第 3 轮需求删除；它顶部那条**沟槽时间轴 + 唱针**
+ * 复刻到这里。两件装置的语义**不重复**（§17.1）：
+ *   - 上方的「瓶身剖面」回答"哪些段录了、缺哪段"（纵向水位 + 干格，段与段的**有无**）；
+ *   - 这条时间轴回答"现在放到哪儿、这一段多长"（横向沟槽 + 唱针 + 段刻度，是**播放头**）。
+ *
+ * 落位（页面 y 207..272 是唯一一条空带）：剖面与试听列之间（y 535..600）会横切剖面的**水面斜边**
+ * —— "水只到第 N 段"正是靠那条边读出来的，压上去就毁掉剖面的读法 ⇒ 时间轴放在页头之下、
+ * 剖面之上：不动任何既有坐标（改前/改后几何逐项比对为 0 位移，见 §17.6）。
+ *
+ * 横向对齐**剖面格位**（左 76 / 宽 924）而不是海面的 1076 ⇒ 时间轴的段边界与剖面的格子同一条竖线，
+ * 缺口格与时间轴上的空段上下对齐。类名与数值照抄 `site/sea-detail.html` 的那条时间轴
+ * （该文件已删，值在这里以运行时 `<style>` 存活）；三处必要偏离（`.band`/`.sheen`/`.refl` 不带过来、
+ * 唱针用本页 `.bar .head` 的 2px 珊瑚竖线语言）都记在 §17.6。
+ */
+const TIMELINE_STYLE_ID = 'w7-timeline-style';
+const TIMELINE_TOP = 210;
+const TIMELINE_WIDTH = PROFILE_RIGHT - PROFILE_LEFT;
+const TIMELINE_GROOVE_TOP = 22;
+const TIMELINE_GROOVE_HEIGHT = 13;
+const TIMELINE_MARKS_TOP = 41;
+const TIMELINE_STYLE = [
+  `.w7-timeline{position:absolute;left:${String(PROFILE_LEFT)}px;top:${String(TIMELINE_TOP)}px;`,
+  `width:${String(TIMELINE_WIDTH)}px;height:58px;}`,
+  '.w7-timeline-lab{position:absolute;left:0;top:0;font-size:11px;letter-spacing:.18em;',
+  'color:rgba(243,249,250,.5);}',
+  `.w7-timeline .groove{position:absolute;left:0;right:0;top:${String(TIMELINE_GROOVE_TOP)}px;`,
+  `height:${String(TIMELINE_GROOVE_HEIGHT)}px;}`,
+  '.w7-timeline .groove::after{content:"";position:absolute;left:0;right:0;bottom:-1px;height:1px;',
+  'background:linear-gradient(90deg,rgba(216,243,246,0),rgba(216,243,246,.15) 12%,',
+  'rgba(216,243,246,.16) 82%,rgba(216,243,246,.05) 100%);}',
+  '.w7-timeline .seg{position:absolute;top:0;height:13px;}',
+  '.w7-timeline .seg.on{border-top:1px solid rgba(216,243,246,.38);border-bottom:1px solid rgba(216,243,246,.38);}',
+  '.w7-timeline .seg.off{border-top:1px solid rgba(216,243,246,.15);border-bottom:1px solid rgba(216,243,246,.15);}',
+  '.w7-timeline .core{position:absolute;top:1px;bottom:1px;left:0;right:0;',
+  'background:repeating-linear-gradient(90deg,rgba(127,209,217,.78) 0 1px,rgba(127,209,217,.16) 1px 3.4px);}',
+  '.w7-timeline .seg.on .core{',
+  '-webkit-mask-image:linear-gradient(90deg,rgba(255,255,255,.58),#fff 28%,rgba(255,255,255,.66) 60%,#fff 88%);',
+  'mask-image:linear-gradient(90deg,rgba(255,255,255,.58),#fff 28%,rgba(255,255,255,.66) 60%,#fff 88%);}',
+  '.w7-timeline .seg.off .core{',
+  'background:repeating-linear-gradient(90deg,rgba(169,199,207,.17) 0 1px,rgba(169,199,207,.03) 1px 3.4px);}',
+  '.w7-timeline .dull{position:absolute;top:0;bottom:0;right:0;',
+  'background:linear-gradient(90deg,rgba(5,15,20,0),rgba(5,15,20,.44) 8%,rgba(5,15,20,.64) 100%);}',
+  '.w7-timeline .seg.empty{border-top:1px dashed rgba(246,215,154,.7);',
+  'border-bottom:1px dashed rgba(246,215,154,.7);',
+  '-webkit-mask-image:linear-gradient(90deg,#fff 0 29%,rgba(255,255,255,0) 29% 71%,#fff 71% 100%);',
+  'mask-image:linear-gradient(90deg,#fff 0 29%,rgba(255,255,255,0) 29% 71%,#fff 71% 100%);}',
+  '.w7-timeline .cut{position:absolute;top:0;height:13px;width:2px;background:rgba(246,215,154,.8);}',
+  '.w7-timeline .voidwash{position:absolute;top:0;height:13px;background:rgba(246,215,154,.05);}',
+  '.w7-timeline .sep{position:absolute;top:-6px;height:25px;width:1px;background:rgba(243,249,250,.09);}',
+  '.w7-timeline .voidlabel{position:absolute;top:50%;transform:translateY(-50%);text-align:center;',
+  'font-size:13.5px;letter-spacing:.06em;color:var(--warm);}',
+  '.w7-timeline .w7-needle{position:absolute;top:16px;width:2px;height:25px;background:var(--coral);}',
+  '.w7-timeline .w7-tip{position:absolute;top:19px;width:20px;height:20px;margin-left:-10px;border-radius:50%;',
+  'background:radial-gradient(circle,rgba(212,85,58,.4),rgba(212,85,58,0) 68%);}',
+  '.w7-timeline .w7-tip::after{content:"";position:absolute;left:50%;top:50%;width:6px;height:6px;',
+  'margin:-3px 0 0 -3px;border-radius:50%;background:var(--coral);}',
+  `.w7-timeline .marks{position:absolute;left:0;right:0;top:${String(TIMELINE_MARKS_TOP)}px;`,
+  'height:17px;display:grid;}',
+  '.w7-timeline .marks > div{display:flex;align-items:baseline;gap:10px;}',
+  '.w7-timeline .marks .cat{font-family:Quattrocento,serif;font-size:11px;letter-spacing:.24em;',
+  'color:rgba(243,249,250,.5);}',
+  '.w7-timeline .marks .d{font-family:Quattrocento,serif;font-size:13px;color:var(--muted);}',
+  '.w7-timeline .marks .d.warm{color:var(--warm);}',
+].join('');
+
+/** 时间轴节点引用（一次建成，之后只改类名/位置；`shape` 变了才重建子节点）。 */
+const timeline = { root: null, lab: null, groove: null, marks: null, needle: null, tip: null, shape: null };
+
+function ensureTimeline() {
+  if (timeline.root !== null && timeline.root.isConnected) return timeline;
+  const main = q('main');
+  if (main === null) return null;
+  if (document.getElementById(TIMELINE_STYLE_ID) === null) {
+    const style = document.createElement('style');
+    style.id = TIMELINE_STYLE_ID;
+    style.textContent = TIMELINE_STYLE;
+    document.head.append(style);
+  }
+  timeline.lab = el('p', { class: 'w7-timeline-lab meta', text: '播放时间轴' });
+  timeline.groove = el('div', { class: 'groove' });
+  timeline.marks = el('div', { class: 'marks' });
+  /**
+   * 唱针：一条 2px 珊瑚竖线（本页 `.bar .head` 的既有语言）+ 稿子里那枚 `.tip`（珊瑚点 + 光晕）。
+   * 装饰件一律 `aria-hidden`（契约：装饰不进内容安全框，`fit.js`/`probe-fit` 都不把它当内容）。
+   */
+  timeline.needle = el('span', { class: 'w7-needle', 'aria-hidden': 'true', dataset: { w7Needle: '' } });
+  timeline.tip = el('span', { class: 'w7-tip', 'aria-hidden': 'true' });
+  timeline.root = el(
+    'section',
+    { class: 'w7-timeline', 'aria-label': '播放时间轴：整条沟槽是这首歌，唱针＝播放头', dataset: { w7Timeline: '' } },
+    [timeline.lab, timeline.groove, timeline.needle, timeline.tip, timeline.marks],
+  );
+  main.append(timeline.root);
+  timeline.shape = null;
+  return timeline;
+}
+
+/** 当前"放到哪儿"：连播看连播游标，否则看正在试听的那一段；两者都取**真实**播放位置。 */
+function timelineCursor() {
+  if (listenAll.playing) {
+    const segment = listenAll.queue[listenAll.cursor] ?? null;
+    if (segment === null) return null;
+    return {
+      index: segment.index,
+      currentMs: listenAll.audio === null ? 0 : listenAll.audio.currentTime * 1000,
+      totalMs: segment.durationMs ?? 0,
+    };
+  }
+  const index = state.selectedIndex;
+  const segment = index === null ? null : segmentByIndex(index);
+  if (segment === null) return null;
+  return {
+    index: segment.index,
+    currentMs: state.audio === null ? 0 : state.audio.currentTime * 1000,
+    totalMs: state.audio === null ? (segment.durationMs ?? 0) : totalMsWithFallback(state.audio),
+  };
+}
+
+/** 段数/缺口/时长变了才重建沟槽与刻度（数值全部来自服务端 DTO，不写死段数与时长）。 */
+function timelineShape(detail) {
+  const segments = detail.segments
+    .map((segment) => `${String(segment.index)}:${String(segment.durationMs)}`)
+    .join(',');
+  return `${String(detail.totalSegments)}/${detail.missingSegmentIndexes.join(',')}/${segments}`;
+}
+
+function buildTimelineShape(view, segWidth) {
+  const detail = state.detail;
+  const total = detail.totalSegments;
+  const missing = new Set(detail.missingSegmentIndexes);
+  const children = [];
+  const marks = [];
+  for (let index = 1; index <= total; index += 1) {
+    const segment = segmentByIndex(index);
+    const node = el('div', { class: 'seg off', style: `left:${String((index - 1) * segWidth)}px;width:${String(segWidth)}px` });
+    if (segment === null) {
+      /** 缺口段：槽壁被切断、中间让出背景（与稿子同一个 `.seg.empty`），它在时间轴上**看得见**。 */
+      node.className = 'seg empty';
+    } else {
+      node.append(el('span', { class: 'core' }));
+    }
+    children.push(node);
+    marks.push(
+      el('div', {}, [
+        el('span', { class: 'cat', text: `A${String(index)}` }),
+        el('span', {
+          class: segment === null ? 'd warm' : 'd',
+          text: segment === null ? '静音' : formatClock(segment.durationMs),
+        }),
+      ]),
+    );
+  }
+
+  const firstGap = [...missing].sort((left, right) => left - right)[0];
+  if (firstGap !== undefined) {
+    const left = (firstGap - 1) * segWidth;
+    children.push(el('span', { class: 'voidwash', style: `left:${String(left)}px;width:${String(segWidth)}px` }));
+    children.push(el('span', { class: 'cut', style: `left:${String(left)}px` }));
+    children.push(el('span', { class: 'cut', style: `left:${String(left + segWidth - 2)}px` }));
+    children.push(
+      el('p', { class: 'voidlabel', style: `left:${String(left)}px;width:${String(segWidth)}px`, text: '这一段还没有人唱' }),
+    );
+  }
+  for (let index = 0; index <= total; index += 1) {
+    children.push(el('span', { class: 'sep', style: `left:${String(index * segWidth)}px` }));
+  }
+  view.groove.replaceChildren(...children);
+  view.marks.style.gridTemplateColumns = `repeat(${String(total)}, ${String(segWidth)}px)`;
+  view.marks.replaceChildren(...marks);
+}
+
+/**
+ * 重画时间轴。**跟着播放走**：段边界与段号来自服务端段数据，唱针位置＝当前段的播放进度
+ * （单段试听与「试听全部」两个播放源都喂进来 —— 唱针只有一个，图里也只该有一条时间轴）。
+ */
+function paintTimeline() {
+  const view = ensureTimeline();
+  const detail = state.detail;
+  if (view === null || detail === null) return;
+  const total = detail.totalSegments;
+  const segWidth = TIMELINE_WIDTH / total;
+  const shape = timelineShape(detail);
+  if (view.shape !== shape) {
+    buildTimelineShape(view, segWidth);
+    view.shape = shape;
+  }
+
+  const cursor = timelineCursor();
+  const cursorIndex = cursor === null ? null : cursor.index;
+  const progress =
+    cursor === null || !(cursor.totalMs > 0) ? 0 : Math.min(1, Math.max(0, cursor.currentMs / cursor.totalMs));
+  const missing = new Set(detail.missingSegmentIndexes);
+
+  for (const [offset, node] of qa('.seg', view.groove).entries()) {
+    const index = offset + 1;
+    if (missing.has(index)) {
+      node.className = 'seg empty';
+      continue;
+    }
+    /** 唱针走过的段亮（`.on`）、没走过的暗（`.off`）；当前段在唱针之后压暗（`.dull`）。 */
+    node.className = cursorIndex !== null && index <= cursorIndex ? 'seg on' : 'seg off';
+    const dull = q('.dull', node);
+    if (dull !== null) dull.remove();
+    if (index === cursorIndex && progress > 0) {
+      node.append(el('span', { class: 'dull', style: `left:${(progress * segWidth).toFixed(1)}px` }));
+    }
+  }
+
+  const label = cursor === null ? '播放时间轴 · 还没有能试听的段' : `播放时间轴 · 唱针在第 ${String(cursorIndex)} 段`;
+  if (view.lab.textContent !== label) view.lab.textContent = label;
+
+  const on = cursor !== null;
+  view.needle.hidden = !on;
+  view.tip.hidden = !on;
+  if (!on) return;
+  const x = (cursorIndex - 1) * segWidth + progress * segWidth;
+  view.needle.style.left = `${(x - 1).toFixed(1)}px`;
+  view.tip.style.left = `${x.toFixed(1)}px`;
 }
 
 function renderPutBack() {

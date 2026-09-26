@@ -1,13 +1,19 @@
 /**
- * 把 11 张设计定稿同步成发布副本 `site/*.html`。
+ * 把 10 张设计定稿同步成发布副本 `site/*.html`。
  *
  * 为什么需要它：用户指正「design-explore 里已经有 html 网页」——
- * 那 11 张 `.html` **就是源**（冻结、字节不改、设计期守卫继续有效），
+ * 那些 `.html` **就是源**（冻结、字节不改、设计期守卫继续有效），
  * `site/` 只是**发布副本**：只注入两行（viewport + 页面脚本），结构一字不改。
  * 重跑本脚本 = 从源重新生成发布副本，源永远是设计稿。
  *
+ * W7：`p-sea-detail-record.html → sea-detail.html` 已从名单移除（用户第 3 轮需求删掉公海详情页）。
+ *
  * 用法：node tools/sync-site.mjs [--check]
  *   --check：只比对，不写盘；有差异则 exit 1（可用于"发布副本是否与源一致"的守卫）。
+ *
+ * ⚠️ 汇总口径（W7 修）：**缺源必须单独计数并说出口**。改前踩到的坑是"源文件不在 `design-explore/`
+ * 里时，那一页根本没被比对，汇总却照样打印「N 页，0 页不一致」" —— 读起来像通过。
+ * 现在缺源页数与不一致页数**分开报**，且缺源时不打印"0 页不一致"这种会被读成通过的字样。
  */
 /* eslint-disable no-console */
 import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
@@ -26,7 +32,6 @@ const PAGES = [
   ['p-bottle-record.html', 'bottle.html', 'bottle'],
   ['p-driftlog-record.html', 'drift-log.html', 'drift-log'],
   ['p-sea-hall.html', 'sea.html', 'sea'],
-  ['p-sea-detail-record.html', 'sea-detail.html', 'sea-detail'],
   ['p-profile-record.html', 'me.html', 'me'],
   ['p-settings-record.html', 'settings.html', 'settings'],
   ['p-login-record.html', 'login.html', 'login'],
@@ -61,10 +66,13 @@ const checkOnly = process.argv.includes('--check');
 if (!checkOnly) mkdirSync(OUT_DIR, { recursive: true });
 
 let changed = 0;
+let missing = 0;
 for (const [source, target, slug] of PAGES) {
   const from = join(SRC_DIR, source);
   if (!existsSync(from)) {
-    console.error(`✗ 缺源文件：${source}`);
+    /** **缺源 = 这一页根本没被比对**（不是"一致"）：单独计数，且在汇总里说出口。 */
+    missing += 1;
+    console.error(`✗ 缺源文件：${source}（${target} 没有被比对；设计稿目录：${SRC_DIR}）`);
     process.exitCode = 1;
     continue;
   }
@@ -85,11 +93,24 @@ for (const [source, target, slug] of PAGES) {
   }
 }
 
-console.log(
-  checkOnly
-    ? `\n比对完成：${String(PAGES.length)} 页，${String(changed)} 页不一致`
-    : `\n同步完成：${String(PAGES.length)} 页，写入 ${String(changed)} 页`,
-);
+/**
+ * 汇总：**缺源与不一致分开报**。缺源时绝不打印"N 页不一致"那种会被读成通过的句子
+ * （"0 页不一致"在缺源场景里是最危险的假话：那一页压根没被看过）。
+ */
+if (missing > 0) {
+  console.error(
+    checkOnly
+      ? `\n比对失败：${String(PAGES.length)} 页里 ${String(missing)} 页缺源（这 ${String(missing)} 页没有被比对）；` +
+          `其余 ${String(PAGES.length - missing)} 页里 ${String(changed)} 页与源不一致`
+      : `\n同步不完整：${String(PAGES.length)} 页里 ${String(missing)} 页缺源（源不在 ${SRC_DIR}），已写入 ${String(changed)} 页`,
+  );
+} else {
+  console.log(
+    checkOnly
+      ? `\n比对完成：${String(PAGES.length)} 页，${String(changed)} 页不一致，缺源 0 页`
+      : `\n同步完成：${String(PAGES.length)} 页，写入 ${String(changed)} 页，缺源 0 页`,
+  );
+}
 
 // 反向检查：site/ 里不该有不在名单内的 .html（防"手写的第 12 页"）
 const strays = readdirSync(OUT_DIR)
