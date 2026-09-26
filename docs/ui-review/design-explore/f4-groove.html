@@ -18,11 +18,13 @@
          真实唱片的沟槽是极密纹理，这里压到 5.5px（再叠一层 17px 让它有疏密），于是从"几十条线"变成"一张表面"。 */
       .grooves { position:absolute; inset:0;
         background:
+          /* ① 细沟：**1px 的发丝线读不出黑胶**——加粗到 1.6px 并提对比 */
           repeating-radial-gradient(circle at 1420px 960px,
-            rgba(243,249,250,.055) 0 1px, transparent 1px 5.5px),
+            rgba(216,243,246,.1) 0 1.6px, transparent 1.6px 6px),
+          /* ② 带纹：黑胶上"一组密槽 + 一道间隔"形成的宽窄相间的带 —— 唱片感主要来自这一层 */
           repeating-radial-gradient(circle at 1420px 960px,
-            rgba(243,249,250,.028) 0 1px, transparent 1px 17px),
-          radial-gradient(circle at 1420px 960px, rgba(127,209,217,.05) 0 26%, transparent 62%);
+            rgba(207,233,238,.035) 0 9px, transparent 9px 26px),
+          radial-gradient(circle at 1420px 960px, rgba(127,209,217,.06) 0 26%, transparent 62%);
       }
       /* 黑胶最认得出来的一处：表面被灯扫过的那道反光 */
       .glint { position:absolute; inset:0; mix-blend-mode:screen;
@@ -119,6 +121,14 @@
       <!-- ── 细节层 2（**删掉这个 g 就回到上一版**）——
            从 g3 借来的四种"感觉"，按唱片主题翻译：尘屑 / 摩尔纹 / 远处尘屑群 / 沟槽调制 -->
       <g id="detail2">
+        <!-- 灯下的同心反光：**宽而柔**（16–34px + 模糊）才像唱片；细而硬就又变回行星轨道 -->
+        <filter id="fSheen"><feGaussianBlur stdDeviation="11" /></filter>
+        <g filter="url(#fSheen)">
+          <circle cx="1420" cy="960" r="1150" fill="none" stroke="rgba(207,233,238,.075)" stroke-width="26" />
+          <circle cx="1420" cy="960" r="1032" fill="none" stroke="rgba(240,252,254,.065)" stroke-width="16" />
+          <circle cx="1420" cy="960" r="822" fill="none" stroke="rgba(207,233,238,.06)" stroke-width="34" />
+          <circle cx="1420" cy="960" r="716" fill="none" stroke="rgba(240,252,254,.055)" stroke-width="12" />
+        </g>
         <!-- 悬浮在光里的尘屑（g3 的"泡泡" → 唱片表面被灯照到的微尘） -->
         <g fill="#eafcff">
           <circle cx="240" cy="180" r="2.4" opacity=".48" /><circle cx="318" cy="244" r="1.6" opacity=".34" />
@@ -175,15 +185,15 @@
     </div>
 
     <!-- 圆形按钮：骑在那条被点亮的沟槽上 -->
-    <div class="port draw ov" style="left:390px; top:500px; width:220px; height:220px" role="button" aria-label="捞一个漂流瓶">
+    <div class="port draw ov" style="left:60px; top:400px; width:190px; height:190px" role="button" aria-label="捞一个漂流瓶">
       <i class="r1"></i><i class="r2"></i><i class="r3"></i>
       <span class="core">捞取<span>DRAW</span></span>
-      <span class="cap" style="left:-314px; top:-16px; width:300px"><b>捞一个漂流瓶</b>捞到即持有：同一时刻，同一条河道上只有你拿着它。</span>
+      <span class="cap" style="left:230px; top:40px; width:240px"><b>捞一个漂流瓶</b>捞到即持有：同一时刻，同一条河道上只有你拿着它。</span>
     </div>
-    <div class="port cast ov" style="left:400px; top:220px; width:180px; height:180px" role="button" aria-label="投下一支漂流瓶">
+    <div class="port cast ov" style="left:380px; top:580px; width:150px; height:150px" role="button" aria-label="投下一支漂流瓶">
       <i class="r1"></i><i class="r2"></i><i class="r3"></i>
       <span class="core">投下<span>CAST</span></span>
-      <span class="cap" style="left:-324px; top:80px; width:300px"><b>投下一支漂流瓶</b>选一首歌，录下第 1 段，然后放进上游等一个陌生人接下一棒。</span>
+      <span class="cap" style="left:-304px; top:-294px; width:300px"><b>投下一支漂流瓶</b>选一首歌，录下第 1 段，然后放进上游等一个陌生人接下一棒。</span>
     </div>
 
     <footer>
