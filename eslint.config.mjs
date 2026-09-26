@@ -16,6 +16,10 @@ export default tseslint.config(
       '.agent-teams/**',
       '.dsh/**',
       'docs/figma/**',
+      // `.tmp-*` 是各波次探针/调试脚本留下的脚手架（`.gitignore` 第 45 行已覆盖，不入库）。
+      // 目录与"叶子文件"两种形态都要写：只写目录形态时，根目录的 `.tmp-*.mjs` 仍会被扫。
+      '**/.tmp-*/**',
+      '**/.tmp-*',
     ],
   },
   js.configs.recommended,
@@ -34,6 +38,34 @@ export default tseslint.config(
   {
     files: ['**/*.{js,mjs,cjs}'],
     languageOptions: { globals: { ...globals.node } },
+  },
+  {
+    // `site/app/**` 是**浏览器**脚本（`node tools/site-server.mjs` 原样发给浏览器执行，无构建步骤）
+    // ⇒ `document`/`window`/`location`/`MediaRecorder` 这类名字是运行环境提供的，不是代码缺声明。
+    files: ['site/app/**/*.js'],
+    languageOptions: { globals: { ...globals.browser } },
+    rules: {
+      // 设计稿的排版分隔符是 U+3000 全角空格（与 `page-login.js` 的 `SEPARATOR` 同口径），
+      // 它写在**模板字符串**里 ⇒ 只放行模板：字符串/注释里的不规则空白仍然报错，这不是放宽规则。
+      'no-irregular-whitespace': ['error', { skipTemplates: true }],
+    },
+  },
+  {
+    // `tools/**` 是 Node 侧的 ESM 脚本（`sourceType` 显式声明，不依赖 `package.json` 的 type）。
+    files: ['tools/**/*.mjs', 'tools/**/*.js'],
+    languageOptions: { sourceType: 'module', globals: { ...globals.node } },
+  },
+  {
+    // `walkthrough.mjs` 的字符串回调是**注入浏览器执行**的（`page.evaluate`/`page.waitForFunction`）：
+    // 文件本体跑在 Node 里，回调体里的 `document` 跑在页面里 ⇒ 两套全局都要声明。
+    files: ['tools/walkthrough.mjs'],
+    languageOptions: { globals: { ...globals.node, ...globals.browser } },
+  },
+  {
+    // `probe-user-viewport.mjs` 自己已 `/* global document, window */`，只缺 `getComputedStyle` 一个；
+    // 这里若叠 `globals.browser` 会与那行内注释撞 `no-redeclare` ⇒ 只补它缺的那一个。
+    files: ['tools/probe-user-viewport.mjs'],
+    languageOptions: { globals: { getComputedStyle: 'readonly' } },
   },
   {
     files: ['apps/api/**/*.ts', 'packages/**/*.ts', '**/*.config.ts'],
