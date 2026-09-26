@@ -14,7 +14,7 @@
 /* eslint-disable no-console */
 /* global document, getComputedStyle */
 import { createServer } from 'node:http';
-import { readdirSync, readFileSync, existsSync } from 'node:fs';
+import { readdirSync, readFileSync, existsSync, statSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { extname, join, normalize } from 'node:path';
 
@@ -66,6 +66,13 @@ const shots = readdirSync(DIR)
   .sort();
 
 for (const name of shots) {
+  const out = join(DIR, name.replace(/\.html$/, '.png'));
+  const src = join(DIR, name);
+  // 并发跑本脚本会抢写同名 PNG（实测 UNKNOWN open 崩溃）。图已比源码新就跳过，--force 可强制重画。
+  if (!process.argv.includes('--force') && existsSync(out) && statSync(out).mtimeMs >= statSync(src).mtimeMs) {
+    console.log(`skip ${name}  （png 比 html 新；--force 强制重画）`);
+    continue;
+  }
   await page.goto(`http://127.0.0.1:${PORT}/docs/ui-review/design-explore/${name}`, {
     waitUntil: 'load',
   });
@@ -79,8 +86,16 @@ for (const name of shots) {
     height: document.documentElement.scrollHeight,
     width: document.documentElement.scrollWidth,
   }));
-  const out = join(DIR, name.replace(/\.html$/, '.png'));
-  await page.screenshot({ path: out, fullPage: true });
+  let shot = false;
+  for (let attempt = 1; attempt <= 3 && !shot; attempt += 1) {
+    try {
+      await page.screenshot({ path: out, fullPage: true });
+      shot = true;
+    } catch (error) {
+      if (attempt === 3) throw error;
+      await page.waitForTimeout(500);
+    }
+  }
   const over = [];
   if (measured.width > VIEWPORT.width) over.push(`横向 +${String(measured.width - VIEWPORT.width)}px`);
   if (measured.height > VIEWPORT.height) over.push(`纵向 +${String(measured.height - VIEWPORT.height)}px`);
