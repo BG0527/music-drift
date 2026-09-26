@@ -53,8 +53,10 @@
       .tag b { position:absolute; left:50%; top:30px; width:88px; margin-left:-44px;
         font-size:11px; font-weight:400; line-height:1.45; letter-spacing:.12em; text-align:center;
         color:rgba(243,249,250,.92); text-shadow:0 1px 0 rgba(5,15,20,.6); }
+      /* 认领线：整根 ≥3:1。原渐变 .06 / .44 / .22 让 2/3 的线低于下限（实测最低 1.19:1），
+         "线那一头串着瓶"就断了；现取 .47 / .56 / .49 —— 对盘面最亮条纹 rgba(24,37,42) 也 ≥3.5:1。 */
       .thread { position:absolute; right:44px; top:208px; width:1px; height:464px;
-        background:linear-gradient(180deg, rgba(203,238,246,.06), rgba(203,238,246,.44) 34%, rgba(203,238,246,.22)); }
+        background:linear-gradient(180deg, rgba(203,238,246,.47), rgba(203,238,246,.56) 34%, rgba(203,238,246,.49)); }
       .devnote { position:absolute; right:56px; top:224px; width:238px; text-align:right;
         font-size:11.5px; line-height:1.8; color:var(--muted); }
 
@@ -65,16 +67,17 @@
       .modes { display:flex; gap:26px; }
       .mode { padding:0 0 8px; font-family:inherit; font-size:15px; font-weight:700; letter-spacing:.14em;
         color:var(--muted); background:transparent; border:0;
-        border-bottom:1px solid rgba(243,249,250,.22); cursor:pointer; }
+        border-bottom:1px solid rgba(243,249,250,.40); cursor:pointer; }
       .mode.on { color:var(--coral); border-bottom:2px solid var(--coral); }
-      .tip { max-width:452px; margin-top:20px; font-size:12.5px; line-height:1.8; color:rgba(243,249,250,.46); }
+      /* 图注：.46 实测 4.45:1（差 0.05 掉出正文口径），提到 .54，5.0:1 以上 */
+      .tip { max-width:452px; margin-top:20px; font-size:12.5px; line-height:1.8; color:rgba(243,249,250,.54); }
 
       .field { display:flex; flex-direction:column; }
       .f-handle { margin-top:32px; }
       .f-pass { margin-top:26px; }
       .field input { width:440px; height:32px; margin-top:8px; padding:0 1px 6px; font-family:inherit; font-size:16px;
         color:var(--paper); background:transparent; border:0;
-        border-bottom:1px solid rgba(243,249,250,.26); }
+        border-bottom:1px solid rgba(243,249,250,.40); }
       .msg { margin-top:8px; font-size:12px; line-height:1.7; color:var(--coral); }
       .msg .code { letter-spacing:.14em; color:rgba(243,249,250,.56); }
       .field.bad input { border-bottom-color:var(--coral); }
@@ -141,19 +144,23 @@
       </div>
 
       <svg class="mouth" width="196" height="28" viewBox="0 0 196 28" fill="none" aria-hidden="true">
+        <!-- 对比度（WCAG 1.4.11 非文本图形 ≥3:1）：每条描边对盘面最亮条纹 rgba(22,37,42)
+             都不低于 3.4:1 —— 瓶肩 .50/.46、内壁 .44/.42、口沿底描边 .40（单独即 ≥3.2:1，与两段
+             唇弧再叠成 近唇 .58 / 远唇 .76）、线头 .46、结 .66；暗开口不靠填充（它比盘面还黑，
+             做不到 3:1），靠这圈冷光轮廓被读成"洞"。 -->
         <!-- 瓶肩：口沿以下只留两侧玻璃壁，中间不画 —— 全页没有一条横贯的线 -->
-        <path d="M96 20 L84 28" stroke="#cbeef6" stroke-opacity=".32" />
-        <path d="M168 20 L180 28" stroke="#cbeef6" stroke-opacity=".24" />
-        <path d="M92 24 L78 28" stroke="#cbeef6" stroke-opacity=".09" />
-        <path d="M172 24 L186 28" stroke="#cbeef6" stroke-opacity=".07" />
+        <path d="M96 20 L84 28" stroke="#cbeef6" stroke-opacity=".50" />
+        <path d="M168 20 L180 28" stroke="#cbeef6" stroke-opacity=".46" />
+        <path d="M92 24 L78 28" stroke="#cbeef6" stroke-opacity=".44" />
+        <path d="M172 24 L186 28" stroke="#cbeef6" stroke-opacity=".42" />
         <!-- 玻璃口：暗的开口；近唇亮、远唇暗，只露这半边 -->
         <ellipse cx="132" cy="20" rx="36" ry="11" fill="rgba(3,14,20,.6)" />
-        <ellipse cx="132" cy="20" rx="36" ry="11" stroke="#cbeef6" stroke-opacity=".2" />
+        <ellipse cx="132" cy="20" rx="36" ry="11" stroke="#cbeef6" stroke-opacity=".40" />
         <path d="M96 20 A36 11 0 0 1 168 20" stroke="#cbeef6" stroke-opacity=".6" />
         <path d="M168 20 A36 11 0 0 1 96 20" stroke="#cbeef6" stroke-opacity=".3" />
         <!-- 口里的线头：认领线终止在这只瓶里 -->
-        <path d="M132 22 L132 28" stroke="#cbeef6" stroke-opacity=".26" />
-        <circle cx="132" cy="22" r="2.4" stroke="#cbeef6" stroke-opacity=".64" />
+        <path d="M132 22 L132 28" stroke="#cbeef6" stroke-opacity=".46" />
+        <circle cx="132" cy="22" r="2.4" stroke="#cbeef6" stroke-opacity=".66" />
       </svg>
 
 

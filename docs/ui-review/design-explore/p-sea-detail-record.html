@@ -27,7 +27,7 @@
       .surface { position:absolute; inset:0; opacity:.48;
         background:
           repeating-radial-gradient(circle at 1420px 960px, rgba(216,243,246,.055) 0 1.2px, transparent 1.2px 6.5px),
-          radial-gradient(circle at 1420px 960px, rgba(127,209,217,.05) 0 30%, transparent 68%); }
+          radial-gradient(circle at 1420px 960px, rgba(201,221,219,.05) 0 30%, transparent 68%); }
       /* 水的深度：水线之上是透光的上层，越往下越深（公海 = 谁都听得到，也谁都够不着底） */
       .water { position:absolute; inset:0;
         background:linear-gradient(180deg,
@@ -67,31 +67,82 @@
       .b4 { left:1080px; top:730px; width:4px; height:4px; opacity:.6; }
       .b5 { left:1100px; top:660px; width:3px; height:3px; opacity:.5; }
       .b6 { left:1146px; top:392px; width:5px; height:5px; opacity:.5; }
-      /* 岸：水到这里为止。岸面从水线起缓缓抬向右边 —— 作品在左，岸在右，瓶子搁在岸上 */
-      .shore { position:absolute; left:1190px; top:0; width:250px; height:900px;
-        clip-path:polygon(0 37.39%, 100% 35.42%, 100% 46%, 0 47.6%);
-        background:linear-gradient(90deg, rgba(246,215,154,0) 0, rgba(246,215,154,.19) 34%, rgba(246,215,154,.11) 100%);
-        -webkit-mask-image:linear-gradient(180deg, #fff 0 37%, rgba(255,255,255,.32) 44%, rgba(255,255,255,0) 49%);
-                mask-image:linear-gradient(180deg, #fff 0 37%, rgba(255,255,255,.32) 44%, rgba(255,255,255,0) 49%); }
-      .shoreline { position:absolute; left:1190px; top:336px; width:252px; height:1px;
-        transform-origin:0 50%; transform:rotate(-4.06deg);
-        background:linear-gradient(90deg, rgba(216,243,246,.44), rgba(216,243,246,.18) 62%, rgba(216,243,246,.04)); }
-      .sand1 { position:absolute; left:1190px; top:354px; width:250px; height:1px;
-        transform-origin:0 50%; transform:rotate(-4.06deg);
-        background:linear-gradient(90deg, rgba(246,215,154,.20), rgba(246,215,154,.08) 70%, rgba(246,215,154,0)); }
-      .sand2 { position:absolute; left:1190px; top:376px; width:224px; height:1px;
-        transform-origin:0 50%; transform:rotate(-4.06deg);
-        background:linear-gradient(90deg, rgba(246,215,154,.11), rgba(246,215,154,0)); }
-      /* 沙粒：只落在岸面里，靠左的一侧淡出，免得出现一条生硬的直边 */
-      .sdot { position:absolute; left:1244px; top:334px; width:196px; height:118px; opacity:.8;
+      /* 岸：水到这里为止。岸**有体块**——湿沙（反光）/ 干沙（受光最亮）/ 内坡（压暗）三段，
+         左边缘就是水陆分界，靠左淡出而不是切一条直边。块体一直铺到画布右下角，
+         让"岸"在缩略图里是一条有厚度的亮块，而不是一条窄带。 */
+      .shore { position:absolute; left:1184px; top:0; width:256px; height:900px;
+        clip-path:polygon(0 324px, 100% 312px, 100% 900px, 50px 900px);
+        -webkit-mask-image:linear-gradient(90deg, rgba(255,255,255,0) 0, rgba(255,255,255,.35) 5%, #fff 14%, #fff 100%),
+          linear-gradient(180deg, #fff 0 40%, rgba(255,255,255,.92) 44%, rgba(255,255,255,.66) 54%, rgba(255,255,255,.13) 74%, rgba(255,255,255,0) 84%);
+                mask-image:linear-gradient(90deg, rgba(255,255,255,0) 0, rgba(255,255,255,.35) 5%, #fff 14%, #fff 100%),
+          linear-gradient(180deg, #fff 0 40%, rgba(255,255,255,.92) 44%, rgba(255,255,255,.66) 54%, rgba(255,255,255,.13) 74%, rgba(255,255,255,0) 84%);
+        -webkit-mask-composite:source-in; mask-composite:intersect;
+        background:
+          radial-gradient(64% 40% at 34% 33%, rgba(246,215,154,.12), rgba(246,215,154,0) 72%),
+          linear-gradient(0deg, rgba(246,215,154,.42) 0, rgba(240,204,142,.17) 100%); }
+      /* 接地线：光打在水陆分界上——全页最实的一条边缘（= 缩略图里"岸"的读数） */
+      .shoreline { position:absolute; left:1184px; top:337px; width:256px; height:1.5px;
+        transform-origin:0 50%; transform:rotate(-2.75deg);
+        background:linear-gradient(90deg, rgba(216,243,246,0) 0%, rgba(216,243,246,.5) 12%,
+          rgba(216,243,246,.72) 42%, rgba(216,243,246,.5) 72%, rgba(216,243,246,.22) 100%); }
+      /* 湿沙亮带：水刚退下去的那一段，紧贴分界线下面（受光最亮 = 缩略图里的"到岸"读数）。
+         用几条不规则的斜向淡斑打散它，免得读成一条发光横条。 */
+      .wetsand { position:absolute; left:1184px; top:335px; width:256px; height:18px;
         background-image:
-          radial-gradient(rgba(246,215,154,.28) .5px, rgba(246,215,154,0) .9px),
-          radial-gradient(rgba(246,215,154,.17) .5px, rgba(246,215,154,0) .9px),
-          radial-gradient(rgba(246,215,154,.12) .5px, rgba(246,215,154,0) .9px);
+          repeating-linear-gradient(86deg, rgba(5,15,20,.22) 0 5px, rgba(246,215,154,.09) 5px 14px, rgba(5,15,20,.12) 14px 21px),
+          linear-gradient(90deg, rgba(246,215,154,.38), rgba(246,215,154,.52) 44%, rgba(246,215,154,.27));
+        -webkit-mask-image:linear-gradient(180deg, #fff, rgba(255,255,255,0) 92%);
+                mask-image:linear-gradient(180deg, #fff, rgba(255,255,255,0) 92%); }
+      .sand1 { position:absolute; left:1184px; top:352px; width:256px; height:1px;
+        transform-origin:0 50%; transform:rotate(-2.75deg);
+        background:linear-gradient(90deg, rgba(246,215,154,.26), rgba(246,215,154,.2) 46%, rgba(246,215,154,.09)); }
+      .sand2 { position:absolute; left:1184px; top:374px; width:256px; height:1px;
+        transform-origin:0 50%; transform:rotate(-2.75deg);
+        background:linear-gradient(90deg, rgba(246,215,154,.16), rgba(246,215,154,.11)); }
+      /* 沙粒：落在岸面里，靠左一侧淡出（免得出现一条生硬直边），下面渐隐进坡面 */
+      .sdot { position:absolute; left:1234px; top:330px; width:206px; height:320px; opacity:.62;
+        background-image:
+          radial-gradient(rgba(246,215,154,.3) .5px, rgba(246,215,154,0) .9px),
+          radial-gradient(rgba(246,215,154,.19) .5px, rgba(246,215,154,0) .9px),
+          radial-gradient(rgba(246,215,154,.13) .5px, rgba(246,215,154,0) .9px);
         background-size:6px 5px, 9px 8px, 13px 11px; background-position:0 0, 3px 2px, 7px 5px;
-        -webkit-mask-image:linear-gradient(90deg, rgba(255,255,255,0), #fff 44%), linear-gradient(0deg, rgba(255,255,255,0), #fff 40%);
-                mask-image:linear-gradient(90deg, rgba(255,255,255,0), #fff 44%), linear-gradient(0deg, rgba(255,255,255,0), #fff 40%);
+        -webkit-mask-image:linear-gradient(90deg, rgba(255,255,255,0), #fff 30%), linear-gradient(180deg, #fff 0 42%, rgba(255,255,255,.24) 74%, rgba(255,255,255,0) 100%);
+                mask-image:linear-gradient(90deg, rgba(255,255,255,0), #fff 30%), linear-gradient(180deg, #fff 0 42%, rgba(255,255,255,.24) 74%, rgba(255,255,255,0) 100%);
         -webkit-mask-composite:source-in; mask-composite:intersect; }
+      /* 岸边沉积：滩肩出露的层理。它给中下段一个真实职责——瓶子搁在上面的那块地有厚度。
+         走向与水线平行，靠左渐隐进水，逐条压暗（= 越早的沉积压得越实）。冷色只留一丝，免得岸发灰。 */
+      .strata { position:absolute; left:1184px; top:0; width:256px; height:900px;
+        clip-path:polygon(0 430px, 100% 414px, 100% 900px, 50px 900px);
+        background:repeating-linear-gradient(177.6deg,
+          rgba(246,215,154,.2) 0 2px,
+          rgba(240,204,142,.11) 2px 6px,
+          rgba(5,15,20,.2) 6px 10px,
+          rgba(226,205,158,.07) 10px 19px,
+          rgba(150,176,180,.05) 19px 26px);
+        -webkit-mask-image:linear-gradient(180deg, rgba(255,255,255,0) 44%, rgba(255,255,255,.35) 50%, rgba(255,255,255,.78) 59%, #fff 68%, rgba(255,255,255,.3) 84%, rgba(255,255,255,0) 96%),
+          linear-gradient(90deg, rgba(255,255,255,0) 0, #fff 26%);
+                mask-image:linear-gradient(180deg, rgba(255,255,255,0) 44%, rgba(255,255,255,.35) 50%, rgba(255,255,255,.78) 59%, #fff 68%, rgba(255,255,255,.3) 84%, rgba(255,255,255,0) 96%),
+          linear-gradient(90deg, rgba(255,255,255,0) 0, #fff 26%);
+        -webkit-mask-composite:source-in; mask-composite:intersect; }
+      /* 砾石透镜：沉积里那条粗粒径带（粗颗粒与细砂的界面，真实滩面上确实有这么一条） */
+      .gravel { position:absolute; left:1184px; top:0; width:256px; height:900px;
+        clip-path:polygon(0 400px, 100% 386px, 100% 900px, 50px 900px);
+        background-image:
+          radial-gradient(rgba(246,215,154,.24) 1.2px, rgba(246,215,154,0) 2.2px),
+          radial-gradient(rgba(246,215,154,.26) 1.4px, rgba(246,215,154,0) 2.4px);
+        background-size:29px 19px, 53px 34px; background-position:0 0, 15px 13px;
+        -webkit-mask-image:linear-gradient(90deg, rgba(255,255,255,0), #fff 30%), linear-gradient(180deg, rgba(255,255,255,0) 0 42%, #fff 46%, rgba(255,255,255,.3) 52%, rgba(255,255,255,0) 59%);
+                mask-image:linear-gradient(90deg, rgba(255,255,255,0), #fff 30%), linear-gradient(180deg, rgba(255,255,255,0) 0 42%, #fff 46%, rgba(255,255,255,.3) 52%, rgba(255,255,255,0) 59%);
+        -webkit-mask-composite:source-in; mask-composite:intersect; }
+      /* 滩面上的几颗砾石：落在沙里（有投影），不是"贴"上去的 —— 尺度参照 */
+      .cobble { position:absolute; border-radius:50%; border:1px solid rgba(5,15,20,.34);
+        background:radial-gradient(50% 50% at 40% 32%, rgba(246,215,154,.4), rgba(150,176,180,.2) 78%);
+        box-shadow:0 1px 0 rgba(5,15,20,.3); }
+      .c1 { left:1300px; top:436px; width:12px; height:7px; transform:rotate(-9deg); }
+      .c2 { left:1362px; top:418px; width:8px; height:5px; transform:rotate(7deg); opacity:.72; }
+      .c3 { left:1418px; top:452px; width:15px; height:8px; transform:rotate(-4deg); opacity:.86; }
+      .c4 { left:1276px; top:486px; width:7px; height:5px; opacity:.6; }
+      .c5 { left:1386px; top:494px; width:10px; height:6px; transform:rotate(12deg); opacity:.56; }
 
       main { position:relative; z-index:2; padding:44px 76px 0; }
       .cat { font-family:Quattrocento,'LXGW WenKai',serif; font-size:11px; letter-spacing:.24em; color:rgba(243,249,250,.5); }
@@ -178,18 +229,29 @@
       .float > * { position:absolute; }
       .flabel { position:absolute; left:1292px; top:242px; }
       .flead { position:absolute; left:1330px; top:256px; width:1px; height:26px; background:rgba(243,249,250,.20); }
-      .bottle { position:absolute; left:1230px; top:276px; width:170px; height:62px;
-        transform:rotate(-4deg); transform-origin:32% 50%; }
-      /* 瓶塞被拔出来，丢在瓶子左边的沙上 */
-      .b-cork { left:1195px; top:315px; width:24px; height:16px; border-radius:2px;
-        transform:rotate(-11deg);
+      /* 瓶子搁在岸上：瓶体中轴与水线齐平，上半立在水面的暗底上（亮物读得清），
+         下半压在受光的湿沙上（暗底读得清）—— 两侧都有对比，缩略图里才不糊成一团 */
+      .bottle { position:absolute; left:1240px; top:272px; width:170px; height:62px;
+        transform:rotate(-4.2deg); transform-origin:24% 50%; }
+      /* 玻璃映在沙上的一点暖反光：把瓶底和沙面焊在一起 */
+      .bglow { left:1250px; top:331px; width:146px; height:10px; border-radius:50%;
+        transform:rotate(-4.2deg);
+        background:radial-gradient(50% 50% at 50% 50%, rgba(246,215,154,.2), rgba(246,215,154,0) 78%); }
+      /* 瓶塞被拔出来，丢在瓶子左边的沙上 —— 位置必须落在岸面里（不是水里） */
+      .b-cork { left:1262px; top:357px; width:24px; height:16px; border-radius:2px;
+        transform:rotate(-9deg);
         border:1px solid rgba(246,215,154,.6);
         background:linear-gradient(180deg, rgba(246,215,154,.72), rgba(246,215,154,.38)); }
-      .corkmark { left:1190px; top:328px; width:36px; height:9px; border-radius:50%;
-        background:radial-gradient(50% 50% at 50% 50%, rgba(5,15,20,.55), rgba(5,15,20,0) 74%); }
-      /* 瓶子压在沙上的那一道暗痕：它搁在这儿，不是浮着 */
-      .btmark { left:1224px; top:330px; width:184px; height:20px; border-radius:50%;
-        background:radial-gradient(50% 50% at 50% 50%, rgba(5,15,20,.6), rgba(5,15,20,0) 72%); }
+      .corkmark { left:1258px; top:372px; width:34px; height:9px; border-radius:50%;
+        background:radial-gradient(50% 50% at 50% 50%, rgba(5,15,20,.62), rgba(5,15,20,0) 74%); }
+      /* 瓶子压在沙上的接地痕 + 沙脊挡出的压痕：它搁在这儿，不是浮着。
+         两段一起给瓶底一条连续的暗边，缩略图里这就等于"坐在沙上"。 */
+      .btmark { left:1234px; top:328px; width:170px; height:26px; border-radius:50%;
+        transform:rotate(-4.2deg);
+        background:radial-gradient(50% 50% at 50% 50%, rgba(5,15,20,.62), rgba(5,15,20,.22) 54%, rgba(5,15,20,0) 80%); }
+      .bpress { left:1240px; top:337px; width:148px; height:9px; border-radius:50%;
+        transform:rotate(-4.2deg);
+        background:radial-gradient(50% 50% at 50% 50%, rgba(5,15,20,.5), rgba(5,15,20,0) 78%); }
       /* 唱针落水的那两圈涟漪：交互发生处 */
       .rip1 { left:696px; top:326px; width:48px; height:12px; border-radius:50%;
         border:1px solid rgba(127,209,217,.28); }
@@ -289,10 +351,18 @@
       <div class="bed"></div>
       <i class="bedline"></i>
       <div class="shore"></div>
+      <div class="gravel"></div>
+      <div class="strata"></div>
       <i class="shoreline"></i>
+      <i class="wetsand"></i>
       <i class="sand1"></i>
       <i class="sand2"></i>
       <i class="sdot"></i>
+      <i class="cobble c1"></i>
+      <i class="cobble c2"></i>
+      <i class="cobble c3"></i>
+      <i class="cobble c4"></i>
+      <i class="cobble c5"></i>
       <i class="bub b1"></i>
       <i class="bub b2"></i>
       <i class="bub b3"></i>
@@ -443,24 +513,27 @@
         <i class="flead"></i>
         <i class="b-cork"></i>
         <i class="corkmark"></i>
+        <i class="bglow"></i>
         <i class="btmark"></i>
+        <i class="bpress"></i>
         <svg class="bottle" viewBox="0 0 170 62" aria-hidden="true">
           <defs>
             <linearGradient id="glass" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0" stop-color="#d8f3f6" stop-opacity=".24"></stop>
-              <stop offset=".3" stop-color="#7fd1d9" stop-opacity=".11"></stop>
-              <stop offset=".64" stop-color="#061820" stop-opacity=".62"></stop>
-              <stop offset=".86" stop-color="#7fd1d9" stop-opacity=".12"></stop>
-              <stop offset="1" stop-color="#d8f3f6" stop-opacity=".26"></stop>
+              <stop offset="0" stop-color="#d8f3f6" stop-opacity=".5"></stop>
+              <stop offset=".2" stop-color="#d8f3f6" stop-opacity=".2"></stop>
+              <stop offset=".45" stop-color="#7fd1d9" stop-opacity=".11"></stop>
+              <stop offset=".7" stop-color="#061820" stop-opacity=".78"></stop>
+              <stop offset=".88" stop-color="#7fd1d9" stop-opacity=".18"></stop>
+              <stop offset="1" stop-color="#d8f3f6" stop-opacity=".4"></stop>
             </linearGradient>
           </defs>
           <path d="M3 24 H13 V18 H32 L54 7 H146 C159 7 167 17 167 31 C167 45 159 55 146 55 H54 L32 44 H13 V38 H3 Z"
-            fill="url(#glass)" stroke="#d8f3f6" stroke-opacity=".34" stroke-width="1"></path>
-          <path d="M58 12 H144" stroke="#d8f3f6" stroke-opacity=".22" stroke-width="1"></path>
-          <path d="M58 50 H142" stroke="#d8f3f6" stroke-opacity=".14" stroke-width="1"></path>
-          <path d="M14 22 H30" stroke="#d8f3f6" stroke-opacity=".2" stroke-width="1"></path>
+            fill="url(#glass)" stroke="#d8f3f6" stroke-opacity=".52" stroke-width="1"></path>
+          <path d="M58 12 H144" stroke="#d8f3f6" stroke-opacity=".34" stroke-width="1"></path>
+          <path d="M58 50 H142" stroke="#d8f3f6" stroke-opacity=".16" stroke-width="1"></path>
+          <path d="M14 22 H30" stroke="#d8f3f6" stroke-opacity=".26" stroke-width="1"></path>
           <rect x="66" y="22" width="72" height="18" rx="2" fill="none"
-            stroke="#f6d79a" stroke-opacity=".42" stroke-dasharray="3 4"></rect>
+            stroke="#f6d79a" stroke-opacity=".6" stroke-dasharray="3 4"></rect>
         </svg>
       </div>
 
