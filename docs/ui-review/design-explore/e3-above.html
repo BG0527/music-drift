@@ -1,0 +1,190 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <title>C3 · 俯视河道 River from Above</title>
+    <style>
+      @import url('/node_modules/.pnpm/lxgw-wenkai-webfont@1.7.0/node_modules/lxgw-wenkai-webfont/lxgwwenkai-regular.css');
+      @import url('/node_modules/.pnpm/lxgw-wenkai-webfont@1.7.0/node_modules/lxgw-wenkai-webfont/lxgwwenkai-bold.css');
+      @import url('/node_modules/.pnpm/@fontsource+quattrocento@5.3.0/node_modules/@fontsource/quattrocento/400.css');
+      @import url('/node_modules/.pnpm/@fontsource+quattrocento@5.3.0/node_modules/@fontsource/quattrocento/700.css');
+
+      :root { --void: #05171e; --paper: #f3f9fa; --muted: #a9c7cf; --line: rgba(243,249,250,.14);
+        --teal: #0f6d80; --glass: #7fd1d9; --coral: #c7452c; }
+      * { box-sizing: border-box; margin: 0; padding: 0; }
+      html, body { width: 1440px; height: 900px; }
+      body { position: relative; overflow: hidden;
+        background: radial-gradient(90% 70% at 78% 62%, #0c3641 0%, #05171e 58%, #021014 100%);
+        color: var(--paper); font-family: 'LXGW WenKai', serif; -webkit-font-smoothing: antialiased; }
+
+      header.bar { position: absolute; left: 0; right: 0; top: 0; height: 62px; display: flex; align-items: center;
+        gap: 36px; padding: 0 44px; border-bottom: 1px solid var(--line); z-index: 4; }
+      .brand { display: flex; align-items: center; gap: 10px; font-size: 15px; font-weight: 700; letter-spacing: .06em; }
+      .bar nav { display: flex; gap: 28px; margin-left: auto; }
+      .bar nav a { color: var(--muted); text-decoration: none; font-size: 14px; letter-spacing: .06em; }
+      .bar nav a[aria-current] { color: var(--paper); border-bottom: 1px solid var(--glass); padding-bottom: 3px; }
+
+      /* ── 左侧编辑栏：标题在上、两个泊位竖排等权 ── */
+      .side { position: absolute; left: 48px; top: 104px; width: 386px; z-index: 3; display: flex; flex-direction: column; gap: 22px; }
+      .side h1 { font-size: 62px; font-weight: 700; line-height: 1.02; }
+      .side .sub { font-size: 15px; line-height: 1.85; color: var(--muted); }
+      .side .rule { height: 1px; background: var(--line); }
+      .act { display: flex; flex-direction: column; gap: 8px; }
+      .act b { font-size: 12.5px; letter-spacing: .12em; font-weight: 400; color: var(--glass); }
+      .act.cast b { color: #e8a08c; }
+      .act button { height: 58px; border: 0; cursor: pointer; font-family: inherit; font-size: 17px; font-weight: 700;
+        letter-spacing: .08em; color: #fff; display: flex; align-items: center; justify-content: center; gap: 10px; }
+      .act.draw button { background: var(--teal); }
+      .act.cast button { background: var(--coral); }
+      .act p { font-size: 12.5px; line-height: 1.7; color: var(--muted); }
+      .meter { display: flex; gap: 4px; }
+      .meter i { width: 22px; height: 3px; background: rgba(243,249,250,.16); display: block; }
+      .meter i.on { background: var(--glass); }
+
+      /* ── 右侧：从上方看下去的一条河道 ── */
+      .field { position: absolute; right: 0; top: 62px; width: 1010px; height: 838px; z-index: 1; }
+      .field > svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+
+      .wp { position: absolute; width: 240px; display: flex; align-items: center; justify-content: flex-end; gap: 9px;
+        font-size: 12.5px; color: rgba(243,249,250,.78); text-shadow: 0 1px 6px rgba(2,16,20,.95);
+        letter-spacing: .06em; z-index: 2; }
+      .wp i { width: 7px; height: 7px; border-radius: 50%; background: rgba(243,249,250,.6); display: block; flex: none; }
+      .wp.hot { color: var(--glass); }
+      .wp.hot i { background: var(--glass); box-shadow: 0 0 10px rgba(127,209,217,.9); }
+
+      footer { position: absolute; left: 48px; right: 48px; bottom: 26px; display: flex; align-items: center; gap: 10px; z-index: 4; }
+      .tag { background: rgba(4,20,26,.5); border: 1px solid var(--line); color: var(--muted); font-family: inherit;
+        font-size: 12px; padding: 8px 15px; cursor: pointer; letter-spacing: .1em; backdrop-filter: blur(3px); }
+      .tag[aria-pressed='true'] { border-color: rgba(127,209,217,.6); color: var(--paper); }
+      footer .go { margin-left: auto; font-size: 13px; color: var(--glass); text-decoration: none; letter-spacing: .06em; }
+    </style>
+  </head>
+  <body>
+    <header class="bar">
+      <div class="brand">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#7fd1d9" stroke-width="2" stroke-linecap="round">
+          <path d="M2 9c2.5-3 5-3 7.5 0s5 3 7.5 0 4.5-2.5 5 0" /><path d="M2 16c2.5-3 5-3 7.5 0s5 3 7.5 0 4.5-2.5 5 0" />
+        </svg>
+        音乐漂流瓶
+      </div>
+      <nav><a href="#" aria-current="page">河道</a><a href="#">公海</a><a href="#">我的</a><a href="#">设置</a></nav>
+    </header>
+
+    <div class="field">
+      <svg viewBox="0 0 1010 838" preserveAspectRatio="none">
+        <defs>
+          <symbol id="bottle" viewBox="0 0 220 360">
+            <defs>
+              <linearGradient id="bg1" x1="0" y1="0" x2="1" y2="0">
+                <stop offset="0" stop-color="#d8f3f6" stop-opacity=".32" />
+                <stop offset=".4" stop-color="#2a9db1" stop-opacity=".2" />
+                <stop offset=".76" stop-color="#0b4e5b" stop-opacity=".48" />
+                <stop offset="1" stop-color="#7fd1d9" stop-opacity=".36" />
+              </linearGradient>
+              <linearGradient id="bs1" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0" stop-color="#7fd1d9" stop-opacity=".55" />
+                <stop offset="1" stop-color="#0f6d80" stop-opacity=".32" />
+              </linearGradient>
+              <clipPath id="bc1">
+                <path d="M80 56 H140 V96 C 140 118, 178 138, 178 168 V300 C 178 318, 164 330, 146 330 H74 C 56 330, 42 318, 42 300 V168 C 42 138, 80 118, 80 96 Z" />
+              </clipPath>
+            </defs>
+            <g clip-path="url(#bc1)">
+              <rect x="30" y="238" width="170" height="110" fill="url(#bs1)" />
+              <g transform="rotate(-14 118 264)">
+                <rect x="94" y="240" width="52" height="44" rx="7" fill="#efe6d2" opacity=".9" />
+                <path d="M101 250 h38 M101 259 h38 M101 268 h24" stroke="#b9a888" stroke-width="2" stroke-linecap="round" />
+              </g>
+            </g>
+            <path d="M80 56 H140 V96 C 140 118, 178 138, 178 168 V300 C 178 318, 164 330, 146 330 H74 C 56 330, 42 318, 42 300 V168 C 42 138, 80 118, 80 96 Z"
+              fill="url(#bg1)" stroke="rgba(216,243,246,.85)" stroke-width="2.4" stroke-linejoin="round" />
+            <path d="M60 176 C 56 220, 56 270, 60 306" fill="none" stroke="rgba(255,255,255,.4)" stroke-width="6" stroke-linecap="round" />
+            <rect x="74" y="44" width="72" height="16" rx="7" fill="rgba(216,243,246,.22)" stroke="rgba(216,243,246,.7)" stroke-width="2" />
+            <rect x="86" y="24" width="48" height="24" rx="7" fill="#c7452c" />
+            <rect x="86" y="24" width="48" height="9" rx="4" fill="#9d4125" />
+          </symbol>
+          <linearGradient id="chan" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0" stop-color="#5fd0e0" stop-opacity=".5" />
+            <stop offset=".5" stop-color="#1a8698" stop-opacity=".34" />
+            <stop offset="1" stop-color="#0b3a4a" stop-opacity=".3" />
+          </linearGradient>
+          <clipPath id="fieldClip"><rect width="1010" height="838" /></clipPath>
+        </defs>
+
+        <g clip-path="url(#fieldClip)">
+          <!-- 水面等深线：一圈圈的细线，让"这是一片水"不用解释 -->
+          <g fill="none" stroke="rgba(127,209,217,.13)" stroke-width="1">
+            <path d="M-20 90 C 200 70, 420 110, 640 90 C 820 74, 940 100, 1030 88" />
+            <path d="M-20 190 C 210 168, 430 212, 650 190 C 830 172, 950 200, 1030 186" />
+            <path d="M-20 300 C 220 276, 440 322, 660 300 C 840 282, 960 310, 1030 296" />
+            <path d="M-20 420 C 230 394, 450 442, 670 420 C 850 402, 970 430, 1030 416" />
+            <path d="M-20 550 C 240 524, 460 572, 680 550 C 860 532, 980 560, 1030 546" />
+            <path d="M-20 680 C 250 654, 470 702, 690 680 C 870 662, 990 690, 1030 676" />
+            <path d="M-20 800 C 260 776, 480 822, 700 800 C 880 782, 1000 810, 1030 796" />
+          </g>
+
+          <!-- 河道：一条从右上流向左下的水带（单支路 —— 只有这一条） -->
+          <path d="M1060 20 C 900 130, 860 250, 742 300 C 620 352, 552 388, 452 470 C 352 552, 292 640, 40 900"
+            fill="none" stroke="rgba(127,209,217,.1)" stroke-width="150" stroke-linecap="round" />
+          <path d="M1060 20 C 900 130, 860 250, 742 300 C 620 352, 552 388, 452 470 C 352 552, 292 640, 40 900"
+            fill="none" stroke="url(#chan)" stroke-width="118" stroke-linecap="round" />
+          <!-- 两条岸线 -->
+          <path d="M1060 20 C 900 130, 860 250, 742 300 C 620 352, 552 388, 452 470 C 352 552, 292 640, 40 900"
+            fill="none" stroke="rgba(216,243,246,.5)" stroke-width="1.4" stroke-dasharray="0" transform="translate(0 -59)" opacity=".7" />
+          <path d="M1060 20 C 900 130, 860 250, 742 300 C 620 352, 552 388, 452 470 C 352 552, 292 640, 40 900"
+            fill="none" stroke="rgba(216,243,246,.45)" stroke-width="1.4" transform="translate(0 59)" opacity=".6" />
+          <!-- 水面上的流向虚线 -->
+          <path d="M1060 20 C 900 130, 860 250, 742 300 C 620 352, 552 388, 452 470 C 352 552, 292 640, 40 900"
+            fill="none" stroke="rgba(243,249,250,.5)" stroke-width="2" stroke-dasharray="16 22" stroke-linecap="round" />
+          <path d="M1060 20 C 900 130, 860 250, 742 300 C 620 352, 552 388, 452 470 C 352 552, 292 640, 40 900"
+            fill="none" stroke="rgba(243,249,250,.28)" stroke-width="2" stroke-dasharray="12 28" stroke-linecap="round" transform="translate(0 -30)" />
+
+          <!-- 四个段位：沿河的四个点 -->
+          <g fill="none" stroke="rgba(127,209,217,.55)" stroke-width="1">
+            <circle cx="928" cy="196" r="16" /><circle cx="742" cy="300" r="16" />
+            <circle cx="500" cy="428" r="16" /><circle cx="256" cy="676" r="16" />
+          </g>
+          <g fill="#c7452c">
+            <circle cx="928" cy="196" r="4.5" /><circle cx="742" cy="300" r="4.5" />
+            <circle cx="500" cy="428" r="4.5" /><circle cx="256" cy="676" r="4.5" />
+          </g>
+
+          <!-- 一只正在漂的瓶 -->
+          <g transform="translate(636 336) rotate(-34)">
+            <use href="#bottle" width="104" height="170" />
+          </g>
+        </g>
+      </svg>
+
+      <!-- 标签宽度固定 240、右对齐，圆点落在河道的四个段位上（圆心坐标 − 26 − 240） -->
+      <div class="wp hot" style="left: 662px; top: 187px"><span>第 1 段 · 待录 · 发起者</span><i></i></div>
+      <div class="wp" style="left: 476px; top: 291px"><span>第 2 段 · 空位</span><i></i></div>
+      <div class="wp" style="left: 234px; top: 419px"><span>第 3 段 · 空位</span><i></i></div>
+      <div class="wp" style="left: -10px; top: 667px"><span>第 4 段 · 空位</span><i></i></div>
+    </div>
+
+    <div class="side">
+      <h1>暖流河道</h1>
+      <p class="sub">河只有一条。瓶子顺水往下，一次只在一个人手里 —— 谁捞到，谁就接下一句。</p>
+      <div class="rule"></div>
+      <div class="act draw">
+        <b>下游 · 接住漂来的</b>
+        <button>捞一个漂流瓶</button>
+        <p>捞取深海深处传来的匿名哼唱，接续她的下一句旋律。捞到即持有：同一时刻，同一条河道上只有你拿着它。</p>
+      </div>
+      <div class="act cast">
+        <b>上游 · 放进河里</b>
+        <button>投下一支漂流瓶</button>
+        <p>选一首歌，录下第 1 段（时长以该段为准），然后投进河道等一个陌生人接下一棒。</p>
+      </div>
+      <div class="meter"><i class="on"></i><i></i><i></i><i></i></div>
+    </div>
+
+    <footer>
+      <button class="tag" aria-pressed="true">全部</button>
+      <button class="tag">深夜</button><button class="tag">通勤</button>
+      <button class="tag">告白</button><button class="tag">雨天</button>
+      <a class="go" href="#">先去公海听听已经完成的作品</a>
+    </footer>
+  </body>
+</html>
