@@ -18,12 +18,13 @@
          真实唱片的沟槽是极密纹理，这里压到 5.5px（再叠一层 17px 让它有疏密），于是从"几十条线"变成"一张表面"。 */
       .grooves { position:absolute; inset:0;
         background:
-          /* ① 细沟：**1px 的发丝线读不出黑胶**——加粗到 1.6px 并提对比 */
+          /* ① 细沟：**更粗、但更稀** —— 1px 太细读不出黑胶，6px 周期又太密；
+                取中间值：2.2px 线 × 12px 周期（约 106 环） */
           repeating-radial-gradient(circle at 1420px 960px,
-            rgba(216,243,246,.1) 0 1.6px, transparent 1.6px 6px),
-          /* ② 带纹：黑胶上"一组密槽 + 一道间隔"形成的宽窄相间的带 —— 唱片感主要来自这一层 */
+            rgba(216,243,246,.085) 0 2.2px, transparent 2.2px 12px),
+          /* ② 带纹：黑胶上"一组密槽 + 一道间隔"形成的宽窄相间的带（周期放宽到 34px） */
           repeating-radial-gradient(circle at 1420px 960px,
-            rgba(207,233,238,.035) 0 9px, transparent 9px 26px),
+            rgba(207,233,238,.03) 0 10px, transparent 10px 34px),
           radial-gradient(circle at 1420px 960px, rgba(127,209,217,.06) 0 26%, transparent 62%);
       }
       /* 黑胶最认得出来的一处：表面被灯扫过的那道反光 */
@@ -124,10 +125,9 @@
         <!-- 灯下的同心反光：**宽而柔**（16–34px + 模糊）才像唱片；细而硬就又变回行星轨道 -->
         <filter id="fSheen"><feGaussianBlur stdDeviation="11" /></filter>
         <g filter="url(#fSheen)">
-          <circle cx="1420" cy="960" r="1150" fill="none" stroke="rgba(207,233,238,.075)" stroke-width="26" />
-          <circle cx="1420" cy="960" r="1032" fill="none" stroke="rgba(240,252,254,.065)" stroke-width="16" />
-          <circle cx="1420" cy="960" r="822" fill="none" stroke="rgba(207,233,238,.06)" stroke-width="34" />
-          <circle cx="1420" cy="960" r="716" fill="none" stroke="rgba(240,252,254,.055)" stroke-width="12" />
+          <circle cx="1420" cy="960" r="1150" fill="none" stroke="rgba(207,233,238,.075)" stroke-width="30" />
+          <circle cx="1420" cy="960" r="1010" fill="none" stroke="rgba(240,252,254,.06)" stroke-width="18" />
+          <circle cx="1420" cy="960" r="800" fill="none" stroke="rgba(207,233,238,.055)" stroke-width="38" />
         </g>
         <!-- 悬浮在光里的尘屑（g3 的"泡泡" → 唱片表面被灯照到的微尘） -->
         <g fill="#eafcff">
