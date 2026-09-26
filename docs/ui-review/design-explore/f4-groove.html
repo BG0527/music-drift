@@ -30,18 +30,19 @@
       .note b { color:var(--glass); font-weight:400; }
       .rpm { font-family:Quattrocento,serif; font-size:26px; color:var(--glass); }
 
-      .port { position:absolute; display:grid; place-items:center; cursor:pointer; }
-      .port i { position:absolute; border-radius:50%; }
-      .port .r1 { inset:0; border:1px solid rgba(127,209,217,.42); }
-      .port .r2 { inset:24px; border:1px solid rgba(127,209,217,.5); }
-      .port .r3 { inset:48px; border:1px solid rgba(224,246,249,.58); }
-      .port .core { position:relative; width:104px; height:104px; border-radius:50%; display:grid; place-items:center; gap:2px;
-        font-family:inherit; font-size:16px; font-weight:700; letter-spacing:.14em; color:#fff; }
-      .port .core span { font-size:10px; letter-spacing:.28em; opacity:.75; font-weight:400; }
-      .draw .core { background:radial-gradient(circle at 34% 26%, rgba(240,252,254,.46), rgba(42,157,177,.34) 46%, rgba(11,78,91,.62) 100%);
-        border:1px solid rgba(216,243,246,.5); box-shadow:0 0 0 8px rgba(5,15,20,.72), inset 0 1px 14px rgba(255,255,255,.26), 0 0 46px rgba(42,157,177,.42); }
-      .cast .core { background:radial-gradient(circle at 34% 26%, rgba(255,238,232,.5), rgba(210,80,47,.42) 46%, rgba(120,36,20,.62) 100%);
-        border:1px solid rgba(255,228,218,.5); box-shadow:0 0 0 8px rgba(5,15,20,.72), inset 0 1px 14px rgba(255,255,255,.28), 0 0 46px rgba(199,69,44,.4); }
+      /* 泊位：照搬 g3 的按钮（深色半透圆盘 + 亮边 + 外环），盘身不填彩色 —— 用户："有颜色太丑了" */
+      .port { position:absolute; display:grid; place-items:center; cursor:pointer; z-index:3; }
+      .port i { position:absolute; border-radius:50%; pointer-events:none; }
+      .port .r1 { inset:-13px; border:1.5px solid rgba(228,249,252,.42); }
+      .port .r2 { inset:-29px; border:1px solid rgba(228,249,252,.2); }
+      .port .r3 { inset:-45px; border:1px solid rgba(228,249,252,.1); }
+      .port .core { position:relative; width:100%; height:100%; border-radius:50%; display:grid; place-items:center; gap:3px;
+        font-family:inherit; font-size:20px; font-weight:700; letter-spacing:.12em; color:#f3f9fa;
+        background:radial-gradient(76% 76% at 34% 26%, rgba(10,48,60,.5), rgba(3,17,23,.78));
+        text-shadow:0 1px 12px rgba(3,16,22,.95); }
+      .port .core span { font-size:10px; letter-spacing:.28em; opacity:.7; font-weight:400; }
+      .draw .core { border:1px solid rgba(203,238,246,.7); box-shadow:0 0 52px rgba(178,232,244,.3), inset 0 0 28px rgba(160,226,240,.2); }
+      .cast .core { border:1px solid rgba(246,215,154,.66); box-shadow:0 0 52px rgba(246,215,154,.26), inset 0 0 28px rgba(246,215,154,.16); }
       .port .cap { position:absolute; width:290px; font-size:12.5px; line-height:1.75; color:var(--muted);
         text-shadow:0 1px 8px rgba(2,10,14,.95); }
       .port .cap b { display:block; color:var(--paper); font-size:15px; margin-bottom:3px; }
@@ -174,12 +175,12 @@
     <div class="port draw ov" style="left:496px; top:574px; width:156px; height:156px" role="button" aria-label="捞一个漂流瓶">
       <i class="r1"></i><i class="r2"></i><i class="r3"></i>
       <span class="core">捞取<span>DRAW</span></span>
-      <span class="cap" style="left:-116px; top:172px"><b>捞一个漂流瓶</b>捞到即持有：同一时刻，同一条河道上只有你拿着它。</span>
+      <span class="cap" style="left:-136px; top:214px; width:300px"><b>捞一个漂流瓶</b>捞到即持有：同一时刻，同一条河道上只有你拿着它。</span>
     </div>
     <div class="port cast ov" style="left:865px; top:119px; width:156px; height:156px" role="button" aria-label="投下一支漂流瓶">
       <i class="r1"></i><i class="r2"></i><i class="r3"></i>
       <span class="core">投下<span>CAST</span></span>
-      <span class="cap" style="left:180px; top:34px"><b>投下一支漂流瓶</b>选一首歌，录下第 1 段，然后放进上游等一个陌生人接下一棒。</span>
+      <span class="cap" style="left:252px; top:58px; width:300px"><b>投下一支漂流瓶</b>选一首歌，录下第 1 段，然后放进上游等一个陌生人接下一棒。</span>
     </div>
 
     <footer>
