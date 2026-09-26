@@ -1,0 +1,275 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <title>选一首歌 · 空白母版（唱片语言）</title>
+    <style>
+      @import url('/node_modules/.pnpm/lxgw-wenkai-webfont@1.7.0/node_modules/lxgw-wenkai-webfont/lxgwwenkai-regular.css');
+      @import url('/node_modules/.pnpm/lxgw-wenkai-webfont@1.7.0/node_modules/lxgw-wenkai-webfont/lxgwwenkai-bold.css');
+      @import url('/node_modules/.pnpm/@fontsource+quattrocento@5.3.0/node_modules/@fontsource/quattrocento/400.css');
+      @import url('/node_modules/.pnpm/@fontsource+quattrocento@5.3.0/node_modules/@fontsource/quattrocento/700.css');
+      :root { --ink:#050f14; --paper:#f3f9fa; --muted:#a9c7cf; --glass:#7fd1d9; --coral:#c7452c; --warm:#f6d79a; --line:rgba(243,249,250,.13); }
+      * { box-sizing:border-box; margin:0; padding:0; }
+      html,body { width:1440px; height:900px; }
+      html { overflow:hidden; }
+      .clip { position:absolute; inset:0; overflow:hidden; }
+      body { position:relative; overflow:hidden; background:var(--ink); color:var(--paper);
+        font-family:'LXGW WenKai',serif; -webkit-font-smoothing:antialiased; }
+      .mono, .cat, .num { font-family:Quattrocento,serif; font-variant-numeric:tabular-nums; }
+      .cat { font-size:11px; letter-spacing:.24em; color:rgba(243,249,250,.5); }
+
+      /* 公共层：盘面 + 冷光 */
+      .platter { position:absolute; inset:0;
+        background:
+          repeating-radial-gradient(circle at 1420px 960px, rgba(216,243,246,.055) 0 1.2px, transparent 1.2px 6.5px),
+          radial-gradient(circle at 1420px 960px, rgba(127,209,217,.05) 0 30%, transparent 68%); }
+      .glint { position:absolute; inset:0; mix-blend-mode:screen;
+        background:linear-gradient(101deg, transparent 28%, rgba(228,247,252,.045) 45%, rgba(228,247,252,.065) 50%, rgba(228,247,252,.028) 55%, transparent 72%); }
+      .art { position:absolute; inset:0; }
+
+      /* 左栏：母版架 */
+      main { position:relative; z-index:2; width:916px; padding:64px 0 0 76px; }
+      h1 { margin-top:12px; font-size:56px; font-weight:700; line-height:1; }
+      .sub { margin-top:14px; max-width:620px; font-size:15.5px; line-height:1.9; color:var(--muted); }
+
+      /* 检索牌：唱片店抽屉里立着的那张卡（凸起的标签 + 下层卡沿 = 曲库张数） */
+      .drawer { margin-top:34px; width:560px; }
+      .stack { display:block; }
+      .stack i { display:block; height:6px; margin:0 auto; border:1px solid rgba(243,249,250,.12);
+        border-top:none; border-radius:0 0 2px 2px; background:rgba(243,249,250,.02); }
+      .idxcard { position:relative; display:flex; align-items:center; gap:16px; height:46px; padding:0 16px;
+        border:1px solid var(--line); border-radius:2px; background:rgba(243,249,250,.035); }
+      .tab { position:absolute; left:18px; top:-16px; height:17px; padding:0 12px; line-height:16px;
+        border:1px solid var(--line); border-bottom:none; border-radius:2px 2px 0 0;
+        background:rgba(243,249,250,.07); }
+      input { width:250px; height:30px; border:none; border-bottom:1px solid rgba(243,249,250,.24);
+        background:transparent; color:var(--paper); font-family:'LXGW WenKai',serif; font-size:15px; }
+      input::placeholder { color:var(--muted); }
+      input:focus { outline:none; border-bottom-color:var(--glass); }
+      .count { margin-left:auto; }
+
+      /* 空态：抽屉报「没有这一张」——虚线=条件态，不是当前渲染态 */
+      .empty { margin-top:22px; width:560px; display:flex; align-items:baseline; gap:14px;
+        padding:11px 14px; border:1px dashed rgba(243,249,250,.18); border-radius:2px; }
+      .empty p { font-size:13.5px; line-height:1.6; color:var(--muted); }
+
+      /* 母版列表：一行 = 一张待刻母版 */
+      ul.masters { list-style:none; margin-top:22px; }
+      li.row { display:grid; grid-template-columns:48px 1fr auto; align-items:center; gap:16px;
+        padding:11px 0; border-top:1px solid rgba(243,249,250,.08); }
+      li.row:last-child { border-bottom:1px solid rgba(243,249,250,.08); }
+      li.row:hover { background:rgba(127,209,217,.035); }
+
+      /* 小母版：光滑面 = 未切分；面上多一圈细沟 = 已切成段位 */
+      .blank { position:relative; width:48px; height:48px; border-radius:50%;
+        background:radial-gradient(76% 76% at 34% 26%, rgba(10,48,60,.5), rgba(3,17,23,.78));
+        border:1px solid rgba(228,249,252,.16); }
+      .blank.cut::before { content:''; position:absolute; inset:8px; border-radius:50%;
+        border:1px dashed rgba(228,249,252,.22); }
+      .blank::after { content:''; position:absolute; left:50%; top:50%; width:7px; height:7px; margin:-3.5px 0 0 -3.5px;
+        border-radius:50%; background:rgba(3,17,23,.95); border:1px solid rgba(228,249,252,.28); }
+
+      .title { font-size:17.5px; font-weight:700; line-height:1.3; }
+      .line { display:flex; align-items:center; gap:12px; margin-top:9px; }
+      .ticks { display:flex; gap:6px; }
+      .ticks i { display:block; width:26px; height:4px; border:1px solid rgba(243,249,250,.22); border-radius:1px; }
+      .ticks i.on { background:var(--coral); border-color:var(--coral); }
+      .empty.slot { width:62px; height:4px; border:none; border-top:1px dashed rgba(243,249,250,.22); margin:0; padding:0; }
+      .meta { font-family:Quattrocento,serif; font-variant-numeric:tabular-nums;
+        font-size:12.5px; color:rgba(169,199,207,.85); }
+      .sep { width:1px; height:11px; background:rgba(243,249,250,.16); }
+      .note { font-size:13px; line-height:1.5; color:var(--warm); }
+
+      .act { display:inline-flex; align-items:center; gap:8px; height:36px; padding:0 14px; border-radius:2px;
+        border:1px solid rgba(243,249,250,.24); background:rgba(243,249,250,.03);
+        color:var(--paper); font-family:'LXGW WenKai',serif; font-size:13.5px; }
+      li.row:hover .act { border-color:rgba(127,209,217,.55); color:var(--glass); }
+      .act[disabled] { border-color:rgba(243,249,250,.12); border-style:dashed; color:rgba(169,199,207,.55); }
+      .act svg { display:block; }
+
+      footer { position:absolute; left:76px; bottom:32px; z-index:2; }
+
+      /* 右栏：刻纹机台 */
+      aside { position:absolute; right:0; top:0; width:540px; height:900px; z-index:3; pointer-events:none; }
+      .counts { position:absolute; right:76px; top:64px; display:flex; gap:38px; text-align:right; }
+      .counts .n { display:block; font-family:Quattrocento,serif; font-size:26px; line-height:1; color:var(--glass); }
+      .counts .cat { display:block; margin-top:7px; }
+      .seglab { position:absolute; left:64px; width:200px; text-align:right; top:326px; white-space:nowrap; }
+      .uncut { position:absolute; left:373px; top:463px; }
+      .cap { position:absolute; left:64px; top:648px; width:170px; line-height:2.3; }
+    </style>
+  </head>
+  <body>
+    <div class="clip">
+      <div class="platter"></div>
+
+      <!-- 刻纹机台：一张还没刻过的母版。四道段位沟已经切好（虚线＝这一段还没人录），
+           最外那道（第 1 段）归发起者；刻纹头吊在导轨上，针尖正落在那道沟里。 -->
+      <svg class="art" width="1440" height="900" viewBox="0 0 1440 900" fill="none" aria-hidden="true">
+        <defs>
+          <radialGradient id="lacquer" cx="34%" cy="26%" r="76%">
+            <stop offset="0" stop-color="#0a3a48" stop-opacity=".55" />
+            <stop offset="1" stop-color="#031117" stop-opacity=".92" />
+          </radialGradient>
+        </defs>
+        <g transform="translate(1290 470)">
+          <circle r="178" stroke="rgba(228,249,252,.1)" />
+          <circle r="164" stroke="rgba(228,249,252,.2)" />
+          <circle r="150" fill="url(#lacquer)" stroke="rgba(228,249,252,.42)" />
+          <!-- 边缘微光：只有一条冷光弧，盘身不填彩 -->
+          <path d="M -140 -55 A 150 150 0 0 0 -126 81" stroke="rgba(203,238,246,.65)" stroke-width="1.1" />
+          <circle r="60" stroke="rgba(243,249,250,.16)" stroke-width="1.5" stroke-dasharray="4 6" />
+          <circle r="84" stroke="rgba(243,249,250,.16)" stroke-width="1.5" stroke-dasharray="4 6" />
+          <circle r="108" stroke="rgba(243,249,250,.16)" stroke-width="1.5" stroke-dasharray="4 6" />
+          <circle r="132" stroke="rgba(199,69,44,.6)" stroke-width="1.7" stroke-dasharray="5 5" />
+          <!-- 标签区是空的：还没有作品 -->
+          <circle r="45" fill="rgba(243,249,250,.022)" stroke="rgba(243,249,250,.1)" />
+          <circle r="5" fill="rgba(3,17,23,.95)" stroke="rgba(228,249,252,.28)" />
+        </g>
+        <!-- 导轨 + 刻纹头：针尖 (1290,338) 正落在 r=132 那道第 1 段沟上 -->
+        <path d="M 1104 200 L 1440 200" stroke="rgba(228,249,252,.18)" />
+        <path d="M 1104 200 L 1104 212" stroke="rgba(228,249,252,.18)" />
+        <path d="M 1290 200 L 1290 250" stroke="rgba(228,249,252,.22)" />
+        <path d="M 1290 264 L 1290 338" stroke="rgba(203,238,246,.55)" stroke-width="1.6" />
+        <rect x="1276" y="250" width="28" height="14" rx="2"
+          fill="rgba(228,249,252,.12)" stroke="rgba(228,249,252,.38)" />
+        <circle cx="1290" cy="338" r="3" fill="rgba(203,238,246,.6)" />
+      </svg>
+      <div class="glint"></div>
+    </div>
+
+    <aside>
+      <div class="counts">
+        <div><span class="n">4</span><span class="cat">张待刻</span></div>
+        <div><span class="n">1</span><span class="cat">未切分</span></div>
+      </div>
+      <span class="cat seglab">第 1 段</span>
+      <span class="cat uncut">未刻</span>
+      <p class="cat cap">4 道段位切痕<br />一段都还没录</p>
+    </aside>
+
+    <main>
+      <div class="cat">SIDE A · 未刻</div>
+      <h1>选一首歌，投出第一棒</h1>
+      <p class="sub">
+        这里每首歌都被切成固定段位（同一位置永远属于同一段，斩浪也不会把后面的段前移）。你录第 1
+        段，之后交给河道里的陌生人。
+      </p>
+
+      <div class="drawer">
+        <div class="idxcard">
+          <span class="tab cat">找 歌</span>
+          <input type="search" placeholder="按曲名过滤" aria-label="按曲名过滤曲库" />
+          <span class="count cat">曲库共 5 首</span>
+        </div>
+        <span class="stack">
+          <i style="width:560px"></i>
+          <i style="width:536px"></i>
+          <i style="width:512px"></i>
+          <i style="width:488px"></i>
+          <i style="width:464px"></i>
+        </span>
+      </div>
+
+      <div class="empty">
+        <span class="cat">无匹配</span>
+        <p>曲库里没有名字含「蓝」的歌，换个词试试。</p>
+      </div>
+
+      <ul class="masters">
+        <li class="row">
+          <span class="blank cut"></span>
+          <div>
+            <p class="title">占位曲目 · 一</p>
+            <div class="line">
+              <span class="ticks"><i class="on"></i><i></i><i></i><i></i></span>
+              <span class="meta">4 段</span><span class="sep"></span>
+              <span class="meta">每段约 24 秒</span><span class="sep"></span>
+              <span class="meta">来源 incompetech-cc-by-4.0</span>
+            </div>
+          </div>
+          <button class="act" type="button">
+            <svg width="15" height="15" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"
+              stroke-linecap="round" fill="none"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/>
+              <path d="M19 10v2a7 7 0 0 1-14 0v-2" /><path d="M12 19v3" /></svg>
+            选这首，录第 1 段
+          </button>
+        </li>
+
+        <li class="row">
+          <span class="blank"></span>
+          <div>
+            <p class="title">占位曲目 · 二</p>
+            <div class="line">
+              <span class="empty slot"></span>
+              <span class="meta">未切分</span><span class="sep"></span>
+              <span class="meta">来源 incompetech-cc-by-4.0</span>
+              <span class="sep"></span>
+              <span class="note">这首还没有切分，暂不能发起</span>
+            </div>
+          </div>
+          <button class="act" type="button" disabled>暂不可发起</button>
+        </li>
+
+        <li class="row">
+          <span class="blank cut"></span>
+          <div>
+            <p class="title">占位曲目 · 三</p>
+            <div class="line">
+              <span class="ticks"><i class="on"></i><i></i><i></i><i></i></span>
+              <span class="meta">4 段</span><span class="sep"></span>
+              <span class="meta">每段约 18 秒</span><span class="sep"></span>
+              <span class="meta">来源 incompetech-cc-by-4.0</span>
+            </div>
+          </div>
+          <button class="act" type="button">
+            <svg width="15" height="15" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"
+              stroke-linecap="round" fill="none"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/>
+              <path d="M19 10v2a7 7 0 0 1-14 0v-2" /><path d="M12 19v3" /></svg>
+            选这首，录第 1 段
+          </button>
+        </li>
+
+        <li class="row">
+          <span class="blank cut"></span>
+          <div>
+            <p class="title">占位曲目 · 四</p>
+            <div class="line">
+              <span class="ticks"><i class="on"></i><i></i><i></i><i></i></span>
+              <span class="meta">4 段</span><span class="sep"></span>
+              <span class="meta">每段约 27 秒</span><span class="sep"></span>
+              <span class="meta">来源 incompetech-cc-by-4.0</span>
+            </div>
+          </div>
+          <button class="act" type="button">
+            <svg width="15" height="15" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"
+              stroke-linecap="round" fill="none"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/>
+              <path d="M19 10v2a7 7 0 0 1-14 0v-2" /><path d="M12 19v3" /></svg>
+            选这首，录第 1 段
+          </button>
+        </li>
+
+        <li class="row">
+          <span class="blank cut"></span>
+          <div>
+            <p class="title">夜航</p>
+            <div class="line">
+              <span class="ticks"><i class="on"></i><i></i><i></i><i></i></span>
+              <span class="meta">4 段</span><span class="sep"></span>
+              <span class="meta">每段约 21 秒</span><span class="sep"></span>
+              <span class="meta">来源 incompetech-cc-by-4.0</span>
+            </div>
+          </div>
+          <button class="act" type="button">
+            <svg width="15" height="15" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"
+              stroke-linecap="round" fill="none"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/>
+              <path d="M19 10v2a7 7 0 0 1-14 0v-2" /><path d="M12 19v3" /></svg>
+            选这首，录第 1 段
+          </button>
+        </li>
+      </ul>
+    </main>
+
+    <footer><span class="cat">曲库 5 首</span></footer>
+  </body>
+</html>

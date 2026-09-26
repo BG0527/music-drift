@@ -1,0 +1,313 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <title>P · 公海作品详情（唱针 + 沟槽 = 播放头与时间轴）</title>
+    <style>
+      @import url('/node_modules/.pnpm/lxgw-wenkai-webfont@1.7.0/node_modules/lxgw-wenkai-webfont/lxgwwenkai-regular.css');
+      @import url('/node_modules/.pnpm/lxgw-wenkai-webfont@1.7.0/node_modules/lxgw-wenkai-webfont/lxgwwenkai-bold.css');
+      @import url('/node_modules/.pnpm/@fontsource+quattrocento@5.3.0/node_modules/@fontsource/quattrocento/400.css');
+      @import url('/node_modules/.pnpm/@fontsource+quattrocento@5.3.0/node_modules/@fontsource/quattrocento/700.css');
+
+      :root {
+        --ink:#050f14; --paper:#f3f9fa; --muted:#a9c7cf; --glass:#7fd1d9;
+        --coral:#c7452c; --warm:#f6d79a; --line:rgba(243,249,250,.13);
+      }
+      * { box-sizing:border-box; margin:0; padding:0; }
+      html,body { width:1440px; height:900px; }
+      html { overflow:hidden; }
+      .clip { position:absolute; inset:0; overflow:hidden; }
+      body { position:relative; overflow:hidden; background:var(--ink); color:var(--paper);
+        font-family:'LXGW WenKai',serif; -webkit-font-smoothing:antialiased; }
+      .mono { font-family:Quattrocento,serif; font-variant-numeric:tabular-nums; }
+      .surface { position:absolute; inset:0; opacity:.9;
+        background:
+          repeating-radial-gradient(circle at 1420px 960px, rgba(216,243,246,.055) 0 1.2px, transparent 1.2px 6.5px),
+          radial-gradient(circle at 1420px 960px, rgba(127,209,217,.05) 0 30%, transparent 68%); }
+      .glint { position:absolute; inset:0; mix-blend-mode:screen;
+        background:linear-gradient(101deg, transparent 28%, rgba(228,247,252,.045) 45%, rgba(228,247,252,.065) 50%, rgba(228,247,252,.028) 55%, transparent 72%); }
+
+      main { position:relative; z-index:2; padding:44px 76px 0; }
+      .cat { font-family:Quattrocento,serif; font-size:11px; letter-spacing:.24em; color:rgba(243,249,250,.5); }
+
+      .crumb { display:flex; align-items:center; gap:16px; height:24px; font-size:14px; }
+      .crumb a { color:var(--glass); text-decoration:underline; text-underline-offset:4px; }
+      .state { font-family:'LXGW WenKai',serif; font-size:12px; letter-spacing:.1em; color:var(--warm);
+        border:1px solid rgba(246,215,154,.32); background:rgba(246,215,154,.08);
+        border-radius:2px; padding:3px 10px; }
+
+      /* 盘标：曲名 + 母版号（母版号 = 本页第二装置：作品与每一段的唯一标识） */
+      .hd { display:flex; justify-content:space-between; align-items:flex-start; margin-top:6px; }
+      h1 { margin-top:4px; font-size:58px; font-weight:700; line-height:1; }
+      .stamp { text-align:right; }
+      .stampno { margin-top:4px; font-size:26px; color:var(--glass); }
+      .meta { display:flex; align-items:baseline; gap:16px; margin-top:14px; font-size:15px; line-height:22px; color:var(--muted); }
+      .meta .warm { color:var(--warm); }
+      .gapnote { margin-top:14px; max-width:820px; padding-left:16px;
+        border-left:2px solid rgba(246,215,154,.55);
+        font-size:15px; line-height:1.85; color:var(--muted); }
+
+      /* ------- 播放区：把这条沟槽拉直。唱针在沟槽上的位置就是播放位置 ------- */
+      .deck { margin-top:20px; }
+      .deck-h { display:flex; align-items:baseline; gap:14px; }
+      .deck-h h2 { font-size:17px; font-weight:700; color:var(--paper); }
+      .band { position:relative; margin:12px -76px 0; height:92px;
+        border-top:1px solid var(--line); border-bottom:1px solid var(--line); }
+      .band::before { content:''; position:absolute; inset:0;
+        background:linear-gradient(180deg, rgba(5,15,20,.42), rgba(5,15,20,.05) 40%, rgba(5,15,20,.30)); }
+
+      .groove { position:absolute; left:76px; right:76px; top:50%; height:13px; margin-top:-6.5px; }
+      .seg { position:absolute; top:0; height:13px; }
+      /* 已唱 / 未播：槽壁与槽底的亮度差就是"唱针走过没有" */
+      .seg.on  { border-top:1px solid rgba(216,243,246,.38); border-bottom:1px solid rgba(216,243,246,.38); }
+      .seg.off { border-top:1px solid rgba(216,243,246,.15); border-bottom:1px solid rgba(216,243,246,.15); }
+      .core { position:absolute; top:1px; bottom:1px; left:0; right:0;
+        background:repeating-linear-gradient(90deg, rgba(127,209,217,.78) 0 1px, rgba(127,209,217,.16) 1px 3.4px); }
+      .seg.on .core { -webkit-mask-image:linear-gradient(90deg, rgba(255,255,255,.58), #fff 28%, rgba(255,255,255,.66) 60%, #fff 88%);
+        mask-image:linear-gradient(90deg, rgba(255,255,255,.58), #fff 28%, rgba(255,255,255,.66) 60%, #fff 88%); }
+      .seg.off .core { background:repeating-linear-gradient(90deg, rgba(169,199,207,.17) 0 1px, rgba(169,199,207,.03) 1px 3.4px); }
+      /* 缺口：槽壁被切断，只剩两截虚线头 + 两个刀口，中间让出背景 */
+      .seg.empty { border-top:1px dashed rgba(246,215,154,.7); border-bottom:1px dashed rgba(246,215,154,.7);
+        -webkit-mask-image:linear-gradient(90deg, #fff 0 29%, transparent 29% 71%, #fff 71% 100%);
+        mask-image:linear-gradient(90deg, #fff 0 29%, transparent 29% 71%, #fff 71% 100%); }
+      .cut { position:absolute; top:0; height:13px; width:2px; background:rgba(246,215,154,.8); }
+      .voidwash { position:absolute; left:322px; width:322px; top:50%; height:13px; margin-top:-6.5px;
+        background:rgba(246,215,154,.05); }
+      .sep { position:absolute; top:50%; height:38px; margin-top:-19px; width:1px; background:rgba(243,249,250,.09); }
+      .voidlabel { position:absolute; left:398px; width:322px; top:50%; transform:translateY(-50%);
+        text-align:center; font-size:13.5px; letter-spacing:.06em; color:var(--warm); }
+
+      /* 段的刻度：A1..A4 = 母版号 SIDE A 的第 1..4 段 */
+      .marks { display:grid; grid-template-columns:repeat(4,322px); margin-top:14px; height:18px; }
+      .marks > div { display:flex; align-items:baseline; gap:10px; }
+      .marks .d { font-family:Quattrocento,serif; font-size:13px; color:var(--muted); }
+      .marks .d.warm { color:var(--warm); }
+
+      /* 唱臂：轴承在右上角，唱针尖落进第 3 段沟槽（x=846 与沟槽同一竖线） */
+      .rig { position:absolute; left:0; top:0; width:1440px; height:900px; z-index:3; pointer-events:none; }
+      .arm { position:absolute; left:846px; top:298px; width:570px; height:2px; transform-origin:0 50%;
+        transform:rotate(-11.75deg);
+        background:linear-gradient(90deg, rgba(243,249,250,.26), rgba(243,249,250,.5)); }
+      .pivot { position:absolute; left:1382px; top:161px; width:44px; height:44px; border-radius:50%;
+        border:1px solid rgba(228,249,252,.34); }
+      .pivot::before { content:''; position:absolute; left:50%; top:50%; width:20px; height:20px;
+        margin:-10px 0 0 -10px; border-radius:50%; border:1px solid rgba(228,249,252,.22); }
+      .pivot::after { content:''; position:absolute; left:50%; top:50%; width:8px; height:8px;
+        margin:-4px 0 0 -4px; border-radius:50%; background:rgba(127,209,217,.6); }
+      .lift { position:absolute; left:855px; top:277px; width:13px; height:2px;
+        transform-origin:0 50%; transform:rotate(-11.75deg); background:rgba(243,249,250,.28); }
+      .shell { position:absolute; left:828px; top:291px; width:36px; height:16px; border-radius:2px;
+        background:linear-gradient(180deg,#12414f,#08202a); border:1px solid rgba(228,249,252,.34); }
+      .stylus { position:absolute; left:841.5px; top:307px; width:0; height:0;
+        border-left:4.5px solid transparent; border-right:4.5px solid transparent;
+        border-top:14px solid rgba(243,249,250,.72); }
+      .tip { position:absolute; left:836px; top:311px; width:20px; height:20px; border-radius:50%;
+        background:radial-gradient(circle, rgba(199,69,44,.4), rgba(199,69,44,0) 68%); }
+      .tip::after { content:''; position:absolute; left:50%; top:50%; width:6px; height:6px;
+        margin:-3px 0 0 -3px; border-radius:50%; background:var(--coral); }
+
+      /* 两栏：左=段链，右=参与者 + 混音导出计划 */
+      .cols { display:grid; grid-template-columns:1fr 424px; gap:88px; margin-top:30px; }
+      .col-h { display:flex; align-items:baseline; gap:12px; }
+      .col-h h2 { font-size:17px; font-weight:700; color:var(--paper); }
+      .hint { font-size:13px; color:var(--muted); }
+      .hint.warm { color:var(--warm); }
+
+      ol.chain { list-style:none; margin-top:8px; }
+      li.row { position:relative; display:grid; grid-template-columns:52px 1fr 96px 76px; gap:14px;
+        align-items:center; height:52px; border-bottom:1px solid rgba(243,249,250,.07); }
+      li.row .mk { font-family:Quattrocento,serif; font-size:16px; letter-spacing:.06em; color:var(--glass); }
+      li.row .desc { font-size:15px; color:var(--paper); }
+      li.row .desc span { font-family:Quattrocento,serif; font-size:13px; color:var(--muted); margin-left:12px; }
+      li.row .dur { text-align:right; font-family:Quattrocento,serif; font-size:13px; color:var(--muted); }
+      li.row .act { text-align:right; font-size:13px; color:var(--glass); text-decoration:underline; text-underline-offset:4px; }
+      li.row[data-state='gap'] { border-bottom:1px dashed rgba(246,215,154,.26); }
+      li.row[data-state='gap'] .mk,
+      li.row[data-state='gap'] .dur { color:var(--warm); }
+      li.row[data-state='gap'] .desc { color:var(--warm); }
+      li.row[data-state='gap'] .desc em { font-family:'LXGW WenKai',serif; font-style:normal;
+        font-size:13px; color:var(--muted); margin-left:12px; }
+      li.row[aria-current='true'] .mk { color:var(--coral); }
+      li.row[aria-current='true']::before { content:''; position:absolute; left:-16px; top:10px; bottom:10px;
+        width:2px; background:var(--coral); }
+
+      ul.credits { list-style:none; margin-top:8px; }
+      ul.credits li { display:flex; justify-content:space-between; align-items:baseline; height:30px; }
+      ul.credits .code { font-family:Quattrocento,serif; font-size:15px; letter-spacing:.04em; color:var(--paper); }
+      ul.credits .at { font-size:13px; color:var(--muted); }
+      .mixbox { margin-top:26px; }
+      .mixbox p { margin-top:4px; font-size:15px; line-height:1.85; color:var(--muted); max-width:400px; }
+
+      /* 底面：唱针读数 */
+      .transport { margin-top:64px; border-top:1px solid var(--line); padding-top:12px;
+        display:flex; align-items:center; }
+      .tie { flex:1; height:1px; margin:0 28px; background:rgba(243,249,250,.09); }
+      audio { position:absolute; left:0; top:0; width:1px; height:1px; opacity:0; }
+      .now .cat { margin-bottom:3px; }
+      .now .line { font-size:17px; color:var(--paper); }
+      .now .line b { font-weight:700; }
+      .now .line span { font-family:Quattrocento,serif; color:var(--muted); margin-left:14px; }
+      .readout { display:flex; align-items:center; gap:28px; }
+      .time { font-family:Quattrocento,serif; font-size:32px; color:var(--glass); letter-spacing:.02em; }
+      .time .of { font-size:16px; color:var(--muted); }
+      .votes { display:flex; align-items:center; gap:14px; font-size:13px; color:var(--muted); }
+      .votes i { width:1px; height:12px; background:rgba(243,249,250,.16); }
+      .ctrl { width:96px; height:44px; border:1px solid rgba(127,209,217,.4); border-radius:2px; background:transparent;
+        color:var(--glass); font-family:'LXGW WenKai',serif; font-size:14px; letter-spacing:.06em;
+        display:flex; align-items:center; justify-content:center; gap:8px; cursor:pointer; }
+
+      /* 收尾沟里的母版刻号 */
+      footer { position:absolute; left:76px; bottom:30px; z-index:2; }
+      .etch { font-family:Quattrocento,serif; font-size:10px; letter-spacing:.3em; color:rgba(243,249,250,.34); }
+    </style>
+  </head>
+  <body>
+    <div class="clip">
+      <div class="surface"></div>
+      <div class="glint"></div>
+    </div>
+
+    <main>
+      <nav class="crumb" aria-label="面包屑">
+        <a href="#">回公海大厅</a>
+        <span class="state">等待接力</span>
+      </nav>
+
+      <header class="hd">
+        <div>
+          <p class="cat">SIDE A · 公海</p>
+          <h1>占位曲目 · 四</h1>
+        </div>
+        <div class="stamp">
+          <p class="cat">母版号</p>
+          <p class="mono stampno">MDB-0001-A</p>
+        </div>
+      </header>
+
+      <p class="meta">
+        <span>已录 3 / 4 段</span>
+        <span class="warm">缺第 2 段</span>
+        <span>入海时间 <span class="mono">2026/9/23 20:38</span></span>
+      </p>
+
+      <p class="gapnote">这支作品还有缺口。缺口是歌里固定的段位，成品里留成静音，不会被别人的段顶替。</p>
+
+      <!-- 沉浸式播放区：一条被拉直的沟槽。4 个区间 = 4 段，唱针所在处 = 播放头 -->
+      <section class="deck" aria-labelledby="deck-h">
+        <div class="deck-h">
+          <h2 id="deck-h">试听与投票</h2>
+          <span class="hint">点左边任何一段换段</span>
+        </div>
+
+        <div class="band">
+          <div class="groove">
+            <div class="seg on" style="left:0;width:322px"><span class="core"></span></div>
+            <div class="seg empty" style="left:322px;width:322px"></div>
+            <div class="seg on" style="left:644px;width:126px"><span class="core"></span></div>
+            <div class="seg off" style="left:770px;width:196px"><span class="core"></span></div>
+            <div class="seg off" style="left:966px;width:322px"><span class="core"></span></div>
+            <span class="voidwash"></span>
+            <span class="cut" style="left:322px"></span>
+            <span class="cut" style="left:642px"></span>
+            <span class="sep" style="left:0"></span>
+            <span class="sep" style="left:322px"></span>
+            <span class="sep" style="left:644px"></span>
+            <span class="sep" style="left:966px"></span>
+            <span class="sep" style="left:1287px"></span>
+          </div>
+          <p class="voidlabel">这一段还没有人唱</p>
+        </div>
+
+        <div class="marks">
+          <div><span class="cat">A1</span><span class="d">00:42</span></div>
+          <div><span class="cat">A2</span><span class="d warm">静音</span></div>
+          <div><span class="cat">A3</span><span class="d">00:51</span></div>
+          <div><span class="cat">A4</span><span class="d">00:47</span></div>
+        </div>
+      </section>
+
+      <div class="cols">
+        <div>
+          <div class="col-h">
+            <h2>接力唱段链</h2>
+            <span class="hint warm">缺第 2 段</span>
+          </div>
+          <ol class="chain">
+            <li class="row">
+              <span class="mk">A1</span>
+              <span class="desc">第 1 段<span>潮汐-3F</span></span>
+              <span class="dur">00:42</span>
+              <a class="act" href="#">听</a>
+            </li>
+            <li class="row" data-state="gap">
+              <span class="mk">A2</span>
+              <span class="desc">这一段还没有人唱<em>缺口在成品里是静音，不会被别人的段顶替。</em></span>
+              <span class="dur">静音</span>
+              <span class="act"></span>
+            </li>
+            <li class="row" aria-current="true">
+              <span class="mk">A3</span>
+              <span class="desc">第 3 段<span>暗礁-91</span></span>
+              <span class="dur">00:51</span>
+              <a class="act" href="#">正在听</a>
+            </li>
+            <li class="row">
+              <span class="mk">A4</span>
+              <span class="desc">第 4 段<span>浮标-2C</span></span>
+              <span class="dur">00:47</span>
+              <a class="act" href="#">听</a>
+            </li>
+          </ol>
+        </div>
+
+        <div>
+          <div class="col-h">
+            <h2>参与者</h2>
+            <span class="hint">匿名代号</span>
+          </div>
+          <ul class="credits">
+            <li><span class="code">潮汐-3F</span><span class="at">第 1 段</span></li>
+            <li><span class="code">暗礁-91</span><span class="at">第 3 段</span></li>
+            <li><span class="code">浮标-2C</span><span class="at">第 4 段</span></li>
+          </ul>
+          <div class="mixbox">
+            <h2>混音导出计划</h2>
+            <p>四段按序拼成纯人声版本，缺口留成静音。</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="transport">
+        <div class="now">
+          <p class="cat">正在听</p>
+          <p class="line" id="now-playing"><b>第 3 段</b><span>暗礁-91</span></p>
+        </div>
+        <span class="tie"></span>
+        <!-- 播放源在运行时由 segmentAudioUrl(选中段) 绑定；自定义控件就是上面那条沟槽 -->
+        <audio id="sea-master" preload="metadata" aria-labelledby="now-playing"></audio>
+        <div class="readout">
+          <p class="time">00:20<span class="of"> / 00:51</span></p>
+          <p class="votes"><span>赞 3</span><i></i><span>踩 0</span></p>
+          <button class="ctrl" type="button">
+            <svg width="11" height="13" viewBox="0 0 11 13" aria-hidden="true">
+              <rect x="0" y="0" width="4" height="13" fill="currentColor"></rect>
+              <rect x="7" y="0" width="4" height="13" fill="currentColor"></rect>
+            </svg>
+            暂停
+          </button>
+        </div>
+      </div>
+
+      <div class="rig" aria-hidden="true">
+        <span class="arm"></span>
+        <span class="pivot"></span>
+        <span class="lift"></span>
+        <span class="shell"></span>
+        <span class="stylus"></span>
+        <span class="tip"></span>
+      </div>
+    </main>
+
+    <footer><span class="etch">MDB-0001-A</span></footer>
+  </body>
+</html>

@@ -1,0 +1,371 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <title>P · 漂流瓶详情（录制 + 接力）</title>
+    <style>
+      @import url('/node_modules/.pnpm/lxgw-wenkai-webfont@1.7.0/node_modules/lxgw-wenkai-webfont/lxgwwenkai-regular.css');
+      @import url('/node_modules/.pnpm/lxgw-wenkai-webfont@1.7.0/node_modules/lxgw-wenkai-webfont/lxgwwenkai-bold.css');
+      @import url('/node_modules/.pnpm/@fontsource+quattrocento@5.3.0/node_modules/@fontsource/quattrocento/400.css');
+      @import url('/node_modules/.pnpm/@fontsource+quattrocento@5.3.0/node_modules/@fontsource/quattrocento/700.css');
+      :root {
+        --ink:#050f14; --paper:#f3f9fa; --muted:#a9c7cf; --glass:#7fd1d9;
+        --coral:#c7452c; --warm:#f6d79a; --line:rgba(243,249,250,.13);
+      }
+      * { box-sizing:border-box; margin:0; padding:0; }
+      html,body { width:1440px; height:900px; }
+      html { overflow:hidden; }
+      body { position:relative; overflow:hidden; background:var(--ink); color:var(--paper);
+        font-family:'LXGW WenKai',serif; -webkit-font-smoothing:antialiased; }
+      /* 数字与元信息走 Quattrocento；CJK 落回 LXGW WenKai，不落系统衬线 */
+      .mono { font-family:Quattrocento,'LXGW WenKai',serif; font-variant-numeric:tabular-nums; }
+      a, button { cursor:pointer; }
+      button { font-family:inherit; }
+      .clip { position:absolute; inset:0; overflow:hidden; }
+      .platter { position:absolute; inset:0;
+        background:
+          repeating-radial-gradient(circle at 1420px 960px, rgba(216,243,246,.055) 0 1.2px, rgba(216,243,246,0) 1.2px 6.5px),
+          radial-gradient(circle at 1420px 960px, rgba(127,209,217,.05) 0 30%, rgba(127,209,217,0) 68%); }
+      .glint { position:absolute; inset:0; mix-blend-mode:screen;
+        background:linear-gradient(101deg, rgba(228,247,252,0) 28%, rgba(228,247,252,.045) 45%, rgba(228,247,252,.065) 50%, rgba(228,247,252,.028) 55%, rgba(228,247,252,0) 72%); }
+      /* 空槽是这一页唯一的光源：刻录头正停在它正上方 */
+      .ember { position:absolute; inset:0;
+        background:radial-gradient(420px 300px at 1244px 336px, rgba(246,215,154,.05), rgba(246,215,154,0) 72%); }
+
+      main { position:absolute; inset:0; z-index:2; }
+
+      /* -- 顶栏 ----------------------------------------------- */
+      .crumb { position:absolute; left:76px; top:34px; height:26px; display:flex; align-items:center; gap:16px; }
+      .back { display:inline-flex; align-items:center; gap:7px; font-size:14px; color:var(--glass);
+        text-decoration:underline; text-underline-offset:4px; }
+      .back svg { width:15px; height:15px; }
+      .pill { font-size:12.5px; letter-spacing:.08em; color:var(--coral);
+        border:1px solid rgba(199,69,44,.55); border-radius:2px; padding:3px 10px 4px; }
+
+      h1 { position:absolute; left:76px; top:68px; font-size:56px; font-weight:700; line-height:1; }
+      .work { position:absolute; left:76px; top:142px; font-size:19px; font-weight:700; }
+      .metaRow { position:absolute; left:76px; top:174px; display:flex; gap:20px; font-size:14px; color:var(--muted); }
+      .note { position:absolute; left:76px; top:206px; width:820px; display:flex; gap:11px;
+        font-size:14.5px; line-height:1.8; color:var(--warm); }
+      .note i { flex:none; width:5px; height:5px; margin-top:9px; background:var(--coral); }
+
+      /* 发起者徽记 = 这枚标就是「谁起的头」 */
+      .maker { position:absolute; left:604px; top:136px; display:flex; align-items:center; gap:16px; }
+      .maker .k { font-size:11px; letter-spacing:.24em; color:rgba(243,249,250,.5); }
+      .maker .v { margin-top:6px; font-size:14.5px; }
+      .seal { flex:none; width:56px; height:56px; border-radius:50%; border:1px solid rgba(199,69,44,.62);
+        background:radial-gradient(76% 76% at 34% 26%, rgba(10,48,60,.5), rgba(3,17,23,.78));
+        display:grid; place-items:center; }
+      .seal i { width:44px; height:44px; border-radius:50%; border:1px solid rgba(243,249,250,.16);
+        display:grid; place-items:center; }
+      .seal i b { width:9px; height:9px; border-radius:50%; background:var(--coral); }
+
+      /* -- 母版刻录面：一条被拉直的唱片，两侧出血 --------------- */
+      .plateLab { position:absolute; left:76px; top:242px; font-size:11px; letter-spacing:.18em;
+        color:rgba(243,249,250,.5); }
+      .master { position:absolute; left:0; top:272px; width:1440px; height:284px; overflow:hidden;
+        border-top:1px solid rgba(228,247,252,.4); border-bottom:1px solid rgba(243,249,250,.16);
+        background:
+          repeating-linear-gradient(90deg, rgba(216,243,246,.115) 0 1px, rgba(216,243,246,0) 1px 2.6px),
+          repeating-linear-gradient(90deg, rgba(228,247,252,.055) 0 1px, rgba(228,247,252,0) 1px 13px); }
+      /* 盘身弧度的掠光：中间偏上一条亮带 */
+      .fall { position:absolute; inset:0; background:linear-gradient(180deg,
+        rgba(5,15,20,.46) 0%, rgba(228,247,252,.028) 28%, rgba(228,247,252,.05) 45%,
+        rgba(5,15,20,.07) 68%, rgba(5,15,20,.52) 100%); }
+      /* 没被刻过的光面：同一张漆面，只是还没有沟槽 */
+      .cut { position:absolute; left:1080px; top:0; width:360px; height:284px;
+        background:
+          repeating-linear-gradient(90deg, rgba(216,243,246,.03) 0 1px, rgba(216,243,246,0) 1px 2.6px),
+          radial-gradient(150% 130% at 22% 8%, rgba(246,215,154,.085), rgba(4,12,17,1) 58%); }
+      .cutEdge { position:absolute; left:1080px; top:0; width:1px; height:284px; background:rgba(246,215,154,.5); }
+      .sheen { position:absolute; inset:0;
+        background:linear-gradient(101deg, rgba(228,247,252,0) 30%, rgba(228,247,252,.05) 47%, rgba(228,247,252,.078) 52%, rgba(228,247,252,0) 68%); }
+      .gridrule { position:absolute; top:258px; width:1px; height:312px; background:rgba(243,249,250,.16); }
+      .big { position:absolute; font-size:28px; color:rgba(243,249,250,.15); }
+      .segLab { position:absolute; font-size:11px; letter-spacing:.24em; }
+      .segLab.done { color:rgba(243,249,250,.5); }
+      .segLab.sel { color:var(--coral); }
+      .segLab.off { color:rgba(246,215,154,.85); }
+      .cap { position:absolute; }
+      .code { font-size:14.5px; }
+      .line { margin-top:8px; display:flex; align-items:baseline; gap:16px; }
+      .dur { font-size:12.5px; color:var(--muted); }
+      .counts { display:flex; gap:12px; font-size:12px; color:rgba(169,199,207,.85); }
+      .listen { display:inline-block; margin-top:11px; font-size:13px; color:var(--glass);
+        text-decoration:underline; text-underline-offset:4px; }
+
+      /* 正在试听的那一段：母版下缘一道珊瑚刻度 */
+      .selMark { position:absolute; left:720px; top:548px; width:360px; height:2px; background:var(--coral); }
+
+      /* 刻录头：从画面外的支点斜伸进来，针尖停在空槽正上方 */
+      .arm { position:absolute; left:1208px; top:76px; width:236px; height:206px; }
+      .cutter { position:absolute; left:1233px; top:274px; width:54px; height:82px; }
+      .cutter .bar { position:absolute; left:0; top:0; width:54px; height:7px;
+        border:1px solid rgba(228,247,252,.34); background:rgba(243,249,250,.05); }
+      .cutter .stem { position:absolute; left:25px; top:7px; width:4px; height:36px; background:rgba(228,247,252,.26); }
+      .cutter .head { position:absolute; left:6px; top:43px; width:42px; height:24px;
+        border:1px solid rgba(228,247,252,.42);
+        background:linear-gradient(180deg, rgba(243,249,250,.09), rgba(5,15,20,.6)); }
+      .cutter .tip { position:absolute; left:22px; top:67px; width:0; height:0;
+        border-left:5px solid transparent; border-right:5px solid transparent;
+        border-top:11px solid rgba(228,247,252,.6); }
+      .contact { position:absolute; left:1256px; top:354px; width:8px; height:8px; border-radius:50%; background:var(--coral); }
+      /* 空槽：一段还没落刀的沟槽道 */
+      .slot { position:absolute; left:1148px; top:364px; width:224px; height:24px;
+        border:1px dashed rgba(246,215,154,.4); }
+      .slotLab { position:absolute; left:1148px; top:396px; width:224px; text-align:center;
+        padding-left:.24em; font-size:11px; letter-spacing:.24em; color:var(--warm); }
+      .segment { position:absolute; left:1110px; top:420px; width:300px; text-align:center; }
+      .segment .q { font-size:15px; }
+      .cta { display:inline-flex; align-items:center; gap:9px; margin-top:8px; height:44px; padding:0 22px;
+        border:0; border-radius:2px; background:var(--coral); color:var(--paper); font-size:15px; }
+      .cta svg { width:17px; height:17px; }
+      .slotNote { margin-top:12px; font-size:12px; line-height:1.7; color:var(--muted); }
+
+      /* 刻度轨 = 「已录 3 / 4 段」的几何说法 */
+      .rail { position:absolute; left:0; top:566px; width:1440px; height:2px; background:rgba(243,249,250,.14); }
+      .railRec { position:absolute; left:0; top:0; width:1080px; height:2px; background:var(--glass); }
+      .railGap { position:absolute; left:1080px; top:0; width:360px; height:2px;
+        background:repeating-linear-gradient(90deg, rgba(246,215,154,.75) 0 5px, rgba(246,215,154,0) 5px 11px); }
+      .railLab { position:absolute; top:574px; font-size:11px; letter-spacing:.20em; }
+      .railLab.a { left:76px; color:rgba(127,209,217,.85); }
+      .railLab.b { left:1088px; color:rgba(246,215,154,.85); }
+
+      /* -- 下半：听 / 投 -------------------------------------- */
+      .split { position:absolute; left:730px; top:600px; width:1px; height:246px; background:rgba(243,249,250,.09); }
+      .col h2 { font-size:17px; font-weight:700; }
+      .col .sub { margin-top:6px; display:flex; gap:16px; font-size:13.5px; color:var(--muted); }
+      .listenCol { position:absolute; left:76px; top:596px; width:624px; }
+      .destCol { position:absolute; left:744px; top:596px; width:620px; }
+
+      .transport { margin-top:26px; display:flex; align-items:center; gap:16px; }
+      .playBtn { flex:none; width:36px; height:36px; border-radius:50%; border:1px solid rgba(127,209,217,.55);
+        background:rgba(5,15,20,0); display:grid; place-items:center; }
+      .playBtn svg { width:13px; height:13px; }
+      .groove { position:relative; width:468px; height:22px;
+        border-top:1px solid rgba(243,249,250,.1); border-bottom:1px solid rgba(243,249,250,.1);
+        background:repeating-linear-gradient(90deg, rgba(216,243,246,.09) 0 1px, rgba(216,243,246,0) 1px 4.4px); }
+      .played { position:absolute; left:0; top:0; width:178px; height:22px; background:rgba(127,209,217,.18); }
+      .head { position:absolute; left:176px; top:-9px; width:2px; height:40px; background:var(--coral); }
+      .votes { margin-top:18px; display:flex; align-items:center; gap:12px; }
+      .voteBtn { display:inline-flex; align-items:center; gap:8px; height:36px; padding:0 15px;
+        border:1px solid rgba(127,209,217,.42); border-radius:2px; background:rgba(5,15,20,0);
+        color:var(--paper); font-size:14px; }
+      .voteBtn svg { width:15px; height:15px; }
+      .voteBtn .n { font-size:13px; color:var(--muted); }
+      .votesNote { margin-top:12px; font-size:12.5px; color:var(--muted); }
+
+      .destRow { display:flex; gap:18px; width:100%; margin-top:16px; height:54px; padding:0;
+        border:0; background:rgba(5,15,20,0); color:inherit; text-align:left; }
+      .destRow .glyph { flex:none; width:44px; height:44px; margin-top:4px; }
+      .destRow .glyph svg { width:44px; height:44px; }
+      .destRow .txt { display:block; }
+      .destRow .t { display:block; font-size:16px; font-weight:700; }
+      .destRow .d { display:block; margin-top:5px; font-size:12.5px; line-height:1.5; color:var(--muted); }
+
+      /* -- 底栏 ----------------------------------------------- */
+      .bottomRule { position:absolute; left:76px; top:854px; width:1288px; height:1px; background:rgba(243,249,250,.1); }
+      .bottom { position:absolute; left:76px; top:864px; width:1288px; display:flex; align-items:center;
+        gap:22px; font-size:13px; color:var(--muted); }
+      .bottom .r { margin-left:auto; display:flex; align-items:center; gap:26px; }
+      .botLink { display:inline-flex; align-items:center; gap:7px; color:var(--muted);
+        text-decoration:underline; text-underline-offset:4px; }
+      .botLink svg { width:14px; height:14px; }
+      .journey { color:var(--glass); text-decoration:underline; text-underline-offset:4px; }
+    </style>
+  </head>
+  <body>
+    <div class="clip">
+      <div class="platter"></div>
+      <div class="ember"></div>
+      <div class="glint"></div>
+    </div>
+
+    <main>
+      <nav class="crumb">
+        <a class="back" href="#">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6" /></svg>
+          回河道
+        </a>
+        <span class="pill">有人持有</span>
+      </nav>
+
+      <h1>漂流瓶详情</h1>
+      <p class="work mono">占位曲目</p>
+      <p class="metaRow">
+        <span>已录 3 / 4 段</span>
+        <span>作品还不完整：缺第 4 段</span>
+      </p>
+
+      <p class="note"><i></i><span>缺口是歌里固定的段位，不会被别人的段顶替。成品里这段时间会留成静音。</span></p>
+
+      <div class="maker">
+        <div class="seal" role="img" aria-label="发起者徽记"><i><b></b></i></div>
+        <div>
+          <div class="k mono">发起者</div>
+          <div class="v mono">匿名歌手#042</div>
+        </div>
+      </div>
+
+      <!-- -- 母版刻录面（两侧出血：这是整张母版里被看见的一段） -- -->
+      <div class="plateLab mono">母版刻录面</div>
+
+      <div class="master">
+        <div class="cut"></div>
+        <div class="cutEdge"></div>
+        <div class="fall"></div>
+        <div class="sheen"></div>
+      </div>
+
+      <div class="gridrule" style="left:360px"></div>
+      <div class="gridrule" style="left:720px"></div>
+      <div class="gridrule" style="left:1080px"></div>
+
+      <!-- 第 1 段 -->
+      <div class="big mono" style="left:304px; top:278px">1</div>
+      <div class="segLab mono done" style="left:76px; top:288px">第 1 段</div>
+      <div class="cap" style="left:76px; top:446px">
+        <p class="code mono">匿名歌手#042</p>
+        <p class="line mono"><span class="dur">0:38</span><span class="counts"><span>赞 14</span><span>踩 1</span></span></p>
+        <a class="listen" href="#">听</a>
+      </div>
+
+      <!-- 第 2 段 -->
+      <div class="big mono" style="left:664px; top:278px">2</div>
+      <div class="segLab mono done" style="left:436px; top:288px">第 2 段</div>
+      <div class="cap" style="left:436px; top:446px">
+        <p class="code mono">匿名歌手#097</p>
+        <p class="line mono"><span class="dur">0:44</span><span class="counts"><span>赞 9</span><span>踩 0</span></span></p>
+        <a class="listen" href="#">听</a>
+      </div>
+
+      <!-- 第 3 段（正在试听） -->
+      <div class="selMark"></div>
+      <div class="big mono" style="left:1024px; top:278px; color:rgba(199,69,44,.3)">3</div>
+      <div class="segLab mono sel" style="left:796px; top:288px">第 3 段</div>
+      <div class="cap" style="left:796px; top:446px">
+        <p class="code mono">匿名歌手#118</p>
+        <p class="line mono"><span class="dur">0:42</span><span class="counts"><span>赞 8</span><span>踩 1</span></span></p>
+        <a class="listen" href="#">听</a>
+      </div>
+
+      <!-- 第 4 段：空槽 + 录制入口 -->
+      <div class="big mono" style="left:1384px; top:278px; color:rgba(246,215,154,.3)">4</div>
+      <div class="segLab mono off" style="left:1156px; top:288px">第 4 段</div>
+
+      <svg class="arm" viewBox="0 0 236 206" fill="none" aria-hidden="true">
+        <circle cx="230" cy="14" r="25" stroke="rgba(228,247,252,.26)" stroke-width="1.2" />
+        <circle cx="230" cy="14" r="9" stroke="rgba(228,247,252,.2)" stroke-width="1.2" />
+        <path d="M226 32 52 196" stroke="rgba(228,247,252,.3)" stroke-width="3" stroke-linecap="round" />
+        <path d="M214 44 44 200" stroke="rgba(228,247,252,.1)" stroke-width="1" stroke-linecap="round" />
+      </svg>
+
+      <div class="cutter" aria-hidden="true">
+        <div class="bar"></div><div class="stem"></div><div class="head"></div><div class="tip"></div>
+      </div>
+      <div class="contact" aria-hidden="true"></div>
+      <div class="slot" aria-hidden="true"></div>
+      <div class="slotLab mono">空槽</div>
+
+      <div class="segment">
+        <p class="q">第 4 段由你开第一句</p>
+        <button class="cta" type="button">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z" /><path d="M19 10v1a7 7 0 0 1-14 0v-1" /><line x1="12" y1="19" x2="12" y2="22" /></svg>
+          录第 4 段
+        </button>
+        <p class="slotNote">这一段按该段的固定时长录，录完再选去向。<br />不点开就不会占用你的麦克风。</p>
+      </div>
+
+      <!-- 刻度轨 -->
+      <div class="rail">
+        <div class="railRec"></div>
+        <div class="railGap"></div>
+      </div>
+      <div class="railLab mono a">刻痕</div>
+      <div class="railLab mono b">空槽</div>
+
+      <!-- -- 试听与投票 ------------------------------------- -->
+      <div class="listenCol col">
+        <h2>试听与投票</h2>
+        <p class="sub mono">
+          <span>第 3 段</span><span>匿名歌手#118</span><span>在上面点「听」换段</span>
+        </p>
+        <div class="transport">
+          <button class="playBtn" type="button" aria-label="播放第 3 段">
+            <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M6 4l14 8-14 8z" /></svg>
+          </button>
+          <div class="groove" role="img" aria-label="第 3 段播放进度 0:16 / 0:42">
+            <div class="played"></div>
+            <div class="head"></div>
+          </div>
+          <span class="timecode mono">0:16 / 0:42</span>
+        </div>
+        <div class="votes">
+          <button class="voteBtn" type="button">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 10v12" /><path d="M15 5.88 14 10h5.83a2 2 0 0 1 1.92 2.56l-2.33 8A2 2 0 0 1 17.5 22H4a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2h2.76a2 2 0 0 0 1.79-1.11L12 2a3.13 3.13 0 0 1 3 3.88Z" /></svg>
+            赞<span class="n mono">8</span>
+          </button>
+          <button class="voteBtn" type="button">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17 14V2" /><path d="M9 18.12 10 14H4.17a2 2 0 0 1-1.92-2.56l2.33-8A2 2 0 0 1 6.5 2H20a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-2.76a2 2 0 0 0-1.79 1.11L12 22a3.13 3.13 0 0 1-3-3.88Z" /></svg>
+            踩<span class="n mono">1</span>
+          </button>
+        </div>
+        <p class="votesNote">还没有听满这一段，继续听一会儿再点踩吧。</p>
+      </div>
+
+      <div class="split"></div>
+
+      <!-- -- 选择去向：同一条沟槽的三种下一步 ----------------- -->
+      <div class="destCol col">
+        <h2>选择去向</h2>
+        <p class="sub"><span>接下来决定它去哪。</span></p>
+
+        <button class="destRow" type="button">
+          <span class="glyph" aria-hidden="true">
+            <svg viewBox="0 0 44 44" fill="none" stroke="rgba(127,209,217,.8)" stroke-width="1.6" stroke-linecap="round"><path d="M2 16h40" /><path d="M2 28h40" /><path d="M30 10v24" stroke-opacity=".55" /></svg>
+          </span>
+          <span class="txt">
+            <span class="t">继续投河</span>
+            <span class="d">把当前版本重新投进河道，交给下一位陌生人接下一棒。</span>
+          </span>
+        </button>
+
+        <button class="destRow" type="button">
+          <span class="glyph" aria-hidden="true">
+            <svg viewBox="0 0 44 44" fill="none" stroke="rgba(127,209,217,.8)" stroke-width="1.6" stroke-linecap="round"><path d="M42 11H15a11 11 0 0 0 0 22h27" /></svg>
+          </span>
+          <span class="txt">
+            <span class="t">回传</span>
+            <span class="d">沿父链把当前版本交回投给你的那个人，由他决定下一步。</span>
+          </span>
+        </button>
+
+        <button class="destRow" type="button">
+          <span class="glyph" aria-hidden="true">
+            <svg viewBox="0 0 44 44" fill="none" stroke="rgba(127,209,217,.8)" stroke-width="1.6" stroke-linecap="round"><path d="M2 22h14" /><path d="M16 22 42 7" /><path d="M16 22h26" /><path d="M16 22 42 37" /></svg>
+          </span>
+          <span class="txt">
+            <span class="t">入海</span>
+            <span class="d">把当下的版本送进公海，成为所有人都能听到的公共作品。</span>
+          </span>
+        </button>
+      </div>
+
+      <div class="bottomRule"></div>
+      <div class="bottom">
+        <a class="journey" href="#">看这只瓶子的漂流日志</a>
+        <span>捞取 / 录音 / 投河 / 回传 / 入海 全部记在服务端。</span>
+        <span class="r">
+          <a class="botLink" href="#">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" /></svg>
+            私密留言
+          </a>
+          <a class="botLink" href="#">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z" /><line x1="4" y1="22" x2="4" y2="15" /></svg>
+            举报（进人工队列，不是自动删除）
+          </a>
+        </span>
+      </div>
+    </main>
+  </body>
+</html>
