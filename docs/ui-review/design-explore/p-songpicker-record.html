@@ -56,8 +56,9 @@
       .rack { position:absolute; inset:0; z-index:3; list-style:none; }
       .bay { position:absolute; top:366px; width:246px; height:534px; }
       .edge { position:absolute; left:0; top:0; width:246px; height:58px;
-        border-top:1px solid rgba(243,249,250,.28);
-        background:linear-gradient(180deg, rgba(243,249,250,.075), rgba(243,249,250,0)); }
+        background:
+          linear-gradient(90deg, rgba(243,249,250,.34), rgba(243,249,250,.05)) 0 0 / 100% 1px no-repeat,
+          linear-gradient(180deg, rgba(243,249,250,.075), rgba(243,249,250,0)); }
       .song { position:absolute; left:12px; top:11px; font-size:17px; font-weight:700; line-height:1.2; }
       .meta { position:absolute; left:12px; font-size:11.5px; color:rgba(169,199,207,.92); }
       .m1 { top:38px; }
@@ -91,16 +92,17 @@
           </radialGradient>
           <linearGradient id="water" x1="0" y1="552" x2="0" y2="900" gradientUnits="userSpaceOnUse">
             <stop offset="0" stop-color="#7fd1d9" stop-opacity=".3" />
-            <stop offset=".2" stop-color="#7fd1d9" stop-opacity=".16" />
-            <stop offset=".5" stop-color="#0a3a48" stop-opacity=".3" />
-            <stop offset="1" stop-color="#031117" stop-opacity=".62" />
+            <stop offset=".18" stop-color="#7fd1d9" stop-opacity=".15" />
+            <stop offset=".45" stop-color="#0a3a48" stop-opacity=".26" />
+            <stop offset=".72" stop-color="#031117" stop-opacity=".52" />
+            <stop offset="1" stop-color="#031117" stop-opacity=".85" />
           </linearGradient>
           <linearGradient id="shallow" x1="0" y1="830" x2="0" y2="900" gradientUnits="userSpaceOnUse">
             <stop offset="0" stop-color="#7fd1d9" stop-opacity=".11" />
             <stop offset="1" stop-color="#031117" stop-opacity=".56" />
           </linearGradient>
-          <linearGradient id="skin" x1="0" y1="552" x2="0" y2="690" gradientUnits="userSpaceOnUse">
-            <stop offset="0" stop-color="#cbeef6" stop-opacity=".09" />
+          <linearGradient id="skin" x1="0" y1="552" x2="0" y2="660" gradientUnits="userSpaceOnUse">
+            <stop offset="0" stop-color="#cbeef6" stop-opacity=".05" />
             <stop offset="1" stop-color="#cbeef6" stop-opacity="0" />
           </linearGradient>
           <linearGradient id="shaft" x1="0" y1="0" x2="1" y2="0">
@@ -114,11 +116,12 @@
           <!-- 一张母版：最外那道沟 = 第 1 段（你先录），往圆心内推 = 后面三段 -->
           <g id="wax">
             <circle r="106" fill="url(#lacquer)" stroke="rgba(228,249,252,.34)" />
-            <path d="M-100 -34 A 106 106 0 0 0 -91 55" stroke="rgba(203,238,246,.55)" stroke-width="1.1" />
-            <circle r="96" stroke="rgba(212,85,58,.52)" stroke-width="1.2" />
-            <circle r="80" stroke="rgba(243,249,250,.15)" />
-            <circle r="64" stroke="rgba(243,249,250,.15)" />
-            <circle r="48" stroke="rgba(243,249,250,.15)" />
+            <path d="M-100 -34 A 106 106 0 0 0 -91 55" stroke="rgba(203,238,246,.5)" stroke-width="1.1" />
+            <circle r="96" stroke="rgba(212,85,58,.34)" stroke-width="1.2" />
+            <circle r="80" stroke="rgba(243,249,250,.18)" />
+            <circle r="64" stroke="rgba(243,249,250,.18)" />
+            <circle r="48" stroke="rgba(243,249,250,.18)" />
+            <path d="M-20 -94 A 96 96 0 0 1 20 -94" stroke="rgba(212,85,58,.9)" stroke-width="2" />
             <circle r="30" fill="rgba(243,249,250,.02)" stroke="rgba(243,249,250,.13)" />
             <circle r="4" fill="#031117" stroke="rgba(228,249,252,.3)" />
           </g>
@@ -133,27 +136,27 @@
 
         <!-- 水面之上：盘面是干净的 -->
         <g clip-path="url(#air)">
-          <use href="#wax" x="199" y="618" />
-          <use href="#wax" x="720" y="624" />
-          <use href="#wax" x="980.5" y="614" />
-          <use href="#wax" x="1241" y="620" />
+          <use href="#wax" x="199" y="606" />
+          <use href="#wax" x="720" y="612" />
+          <use href="#wax" x="980.5" y="602" />
+          <use href="#wax" x="1241" y="608" />
         </g>
         <!-- 水面之下：同一张盘，被水挪了 4px、压暗 —— 这是"落在水里"那句的图形 -->
-        <g clip-path="url(#sunk)" opacity=".62">
+        <g clip-path="url(#sunk)" opacity=".72">
           <g transform="translate(0 4)">
-            <use href="#wax" x="199" y="618" />
-            <use href="#wax" x="720" y="624" />
-            <use href="#wax" x="980.5" y="614" />
-            <use href="#wax" x="1241" y="620" />
+            <use href="#wax" x="199" y="606" />
+            <use href="#wax" x="720" y="612" />
+            <use href="#wax" x="980.5" y="602" />
+            <use href="#wax" x="1241" y="608" />
           </g>
         </g>
         <!-- 干槽里那张：完全在水面外，所以它最亮、最清楚 -->
-        <use href="#waxBlank" x="459.5" y="618" />
+        <use href="#waxBlank" x="459.5" y="606" />
 
         <!-- 水：一整片，只在第 2 格塌成 278px 的水位差 -->
         <path d="M0 552 C90 544 270 560 336.5 556 V900 H582.5 V556 C640 548 760 562 942.5 552 C1032 546 1212 560 1302.5 552 C1350 548 1410 558 1440 554 V900 H0 Z"
           fill="url(#water)" />
-        <path d="M1000 552 L1440 552 L1240 900 L820 900 Z" fill="url(#shaft)" />
+        <path d="M900 552 L1440 552 L1260 900 L660 900 Z" fill="url(#shaft)" />
         <path d="M0 552 C90 544 270 560 336.5 556 V900 H1440 V554 C1410 558 1350 548 1302.5 552 C1212 560 1032 546 942.5 552 C760 562 640 548 582.5 556 V900 H0 Z"
           fill="url(#skin)" opacity=".9" />
 
@@ -165,12 +168,16 @@
         <path d="M575 646 V662" stroke="rgba(203,238,246,.22)" />
 
         <!-- 水与空气的交线（水波，不是一条直尺） -->
-        <path d="M0 552 C90 544 270 560 336.5 556" stroke="rgba(228,247,252,.42)" stroke-width="1.1" />
+        <path d="M0 552 C90 544 270 560 336.5 556" stroke="rgba(228,247,252,.55)" stroke-width="1.1" />
         <path d="M582.5 556 C640 548 760 562 942.5 552 C1032 546 1212 560 1302.5 552 C1350 548 1410 558 1440 554"
-          stroke="rgba(228,247,252,.42)" stroke-width="1.1" />
+          stroke="rgba(228,247,252,.55)" stroke-width="1.1" />
         <path d="M336.5 830 C400 826 520 834 582.5 830" stroke="rgba(228,247,252,.32)" />
-        <path d="M0 620 H336.5" stroke="rgba(203,238,246,.07)" />
-        <path d="M582.5 700 H1440" stroke="rgba(203,238,246,.05)" />
+        <!-- 干槽口那道虚线：水本该漫到这里 -->
+        <path d="M336.5 556 H582.5" stroke="rgba(243,249,250,.16)" stroke-dasharray="2 6" />
+        <path d="M20 616 Q168 606 316 618" stroke="rgba(203,238,246,.08)" />
+        <path d="M620 700 Q800 688 980 702" stroke="rgba(203,238,246,.07)" />
+        <path d="M120 782 Q260 774 400 784" stroke="rgba(203,238,246,.06)" />
+        <path d="M1040 764 Q1220 752 1400 766" stroke="rgba(203,238,246,.06)" />
 
         <!-- 气泡：稀疏，只在水里 -->
         <circle cx="150" cy="806" r="2.4" fill="rgba(228,247,252,.3)" />
@@ -224,7 +231,7 @@
       </li>
 
       <li class="bay" style="left:336.5px">
-        <span class="edge"></span>
+        <span class="edge" style="top:6px"></span>
         <p class="song">占位曲目 · 二</p>
         <p class="meta m1">未切分</p>
         <p class="meta m2">来源 incompetech-cc-by-4.0</p>
@@ -233,7 +240,7 @@
       </li>
 
       <li class="bay" style="left:597px">
-        <span class="edge"></span>
+        <span class="edge" style="top:2px"></span>
         <p class="song">占位曲目 · 三</p>
         <p class="meta m1">4 段<span class="sep"></span>每段约 18 秒</p>
         <p class="meta m2">来源 incompetech-cc-by-4.0</p>
@@ -246,7 +253,7 @@
       </li>
 
       <li class="bay" style="left:857.5px">
-        <span class="edge"></span>
+        <span class="edge" style="top:8px"></span>
         <p class="song">占位曲目 · 四</p>
         <p class="meta m1">4 段<span class="sep"></span>每段约 27 秒</p>
         <p class="meta m2">来源 incompetech-cc-by-4.0</p>
@@ -259,7 +266,7 @@
       </li>
 
       <li class="bay" style="left:1118px">
-        <span class="edge"></span>
+        <span class="edge" style="top:4px"></span>
         <p class="song">夜航</p>
         <p class="meta m1">4 段<span class="sep"></span>每段约 21 秒</p>
         <p class="meta m2">来源 incompetech-cc-by-4.0</p>
