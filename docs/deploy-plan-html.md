@@ -549,3 +549,41 @@ W4-b（`ced717a`）刚给公海详情加了「试听全部」与「赞/踩」。
 `probe-canvas-ab`（22/22 页面×尺寸**画布元素差异 0 个** —— A/B 反证落位改动与画布无关）· `probe-state-behavior`（16/16）·
 `tools/probe-fit.mjs`（0 项不达标）· `probe-text-collision`（诊断，见上表）。
 且**跑完后复算 hash 与交付基线一致**（`base.css d3c6d899…` / `dom.js 08cb49a4…` / `demo-nav.js` 未改）⇒ 判定跑在交付的那份字节上。
+
+---
+
+## 19. 设计稿目录的成批删除（18 处，可恢复）与处置决定
+
+**现象**（`git status --porcelain docs/ui-review/design-explore/` 实测，` D` ＝工作区已删、git 里还在）：
+```
+D  f4-d-dense.html / .png      （当初被淘汰的 4 个 f4 候选）
+D  f4-d-mid.html   / .png
+D  f4-d-soft.html  / .png
+D  f4-d-sparse.html/ .png
+D  g3-underwater.html / .png   （落选的 g3）
+D  p-sea-detail-record.html / .png  （用户要求删的那页）
+D  s1-sea-record.html / .png   （早期公海版本）
+D  s1-sea-water.html  / .png
+D  s2-admin-water.html/ .png   （早期审核台版本）
+```
+⇒ 正好是**归档/候选**那一整批，外加公海详情。**不是某个 agent 改坏的单个文件**，是有人成批清理归档。
+（同类事件本会话早先发生过一次：当时 7 个文件被删，我用 `git checkout HEAD --` 恢复过；这一次没有恢复。）
+
+### 19.1 处置：**不恢复**
+理由：① 用户的原文就是「删掉所有与公海详情有关的东西」⇒ 公海详情那两份**符合意图**；
+② 其余归档本就是过程产物，**历史在 git 里不会丢**（任一份都能 `git show` 取回）；
+③ 恢复会与用户的清理意图打架，且没有任何交付物依赖它们。
+
+### 19.2 那条 `site-guard` 红会随 W7 自动消失（**不需要恢复源文件**）
+`site-guard` 现在红在「发布副本 ≠ 设计源 / 缺源文件：`p-sea-detail-record.html`」—— 根因是 `sync-site.mjs` 的 `PAGES` 仍列着这一页，
+而它的设计源已被删。**W7 会把 `sea-detail` 从站点名单移除并删掉 `site/sea-detail.html` 与 `page-sea-detail.js`** ⇒
+`sync-site --check` 变成 **10 页 0 页不一致**、`site-guard` 回到「✓ 全部通过」，**不再需要那个源文件**。
+
+### 19.3 顺带记录：三个执行者都独立报了同一条工具缺陷（W7 负责修）
+`tools/sync-site.mjs` 在缺源文件时走 `continue`，**结尾仍打印「11 页，0 页不一致」** ⇒ 汇总口径会**掩盖缺源**，
+让人（和脚本）把红读成绿。W4-a、W3 都独立撞到并上报了这条，已写进 W7 的任务书。
+
+### 19.4 一条对所有后续验收者的硬要求（W3 提，我采纳）
+**评委前必须冻结 `site/app/**` 再跑一次 `node tools/walkthrough.mjs`。**
+原因：W3 写走查与复跑期间，`site/app/**` 一直在被并发修改（`page-bottle.js` 从 1035 行长到 1297 行、录音被搬到 `/bottle.html`、`fit.js` 两次被写）⇒
+**在会动的代码上跑出的绿，不能作为交付证据**。本会话已经因为"并发中取快照"吃过几次亏，这一条是同一类问题的正解。
