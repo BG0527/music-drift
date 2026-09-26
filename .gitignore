@@ -40,3 +40,8 @@ playwright-report/
 
 # 设计探索渲染器的运行时锁（并发跑 _shoot.mjs 时生成，不该入库）
 docs/ui-review/design-explore/.shoot.lock
+
+# 探索/实现期的临时产物（不许入库）
+.tmp-*
+_tmp*
+%SystemDrive%
