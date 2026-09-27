@@ -77,7 +77,7 @@ node tools/site-server.mjs --port=5173
 #     同源反代：/api/* 与 /healthz → http://127.0.0.1:8787
 ```
 
-浏览器打开 `http://localhost:5173/`（会 302 到 `/river.html`）。右下角有**默认收起**的「演示导航」按钮，展开可跳 11 页。
+浏览器打开 `http://localhost:5173/`（会 302 到 `/river.html`）。右下角有**默认收起**的「站点导航」按钮，展开可跳 11 页。
 
 ### 2.6 造演示账号（W3；**评委进场前必须跑一次**）
 
@@ -230,8 +230,8 @@ curl.exe -s -i -c .tmp-w0-cookies.txt -X POST http://127.0.0.1:5173/api/auth/log
 | `api.js` | `get(path, opts)` / `post(path, body, opts)` / `del(path, opts)` / `request(method, path, opts)` / `ApiError` / `loginUrl()` / `redirectToLogin()` / `sanitizeNextPath()` / `currentPathWithSearch()` | 成功返回解析后的 JSON（204 → `null`）；失败**抛** `ApiError`。`opts`：`{ query, headers, signal, redirectOn401 }`。`err.status` / `err.code` / `err.violations` / `err.message`（中文文案）/ `err.isServiceDown` |
 | `dom.js` | `q` `qa` `on` `show` `hide` `setVisible` `bind` `bindMany` `el` `toText` `ensureBaseStyles` `showState` `showLoading` `showEmpty` `showError` `showWaking` `clearState` `showRequestFailure` **`stateNode` `stateKind`** | **只用 textContent**；`bind('bottle.title', v)` 填所有 `[data-bind="bottle.title"]` 并返回命中数；`el(tag, {class,text,dataset,on,...}, children)` 是唯一建元素出口，不碰 `innerHTML`。**`stateNode({target})` / `stateKind({target})`（W3 新增，只加不减）**＝状态条的可测性查询口：返回此刻在 DOM 里的状态节点 / 状态名（`loading`｜`empty`｜`error`｜`waking`），没有状态时 `null`。为什么需要它：全局状态条在非错误态会按 `STATE_AUTO_HIDE_MS` 淡出并**从 DOM 移除**，测试用选择器去抓必然抢跑或扑空 |
 | `session.js` | `currentUser({refresh})` / `requireUser({redirect})` / `login(email,pwd)` / `register(handle,email,pwd)` / `logout()` / `cachedUser()` / `invalidateSession()` / `nextTarget(fallback)` | `currentUser()` 只给 user 或 `null`（401）；网络/5xx **抛** `ApiError`。`requireUser()` 未登录时自动跳 `/login.html?next=当前页` |
-| `demo-nav.js` | `mountDemoNav()` / `DEMO_PAGES` | 幂等；`page.js` 已自动挂载，一般不用手动调 |
-| `page.js` | `definePage({name, owner, endpoints, note, init})` | 注入样式 + 挂演示导航 + console 打本页端点 + `DOMContentLoaded` 后自动跑一次 `init()`。**接线完成信号（W3 新增）**：`init()` 全部 await 完之后写 `document.documentElement.dataset.pageReady = name` 与 `window.__pageReady = name`；`init()` 抛错则写 `dataset.pageError = name` 且**不**置 ready（原来的未捕获 rejection 语义不变） |
+| `top-nav.js` | `mountDemoNav()` / `TOP_NAV` | 幂等；`page.js` 已自动挂载，一般不用手动调 |
+| `page.js` | `definePage({name, owner, endpoints, note, init})` | 注入样式 + 挂站点导航 + console 打本页端点 + `DOMContentLoaded` 后自动跑一次 `init()`。**接线完成信号（W3 新增）**：`init()` 全部 await 完之后写 `document.documentElement.dataset.pageReady = name` 与 `window.__pageReady = name`；`init()` 抛错则写 `dataset.pageError = name` 且**不**置 ready（原来的未捕获 rejection 语义不变） |
 | `assets/base.css` | `.demo-nav*` `.app-state*` 与 `[hidden]` | **只服务共享层**；设计稿的七色 token/字体/构图一律没动 |
 
 典型页面写法（W1）：
@@ -283,7 +283,7 @@ node tools/probe-fit.mjs                                                    # �
 进场前提：§2 的 2.1 → 2.5 都起来了，且 2.6 跑过一次。
 
 > **站点重构进行中（W8 记录，2026-09-27 00:19 实测）**：`site/bottle.html` 已被删（作品详情并入
-> `/bottle.html?id=…`），但 `site/app/page-me.js`（收藏/作品两行的跳转）与 `site/app/demo-nav.js`（「公海详情」）
+> `/bottle.html?id=…`），但 `site/app/page-me.js`（收藏/作品两行的跳转）与 `site/app/top-nav.js`（「公海详情」）
 > 仍指向 `/bottle.html` ⇒ 这两条入口现在会落到 404 页；`tools/probe-fit.mjs` 的 `PAGES` 也还含
 > `sea-detail`（会报"没有就绪信号"）。同刻 `tools/site-guard.mjs` 报 `site/app/page-login.js 含 emoji`，
 > 且登录页把「账号」当 handle 提交 ⇒ `probe-fit`/`walkthrough` 用邮箱登录会收到 401 `INVALID_CREDENTIALS`
@@ -291,16 +291,16 @@ node tools/probe-fit.mjs                                                    # �
 
 | # | 怎么走 | 应该看到什么（判据） |
 | --- | --- | --- |
-| 0 | 浏览器打开 `http://localhost:5173/` | 自动到 `/river.html`；右下角（演示导航展开前）没有多余浮层 |
-| 1 | 点右上角「演示导航」→「登录 / 注册」 | 登录页；**注册** tab 三项（账号/用户名/密码）、**登录** tab 两项 |
+| 0 | 浏览器打开 `http://localhost:5173/` | 自动到 `/river.html`；右下角（站点导航展开前）没有多余浮层 |
+| 1 | 点右上角「站点导航」→「登录 / 注册」 | 登录页；**注册** tab 三项（账号/用户名/密码）、**登录** tab 两项 |
 | 2 | 切到「登录」，填 `demo@example.com` + `SeaDrift2026`，点「登录并进入」 | 进河道页；登录页底部那句话变成"你已经登录为「demo」" |
-| 3 | 「演示导航」→「我的漂流瓶」（`/me.html`） | **三块都不是空态**：<br>· 我参与过的漂流瓶 **≥2 格**（至少一格写"已入海 · 完整作品"、至少一格写"漂流中"或"已被接住"）<br>· 消息区 **≥1 条**，其中至少一条带「**未读**」小标与「标记已读」<br>· 我的收藏 **≥1 行**（可点「听《…》」）、我的徽章 **≥1 行**（"漂流参与者"） |
+| 3 | 「站点导航」→「我的漂流瓶」（`/me.html`） | **三块都不是空态**：<br>· 我参与过的漂流瓶 **≥2 格**（至少一格写"已入海 · 完整作品"、至少一格写"漂流中"或"已被接住"）<br>· 消息区 **≥1 条**，其中至少一条带「**未读**」小标与「标记已读」<br>· 我的收藏 **≥1 行**（可点「听《…》」）、我的徽章 **≥1 行**（"漂流参与者"） |
 | 4 | 在「我的」点那条**未读**通知右边的「标记已读」 | **不跳页**：该条的「未读」小标消失、时间戳变成"已读 YYYY/M/D HH:MM"；刷新页面后仍是已读 |
 | 5 | 点收藏那行的「听《…》」→ `/bottle.html` | 曲名、A1–A4 段链、`收藏` 是「已收藏」态；底部可试听 |
-| 6 | 演示导航 →「公海」（`/sea.html`） | 已完成区有作品（卡片有曲名、"已录 4 / 4 段"、「听这支作品」） |
-| 7 | 演示导航 →「河道」（`/river.html`）→ 点中间的「撒网」 | 若河道里有瓶子：跳到 `/bottle.html?id=…` 且"瓶塞 · 有人持有"；若空河道：给出服务端文案的空态（不是红字错误） |
+| 6 | 站点导航 →「公海」（`/sea.html`） | 已完成区有作品（卡片有曲名、"已录 4 / 4 段"、「听这支作品」） |
+| 7 | 站点导航 →「河道」（`/river.html`）→ 点中间的「撒网」 | 若河道里有瓶子：跳到 `/bottle.html?id=…` 且"瓶塞 · 有人持有"；若空河道：给出服务端文案的空态（不是红字错误） |
 | 8 | 任意瓶子页：点瓶身上的「听」、点赞/点踩、`私密留言`、`继续投河`/`回传`/`入海`、`放回海中`、`看这只瓶子的漂流日志` | 每个动作都有即时反馈（状态条/就地文案），不出现"点了没反应" |
-| 9 | 演示导航 →「设置」「审核台」「404」 | 设置页显示真账号与版本；审核台按角色显示（demo 是普通用户，处理按钮应禁用/不可用）；404 页正常 |
+| 9 | 站点导航 →「设置」「审核台」「404」 | 设置页显示真账号与版本；审核台按角色显示（demo 是普通用户，处理按钮应禁用/不可用）；404 页正常 |
 | 10 | 想自己完整跑一遍（不用手点） | `node tools/walkthrough.mjs` → 结尾 `结论：0 项不达标` |
 
 **退出登录**：设置页的「退出登录」；之后回到 `http://localhost:5173/` 会以未登录身份进河道（会被引导去登录页）。

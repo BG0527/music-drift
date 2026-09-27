@@ -82,8 +82,13 @@ html .bed.two {
 }
 
 /* ── 页眉与页签（在文档流里） ───────────────────────────────────────────── */
+/* W16：站点顶栏（固定高 `--top-nav-h`）占住视口顶部一条 ⇒ main 的顶内边距取
+ * `max(设计值, 顶栏高)`：1440 档设计值是 46px ⇒ 补到 48px（只补 2px）；
+ * 720 档设计值是 28.8px ⇒ 补到 48px（主体是列表，有富余）。
+ *（`* { box-sizing:border-box }` ⇒ 内容盒自己短那一条，不顶出视口。） */
 html main {
-  padding: clamp(28px, calc(46 * var(--u)), 46px) clamp(24px, calc(76 * var(--ux)), 76px) 0;
+  padding: max(clamp(28px, calc(46 * var(--u)), 46px), var(--top-nav-h, 44px))
+    clamp(24px, calc(76 * var(--ux)), 76px) 0;
 }
 
 html header h1 {

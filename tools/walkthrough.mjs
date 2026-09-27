@@ -10,6 +10,12 @@
  * ⚠️ W7 起流程变了（用户第 3 轮需求，`docs/deploy-plan-html.md` §17）：**公海详情页已删除**，
  * 公海的「听这支作品」直接跳 `/bottle.html?id=…`，那条时间轴复刻进了瓶子详情 ⇒ 第 8 步改在这里走。
  *
+ * ⚠️ W16b（用户第 4 轮 #4）：**顶部的「演示导航」浮钮已删除**，换成画面上部常显的顶栏
+ * （`site/app/top-nav.js`，4 项：河道 / 公海 / 我的 / 设置）。本脚本原本**没有任何**
+ * demo-nav 选择器或断言（改前 grep `demo-nav|演示导航` 命中 0）⇒ **32 项语义一字未动**；
+ * 只把第 8 步从 `/drift-log.html` 去公海的 `page.goto` 换成**点顶栏那一项**（评委就是这么走的）
+ * ⇒ 顶栏的存在/可点/跳转从此也在走查里被真踩到，而不是只靠探针。
+ *
  * ⚠️ 与 W4-a 的接口面（本脚本按**当前**页面实现，页面改了要回来对一次）：
  *   - `/new.html` **不再录音**：只建一只 DRAFT 瓶并跳 `/bottle.html?id=…`（"选这首，去接唱"）；
  *   - 录制入口只剩 `/bottle.html` 的 `.gapBox .cta`，**录满曲库预设自动停并自动上传**；
@@ -561,8 +567,11 @@ async function main() {
     );
 
     // ─────────────────────────────────────────────────────────── 8. 公海 →「听这支作品」→ 瓶子详情
-    step('8. 公海（/sea.html）→ 点「听这支作品」→ 瓶子详情（/bottle.html?id=…）');
-    await relay.page.goto(`${BASE}/sea.html`);
+    step('8. 公海（点**顶栏**的「公海」）→ 点「听这支作品」→ 瓶子详情（/bottle.html?id=…）');
+    await Promise.all([
+      relay.page.waitForURL(/\/sea\.html$/, { timeout: 20000 }),
+      relay.page.locator('#site-topnav a[href="/sea.html"]').click({ timeout: 20000 }),
+    ]);
     await relay.page.waitForFunction(() => document.documentElement.dataset.pageReady === 'sea');
     await relay.page.waitForSelector('main > ul.fleet > li', { timeout: 15000 });
     const seaInfo = await relay.page.evaluate(() => {

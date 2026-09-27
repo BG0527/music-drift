@@ -43,14 +43,20 @@ body {
 }
 
 /* ── 外框：标题区 / 右上计数 / 页脚 ───────────────────────────────────── */
+/* W16b：给站点顶栏让位（`site/app/top-nav.js`，固定高 `--top-nav-h`）。
+ * 这两块的顶距是 `clamp(28px, 7.8dvh, 88px)`：视口高 ≥ 565px 时本来就高于 44px
+ * （1280×720 = 56.16px，**一像素都不动**），再矮就会被顶栏压住 ——
+ * 实测 1280×560：`p.cat` 相交 239px²、两处 `span.n` 各 13px²；1280×400：9348 / 524 / 524px²。
+ * 所以取 `max(设计值, 顶栏高)`：**只补"缺的那一条"**，与另外 9 个补丁同一写法。
+ * 两块必须一起动（标题与计数在定稿里同高，只挪一块会错行）。 */
 header {
   left: 5.28%;
-  top: clamp(28px, 7.8dvh, 88px);
+  top: max(clamp(28px, 7.8dvh, 88px), var(--top-nav-h, 44px));
 }
 
 .tally {
   right: 5.28%;
-  top: clamp(28px, 7.8dvh, 88px);
+  top: max(clamp(28px, 7.8dvh, 88px), var(--top-nav-h, 44px));
 }
 
 footer {

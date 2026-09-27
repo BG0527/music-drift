@@ -107,27 +107,38 @@ svg.rings {
   height: calc(900 * var(--u));
 }
 
-/* ── 二、前台外框：顶栏 / 页头 / 分区 / 页脚贴视口 ───────────────────────── */
+/* ── 二、前台外框：顶栏 / 页头 / 分区 / 页脚贴视口 ─────────────────────────
+ * W16：站点顶栏（共享层，固定高 `--top-nav-h`）压住视口顶部一条 ⇒ 外框的**上半部**
+ *（`.topbar` / `.rule` / `.hero` / `.zones` 这四件）整体下移**同一段让位量**：
+ *   `--nav-reserve = max(0px, 顶栏高 − 本页顶栏那一格的设计顶距)` —— 只补"缺的那一条"，
+ *   1440 档缺 10.2px、720 档缺 17.8px。四件同进退 ⇒ 彼此的相对构图一点没变
+ *（只挪 `.topbar` 会撞进 h1）。
+ * 船队（`.col`，跨骑水线 540×--u）与页脚**不动** —— 水线与视口底边是它们自己的锚。
+ */
+:root {
+  --nav-reserve: max(0px, calc(var(--top-nav-h, 44px) - clamp(20px, 4.2dvh, 56px)));
+}
+
 .topbar {
   left: 6.11%;
   right: 6.11%;
-  top: clamp(20px, 4.2dvh, 56px);
+  top: calc(clamp(20px, 4.2dvh, 56px) + var(--nav-reserve));
 }
 
 .rule {
   left: 6.11%;
   right: 6.11%;
-  top: clamp(34px, 7.6dvh, 96px);
+  top: calc(clamp(34px, 7.6dvh, 96px) + var(--nav-reserve));
 }
 
 .hero {
   left: 6.11%;
-  top: 10.89%;
+  top: calc(10.89% + var(--nav-reserve));
 }
 
 .zones {
   right: 6.11%;
-  top: 10.89%;
+  top: calc(10.89% + var(--nav-reserve));
 }
 
 .foot {

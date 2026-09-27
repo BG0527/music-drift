@@ -322,9 +322,17 @@ html .wline > i:nth-child(5) { left: calc(1010 * var(--ux)) !important; top: -1p
 html .wline > i:nth-child(6) { left: calc(1300 * var(--ux)) !important; top: 1px !important; width: calc(18 * var(--ux)) !important; }
 
 /* ── 文字层：三块文字挂在纸与水线上 ──────────────────────────────────────── */
+/* W16b：两块**干区文字**给站点顶栏（固定高 `--top-nav-h`）让位。它们锚在 `92 * --u`：
+ * 视口高 ≥ 431px 时本来就高于 44px（1280×720 = 73.6px ⇒ 富余 30px，1440×900 = 92px，
+ * **一格不动**），再矮就会被顶栏压住 —— 实测 1280×400：`p.cat` 相交 1467px²、
+ * `h2.block` 相交 1056px²。所以取 `max(设计值, 顶栏高)`，与另外 9 个补丁同一写法。
+ * 注意**只补文字，不补折页**：`.leaf` 的顶边与"浸湿前沿"是锁死的
+ *（leaf.top 52·--u + leaf-wet.top 468·--u = 520·--u = `--wl`，实测接缝与水线相差 0px），
+ * 把纸整体下移会把折页的干湿分界从水线上撕开 —— 那比"矮窗口下 2.4px 纸边落在玻璃条后面"重得多。
+ * 纸与 `.platter`/`.air` 一样是**满幅底材**，和河道的水体同类：从玻璃条下面穿过去是对的。 */
 html .l-dry {
   left: calc(152 * var(--ux));
-  top: calc(92 * var(--u));
+  top: max(calc(92 * var(--u)), var(--top-nav-h, 44px));
   width: min(528px, calc(528 * var(--ux)));
 }
 
@@ -336,7 +344,7 @@ html .l-wet {
 
 html .r-dry {
   left: calc(760 * var(--ux));
-  top: calc(92 * var(--u));
+  top: max(calc(92 * var(--u)), var(--top-nav-h, 44px));
   width: min(380px, calc(380 * var(--ux)));
 }
 

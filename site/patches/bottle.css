@@ -73,40 +73,50 @@ svg.scene {
   height: calc(900 * var(--u));
 }
 
-/* ── 挂在场景上的字：横向用百分比（与 --u 在 ≥16:10 时等价），纵向按 --u 落在定稿的位置上 ── */
+/* ── 挂在场景上的字：横向用百分比（与 --u 在 ≥16:10 时等价），纵向按 --u 落在定稿的位置上 ──
+ * W16：站点顶栏（共享层，固定高 `--top-nav-h`）压住视口顶部一条 ⇒ **页头那一段整条下移**
+ * 同一段让位量 `--nav-reserve = max(0px, 顶栏高 − 面包屑的设计顶距 26u)`（只补缺的那一条：
+ * 1440 档 22px、720 档 24.9px）。这一段是"面包屑 / 大标题 / 作品名 / 元信息行 / 说明"叠成的
+ * 一列（26u → 184u），只挪上面一格就会撞进它下面那格 ⇒ 同进退；右侧 `.maker`（62u）是同一行的
+ * 另一半，跟着走。再往下的 `p.heroLab`（272u）与段位条（320u）**不动** —— 它们的锚是乐句刻度。
+ */
+:root {
+  --nav-reserve: max(0px, calc(var(--top-nav-h, 44px) - 26 * var(--u)));
+}
+
 /* 面包屑上移 4×--u（定稿 30 ⇒ 26）：h1 的字形内容盒是 1.32em、行盒只有 1em ⇒ 它会向上溢出
  * 0.16em（1440 档 = 9px），正好压到「回河道」的文字盒上 —— 墨迹探针实测 42px² 相交
  *（`docs/deploy-plan-html.md` §33）。上移 4×--u 后两盒不相交，且不动任何纵向坐标的读法。 */
 .crumb {
   left: 5.278%;
-  top: calc(26 * var(--u));
+  top: calc(26 * var(--u) + var(--nav-reserve));
 }
 
 h1 {
   left: 5.278%;
-  top: calc(60 * var(--u));
+  top: calc(60 * var(--u) + var(--nav-reserve));
   font-size: clamp(34px, 3.89vw, 76px);
 }
 
 .work {
   left: 5.278%;
-  top: calc(126 * var(--u));
+  top: calc(126 * var(--u) + var(--nav-reserve));
 }
 
 .metaRow {
   left: 5.278%;
-  top: calc(156 * var(--u));
+  top: calc(156 * var(--u) + var(--nav-reserve));
 }
 
 .note {
   left: 5.278%;
-  top: calc(184 * var(--u));
+  top: calc(184 * var(--u) + var(--nav-reserve));
   width: min(55.56%, 62vw);
 }
 
 .maker {
   right: 5.278%;
-  top: calc(62 * var(--u));
+  top: calc(62 * var(--u) + var(--nav-reserve));
 }
 
 .heroLab {

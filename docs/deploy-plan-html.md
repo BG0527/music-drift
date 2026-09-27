@@ -1738,3 +1738,143 @@ WARN  演示账号此刻没有「就地标记已读」类的未读消息（未�
 site-guard `✓ 全部通过`、probe-fit `0 项不达标`、walkthrough `PASS=32 FAIL=0`、
 W15 判据件 `15/15 通过`（含阳性对照）、`pnpm lint` `0 errors`；`pnpm -r test` 的
 `packages/shared` 与 `apps/api` 每次采样都全绿。
+
+---
+
+## 34. W16b 执行记录：顶栏导航替换「演示导航」（用户第 4 轮 #4，2026-09-27）
+
+> 归属：W16（§30.4 波次表；W16 中途失败没留交代，由 **W16b** 接手，本片即交接后的收口）。
+> 可改清单与实改一致：`site/app/top-nav.js` · `site/app/page.js` · `site/app/assets/base.css` ·
+> `site/patches/*.css`（10 个） · `tools/walkthrough.mjs` · 本节。**未动** `site/*.html`、
+> 其它 `site/app/page-*.js`、`site/app/{api,dom,session,fit,recorder}.js`、其它工具、
+> `packages/**`、`apps/**`（§8：别人负责的文件不顺手改）。
+
+### 34.1 接手时磁盘上是什么（先说清前后任边界）
+
+前任 W16 留下了：新建 `site/app/top-nav.js`、**删除** `site/app/demo-nav.js`、把 `page.js` 的
+`mountDemoNav()` 换成 `mountTopNav()`、往 `base.css` 加 `.top-nav*`、改了 7 个补丁
+（`404/admin/bottle/drift-log/login/me/sea`）。**没做**：`new/river/settings` 三个补丁、
+`tools/walkthrough.mjs`、以及**任何验收证据**（`.tmp-w16/` 里有它自己的探针与日志，但没跑全门、
+也没写本节）。本片先审前任实现，再补完，再补证据。
+
+### 34.2 审查结论：前任的实现**达标，保留**；但有两处缺陷（已修）
+
+判据（用户原话「不要演示导航，改为画面上部**同风格**导航栏：河道/公海/我的/设置」）：
+
+| 判据 | 实测 |
+| --- | --- |
+| 4 项 = 河道/公海/我的/设置 → `/river.html` `/sea.html` `/me.html` `/settings.html` | 10 页 × 4 档全部 `href` 与文案逐字相符、顺序一致 |
+| 当前页高亮（站内「当下」= `--coral`） | `aria-current="page"` 只落本页那一项；那一项 computed color = `rgb(212,85,58)` = `--coral`、字重 500；其余 = `--muted`、400 |
+| 其余页（new/bottle/drift-log/login/admin/404）不进主导航、顶栏仍在、**无高亮项** | 6 页 × 4 档 `aria-current` 集合 = `[]`（顶栏照常存在） |
+| `<nav>` + 可 Tab + `:focus-visible` | 顶栏是 `body` 第一个元素 ⇒ Tab 第一站；`aria-label="站点导航"` |
+| 同风格：只用既有 token、1px 细线、既有字号档、禁新 hex/emoji | `--line/--muted/--paper/--coral/--glass` + `ink` 的 alpha 派生 `rgba(5,15,20,.72)`（与 `.app-state` 的 `rgba(8,26,34,.92)` 同一写法）；13px/`.1em` 取自 `.tag` 那一档；`site-guard` ✓ |
+
+**缺陷 1（真缺陷，已修）**：`:focus-visible` 用 `outline-offset: 2px`，而顶栏贴视口顶边
+（链接盒 `rect=[68,0,120,43]`）⇒ 环的上边缘画到 **y=-2，被视口裁掉**，只剩三边。
+红：`环带=[66,-2,122,45] visibleRing=false`（river/new/me 三页一致）。修：`outline-offset: -2px`
+⇒ `环带=[70,2,118,41]`，四边齐全；`outline` 不参与布局 ⇒ **所有坐标一格未动**。
+
+**缺陷 2（潜伏陷阱，已修）**：`.top-nav { height: var(--top-nav-h, 52px) }` 的兜底值与
+`:root` 里的 `44px` 不一致 —— 顶栏高与补丁让位量因此有**两份真相**，谁动了其中一份就是
+8px 内容被压。兜底改成 `44px`（单一真相），并把这句原因写进 `base.css`。
+
+### 34.3 三个补丁的让位（`new` / `river` / `settings`）
+
+判据 = **墨迹相交**（"自己有直接文字节点 或 可交互"的元素 ∩ 顶栏矩形）= 0，不是"看起来差不多"。
+四档验收视口里，10 页的最上墨迹 y 与相交数：
+
+| 页 | 1280×720 | 1440×900 | 1680×1003 | 2560×1400 | 相交 |
+| --- | --- | --- | --- | --- | --- |
+| river | 77 | 96 | 107 | 149 | 0 |
+| new | 56 | 70 | 78 | 88 | 0 |
+| bottle | 44 | 44 | 44 | 46 | 0 |
+| drift-log | 46 | 58 | 64 | 76 | 0 |
+| sea | 44 | 44 | 44 | 56 | 0 |
+| me | 44 | 61 | 61 | 61 | 0 |
+| settings | 74 | 92 | 103 | 143 | 0 |
+| login | 51 | 64 | 64 | 64 | 0 |
+| admin | 44 | 46 | 46 | 46 | 0 |
+| 404 | 44 | 58 | 44 | 44 | 0 |
+
+⇒ **`new`/`river` 在四档下本来就没有内容落在 44px 带内**（56 / 77 起），`settings` 的干区文字
+从 73.6px 起（富余 30px）。但**矮视口会破**，红先于绿看见：
+1280×560 `new`（`header/.tally` 的 `7.8dvh` = 43.68 < 44 ⇒ `p.cat` 相交 239px²、两处 `span.n` 各 13px²）、
+1280×400 `new`（9348/524/524px²）、1280×400 `river`（`.ov` 的 10.67% = 42.68 ⇒ `div.cat` 614px²）、
+1280×400 `settings`（干区文字 `92·--u` = 40.9 ⇒ `p.cat` 1467px²、`h2.block` 1056px²）。
+⇒ 三页各拿一条 `max(本页设计值, var(--top-nav-h, 44px))`（**只补"缺的那一条"**，与另外 7 个补丁
+一字同一写法），逐块成对动（标题+计数、标题区+RPM 区、左右干区），免得错行。原始输出：
+`.tmp-w16b/short-red.log` → `.tmp-w16b/short-green.log`。
+
+**`settings` 的折页 `.leaf` 故意不让位**：它的顶边与"水线处那条浸湿前沿"是**锁死**的 ——
+`leaf.top 52·--u + leaf-wet.top 468·--u = 520·--u = --wl`，探针实测**接缝 − 水线 = 1.00px 且四档恒定**
+（1280×720 / 1440×900 / 1680×1003 / 2560×1400）= 折页自己那条 `border: 1px solid` 的上边框
+⇒ **干湿分界与水线本来就是同一条线**（差的那 1px 是纸的边框本身）。
+把纸下移会把折页的干湿分界从水线上撕开，那比"矮窗口下 2.4px 纸边落在玻璃条后面"重得多；
+纸与 `.platter`/`.air` 一样是**满幅底材**（与河道的水体同类），从玻璃条下穿过是对的，
+墨迹判据在它上面也没有命中。
+
+### 34.4 其余 7 个补丁的让位复核（不是"前任粗略改了"）
+
+逐条读过：全部是 `max(本页设计值, var(--top-nav-h, 44px))`，或等价的
+`--nav-reserve: max(0px, 顶栏高 − 本页设计顶距)`（`bottle`/`sea`/`me` 用预算变量，`sea`/`me`
+还连带把贴顶的 sleeve 高度扣掉，避免"让位后底边被顶出视口"）—— **没有一处"一律加一整条"**。
+够不够由三条独立的量证实：① 10 页 × 4 档墨迹相交 = 0；② 另加 2 档矮视口（1280×560 / 1280×400）
+10 页复扫；③ `probe-fit` 8 档（含 1707×1019 dpr1.5 / 1366×768 / 1280×800）`0 项不达标`
+（没有被顶出视口的连带）。最紧的**五**处是 **0px 富余**（最上墨迹在某一档正好 = 44px：
+bottle / sea / me / admin / 404）—— 判据成立，但没余量，见 34.7。
+
+### 34.5 `tools/walkthrough.mjs`
+
+改前全仓 grep：`demo-nav|演示导航|DEMO_PAGES` 在本脚本里 **0 命中** ⇒ 没有"依赖旧演示导航的
+选择器/断言"需要替换；**32 项语义一字未动**（不许为了变绿删断言）。唯一改动：第 8 步从
+`/drift-log.html` 去公海由 `page.goto` 改成**点顶栏的「公海」**（评委就是这么走的）⇒
+"顶栏存在 + 可点 + 能跳转"从此进了走查，而不是只靠探针。仍是 32 项，全绿。
+
+### 34.6 五道门（原始输出）
+
+| 门 | 结果 |
+| --- | --- |
+| `node tools/site-guard.mjs` | `✓ 全部通过`（10 页 + 17 个 JS + 10 个补丁） |
+| `node tools/probe-fit.mjs --port=5207` | `结论：0 项不达标` |
+| `node tools/walkthrough.mjs --port=5207` | `结论：0 项不达标`（32 PASS / 0 FAIL，含两次真 MediaRecorder ≥20s） |
+| 本片顶栏探针 `.tmp-w16b/probe-topnav.mjs --port=5207` | `结论：0 项不达标` —— **52 项断言全 PASS / 0 FAIL**（10 页 × 4 档 40 项：顶栏存在+href+文案+当前页高亮+墨迹相交+不横滚；键盘 3 页 12 项：Tab 顺序/焦点环/纯 Tab 到「公海」/Enter 跳转） |
+| `pnpm lint` | `2 errors`，**两处都在 `apps/web/src/pages/bottle-page.tsx` 344:56 / 344:85**（并发写者刚改的文件，本片不碰 `apps/**`）；本片经手的 `site/**`、`tools/**` 0 error、0 新增 warning |
+
+端口纪律（§15）：每条命令都是**同一个前台 PowerShell** 里 `Start-Process` 5207 → 跑 → `Stop-Process`，
+没留常驻进程；API 只用既有的 8787（没起第二个）。
+
+### 34.7 残留与自评（本片的弱点）
+
+- **0px 富余**：五页（bottle / sea / me / admin / 404）的最上墨迹在某一档正好落在顶栏下沿（44px）。
+  相交 = 0 成立，但只要谁把某页的顶距再挪上 1px，立刻就压住。这是本片最薄的一处。
+- `settings` 的 `.leaf` 顶边在视口高 < 761px 时落在顶栏下面（1280×720 实测 2.4px）：**装饰层**、
+  墨迹相交 0，理由见 34.3 —— 已知、已量、不改。
+- **视野外但未清干净**（不在本片可改清单，留给拿到写权的人）：`docs/site-runbook.md` 仍写着
+  `demo-nav.js` / `DEMO_PAGES` / "右下角演示导航"（第 80、233、234、235、286、294–303 行）、
+  `site/app/fit.js` 第 12 行注释、`tools/probe-fit.mjs` 第 211 / 298 行的 `.demo-nav` 排除项 ——
+  全是**旧名字**；站点上已经没有任何 `.demo-nav`（探针每档都查计数 = 0）。
+- `tools/probe-fit.mjs` 的内容元素扫描**没有**排除 `.top-nav`：今天无害（顶栏 4 个链接都在视口内，
+  不会被算成"被裁内容"；它也不满幅，进不了"背景铺满"的候选），但下一个人动顶栏几何时要小心。
+- 未验：`prefers-reduced-motion`（顶栏无动效，无关）；移动端窄视口（< 768px 宽）不在本片验收面内。
+
+### 34.8 改动文件与 sha256（LF、CR=0、无 4 字节 UTF-8 = 无 emoji）
+
+| 文件 | sha256 | 谁改的 |
+| --- | --- | --- |
+| `site/app/top-nav.js` | `3ed345436bea4889039d1a56d8910e34253c3ba06e45cf255c5d99b46e80ad2d` | 前任建（本片审=达标，未动） |
+| `site/app/page.js` | `c86fb7dfa7a16dd34362c21fbaf6ec2dcd8b481be282e40f7883b1ac9f490c72` | 前任改（本片审=达标，未动） |
+| `site/app/assets/base.css` | `e8162ba648f80ddf8e5f8a9eb00000ff780cc8b5af627ccde5bc08eb91f8dd45` | 前任 + **本片两处**（焦点环 offset、高度兜底） |
+| `site/patches/404.css` | `b9111a55cf6f006f0c766f98ae1c5af86d3394aefa88573db2fdaa620cc279b4` | 前任（本片复核=够） |
+| `site/patches/admin.css` | `c21f6d0e4f59902d1150fa13c2403ed7ecd08fa7954ac76970d3bb9f36c312f2` | 前任（本片复核=够） |
+| `site/patches/bottle.css` | `399485cdf5c981a7bdb418cf7e6cfa01e21d0af9ca0b6f4fb20dbdf9e28debba` | 前任（本片复核=够） |
+| `site/patches/drift-log.css` | `e6bd882adcdfd495df16ff456c672229c86328459117a2ba6b37a5e62c4ea514` | 前任（本片复核=够） |
+| `site/patches/login.css` | `60e826a75052be8f4e1142b5d924f4ed4e20fbf58d960f6d2b8d27574fdf7a2a` | 前任（本片复核=够） |
+| `site/patches/me.css` | `3e856fa4445a8c05b410fd0bbdb1c4c5baaea8effe509ceac8b5a7e59ab375fd` | 前任（本片复核=够） |
+| `site/patches/new.css` | `85d83ad9eefa871d9c5773228a2445b409545e8687ba2c535558bff646fb089d` | **本片**（让位） |
+| `site/patches/river.css` | `b178587c316b06e67f3956495d69e389cbfc13dbfa10fb26a676c44925f6ca5a` | **本片**（让位） |
+| `site/patches/sea.css` | `d89936b4b31ab14e651e7c4d7e1fa66b9c7d09b7585f361c20e4e52dde7d9487` | 前任（本片复核=够） |
+| `site/patches/settings.css` | `a0b6e04c38f7e03de161fb85b26439c9ed58b42753fefdd5125fe3a85aeea575` | **本片**（干区文字让位） |
+| `tools/walkthrough.mjs` | `bdbf077066947187d67fa731712efe695019065d1f2ea0cb4368e1d5c5437e22` | **本片**（第 8 步走顶栏；32 项不变） |
+| `site/app/demo-nav.js` | ——（**已删除**，`DEMO_PAGES` 随之消失，无孤儿） | 前任删 |
+
+本节自身不进表（写进去会改变自己的哈希）；它的 sha256 见本片汇报。

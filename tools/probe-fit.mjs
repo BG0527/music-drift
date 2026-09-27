@@ -208,7 +208,7 @@ try {
           for (const el of root.querySelectorAll('*')) {
             if (el.namespaceURI !== 'http://www.w3.org/1999/xhtml') continue;
             if (el.closest('[aria-hidden="true"]') !== null) continue;
-            if (el.closest('.demo-nav, .app-state') !== null) continue;
+            if (el.closest('.top-nav, .app-state') !== null) continue;
             let own = '';
             for (const node of el.childNodes) {
               if (node.nodeType === 3) own += node.textContent ?? '';
@@ -295,7 +295,7 @@ try {
         const opaque = (c) => c !== '' && c !== 'rgba(0, 0, 0, 0)' && c !== 'transparent';
         let coverLayer = opaque(bodyBg) || opaque(htmlBg) ? 'body/html 底色' : null;
         for (const el of document.querySelectorAll('body > *, body > * > *')) {
-          if (el.closest('.demo-nav, .app-state') !== null) continue;
+          if (el.closest('.top-nav, .app-state') !== null) continue;
           const cs = getComputedStyle(el);
           if (cs.position !== 'absolute' && cs.position !== 'fixed') continue;
           const r = el.getBoundingClientRect();

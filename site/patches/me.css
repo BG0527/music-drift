@@ -26,6 +26,15 @@
   --gap-page: clamp(28px, calc(28px + (100dvh - 720px) * 0.2), 64px);
   --gap-crate: clamp(20px, calc(20px + (100dvh - 720px) * 0.156), 48px);
   --gap-bottom: clamp(8px, calc(8px + (100dvh - 720px) * 0.0889), 24px);
+  /* W16：**给站点顶栏让位的那一条**（`site/app/top-nav.js`，高 `--top-nav-h`）。
+   * 本页 720 高的窗口里已经一点富余都没有（W5-B 把上面三条空隙收到了地板，内容底正好压在视口底边），
+   * 而 720 档的 `--gap-page` 只有 28px、比顶栏矮 ⇒ 顶栏要的那 16px 只能从**空隙**里再挤：
+   * 720 档两个空隙各让 7.5px（合计 15px，加上格子里的 1px 余量刚好够），
+   * 745 高以上完全为 0（`--gap-page` 到那时也已长过顶栏高 ⇒ 本页版式一点不动）。
+   * 写法与上面既有的 `(100dvh - 720px) * k` 直线同一族。 */
+  --nav-squeeze: max(0px, calc(745px - 100dvh) * 0.3);
+  --gap-crate: calc(clamp(20px, calc(20px + (100dvh - 720px) * 0.156), 48px) - var(--nav-squeeze));
+  --gap-bottom: calc(clamp(8px, calc(8px + (100dvh - 720px) * 0.0889), 24px) - var(--nav-squeeze));
   /* 消息行只有 20px 高的一行字与一行说明，它的上下内距是纯粹的呼吸位 ⇒ 矮窗先收这里
    *（卡格与沉积柱必须原样保存，见下面 .window 的说明）。 */
   --pad-msg-row: clamp(1.5px, calc(1.5px + (100dvh - 720px) * 0.025), 6px);
@@ -51,9 +60,13 @@ html .waterlight {
 }
 
 /* ── 页框：flex 纵向列 ───────────────────────────────────────────────────── */
+/* W16：站点顶栏（固定高 `--top-nav-h`）占住视口顶部一条 ⇒ 顶内边距取 `max(设计值, 顶栏高)`：
+ * 本页设计顶边距在高窗下是 64px（比顶栏高）⇒ **一点不动**；只有矮窗（720 档 28px）才补到 48px。
+ * `* { box-sizing:border-box }` + main 高 100dvh ⇒ 内容盒自己短那一条，页脚仍贴视口底边。 */
 html main {
   height: 100dvh;
-  padding: var(--gap-page) clamp(24px, calc(76 * var(--ux)), 76px) clamp(10px, calc(16 * var(--u)), 16px);
+  padding: max(var(--gap-page), var(--top-nav-h, 44px)) clamp(24px, calc(76 * var(--ux)), 76px)
+    clamp(10px, calc(16 * var(--u)), 16px);
   display: flex;
   flex-direction: column;
 }
@@ -73,10 +86,17 @@ html h1 {
  * W5-B 当初写这条的原因之一是"代号栏会压到第一格卡片的字"；**W15 已把代号栏整块收掉**
  * （见下面 `html .codeslot`），那条溢出通路不存在了 —— 高度公式原样保留：它现在只决定纸面
  * 大小，本片不改版式参数。 */
+/* 内袋是**绝对定位**在 body 上的（main 是 static），它不跟 main 的顶内边距走 ⇒ 单独一条。
+ * W16 的处置：**整袋下移"缺的那一条"、同时把高度减掉同一段** ⇒ 袋**底**一动不动。
+ * 为什么不整袋平移到栏下：袋底（304）就压在"参与过的漂流瓶"卡格顶边（312）上，整袋下移 20px
+ * 会让袋框横在两张卡片上（三方案实拍见 `docs/deploy-plan-html.md` §34.5）。这样处置后
+ * 袋框 / 袋口那行字 / 孔 / 账号四者的相对构图与定稿完全一致，被顶栏切掉的只是纸面顶上那一条。
+ *（墨迹探针实测：不挪时 `span.cat.stop` 与顶栏相交 382px²。） */
 html .sleeve {
+  --nav-sleeve-drop: max(0px, calc(var(--top-nav-h, 44px) - 8 * var(--u)));
   right: calc(26 * var(--ux));
-  top: calc(8 * var(--u));
-  height: clamp(240px, calc(296 * var(--u)), 296px);
+  top: calc(8 * var(--u) + var(--nav-sleeve-drop));
+  height: calc(clamp(240px, calc(296 * var(--u)), 296px) - var(--nav-sleeve-drop));
 }
 
 html .sleeve .stop {

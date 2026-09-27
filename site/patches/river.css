@@ -147,16 +147,19 @@ svg.canvas {
 /* ── 外框：标题区 / 右上 RPM 区 / 页脚 —— 贴视口，不跟水体缩放 ──────────────
  * `!important` 是**必需**的：这两个区块的落点写在 HTML 的 style 属性里（§8「HTML 是源、不许改」），
  * 只有 !important 的样式表声明才压得住内联声明。`:has()` 用来选中它们而不改 HTML：
- * 标题区 = 含 h1 的覆盖层，RPM 区 = 含 .rpm 的那个。 */
+ * 标题区 = 含 h1 的覆盖层，RPM 区 = 含 .rpm 的那个。
+ * W16b 给站点顶栏（固定高 `--top-nav-h`）让位：10.67% / 12.44% 在视口高 ≥ 413px 时本来就高于
+ * 44px（1440×900 = 96 / 112px，**一格不动**），再矮就被顶栏压住 —— 实测 1280×400：`div.cat`
+ * 相交 614px²。取 `max(设计值, 顶栏高)`，与另外 9 个补丁同一写法；两块同排必须一起动。 */
 .ov:has(h1) {
   left: 5.28% !important;
-  top: 10.67% !important;
+  top: max(10.67%, var(--top-nav-h, 44px)) !important;
   width: 36.1% !important;
 }
 
 .ov:has(.rpm) {
   left: 79.86% !important;
-  top: 12.44% !important;
+  top: max(12.44%, var(--top-nav-h, 44px)) !important;
   width: 18.5% !important;
 }
 

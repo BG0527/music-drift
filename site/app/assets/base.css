@@ -1,9 +1,9 @@
 /*
  * 共享层样式（W0）。
  *
- * 边界（方案 §7.5）：**这里只放共享层自己的东西** —— 演示导航与四种状态条。
+ * 边界（方案 §7.5）：**这里只放共享层自己的东西** —— 站点顶栏导航与四种状态条。
  * 设计稿的七色 token / 字体 / 排版 / 构图**一律不动**：本文件不重排、不复用、不覆盖设计稿的类名，
- * 只新增 `.demo-nav*` 与 `.app-state*` 两个前缀（页面里不存在这两个前缀）。
+ * 只新增 `.top-nav*` 与 `.app-state*` 两个前缀（页面里不存在这两个前缀）。
  * 颜色只用设计稿 `:root` 里已有的变量（带 fallback），不引入新色值、无纯黑、无外部资源。
  */
 
@@ -13,16 +13,27 @@
 }
 
 /*
- * 浮层落位（两个固定浮层共用；仍然只作用在 .demo-nav* 与 .app-state* 上）。
+ * 顶栏高度（W16）：共享层与各页补丁之间的**唯一契约**。
+ *   · 顶栏自己按它取高（`.top-nav { height: var(--top-nav-h) }`）；
+ *   · 补丁一律写 `var(--top-nav-h, 44px)`，并且用 `max(本页设计值, var(--top-nav-h, 44px))`
+ *     的形式 —— **只让出"缺的那一条"**：本页原本的顶边距已经够高时（例如登录页 1440 档 64px、
+ *     我的页 1440 档 64px），版式**一点都不动**（与定稿逐像素一致）；不够高时才把它补到顶栏底边。
+ *     为什么不能一律"加一整条"：登录页 1280×720 下内容正好铺满 100dvh（页脚底边 = 视口底边），
+ *     整条下移会把页脚顶出视口（`tools/probe-fit.mjs` 实测"被裁内容"）。
+ * 44px = 可点区域下限（每个链接占满整条高）；改高度只改这一处。
+ */
+:root {
+  --top-nav-h: 44px;
+}
+
+/*
+ * 浮层落位（状态条用；仍然只作用在 `.app-state` 上）。
  *
  * 为什么是"贴视口边缘 16px"而不是"贴画布边缘"：画布 1440×900 由 fit.js 等比缩放居中，
  * 视口上下（或左右）比画布多出来的部分就是**留白带**——它紧挨着视口边缘。
- * 所以贴着视口边缘落位天然满足"有留白时落在留白侧"：视口比画布高时，
- * 浮层整块落进上下留白带（例：1440×1080 的留白带是 y∈[0,90] 与 y∈[990,1080]，
- * 44px 高的触发器与最长两行的状态条都完整落在带内）；同比或无留白时，
+ * 所以贴着视口边缘落位天然满足"有留白时落在留白侧"；同比或无留白时，
  * 16px 就是一处不压内容的边缘内缩。
  */
-.demo-nav,
 .app-state {
   --overlay-inset: 16px;
 }
@@ -118,98 +129,75 @@
   cursor: pointer;
 }
 
-/* ── 演示导航（顶部居中，默认收起；面板往下展开） ────────────────────────── */
-.demo-nav {
+/* ── 站点顶栏导航（画面顶部整条；4 项：河道 / 公海 / 我的 / 设置） ───────────────
+ * 形态**全部来自站点既有语言**，没有一处新发明：
+ *   · DESIGN.md §Components 的 `nav` 行：ink 底 + 1px 细线 + 当前项用 coral 指示（1px 线 + 字重 500）、
+ *     内边距 8px 12px、圆角 ≤4px（本条整幅贴顶 ⇒ 只有下沿那条 1px 线，没有圆角可加）；
+ *   · DESIGN.md §z-index 契约：sticky-nav = 100（与旧浮钮同层，不抢 overlay/modal）；
+ *   · 左右内缩 = 各页补丁一直在用的那条边线 `clamp(24px, 76 * 100vw/1440, 76px)`
+ *     （河道标题区 5.28%、审核台 main 的内边距都是它）⇒ 顶栏的项与页面版心左边线**同一条**；
+ *   · 底色的透明度是 `ink` 的 alpha 派生（DESIGN.md front matter 的「基色 + alpha 派生」写法，
+ *     站点没有第二个底色）⇒ 读成"同一张水面上的一层玻璃"，不是贴上去的一条通用导航；
+ *   · 字号 13px 与字距 .1em 取的是 `.tag`（河道页心情标签）那一档。
+ */
+.top-nav {
   position: fixed;
-  top: var(--overlay-inset);
-  left: 50%;
-  transform: translateX(-50%);
+  inset: 0 0 auto;
   z-index: 100;
-  display: flex;
-  /* DOM 是 [panel, trigger]：`column-reverse` 让触发器在上、面板向下展开
-   *（11 张定稿的顶部中央是空白带，底部在审核台/瓶子详情有真实内容）。
-   * 用 CSS 换向而不是改 DOM 顺序 ⇒ demo-nav.js 的挂载、Escape、aria-current 全不动。 */
-  flex-direction: column-reverse;
-  align-items: center;
-  gap: 8px;
-}
-
-.demo-nav__trigger {
-  /* 可点区域仍 ≥44px（原来的 8px 内边距只有 ~35px 高）。 */
-  min-height: 44px;
-  padding: 8px 14px;
-  border: 1px solid var(--glass, #7fd1d9);
-  border-radius: 999px;
-  background: rgba(8, 26, 34, 0.92);
-  color: var(--paper, #f3f9fa);
-  font: inherit;
+  /* 兜底值 = `:root` 里那个数（写两个值曾让"顶栏高"有两份真相：顶栏按兜底 52px 取高、
+   * 补丁按 44px 让位 ⇒ 8px 的内容会被压住。只留一处定义，兜底与它一致）。 */
+  height: var(--top-nav-h, 44px);
+  border-bottom: 1px solid var(--line, rgba(243, 249, 250, 0.16));
+  background: rgba(5, 15, 20, 0.72);
+  color: var(--muted, #a9c7cf);
   font-size: 13px;
-  cursor: pointer;
-  /* 收起态不抢设计稿的视线：悬停/键盘聚焦才完全不透明。 */
-  opacity: 0.78;
 }
 
-.demo-nav__trigger:hover,
-.demo-nav__trigger:focus-visible {
-  opacity: 1;
-}
-
-.demo-nav__trigger[aria-expanded='true'] {
-  border-color: var(--warm, #f6d79a);
-}
-
-.demo-nav__panel {
-  width: 272px;
-  max-height: 66vh;
-  overflow: auto;
-  padding: 12px 14px;
-  border: 1px solid var(--line, rgba(243, 249, 250, 0.13));
-  border-radius: 14px;
-  background: rgba(8, 26, 34, 0.96);
-  box-shadow: 0 18px 40px rgba(3, 14, 20, 0.5);
-}
-
-.demo-nav__title {
-  margin: 0 0 8px;
-  color: rgba(243, 249, 250, 0.55);
-  font-size: 11px;
-  letter-spacing: 0.24em;
-}
-
-.demo-nav__list {
+.top-nav__list {
+  display: flex;
+  align-items: stretch;
+  height: 100%;
   margin: 0;
-  padding: 0;
+  padding: 0 clamp(24px, 5.28vw, 76px);
   list-style: none;
 }
 
-.demo-nav__link {
+.top-nav__item {
   display: flex;
-  justify-content: space-between;
-  gap: 10px;
-  padding: 6px 8px;
-  border-radius: 8px;
-  color: var(--paper, #f3f9fa);
+}
+
+.top-nav__link {
+  display: flex;
+  align-items: center;
+  padding: 0 12px;
+  /* 未选中：`--muted` 字 + 一条透明线（当前项换成 coral，**线宽一致 ⇒ 切换时不跳位**）。 */
+  border-bottom: 1px solid transparent;
+  color: var(--muted, #a9c7cf);
   font-size: 13px;
+  letter-spacing: 0.1em;
   text-decoration: none;
 }
 
-.demo-nav__link:hover {
-  background: rgba(127, 209, 217, 0.14);
+.top-nav__link:hover {
+  color: var(--paper, #f3f9fa);
+  border-bottom-color: var(--line, rgba(243, 249, 250, 0.16));
 }
 
-.demo-nav__link[aria-current='page'] {
-  background: rgba(127, 209, 217, 0.2);
+/* 当前页 = 站点里"当下"的那一档颜色（sea 的分页、river 的选中标签都这么用 coral）。 */
+.top-nav__link[aria-current='page'] {
+  color: var(--coral, #d4553a);
+  border-bottom-color: var(--coral, #d4553a);
+  font-weight: 500;
 }
 
-.demo-nav__path {
-  color: rgba(243, 249, 250, 0.5);
-  font-family: Quattrocento, serif;
-  font-size: 12px;
-}
-
-.demo-nav__note {
-  margin: 10px 0 0;
-  color: rgba(243, 249, 250, 0.5);
-  font-size: 11px;
-  line-height: 1.6;
+/* 键盘可达：写法与河道页 `footer .tag:focus-visible` 同一套 token（1px glass 实线），
+ * 只有 `outline-offset` 一处不同，且是**必需**的：
+ *   顶栏贴视口顶边（`inset: 0 0 auto`），链接盒高 43px（顶栏 44 = 43 + 下沿那条 1px 线）⇒
+ *   链接的上边缘就在 y=0。`outline-offset: 2px` 会把环的上边缘画到 y=-2 —— **被视口裁掉**，
+ *   只剩左/右/下三边（实测环带 [66,-2,122,45]，W16b 键盘探针读数）。
+ *   收成 -2px 后环整条落在盒内（环带 [70,2,118,41]），四边全可见；`outline` 不参与布局，
+ *   所以这一改**不动任何坐标**（其它页不在视口边缘的焦点环仍是 +2px，如河道页的心情标签）。 */
+.top-nav__link:focus-visible {
+  outline: 1px solid var(--glass, #7fd1d9);
+  outline-offset: -2px;
 }

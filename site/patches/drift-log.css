@@ -44,17 +44,27 @@ body {
 
 /* ── 版面骨架：页边距跟视口，纵向用 dvh（百分比 padding 会按"宽度"解析，不能用来做上下边距） ──
  * main 改成**一列 flex**：页头 / 刻痕语法表是固定高度，主体吃掉剩下的高度。
- * 这样"列表能有多高"不需要我去猜页头占了多少 —— 少一个魔数就少一处失真。 */
+ * 这样"列表能有多高"不需要我去猜页头占了多少 —— 少一个魔数就少一处失真。
+ *
+ * W16：给站点顶栏（`site/app/top-nav.js`，固定高 `--top-nav-h`）让出顶部一条 ——
+ * 顶内边距取 `max(设计值, 顶栏高)`：本页设计顶边距 1440 档是 57.6px（比顶栏高）⇒ 一点不动，
+ * 720 档是 46.1px ⇒ 补到 48px（只补 1.9px，主体又能在内部滚动，不会顶出视口）。
+ * `* { box-sizing:border-box }` + main 高 100dvh ⇒ 内容盒自己短那一条，页脚仍贴视口底边。
+ * 探针：10 页 × 4 档下"页面墨迹 ∩ 顶栏矩形 = 0"（`docs/deploy-plan-html.md` §34）。 */
 main {
   display: flex;
   flex-direction: column;
   height: 100dvh;
-  padding: clamp(36px, 6.4dvh, 76px) clamp(28px, 5.28vw, 160px) clamp(24px, 3dvh, 48px);
+  padding: max(clamp(36px, 6.4dvh, 76px), var(--top-nav-h, 44px)) clamp(28px, 5.28vw, 160px)
+    clamp(24px, 3dvh, 48px);
 }
 
+/* 右上角那格（曲名 / 编号）是**绝对定位**在 body 上的（header 只有 width:fit-content），
+ * 它不跟 main 的顶内边距走 ⇒ 用**同一个表达式**再给它一份（两处同进退）。
+ * 墨迹探针实测：不挪时 1280×720 相交 1 处。 */
 .hright {
   right: clamp(28px, 5.28vw, 160px);
-  top: clamp(36px, 6.4dvh, 76px);
+  top: max(clamp(36px, 6.4dvh, 76px), var(--top-nav-h, 44px));
 }
 
 /* 刻痕语法表：七个小图与字样是固定字号的一行，窄窗下允许换行（定稿一行的排法在 1280 下会顶到边） */

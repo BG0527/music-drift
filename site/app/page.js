@@ -3,7 +3,7 @@
  *
  * 每个 `page-<名>.js` 只用它做三件事：
  *   1. 注入共享层样式（`base.css`）；
- *   2. 挂载演示导航；
+ *   2. 挂站点顶栏导航（`top-nav.js`）；
  *   3. 打一条 console 说明"本页 W1 要接哪些端点"，并在 DOMContentLoaded 之后自动调用一次 `init()`。
  *
  * 为什么自动调用：页面只加了一个 `<script type="module" src="/app/page-x.js">`，
@@ -21,7 +21,7 @@
 
 import { ensureBaseStyles } from './dom.js';
 import { installFit } from './fit.js';
-import { mountDemoNav } from './demo-nav.js';
+import { mountTopNav } from './top-nav.js';
 
 /** 发布版补丁目录（见 `docs/deploy-plan-html.md` §20）。 */
 const PATCH_DIR = '/patches/';
@@ -78,11 +78,12 @@ export function definePage(config) {
   const { name, owner = '', endpoints = [], note = null, init = null } = config;
 
   ensureBaseStyles();
-  // 顺序要紧：**先判补丁、再装缩放**（补丁页必须先有 `data-fit-off`），最后挂演示导航
-  //（导航追加到 body、position:fixed ⇒ 不被缩放）。
+  // 顺序要紧：**先判补丁、再装缩放**（补丁页必须先有 `data-fit-off`），最后挂站点顶栏
+  //（顶栏插到 body 最前、position:fixed ⇒ 不被缩放，也不参与页面构图；各页补丁按
+  //  `var(--top-nav-h)` 把顶层内容下移，见 docs/deploy-plan-html.md §34）。
   installPatch(name);
   installFit();
-  mountDemoNav();
+  mountTopNav();
 
   async function pageInit() {
     const scope = owner === '' ? '' : `（归属 ${owner}）`;

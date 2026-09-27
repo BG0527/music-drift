@@ -9,7 +9,7 @@
  * 关键细节：
  * - 只把**画布**（`body` 的现有子元素）搬进 `#fit-stage` 并缩放；`#fit-stage` 是 `position:absolute`
  *   的定位祖先，所以页面里 `position:absolute; inset:0` 的块解析结果与原来 `body` 时**完全一致**。
- * - 演示导航（`demo-nav.js` 追加到 `body`、`position:fixed`）**不在 stage 内** ⇒ 不被缩放。
+ * - 站点导航（`top-nav.js` 追加到 `body`、`position:fixed`）**不在 stage 内** ⇒ 不被缩放。
  * - 页面里若有 `position:fixed` 元素，会因 stage 的 transform 而改为相对 stage —— 这正是想要的
  *   （画布内的一切一起缩放）。
  */
