@@ -48,6 +48,20 @@ describe('顶部 top-nav（页面上方常显导航，替换浮动收起式 demo
     }
   });
 
+  it('微动效：链接 hover 抬升类存在 + 激活指示线 scaleX，时长/缓动只引用 motion token', () => {
+    renderWithProviders(<TopNav items={NAV_ITEMS} current="sea" />);
+    const active = screen.getByRole('link', { name: '公海' });
+    // 类存在：hover 轻微上移（只动 transform）
+    expect(active.className).toMatch(/\bhover:-translate-y-px\b/);
+    // token 引用：禁写死 ms / cubic-bezier / ease-out 档
+    expect(active.className).toMatch(/var\(--motion-hover-duration\)/);
+    expect(active.className).toMatch(/var\(--motion-entry-easing\)/);
+    // 激活项指示线 scale-x-100、非激活 scale-x-0（scaleX 过渡）
+    expect(active.querySelector('span')?.className).toMatch(/\bscale-x-100\b/);
+    const idle = screen.getByRole('link', { name: '河道' });
+    expect(idle.querySelector('span')?.className).toMatch(/\bscale-x-0\b/);
+  });
+
   it('同主题：water-void 底 + hairline 细线 + meta 字号字距，激活项 coral 指示', () => {
     renderWithProviders(<TopNav items={NAV_ITEMS} current="sea" />);
     const bar = screen.getByRole('navigation', { name: '站内导航' });

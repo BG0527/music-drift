@@ -8,7 +8,11 @@
  * - 热区 ≥44px（min-h-11）；`nav` landmark + `aria-current="page"`。
  *
  * 样式走 record-v1：`water-void` 底 + `border-hairline`（line 13% 细线）+ meta 字（11px / .24em）；
- * 激活项沿用 design-system Tabs 的选中语态（1px `border-coral` 下划线 + `text-coral`），圆角 rounded-base。
+ * 激活项沿用 design-system Tabs 的选中语态（1px coral 下划线 + `text-coral`），圆角 rounded-base；
+ * 微动效（motion-web §1/§2）：只动 transform —— 链接 hover `translateY(-1px)`、
+ * 激活指示线 `scaleX` 0→1 展开；时长/缓动只引 `var(--motion-hover-duration)` /
+ * `var(--motion-entry-easing)`，不写死时间字面量 / 手写缓动曲线 / 内联 duration·ease 档（下划线由绝对定位
+ * span 承担，故 border 只留颜色类不带宽度，避免静态线盖过 scaleX 动画）。
  */
 import { cn } from '../../design-system';
 import { Link } from './router';
@@ -39,15 +43,26 @@ export function TopNav({ items, current }: TopNavProps) {
                   to={item.href}
                   aria-current={active ? 'page' : undefined}
                   className={cn(
-                    'flex min-h-11 items-center whitespace-nowrap px-[10px] md:px-4',
-                    'border-b border-transparent text-[0.6875rem] tracking-[0.24em]',
+                    'relative flex min-h-11 items-center whitespace-nowrap px-[10px] md:px-4',
+                    'text-[0.6875rem] tracking-[0.24em]',
                     'focus-visible:ring-2 focus-visible:ring-coral focus-visible:ring-offset-2 focus-visible:ring-offset-ink',
-                    // feedback（motion-web §1）：切页时颜色与下划线过渡，不瞬变
-                    'transition-colors duration-200 ease-out',
-                    active ? 'border-coral font-medium text-coral' : 'text-muted hover:text-paper',
+                    // feedback（motion-web §1）：切页颜色过渡 + hover 抬升 1px，只动 transform/color；
+                    // transition-property 显式列举（v4 的 translate/scale 是独立属性，不含在 transform 里）
+                    'transition-[transform,translate,scale,color] duration-[var(--motion-hover-duration)] ease-[var(--motion-entry-easing)]',
+                    'hover:-translate-y-px',
+                    active ? 'border-coral font-medium text-coral' : 'border-transparent text-muted hover:text-paper',
                   )}
                 >
                   {item.label}
+                  {/* 激活指示线：scaleX 0→1（origin-left），绝对定位不占布局 */}
+                  <span
+                    aria-hidden="true"
+                    className={cn(
+                      'pointer-events-none absolute inset-x-0 bottom-0 h-px origin-left bg-coral',
+                      'transition-[transform,scale] duration-[var(--motion-hover-duration)] ease-[var(--motion-entry-easing)]',
+                      active ? 'scale-x-100' : 'scale-x-0',
+                    )}
+                  />
                 </Link>
               </li>
             );
