@@ -34,6 +34,15 @@
  *
  * W7（用户第 3 轮需求，§17）：公海详情页被删除，它顶部那条**沟槽时间轴 + 唱针**复刻到本页。
  * 几何与类名照抄那条时间轴（值见本文件 `TIMELINE_STYLE`），落位与三处必要偏离记在 §17.6。
+ *
+ * W12（用户第 4 轮 #1/#2/#6，§30/§33）修三件事，都在本文件 + `site/patches/bottle.css`：
+ *   1. **坐标只有一套尺**：设计坐标一律用 `pct()` 换成百分比（见 `DESIGN_WIDTH`），
+ *      `bottle.css` 里那批 `[style*='left: …px']` 的枚举规则整批删除 —— 它们把"哪些段位可用"
+ *      写死在样式里，换个缺口段位就静默错位。
+ *   2. **公海未完成品（`SEA` + 缺口）的接力入口**：先「指定接唱」把瓶子接到手里，才谈得上录
+ *      （内核只允许 `DRAFT` 的发起者与 `HELD` 的持有者录）。
+ *   3. **去向列没有可点的水路时给明确的出口**（「回河道」，形态照抄站内既有那一个），
+ *      投河成功也不再是"提示一闪、页面无动作"。
  */
 import { ApiError, get, post, postAudio } from './api.js';
 import {
@@ -94,6 +103,49 @@ const PROFILE_RIGHT = 1000;
 const WATER_SLANT_X = 93;
 const WATER_SLANT_CONTROL_X = 71;
 
+/** 缺口簇比它所在的那一格内缩多少（定稿：`gapBox` 与格位同宽再各缩 10）。 */
+const GAP_BOX_INSET = 10;
+
+/**
+ * 设计画布宽（`svg.scene` 的 `viewBox` 就是 1440×900）。
+ *
+ * W12 #1：**这一页的"设计坐标 → 屏幕坐标"换算只有这一个入口**。
+ * 以前 JS 写设计 px（`gapBox.style.left = '908.828px'`），再由 `bottle.css` 用
+ * `[style*='left: …px']` 把**已知的几个值**枚举翻成百分比 ⇒ 只要缺口不在预设的那几段就漏
+ * （实测：缺第 1 段的瓶，缺口簇被钉在第 4 格；见 `docs/deploy-plan-html.md` §30.2）。
+ * 现在两边同一套尺：JS 直接写百分比（`设计 x / 1440 × 100`），横向随视口伸缩，
+ * 与 `svg.scene` 自己的刻度（76 + (n-1)×231）永远自洽 —— 段数变了、缺口段位变了都不用改样式。
+ */
+const DESIGN_WIDTH = 1440;
+
+/** 设计 x → 百分比（CSS `left/width`）。 */
+function pct(designX) {
+  return `${(designX / DESIGN_WIDTH) * 100}%`;
+}
+
+/**
+ * 冻结 HTML 里那三组**示例格**（第 1/2/3 格的 `.segNum`/`.segLab`/`.cap`）的内联 `left` 是设计 px，
+ * 它们同样要换到百分比上 —— 否则在没有 `?id=` 的落点（以及 JS 渲染之前的首帧）上，
+ * 设计 px 的格子会和相邻格子叠在一起（`tools/probe-fit.mjs` 在 2560 档实测 `.segNum × .segNum` 44%）。
+ *
+ * 为什么写在 JS 里而不是样式表：换算的输入就是**节点自己身上的设计 px**，
+ * 样式表只能靠 `[style*='left: 769px']` 这类**枚举**去猜（W12 #1 的根因），
+ * 数据一变就漏。这里只认"内联值以 px 结尾"的节点，JS 自己渲染出来的（已是百分比）一律不动。
+ */
+function normalizeSampleGrid() {
+  for (const node of qa('.segNum, .segLab, .cap')) {
+    for (const property of ['left', 'width']) {
+      const raw = property === 'left' ? node.style.left : node.style.width;
+      if (!raw.endsWith('px')) continue;
+      const design = Number.parseFloat(raw);
+      if (!Number.isFinite(design)) continue;
+      const value = pct(design);
+      if (property === 'left') node.style.left = value;
+      else node.style.width = value;
+    }
+  }
+}
+
 const state = {
   id: null,
   detail: null,
@@ -114,10 +166,18 @@ const state = {
   recordTimer: null,
   /** 选去向请求进行中（防连点第二条水路）。 */
   resolving: false,
+  /** 「指定接唱」请求进行中（公海未完成品接手；防连点）。 */
+  claiming: false,
 };
 
 // ------------------------------------------------------------------ 渲染小工具
 
+/**
+ * 第 `index` 格在**设计画布**里的位置（左沿与宽，单位＝设计 px）。
+ *
+ * 调用方必须用 `pct()` 落到样式里（横向一律百分比）；这里的数字只有两个用途：
+ * 交给 `pct()`、以及喂给瓶身剖面自己的 SVG 几何（水位、分隔线）。
+ */
 function cellSlot(index) {
   const count = state.detail?.totalSegments ?? 4;
   const width = (PROFILE_RIGHT - PROFILE_LEFT) / count;
@@ -130,14 +190,18 @@ function setText(selector, value) {
   return node;
 }
 
-/** 成功提示优先落在缺口格上；瓶子已完整（缺口格没了）时落到「选择去向」的说明行。 */
+/**
+ * 页内公告：优先落在缺口格上；瓶子已完整（缺口格没了）时落到「选择去向」的说明行。
+ * W12 #6：说明行可能是"结果 + 出口"（`renderDestSub`），所以这里走同一个渲染入口，
+ * 免得一句公告把「回河道」入口擦掉。
+ */
 function announce(message) {
   const gapNote = q('.gapBox .gapNote');
   if (gapNote !== null && q('.gapBox') !== null) {
     gapNote.textContent = message;
     return;
   }
-  setText('.destCol .sub', message);
+  renderDestSub(message);
 }
 
 function segmentByIndex(index) {
@@ -207,6 +271,8 @@ function formatClock(ms) {
 // ------------------------------------------------------------------ 初始化
 
 async function load() {
+  /** 先让冻结样例也落到同一套尺上（没有 `?id=` 的落点、以及 JS 渲染前的首帧都靠它）。 */
+  normalizeSampleGrid();
   const id = new URLSearchParams(location.search).get('id');
   const back = q('.back');
   if (back !== null) back.setAttribute('href', '/river.html');
@@ -355,22 +421,22 @@ function renderProfile() {
     const num = templates.num.cloneNode(true);
     num.textContent = String(index);
     num.className = dry ? 'segNum mono gap' : 'segNum mono';
-    num.style.left = `${slot.left}px`;
-    num.style.width = `${slot.width}px`;
+    num.style.left = pct(slot.left);
+    num.style.width = pct(slot.width);
     parent.append(num);
 
     const lab = templates.lab.cloneNode(true);
     lab.textContent = `第 ${index} 段`;
     lab.className = `segLab meta${dry ? ' gap' : ''}`;
-    lab.style.left = `${slot.left}px`;
-    lab.style.width = `${slot.width}px`;
+    lab.style.left = pct(slot.left);
+    lab.style.width = pct(slot.width);
     parent.append(lab);
 
     if (segment === null) continue;
 
     const cap = templates.cap.cloneNode(true);
-    cap.style.left = `${slot.left}px`;
-    cap.style.width = `${slot.width}px`;
+    cap.style.left = pct(slot.left);
+    cap.style.width = pct(slot.width);
     const code = cap.querySelector('.code');
     const spans = cap.querySelectorAll('.line span');
     const listen = cap.querySelector('.listen');
@@ -395,8 +461,8 @@ function renderProfile() {
   if (gapIndex !== null) {
     const slot = cellSlot(gapIndex);
     const gapBox = templates.gapBox;
-    gapBox.style.left = `${slot.left + 10}px`;
-    gapBox.style.width = `${slot.width - 20}px`;
+    gapBox.style.left = pct(slot.left + GAP_BOX_INSET);
+    gapBox.style.width = pct(slot.width - GAP_BOX_INSET * 2);
     parent.append(gapBox);
     renderGapBox(gapIndex);
   }
@@ -422,22 +488,59 @@ function renderRolls() {
   });
 }
 
+/**
+ * 公海「等待接力」的作品（`SEA` + 缺口）：**能不能先接住这一棒**（W12 #2，用户第 4 轮原话
+ * 「公海等待接力的瓶子进去后无法接力」）。
+ *
+ * 为什么必须多这一步：内核 `canRecordSegment` 只认 `DRAFT` 的发起者与 `HELD` 的持有者
+ * ⇒ 公海里的瓶子对谁都判 `NOT_HOLDER`，而页面过去只把 CTA 藏起来 —— 于是"缺口看得见、录不了"
+ * （实测截图那支瓶：`<button hidden class="cta">录第 3 段</button>`，点不动）。
+ * 服务端早就给了正路：`POST /api/sea/:id/targeted-segment`（CONTEXT §6.2「指定接唱」，
+ * 只对公海未完成品开放）。接住之后状态变 `HELD`、`isHolder=true`，录制入口自然成立。
+ *
+ * 判据全部取自服务端口径：在公海 + 还有缺口 + 我**没在本瓶唱过**（内核 `hasEverSung`，
+ * 含被斩的软删段）。服务端仍会二次判定（唱过 ⇒ 422），页面这层只是不摆一个注定失败的按钮。
+ */
+function canRelayFromSea() {
+  const detail = state.detail;
+  if (detail === null || state.me === null) return false;
+  if (detail.status !== 'SEA' || detail.isComplete === true) return false;
+  if (detail.missingSegmentIndexes.length === 0) return false;
+  return !detail.segments.some((segment) => segment.ownerId === state.me.id);
+}
+
 function renderGapBox(gapIndex) {
   const canRecord = recordingAllowed();
+  /** 公海未完成品：接力入口（先接手、再录）。两者互斥：能录就说明我已经是持有者了。 */
+  const canRelay = !canRecord && canRelayFromSea();
   const preset = presetDurationFor(gapIndex);
 
   setText('.gapBox .gapKind', '缺口');
-  setText('.gapBox .gapHead', canRecord ? `第 ${gapIndex} 段由你开第一句` : `第 ${gapIndex} 段还空着`);
+  setText(
+    '.gapBox .gapHead',
+    canRecord ? `第 ${gapIndex} 段由你开第一句` : canRelay ? `第 ${gapIndex} 段还空着，等你接手` : `第 ${gapIndex} 段还空着`,
+  );
   const cta = q('.gapBox .cta');
   const note = q('.gapBox .gapNote');
   if (cta !== null) {
+    const label = canRelay ? `接第 ${gapIndex} 段` : `录第 ${gapIndex} 段`;
+    /** 接线端按 `data-mode` 分派（`wire()` 只接一次，重建的节点不重绑）。 */
+    cta.dataset.mode = canRelay ? 'relay' : 'record';
     cta.disabled = false;
-    cta.textContent = `录第 ${gapIndex} 段`;
-    cta.setAttribute('aria-label', `录第 ${gapIndex} 段`);
-    if (canRecord && preset !== null) show(cta);
+    cta.textContent = label;
+    cta.setAttribute('aria-label', label);
+    if (canRelay || (canRecord && preset !== null)) show(cta);
     else hide(cta);
   }
   if (note === null) return;
+  if (canRelay) {
+    note.textContent =
+      `第 ${gapIndex} 段还空着。点「接第 ${gapIndex} 段」把瓶子接到手里（接住后你就是这一棒的作者），` +
+      (preset === null
+        ? '再录这一段 —— 不过这一段的曲库预设时长缺失，服务端会拒绝上传（先在曲库补上这一段）。'
+        : `再按曲库预设 ${formatClock(preset)} 录。`);
+    return;
+  }
   if (!canRecord) {
     note.textContent = '这一段只有发起者（尚未投河时）或当前持有者能录：你看得到缺口，但录不了它。';
     return;
@@ -528,13 +631,38 @@ function renderResolution() {
     if (glyph !== null) glyph.style.opacity = usable ? '' : '.45';
   });
 
+  renderDestSub(
+    available.length === 0
+      ? '现在这支瓶子不由你定去向（只有持有者、或「还没投河的发起者」能选）。可选去向由服务端给。'
+      : `你现在可选 ${available.length} 条水路；想去向由服务端给，不可用的照样列出来但点不动。`,
+  );
+}
+
+/**
+ * 「选择去向」那一行的文案**唯一入口**（W12 #6）。
+ *
+ * 三条水路一条都不能点时（刚投完河、瓶子已完整、我此刻不是持有者、被处置过……），
+ * 这一列在过去就是一个"没有可继续的动作、也没有出口"的死页 —— 用户第 4 轮原话是
+ * 「投出第一棒后页面卡死，需要「返回河道」入口」。所以：**没有可点的水路就补一个「回河道」**，
+ * 形态照抄站内已经有的那一个（同一个 `.back` 类、同一句文案、同一个箭头图标、同一个落地页），
+ * 只是它长在"我刚刚做决定的地方"。
+ *
+ * 为什么并进这一行而不是另起一行：`.destCol` 的纵向余量只剩到页脚（852 的分隔线）,
+ * 另起一行在 1440×900 / 1280×720 会把这一列顶进页脚；并进同一行不增加高度（实测不换行）。
+ */
+function renderDestSub(message) {
   const sub = q('.destCol .sub');
-  if (sub !== null) {
-    sub.textContent =
-      available.length === 0
-        ? '现在这支瓶子不由你定去向（只有持有者、或「还没投河的发起者」能选）。可选去向由服务端给。'
-        : `你现在可选 ${available.length} 条水路；想去向由服务端给，不可用的照样列出来但点不动。`;
+  if (sub === null) return;
+  const needed = state.detail !== null && state.detail.availableResolutions.length === 0;
+  if (!needed) {
+    sub.textContent = message;
+    return;
   }
+  const icon = q('.crumb .back svg');
+  sub.replaceChildren(
+    document.createTextNode(`${message} `),
+    el('a', { class: 'back', href: '/river.html' }, [icon === null ? null : icon.cloneNode(true), '回河道']),
+  );
 }
 
 /**
@@ -570,7 +698,8 @@ async function selectSegment(index, options = {}) {
   const slot = cellSlot(index);
   const mark = q('.selMark');
   if (mark !== null) {
-    mark.style.left = `${slot.left + (slot.width - 60) / 2}px`;
+    /** 珊瑚刻度居中挂在这一格上（定稿宽 60 ⇒ 用 pct() 与格子同一套尺）。 */
+    mark.style.left = pct(slot.left + (slot.width - 60) / 2);
     show(mark);
   }
 
@@ -1424,6 +1553,40 @@ async function refresh() {
   render();
 }
 
+/**
+ * 「指定接唱」（`POST /api/sea/:id/targeted-segment`，CONTEXT §6.2）：把公海未完成品接到手里。
+ *
+ * 成功后**必须重新取详情**：持有权（`isHolder`）与可选去向都在服务端，就地改本地状态等于撒谎。
+ * 重取之后 `recordingAllowed()` 自然成立 ⇒ 同一格上的 CTA 从「接第 N 段」变成「录第 N 段」。
+ */
+async function takeTargetedSegment() {
+  const gapIndex = recordTargetIndex();
+  if (gapIndex === null || state.claiming) return;
+  state.claiming = true;
+  const cta = q('.gapBox .cta');
+  if (cta !== null) {
+    cta.disabled = true;
+    cta.textContent = '正在接住这一棒…';
+  }
+  try {
+    await post(`/api/sea/${encodeURIComponent(state.id)}/targeted-segment`);
+    clearState();
+    await refresh();
+    announce(`这支瓶子现在在你手里：点「录第 ${gapIndex} 段」开第一句。`);
+  } catch (error) {
+    const message = error instanceof ApiError ? error.message : '接手失败，请重试。';
+    announce(`没能接住这一棒：${message}`);
+    showError(message);
+    const again = q('.gapBox .cta');
+    if (again !== null) {
+      again.disabled = false;
+      again.textContent = `接第 ${gapIndex} 段`;
+    }
+  } finally {
+    state.claiming = false;
+  }
+}
+
 function wire() {
   qa('.destRow').forEach((row, position) => {
     const spec = RESOLUTION_ROWS[position];
@@ -1446,7 +1609,7 @@ function wire() {
          * 状态种类只有 loading/empty/error/waking（共享层是冻结的），成功用中性的 `empty`：
          * 它的点是 muted 色 —— 不是错误色，也不是"正在加载"的脉冲。
          */
-        setText('.destCol .sub', notice);
+        renderDestSub(notice);
         showState('empty', notice);
         await new Promise((resolve) => setTimeout(resolve, RESOLUTION_REDIRECT_DELAY_MS));
         location.assign('/river.html');
@@ -1492,6 +1655,7 @@ function wire() {
   if (cta !== null) {
     on(cta, 'click', () => {
       if (state.session !== null) stopRecording();
+      else if (cta.dataset.mode === 'relay') void takeTargetedSegment();
       else void startRecording();
     });
   }
@@ -1522,6 +1686,7 @@ export const { init } = definePage({
     'GET/POST /api/bottles/:id/messages',
     'POST /api/bottles/:id/resolution',
     'POST /api/bottles/:id/put-back',
+    'POST /api/sea/:id/targeted-segment（公海未完成品的接力入口）',
     'POST /api/reports',
   ],
   note: '额外必需：GET /api/segments/:id/audio（试听）、GET /api/songs（该段曲库预设时长）',

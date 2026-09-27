@@ -74,9 +74,12 @@ svg.scene {
 }
 
 /* ── 挂在场景上的字：横向用百分比（与 --u 在 ≥16:10 时等价），纵向按 --u 落在定稿的位置上 ── */
+/* 面包屑上移 4×--u（定稿 30 ⇒ 26）：h1 的字形内容盒是 1.32em、行盒只有 1em ⇒ 它会向上溢出
+ * 0.16em（1440 档 = 9px），正好压到「回河道」的文字盒上 —— 墨迹探针实测 42px² 相交
+ *（`docs/deploy-plan-html.md` §33）。上移 4×--u 后两盒不相交，且不动任何纵向坐标的读法。 */
 .crumb {
   left: 5.278%;
-  top: calc(30 * var(--u));
+  top: calc(26 * var(--u));
 }
 
 h1 {
@@ -123,38 +126,42 @@ h1 {
   top: calc(458 * var(--u));
 }
 
-/* 「正在试听」那道珊瑚刻度：落点由 JS 按"选中第几段"算（76 + (n-1)×231 + 85.5）= 161.5/392.5/623.5/854.5。
- * 同样是内联值 ⇒ 按值选列（否则 2560 下它会留在 161px 处、跟瓶子彻底脱开）。 */
-.selMark[style*='left: 161.5px'],
-.selMark[style*='left:161.5px'] {
-  left: 11.215% !important;
+/* ── 挂在剖面刻度上的字：左沿与格宽**一律由 JS 按设计坐标写百分比**（见 §33） ──
+ *
+ * W12 删掉了一整批 `[style*='left: …px']` 的枚举规则。那批规则的形状是
+ * 「把 JS 写死的设计 px 值枚举成百分比」，本质是把"哪些段位可用"写死在样式里：
+ * 缺口不在预设那几段（例如缺第 1 段）时样式不命中，元素就停在设计 px 上、静默错位。
+ * 现在坐标只有一套尺：JS 用 `pct(设计x)` 直接写 `left/width` 百分比，CSS 只留纵向落点
+ * 与冻结样板（无 `?id=` 时页面渲染的是定稿那一份，JS 不跑）的兜底百分比
+ * —— 兜底不带 `!important`，真实数据的内联值自然胜出。
+ */
+.segNum {
+  top: calc(320 * var(--u));
 }
 
-.selMark[style*='left: 392.5px'],
-.selMark[style*='left:392.5px'] {
-  left: 27.257% !important;
+.segLab {
+  top: calc(356 * var(--u));
 }
 
-.selMark[style*='left: 623.5px'],
-.selMark[style*='left:623.5px'] {
-  left: 43.299% !important;
+.cap {
+  top: calc(458 * var(--u));
 }
 
-.selMark[style*='left: 854.5px'],
-.selMark[style*='left:854.5px'] {
-  left: 59.34% !important;
-}
-
+/* 「正在试听」那道珊瑚刻度：落点由 JS 按"选中第几段"算成百分比；这里只留纵向与尺寸。
+ * 宽度是 px×--u（定稿 60），横向落点与格位同为百分比 —— 视口比例 ≥16:10 时两者等价。 */
 .selMark {
   top: calc(451 * var(--u));
   width: calc(60 * var(--u));
   height: calc(2 * var(--u));
 }
 
+/* 冻结样板的兜底（定稿：缺口盒 = 第 4 格内缩 10 ⇒ 779/211，换算成百分比）。
+ * 真实数据的左右由 JS 按段号写内联百分比，所以这里**不能**用 `!important`
+ * —— 用了就等于"缺口盒钉死在第 4 格"（用户第 4 轮 #1 的实测现象）。 */
 .gapBox {
-  left: 54.097% !important;
+  left: 54.097%;
   top: calc(402 * var(--u));
-  width: 14.653% !important;
+  width: 14.653%;
 }
 
 .callout {
@@ -167,38 +174,11 @@ h1 {
   top: calc(468 * var(--u));
 }
 
-/* 四格刻度：定稿 76 / 307 / 538 / 769 = 76 + (n-1) × 231。
- *
- * 为什么用「内联 left 的值」选列、而不是 `:nth-of-type`：`page-bottle.js` 会把三组格子
- * **全部删掉再按数据重新 append**（顺序随"有几段有人唱"变化）⇒ 任何按兄弟序号的写法在真数据下都会错位。
- * 稳定的事实只有一件事：这三组格子的 left 就是 76/307/538/769（JS 与冻结 HTML 都这么写）。
- * 两种写法的空格不同（HTML `left:76px`、JS 序列化 `left: 76px`），所以各匹配一次。 */
-:is(.segNum, .segLab, .cap)[style*='left:76px'],
-:is(.segNum, .segLab, .cap)[style*='left: 76px'] {
-  left: 5.278% !important;
-}
-
-:is(.segNum, .segLab, .cap)[style*='left:307px'],
-:is(.segNum, .segLab, .cap)[style*='left: 307px'] {
-  left: 21.319% !important;
-}
-
-:is(.segNum, .segLab, .cap)[style*='left:538px'],
-:is(.segNum, .segLab, .cap)[style*='left: 538px'] {
-  left: 37.361% !important;
-}
-
-:is(.segNum, .segLab, .cap)[style*='left:769px'],
-:is(.segNum, .segLab, .cap)[style*='left: 769px'] {
-  left: 53.403% !important;
-}
-
-/* 横向用百分比而不是 calc(N × --u)：在宽高比 ≥ 16:10 时两者等价（--u 就是 100vw/1440），
- * 但在更"竖"的窗口里百分比不会把格子推出视口。列宽同理（231/1440 = 16.042%）。 */
+/* 冻结样板的兜底列宽（定稿 231/1440 = 16.042%）；真实数据的宽度同样由 JS 内联决定。 */
 .segNum,
 .segLab,
 .cap {
-  width: 16.042% !important;
+  width: 16.042%;
 }
 
 /* ── 时间轴（page-bottle.js 注入）：内部逐段内联 px ⇒ 整块等比缩放到 --u 的尺度 ── */
