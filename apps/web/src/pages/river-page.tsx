@@ -33,11 +33,8 @@
  */
 import { useCallback, useEffect, useRef, useState, type CSSProperties, type MouseEvent as ReactMouseEvent } from 'react';
 import {
-  LightShafts,
   Ripple,
   RippleRing,
-  WaterSheen,
-  WaterTexture,
   cn,
   motion,
   prefersReducedMotion,
@@ -271,15 +268,26 @@ export function RiverPage() {
     // 页面自带 <main>（外壳不渲染，且外壳不给 padding ⇒ main 贴视口宽全出血，
     // 不得再写负外边距：-mx-6/md:-mx-12 曾把 scrollWidth 撑成 1488>1440 / 399>375）。
     // 唱片出血由 backdrop 的 absolute inset-0 承担；正文边距是 header/section/footer 各自的 px-6。
-    <main className="relative isolate flex flex-col gap-6 md:gap-8">
+    <main className="relative isolate flex flex-col gap-6 md:min-h-[100dvh] md:gap-8">
       {/* ── B1 背景五层 + B2 唱片表面 SVG（稿 §5/§4）───────────────────────────
-          放在 z-0：它压在水体之上（"沟槽里流的是水"），但在全部正文之下（正文 relative z-10）。
+          一比一 v2：backdrop 与泊位共用**同一个 cover 场景几何**（art 恒 1440:900：
+          宽=max(scene, H×1.6)、高=max(scene, W/1.6)，居中裁切）——
+          SVG 与泊位从此同一坐标系，任何视口宽度都逐像素咬合（旧版 xMaxYMax 裁切 + 泊位挂
+          river-body 局部 % ⇒ 两套坐标，宽屏下弧线与按钮必然脱节）。
           纯装饰：aria-hidden、pointer-events-none、绝对定位零布局高度。 */}
       <div
         aria-hidden="true"
         data-river-backdrop=""
-        className="pointer-events-none absolute inset-0 z-0"
+        className="pointer-events-none absolute inset-0 z-0 overflow-hidden"
       >
+        <div
+          data-river-art=""
+          className="pointer-events-none absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2"
+          style={{
+            width: 'max(100%, calc(100dvh * 1.6))',
+            height: 'max(100%, calc(100vw / 1.6))',
+          }}
+        >
         {/* ① 底：台面接触阴影 + 盘身亮一档 */}
         <div className="platter absolute inset-0" style={PLATTER_LAYER} />
         <div className="body absolute inset-0" style={BODY_LAYER} />
@@ -376,6 +384,7 @@ export function RiverPage() {
             顺槽 · 33⅓
           </text>
         </svg>
+        </div>
       </div>
 
       {/* ── B3/B4 岸（水线以上）：标题立在被压暗的盘面上 ─────────────────────── */}
@@ -412,12 +421,10 @@ export function RiverPage() {
       {/* ── 水线以下：一整片水（水面光 / 水纹 / 水下光柱 / 常驻装饰）────────────
           两个泊位骑在这条河上 —— 它们**没有各自的背景、边框与阴影**，浮在同一片水上，
           这是"同一条河上的两个位置"的关键（`DESIGN.md` §Composition）。 */}
-      <section className="river-body relative isolate overflow-hidden px-6 pb-6 pt-16 md:px-12 md:pb-8 md:pt-24">
-        {/* 一比一复刻（2026-09-27 用户点名）：稿 f4-groove 全页无横贯直线 ⇒
-            原 SurfaceLine 横实线与 .river-flowline 横虚线一并删除；水感由 backdrop 五层承担。 */}
-        <WaterSheen />
-        <WaterTexture drift />
-        <LightShafts />
+      <section className="river-body relative isolate overflow-hidden bg-none px-6 pb-6 pt-16 md:px-12 md:pb-8 md:pt-24">
+        {/* 一比一复刻 v2（用户看图打回）：稿的下半是**纯暗盘面** ⇒ 上一版保留的
+            WaterSheen / WaterTexture / LightShafts 与 .river-body 自带的 gradient-river
+            大色块全部退场（bg-none 盖掉 DS 里的底），水感只由 backdrop 五层承担。 */}
 
         {/* ── f0① 常驻态「只有水在流」：两圈错拍的场景涟漪。
             装饰零信息 —— aria-hidden、pointer-events-none、绝对定位零布局高度。 */}
@@ -467,15 +474,15 @@ export function RiverPage() {
           </div>
         ) : null}
 
-        {/* 一比一复刻：桌面下泊位按稿绝对坐标骑在河道弧上
-            （draw 60,400 / cast 380,580 ⇒ 容器左缘≈稿 x76，draw 贴左、cast 右移 23.6%、垂直错落 180px）；
-            <md 维持流式单列（375 锚点进首屏的现行判据靠流式保证）。 */}
-        <div className="relative z-10 grid gap-4 md:block md:h-[clamp(440px,31.9vw,470px)]">
-          {/* B5 · 下游 · 捞取（稿 60,400 190×190）：新用户的第一动作，按阅读顺序放先。 */}
+        {/* 一比一复刻 v2：泊位容器在 md+ 变成与 backdrop 同几何的 **cover 场景盒**
+            （fixed 挂视口、宽高 = art 覆盖式、居中），子节用稿画布百分比落位 ——
+            与 SVG 同一坐标系，任意宽度下泊位都骑在弧上；<md 维持流式单列（375 锚点判据靠流式）。 */}
+        <div className="relative z-10 grid gap-4 md:pointer-events-none md:fixed md:left-1/2 md:top-1/2 md:z-10 md:h-[max(100dvh,calc(100vw_/_1.6))] md:w-[max(100vw,calc(100dvh_*_1.6))] md:-translate-x-1/2 md:-translate-y-1/2">
+          {/* B5 · 下游 · 捞取（稿画布 60,400 → 4.1667%,44.444%；190×190） */}
           <section
             data-anchor="river-draw"
             aria-labelledby="draw-heading"
-            className="flex items-start gap-4 md:absolute md:left-0 md:top-0 md:gap-6"
+            className="flex items-start gap-4 md:absolute md:left-[4.1667%] md:top-[44.444%] md:pointer-events-auto md:gap-6"
           >
             <h2 id="draw-heading" className="sr-only">
               从河道捞一个漂流瓶
@@ -512,8 +519,8 @@ export function RiverPage() {
               </button>
             </div>
 
-            {/* B5 cap：稿宽 240（固定 px → 流体 clamp），位于盘右侧、比盘顶低 40px（稿 top:40） */}
-            <div className="flex min-w-0 flex-col gap-[6px] md:mt-[40px] md:w-[clamp(200px,16.667vw,240px)]">
+            {/* B5 cap（稿：相对盘 left:230=top+40px 间隙、top:40 下沉；md+ 绝对对位，<md 流式） */}
+            <div className="flex min-w-0 flex-col gap-[6px] md:absolute md:left-[calc(100%+40px)] md:top-[40px] md:w-[clamp(200px,16.667vw,240px)]">
               <p className="block text-[0.9375rem] text-paper">捞一个漂流瓶</p>
               <p className="text-[0.78125rem] leading-[1.75] text-muted">
                 捞到别人的半句，接下一句。捞到即持有：同一时刻只有你拿着它。
@@ -528,11 +535,11 @@ export function RiverPage() {
             </div>
           </section>
 
-          {/* B6 · 上游 · 投下（稿 380,580 150×150，较捞取右移 23.6%、下沉 180px）：暖边 + 小一档（captain 裁决不等大）。 */}
+          {/* B6 · 上游 · 投下（稿画布 380,580 → 26.389%,64.444%；150²，较捞取右下、稿垂直差 180px） */}
           <section
             data-anchor="river-drop"
             aria-labelledby="cast-heading"
-            className="mt-4 flex flex-row-reverse items-start gap-4 md:absolute md:left-[23.6%] md:top-[180px] md:gap-6"
+            className="mt-4 flex flex-row-reverse items-start gap-4 md:absolute md:left-[26.389%] md:top-[64.444%] md:pointer-events-auto md:gap-6"
           >
             <h2 id="cast-heading" className="sr-only">
               投下一支漂流瓶
@@ -563,8 +570,8 @@ export function RiverPage() {
               </Link>
             </div>
 
-            {/* B6 cap：稿宽 300，位于盘**左下**（flex-row-reverse ⇒ 视觉在盘左侧；稿 top:165 ⇒ 下沉到盘下方偏左） */}
-            <div className="flex min-w-0 flex-col gap-[6px] md:mt-[165px] md:w-[clamp(240px,20.833vw,300px)]">
+            {/* B6 cap（稿：相对盘 left:-180/宽300 ⇒ 右缘在盘内 80% 处、top:165 沉到盘下方偏左；md+ 绝对对位） */}
+            <div className="flex min-w-0 flex-col gap-[6px] md:absolute md:right-[20%] md:top-[165px] md:w-[clamp(240px,20.833vw,300px)]">
               <p className="block text-[0.9375rem] text-paper">投下一支漂流瓶</p>
               <p className="text-[0.78125rem] leading-[1.75] text-muted">
                 选一首歌，录下第 1 段，投进河道，等一个陌生人接棒。

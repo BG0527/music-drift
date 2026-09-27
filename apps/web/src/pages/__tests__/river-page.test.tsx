@@ -262,19 +262,20 @@ describe('河道页 · 三件装置（S3）', () => {
 
   it('② 两枚泊位**错落**：只有「投下」被下移，两枚不在同一条水平线上', () => {
     /**
-     * ⚠️ 断言原文 → 新文（一比一复刻 2026-09-27）：
-     * 原文：draw className 不含 `md:mt-`、drop 含 `md:mt-`（旧 grid 流式错落机制，md:mt-16=64px）。
-     * 新文：稿的错落 = 绝对坐标垂直差 180px ⇒ draw `md:absolute md:top-0`（不下移）、
-     * drop `md:top-[180px]`（下移 180px，较稿 64px 的旧值多 116px）。
+     * ⚠️ 断言原文 → 新文（一比一复刻 v2）：
+     * 原文：draw `md:top-0` / drop `md:top-[180px]`（river-body 局部 px 错落）。
+     * 新文：改挂 cover 场景盒后错落 = 稿画布 y%（400 vs 580 ⇒ 44.444% vs 64.444%，
+     * 差 20%×900 = 稿 180px），draw 贴画布 (60,400)、drop 贴 (380,580)。
      */
     const { container } = renderWithProviders(<RiverPage />, { handlers: [] });
     const wrap = (id: 'draw' | 'drop'): HTMLElement | null =>
       container.querySelector<HTMLElement>(`[data-anchor="river-${id}"]`);
-    expect(wrap('draw')?.className, '捞取不该被下移（贴画布顶）').toContain('md:top-0');
-    expect(wrap('draw')?.className, '捞取走绝对定位贴左').toContain('md:absolute md:left-0');
-    expect(wrap('drop')?.className, '投下必须与捞取错开（桌面下移 180px）').toContain(
-      'md:top-[180px]',
+    expect(wrap('draw')?.className, '捞取在稿画布 60,400').toContain('md:top-[44.444%]');
+    expect(wrap('draw')?.className, '捞取贴画布左缘').toContain('md:left-[4.1667%]');
+    expect(wrap('drop')?.className, '投下在稿画布 380,580（较捞取下沉稿 180px）').toContain(
+      'md:top-[64.444%]',
     );
+    expect(wrap('drop')?.className, '投下在捞取右下方').toContain('md:left-[26.389%]');
   });
 
   it('③ 默认态没有漂流瓶（用户第 ④ 条硬约束：只有水在流，瓶的缺席本身可读）', () => {
@@ -318,7 +319,7 @@ describe('河道页 · f4 块对照（review-river-blocks）', () => {
 
   it('B2 唱片 SVG 整套：圆族 + 擦痕弧 + 尘点 + 转向箭头「顺槽 · 33⅓」，且源码禁 hex', () => {
     const { container } = renderWithProviders(<RiverPage />, { handlers: [] });
-    const canvas = container.querySelector('[data-river-backdrop] > svg');
+    const canvas = container.querySelector('[data-river-art] > svg');
     expect(canvas, '缺唱片表面 SVG（稿 B2）').not.toBeNull();
     expect(canvas?.getAttribute('viewBox')).toBe('0 0 1440 900');
     // 圆族 ≥20：标签族 6（268/262/275/336/1276/1268）+ 河道 6 + 擦痕弧 4 + 尘点 4
@@ -520,24 +521,55 @@ describe('河道页 · f0 三段分镜（任务 E）', () => {
   });
 
   /**
-   * 一比一复刻（2026-09-27 用户点名）：泊位按稿 f4-groove 的绝对坐标落位——
-   * draw 60,400（190²）/ cast 380,580（150²），垂直错落 180px、投下位右移 23.6%（(380−76)/1288），
-   * cap 下沉 draw 40 / cast 165。DOM 在 jsdom 无布局 ⇒ 源码级钉 class 语义。
+   * 一比一复刻 v2（用户 2026-09-27 看图打回后重裁）：泊位与 SVG 必须**同一坐标系** ——
+   * 场景 = cover 盒（art 宽=max(100vw,100dvh×1.6)、高=max(100dvh,100vw/1.6)，恒 1440:900 比例），
+   * 泊位 fixed 挂在同一个 art 盒上、坐标 = 稿画布百分比：
+   * draw 60,400 ⇒ 4.1667%,44.444%（190²）｜cast 380,580 ⇒ 26.389%,64.444%（150²）
+   * —— 任何视口宽度下都与 SVG 弧线逐像素咬合（旧实现：SVG xMaxYMax 裁切 + 泊位挂 river-body 局部 %，两套坐标必脱节）。
    */
-  it('泊位一比一：绝对坐标骑在河道弧上（垂直错落 180px + cap 下沉 40/165）', () => {
+  it('泊位一比一 v2：cover 场景盒同坐标系（fixed + 稿画布百分比 + cap 下沉 40/165）', () => {
     const src = readFileSync(
       resolve(process.cwd(), 'src', 'pages', 'river-page.tsx'),
       'utf8',
     );
-    const draw = /<section[\s\S]{0,400}?data-anchor="river-draw"[\s\S]{0,260}?className=\{?"([^"]+)"/.exec(src)?.[1] ?? '';
-    const cast = /<section[\s\S]{0,400}?data-anchor="river-drop"[\s\S]{0,260}?className=\{?"([^"]+)"/.exec(src)?.[1] ?? '';
-    expect(draw, '捞取：桌面绝对定位在画布左上').toContain('md:absolute md:left-0 md:top-0');
-    expect(cast, '投下：桌面绝对定位、右移 23.6%、垂直错落 180px').toContain(
-      'md:absolute md:left-[23.6%] md:top-[180px]',
+    const draw = /<section[\s\S]{0,400}?data-anchor="river-draw"[\s\S]{0,300}?className=\{?"([^"]+)"/.exec(src)?.[1] ?? '';
+    const cast = /<section[\s\S]{0,400}?data-anchor="river-drop"[\s\S]{0,300}?className=\{?"([^"]+)"/.exec(src)?.[1] ?? '';
+    expect(draw, '捞取：稿坐标 60,400 + 可点恢复').toContain(
+      'md:absolute md:left-[4.1667%] md:top-[44.444%]',
     );
-    expect(src, '容器须是桌面相对画布并给定稿高').toMatch(/md:h-\[clamp\(4[0-9]{2}px,31\.9vw,470px\)\]/);
-    expect(src, '捞取 cap 下沉 40px（稿 top:40）').toContain('md:mt-[40px]');
-    expect(src, '投下 cap 下沉 165px（稿 top:165）').toContain('md:mt-[165px]');
+    expect(draw, '泊位在 pointer-none 场景盒里必须恢复可点').toContain('pointer-events-auto');
+    expect(cast, '投下：稿坐标 380,580（与 draw 垂直差=稿 180px）').toContain(
+      'md:absolute md:left-[26.389%] md:top-[64.444%]',
+    );
+    expect(cast, '投下也要可点').toContain('pointer-events-auto');
+    expect(src, '泊位容器 md 下必须是 fixed cover 盒').toContain('md:fixed');
+    expect(src, 'cover 盒宽 = max(100vw, 100dvh×1.6)').toContain('max(100vw');
+    expect(src, 'cover 盒高 = max(100dvh, 100vw/1.6)').toContain('max(100dvh');
+    expect(src, '捞取 cap 对位：相对盘右侧 +40px、top 40 下沉').toContain('md:left-[calc(100%+40px)]');
+    expect(src, '捞取 cap top 40（稿）').toContain('md:top-[40px]');
+    expect(src, '投下 cap 对位：右缘在盘内 80% 处（稿 left:-180/宽300）').toContain('md:right-[20%]');
+    expect(src, '投下 cap top 165（稿，沉到盘下方偏左）').toContain('md:top-[165px]');
+  });
+
+  /**
+   * 一比一复刻 v2：稿 f4-groove 的下半是**纯暗盘面**——上一版保留的青绿三层
+   * （.river-body 的 gradient-river 大色块 + WaterSheen 光带 + LightShafts 斜纹）与
+   * WaterTexture 扫描线在宽屏截图里糊成一整片青绿，用户打回。全部删除，水感只由 backdrop 承担。
+   */
+  it('无青绿块：WaterSheen/WaterTexture/LightShafts 已从河道页移除，river-body 禁用自身渐变底', () => {
+    const src = readFileSync(
+      resolve(process.cwd(), 'src', 'pages', 'river-page.tsx'),
+      'utf8',
+    );
+    expect(src, 'WaterSheen 应已删').not.toContain('<WaterSheen');
+    expect(src, 'WaterTexture 应已删').not.toContain('<WaterTexture');
+    expect(src, 'LightShafts 应已删').not.toContain('<LightShafts');
+    expect(src, 'river-body 必须 bg-none 盖掉 .river-body 的 gradient-river').toMatch(
+      /river-body[^"]*bg-none/,
+    );
+    expect(src, 'backdrop 必须是 cover 场景盒（art 恒 1440:900 比例）').toContain(
+      'max(100%, calc(100dvh * 1.6))',
+    );
   });
 
   it('捞取失败：aria-live 补失败文案（动效不是唯一反馈），不播「收拢确认」、不跳转', async () => {

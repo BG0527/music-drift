@@ -62,19 +62,30 @@ describe('顶部 top-nav（页面上方常显导航，替换浮动收起式 demo
     expect(idle.querySelector('span')?.className).toMatch(/\bscale-x-0\b/);
   });
 
-  it('同主题：water-void 底 + hairline 细线 + meta 字号字距，激活项 coral 指示', () => {
+  it('美化 v2（用户看图打回「太丑」）：无框无底纯文字链，15px 正常字距，激活 coral + 指示线', () => {
+    /**
+     * ⚠️ 断言原文 → 新文（2026-09-27 看图打回）：
+     * 原文：nav 必须 `bg-water-void + border-hairline + rounded-base`（居中药丸框），
+     *       链接 11px/.24em meta 字 + border-coral。
+     * 新文：参考稿/站外同款顶栏 —— **去掉方框与底**，纯文字链 15px 正常字距；
+     *       激活项 text-coral + font-medium + scaleX 指示线（2px，贴文字下方），无 border 类。
+     */
     renderWithProviders(<TopNav items={NAV_ITEMS} current="sea" />);
     const bar = screen.getByRole('navigation', { name: '站内导航' });
-    expect(bar.className).toMatch(/\bbg-water-void\b/);
-    expect(bar.className).toMatch(/\bborder-hairline\b/);
-    expect(bar.className).toMatch(/\brounded-base\b/);
+    expect(bar.className, '不再要方框底色').not.toMatch(/\bbg-water-void\b/);
+    expect(bar.className, '不再要描边').not.toMatch(/\bborder-hairline\b/);
+    expect(bar.className, '不再要药丸圆角容器').not.toMatch(/\brounded-base\b/);
     const active = screen.getByRole('link', { name: '公海' });
     expect(active.className).toMatch(/\btext-coral\b/);
-    expect(active.className).toMatch(/\bborder-coral\b/);
-    expect(active.className).toMatch(/text-\[0\.6875rem\]/);
-    expect(active.className).toMatch(/tracking-\[0\.24em\]/);
+    expect(active.className).toMatch(/\bfont-medium\b/);
+    expect(active.className, '15px 正常字距（参考图语态）').toMatch(/text-\[0\.9375rem\]/);
+    expect(active.className, '不再是 11px/.24em meta 药丸字').not.toMatch(/tracking-\[0\.24em\]/);
+    expect(active.className, '指示线由 span 承担，链接本体不再带 border 类').not.toMatch(/\bborder-coral\b/);
+    const indicator = active.querySelector('span');
+    expect(indicator?.className, '指示线 2px 贴文字下').toMatch(/\bh-\[2px\]/);
+    expect(indicator?.className).toMatch(/\bscale-x-100\b/);
     const idle = screen.getByRole('link', { name: '河道' });
     expect(idle.className).not.toMatch(/\btext-coral\b/);
-    expect(idle.className).not.toMatch(/\bborder-coral\b/);
+    expect(idle.querySelector('span')?.className).toMatch(/\bscale-x-0\b/);
   });
 });

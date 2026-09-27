@@ -135,10 +135,18 @@ describe('水域母题：装饰层的基本纪律（不喧宾夺主）', () => {
 });
 
 describe('水域母题：页面确实接入了（不是写了组件没人用）', () => {
-  it('河道页的整片水体加了水面光带与水纹', () => {
+  it('河道页水感由 backdrop 五层承担（一比一 v2：组件级光带/水纹/光柱已退场）', () => {
+    /**
+     * ⚠️ 守卫改动（原文 → 新文，整合者执行，一比一 v2 / 用户看图打回「大片青绿」）：
+     * 原文：断 river-page 含 `<WaterSheen` 与 `<WaterTexture`（组件接入判据）。
+     * 新文：稿 f4-groove 的下半是纯暗盘面 ⇒ 组件级三层全删，改断「删干净了 + backdrop 场景盒在位
+     * + river-body 用 bg-none 盖掉 DS 自带的 gradient-river」。
+     */
     const river = pageSource('river-page.tsx');
-    expect(river, 'river-page 未接入 WaterSheen').toContain('<WaterSheen');
-    expect(river, 'river-page 未接入 WaterTexture').toContain('<WaterTexture');
+    expect(river, 'WaterSheen 应已退场').not.toContain('<WaterSheen');
+    expect(river, 'WaterTexture 应已退场').not.toContain('<WaterTexture');
+    expect(river, 'backdrop cover 场景盒必须在位').toContain('data-river-backdrop');
+    expect(river, 'river-body 必须盖掉 DS 自带渐变底').toMatch(/river-body[^"]*bg-none/);
   });
   // ⚠️ 守卫改动（整合者记录，2026-09-27）：原「公海作品页的深底页头加了水面光带」一条已删 ——
   // 用户 §17 裁决删除公海详情页（sea-detail-page.tsx 已不存在），其沟槽时间轴+唱针移植进瓶子详情。
@@ -379,21 +387,18 @@ describe('t46 水流漂移：走契约 + reduced-motion 可静止（能真的区
     );
   });
 
-  it('有页面真的在用漂移（照抄批次口径：≥2 —— river + settings）', () => {
+  it('有页面真的在用漂移（一比一 v2 口径：≥1 —— settings）', () => {
     /**
-     * ⚠️ 守卫改动（原文 → 新文，整合者执行）：
-     * 原文：`['sea-page.tsx','profile-page.tsx','settings-page.tsx'] … ≥3`。
-     * 新文：名单换成**真实在用**的页面并把下限定为 2。
-     * 为什么必须改：照抄批次（2026-09-27 返工令）后，公海/我的的组件级 `<WaterTexture drift>`
-     * 被各自稿的装置取代（稿是静态 mock，没有组件级漂移），真实用户只剩 river（passage-drift
-     * 族 + WaterTexture）与 settings。**这不是悄悄放宽**：t46「≥3」的回升路径已登记 ——
-     * motion-plan（apps/web/docs/motion-plan.md）逐页应用阶段会把常驻漂移按页补回，届时把
-     * 名单与下限改回 ≥3。
+     * ⚠️ 守卫改动（原文 → 新文 v2，整合者执行）：
+     * 上一版：名单 [river, settings] ≥2。
+     * 本版：**一比一 v2**（用户看图打回）后 river 删除组件级 WaterTexture（稿无扫描线）⇒
+     * 真实用户只剩 settings，下限降为 1。**仍是显式记录的降档**：回升路径不变 ——
+     * motion-plan 逐页应用 + DESIGN 契约记账（§8.4/§9.4）恢复后，把名单与下限改回 ≥2/≥3。
      */
-    const users = ['river-page.tsx', 'settings-page.tsx'].filter((page) =>
+    const users = ['settings-page.tsx', 'river-page.tsx'].filter((page) =>
       usesDrift(pageSource(page)),
     );
-    expect(users.length, `只有 ${String(users.length)} 个页面用了 drift`).toBeGreaterThanOrEqual(2);
+    expect(users.length, `只有 ${String(users.length)} 个页面用了 drift`).toBeGreaterThanOrEqual(1);
   });
 
   it('旧硬约束③已从 DESIGN.md 删除，且新条文在位（不许两份规则并存）', () => {
@@ -403,41 +408,14 @@ describe('t46 水流漂移：走契约 + reduced-motion 可静止（能真的区
 });
 
 /* ── t47 收尾：深底水面也要流动（浅底活、深底死图 = 同一页两种水，不一致）─────────
-   判据（全部 includes，无正则）：① 河道页两个深水面板的水层带 drift；
-   ② 作品详情深底页头的水层带 drift；③ 降级通道唯一 —— water.css 里不得有 JS 驱动动画
+   ⚠️ 判据 v2（一比一 v2，整合者执行）：原①「河道页 river-body 有 drift」+ countDriftTags、
+   原②「作品详情深底页头 drift」+ darkSurfaceDrifts 均已删除（河道随稿删组件级 WaterTexture；
+   详情页随 §17 删除）—— 深底 drift 真实用户仅剩 settings（断言在上方 t46 组，下限降 1、记回升路径）。
+   保留判据：降级通道唯一 —— water.css 里不得有 JS 驱动动画
    （`.animate(` / requestAnimationFrame），否则 reduced-motion 的 CSS 重置会被绕过。 */
-const countDriftTags = (src: string, tag: string): number => {
-  let n = 0;
-  let i = src.indexOf('<' + tag);
-  while (i !== -1) {
-    if (src.slice(i, i + 80).includes(' drift')) n += 1;
-    i = src.indexOf('<' + tag, i + 1);
-  }
-  return n;
-};
 
-/**
- * 深底容器（`bg-deep-current`）里是否**有**带 drift 的水层。
- * 判据放在"深底容器之后 700 字符"的窗口里 —— 因为装饰层是该容器的子节点，
- * 而 className 在容器标签上、装饰在它之后。
- * ⚠️ 守卫改动（整合者记录，2026-09-27）：`darkSurfaceDrifts` 的唯一调用点
- * 「作品详情深底页头也有 drift 水层」已随用户 §17 裁决（删除公海详情页）一并删除；
- * 函数若保留会触发 TS6133（未使用）。
- */
 describe('t47 深底水面也流动（消除"浅底活在流、深底是贴图"）', () => {
-  /* 本轮河道页从「两张深色卡片」改成「一整片水体」：深底容器数 2 → 1。
-     断言跟着**新结构**走，不删不改意 —— 判据仍是"深底水面必须是活的"。 */
-  it('河道页的整片水体（river-body）里有 drift 水层', () => {
-    const src = pageSource('river-page.tsx');
-    const body = src.split('river-body');
-    expect(body.length - 1, '河道页水体容器数量变了？').toBe(1);
-    expect(body[1]?.slice(0, 1200).includes(' drift'), '河道页水体没开漂移').toBe(true);
-    expect(
-      countDriftTags(src, 'WaterTexture'),
-      '河道页带 drift 的水层少于 1 处',
-    ).toBeGreaterThanOrEqual(1);
-  });
-
+  /* ⚠️ 原「河道页的整片水体（river-body）里有 drift 水层」已删（见上方 v2 头注）。 */
   it('降级通道唯一：water.css 里不得有 JS 驱动动画（否则 reduced-motion 会被绕过）', () => {
     expect(waterCss, 'water.css 出现 JS 动画').not.toContain('.animate(');
     expect(waterCss, 'water.css 出现 rAF 驱动').not.toContain('requestAnimationFrame');
