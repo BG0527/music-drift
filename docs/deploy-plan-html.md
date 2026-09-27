@@ -1552,10 +1552,21 @@ VERDICT: 构图零差异（坐标逐元素一致）
 ### 32.8 读图（`.tmp-w14/shots/`）
 
 `river-default-footer.png`（默认「全部」选中）/ `river-mood-yeshen-footer.png`（点「深夜」后）/
-`river-default-full.png`、`river-mood-yeshen-full.png`（整页）/ `river-keyboard-focus-footer.png`（键盘焦点）。
+`river-default-full.png`、`river-mood-yeshen-full.png`（整页）/ `river-keyboard-focus-footer.png`（键盘焦点）
+/ `footer-padded-after-click.png`（点击后带内边距的裁切）。
 结论：两态都落在这一页的视觉语言里 —— **1px 细边、无填充、无 emoji**；选中项边框是页面水体那条
 `--glass`（青），未选中仍是 `--line`（灰）。整页图除被选中的那一格，其余构图（标题区 / RPM 区 /
 两个泊位 / 沟槽弧 / 页脚其余元素）完全重合。
+
+**焦点环另用 computed style 判**（页脚那几张裁切图只有 33px 高，outline 落在框外 2px 处会被裁掉，
+读图判不出来）：
+
+```
+键盘 Tab 后：   outline="1px solid rgb(127, 209, 217)"（= var(--glass) 的算值）· offset=2px · matches(':focus-visible')=true
+真鼠标点击后：  outline="3px none" · matches(':focus-visible')=false  ⇒ 点完只剩选中态，不会多一圈环
+```
+
+⇒ 新增的 `:focus-visible` 只在键盘路径出现，鼠标用户的观感与定稿一致。
 
 ### 32.9 残留与弱点（诚实自报）
 

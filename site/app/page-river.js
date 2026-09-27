@@ -11,6 +11,8 @@
  * 本文件**不改 HTML**（`site/*.html` 是发布副本，由 `tools/sync-site.mjs` 生成）：
  * 只用页面已有的 class 名（`.port.draw` / `.port.cast` / `footer .go` / `footer .tag`）定位。
  * 页面默认态是设计定的「空河道在等」——不画瓶子、不伪造数据；文案一律 `textContent`。
+ * 页脚的心情标签（`.tag`）是本页唯一的「纯交互」件（W14）：切换选中态**不调用任何端点**，
+ * 视觉就是页面自己的 `.tag[aria-pressed='true']`，本身不增删节点 ⇒ 构图坐标一动不动。
  */
 import { post } from './api.js';
 import { clearState, on, q, qa, showEmpty, showError, showLoading, showRequestFailure } from './dom.js';
@@ -24,6 +26,40 @@ const SEA_TARGET = '/sea.html';
 const EMPTY_RIVER_CODE = 'NO_BOTTLE_AVAILABLE';
 
 let drawing = false;
+
+/** 心情标签 = 页脚那排 `<button class="tag">`：全部 / 深夜 / 通勤 / 告白 / 雨天。 */
+const TAG_SELECTOR = 'footer .tag';
+
+/**
+ * 选中的心情（= 那个标签的文字）。**存在模块作用域，不挂在某个节点上**：
+ * 页面重渲染、页脚被换掉之后要按它把选中态拨回来，否则用户点出来的选择会被一次重画抹回定稿默认。
+ */
+let mood = null;
+
+const tagLabel = (tag) => (tag.textContent ?? '').trim();
+
+/**
+ * **单选**：恰有一个标签 `aria-pressed="true"`。
+ * 依据：这排标签的第一个是「全部」（定稿就把它标成选中），即"复位项" —— 多选会让「全部 + 深夜」自相矛盾；
+ * 它们的位置与措辞（深夜/通勤/告白/雨天）也是筛选取景的语义。
+ * 首次调用采纳页面自带的默认态；之后一律以 `mood` 为准 —— 这就是"重挂载后状态还在"的全部机制。
+ */
+function syncMood() {
+  const tags = qa(TAG_SELECTOR);
+  if (tags.length === 0) return;
+  if (mood === null || !tags.some((tag) => tagLabel(tag) === mood)) {
+    mood = tagLabel(tags.find((tag) => tag.getAttribute('aria-pressed') === 'true') ?? tags[0]);
+  }
+  for (const tag of tags) tag.setAttribute('aria-pressed', String(tagLabel(tag) === mood));
+}
+
+/** 点中的那个成为唯一选中项；再点它本身是空操作（有「全部」当复位项 ⇒ 不存在"一个都没选"）。 */
+function selectMood(tag) {
+  const next = tagLabel(tag);
+  if (next === mood) return;
+  mood = next;
+  syncMood();
+}
 
 /** 键盘可达（泊位在设计里是 `<div role="button">`，没有 tabindex）。 */
 function activate(element, handler) {
@@ -76,13 +112,16 @@ function wire() {
   const sea = q('footer .go');
   if (sea !== null) sea.setAttribute('href', SEA_TARGET);
 
-  // 心情标签是设计稿的演示控件：河道只有随机捞取，没有按心情筛选的端点。
-  // 只标 `aria-disabled`（无声明的视觉变化），不改动构图与既有样式。
-  for (const tag of qa('footer .tag')) {
-    if (tag.getAttribute('aria-pressed') === 'true') continue;
-    tag.setAttribute('aria-disabled', 'true');
-    tag.setAttribute('title', '演示控件：河道按心情筛选尚未接入后端');
-  }
+  // 心情标签：**只切 `aria-pressed`**（页面自己的激活态语言就是 `.tag[aria-pressed='true']`），
+  // 不增删任何节点 ⇒ 河道页的构图坐标一个都不动。点击走**事件委托**：重挂载出来的新节点无需重新绑。
+  syncMood();
+  on(document, 'click', (event) => {
+    const tag = event.target instanceof Element ? event.target.closest(TAG_SELECTOR) : null;
+    if (tag !== null) selectMood(tag);
+  });
+  // 页面重渲染 / 页脚重挂载（`showState` 系列会动 body，数据渲染会换掉页脚）之后把选择拨回来。
+  // `syncMood` 只改属性、不插节点 ⇒ 不会自激（本观察者只看 childList）。
+  new MutationObserver(syncMood).observe(document.body, { childList: true, subtree: true });
 }
 
 export const { init } = definePage({

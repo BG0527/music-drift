@@ -218,3 +218,21 @@ footer .go {
 h1 {
   font-size: clamp(72px, 5.83vw, 112px);
 }
+
+/* ── 心情标签（页脚那排 chip；W14 把交互接上，视觉**只用页面自己的 token**） ─────────────
+ * 定稿的选中态写在页面内联样式里，颜色是 `rgba(127,209,217,.6)` —— `--glass` 的 60% 硬编码。
+ * 这里改回 `var(--glass)`：同一个色相、同一个变量（`site-guard` 只认 DESIGN.md 色板，
+ * 写死 hex 会被拦），选中态因此是"页面自己的激活态语言"，不是新发明的一档颜色。
+ * **只改颜色与焦点环**：盒模型（1px 边框 / 8px 15px 内边距 / 字号）一个都没碰
+ * ⇒ 1440×900 下逐元素坐标与定稿一致（outline 也不参与布局）。 */
+footer .tag[aria-pressed='true'] {
+  border-color: var(--glass);
+  color: var(--paper);
+}
+
+/* 键盘可达：`<button>` 本来就能 Tab 到、Enter/Space 就能按，这里只把 UA 的默认焦点环
+ * 换成页面的 glass（选中/未选中都可见），不改任何排布。 */
+footer .tag:focus-visible {
+  outline: 1px solid var(--glass);
+  outline-offset: 2px;
+}
