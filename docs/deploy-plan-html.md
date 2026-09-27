@@ -1838,7 +1838,12 @@ bottle / sea / me / admin / 404）—— 判据成立，但没余量，见 34.7�
 | `node tools/probe-fit.mjs --port=5207` | `结论：0 项不达标` |
 | `node tools/walkthrough.mjs --port=5207` | `结论：0 项不达标`（32 PASS / 0 FAIL，含两次真 MediaRecorder ≥20s） |
 | 本片顶栏探针 `.tmp-w16b/probe-topnav.mjs --port=5207` | `结论：0 项不达标` —— **52 项断言全 PASS / 0 FAIL**（10 页 × 4 档 40 项：顶栏存在+href+文案+当前页高亮+墨迹相交+不横滚；键盘 3 页 12 项：Tab 顺序/焦点环/纯 Tab 到「公海」/Enter 跳转） |
-| `pnpm lint` | `2 errors`，**两处都在 `apps/web/src/pages/bottle-page.tsx` 344:56 / 344:85**（并发写者刚改的文件，本片不碰 `apps/**`）；本片经手的 `site/**`、`tools/**` 0 error、0 新增 warning |
+| `pnpm lint` | `errors` **全部在 `apps/web/**`**（并发写者正在改那个应用，红点在同一小时内还在动）：第一次采样 `2 errors` = `bottle-page.tsx` 344:56 / 344:85；第二次采样 `3 errors` = 同上两处 **+** `route-view.tsx` 14:10（`'LoginPage' is defined but never used`）。warning 稳定 10 条（含既有的 `site/app/page.js:91`）⇒ 本片经手的 `site/**`、`tools/**` **0 error、0 新增 warning**；本片**不碰** `apps/**`（§8） |
+
+上面五道门都是在**本节写完之后**在当前冻结字节上重跑的（日志 `.tmp-w16b/final-guard.log` ·
+`final-probe.log` · `final-probe-fit.log` · `final-walkthrough.log` · `final-lint.log`），
+不是"改前跑过一次"：`site-guard ✓ 全部通过`、`probe-fit 0 项不达标`、
+`walkthrough 0 项不达标（PASS=32 FAIL=0）`、`probe-topnav 0 项不达标`。
 
 端口纪律（§15）：每条命令都是**同一个前台 PowerShell** 里 `Start-Process` 5207 → 跑 → `Stop-Process`，
 没留常驻进程；API 只用既有的 8787（没起第二个）。
