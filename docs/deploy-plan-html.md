@@ -1296,3 +1296,308 @@ gapBox（缺口簇）：      x=909..1155   ← 落在【第 4 格】上 ✗
 **禁止"枚举式"适配**：任何"按内联 px 值/按已知段位枚举"的样式补丁一律拒绝验收 ——
 它会在数据一变就静默错位，而且**看起来是好的**（1440 下可能恰好对）。
 判据：修完必须在**至少 3 种视口 × 至少 3 种缺口位置**下量"缺口簇中心 = 第 gapIndex 格中心"。
+---
+
+## 31. W15 执行记录：「我的」页不再显示匿名代号（用户第 4 轮 #7，2026-09-27）
+
+> 归属：W15（§30.4 波次表）。**只写两个文件**（`site/app/page-me.js`、`site/patches/me.css`）+ 本节；
+> `site/*.html`、其它 `site/app/**`、其它补丁、`tools/**`、`packages/**`、`apps/**` 一字未改。
+> 判据件在 `.tmp-w15/me-nocode-check.mjs`（`.tmp-*` 不入库）。
+
+### 31.1 改动文件与 sha256（LF、无 CRLF、无 emoji：4 字节 UTF-8 起始字节 = 0）
+
+| 文件 | sha256 | 字节 |
+| --- | --- | --- |
+| `site/app/page-me.js` | `2fe7dd7ec51c8704a21957d4bbcb11749951642ee3045c4a9f71b78947072c6b` | 24321 |
+| `site/patches/me.css` | `364a0c82b4a47c10ea480aeb5111ed5f45b4f73a37803b20aaddac8c2d815957` | 9410 |
+
+### 31.2 那一格怎么处置：**整块收掉**，且收掉的只有它自己
+
+`site/me.html` 是被冻结的设计稿副本（本片不许改 HTML），于是那格（`.sleeve > .codeslot` =
+「匿名代号」小标题 + 30px 高的带边框框）在 `me.css` 里由一处拥有：
+
+```css
+html .codeslot {
+  display: none;
+}
+```
+
+**为什么是 `display:none` 而不是"留着框、清空文字"**：
+
+1. 定稿那个框**自带 1px 边框**（`border:1px solid rgba(243,249,250,.2)`）——只清空文字会留下一个
+   **空框**，那才是这一页最显眼的"破绽/空洞"；
+2. `display:none` 在**首次绘制前**生效：不会有 `page-me.js` 跑起来之前"先闪一下代号框"的抖动
+   （红跑实测：JS 执行后那格里确实画着 2 枚代号 + 「+17」，全量在 `title` 里）；
+3. 这一格是**静态 HTML 里的固定元素**（不是数据渲染出来的），收掉它是纯表现层的事 ⇒ **归 CSS 一处拥有**，
+   不在 JS 里再删一遍节点（两处互相掩盖 = 下一个人分不清哪处才"真的收掉了"）；
+4. 收掉后那块位置就是**内袋纸面的留白**：纸面本身（`.sleeve` 470×296）、孔、账号块、徽章位**
+   一格未动**（见 §31.3 的 M5c/M5d），所以页面构图不塌、不错位。
+
+**同时删掉的 JS 死代码**（`page-me.js`）：`codesText()`、`fitCodes()`、`CODE_SEPARATOR`、
+`CODES_FALLBACK_COUNT`、`codeField` 以及那一段"量宽取前 N 枚 + 「+M」"的渲染（W11 的产物）——
+它们的**唯一用途**就是把代号塞进这一格。另外 `GET /api/me/anonymous-codes` 的请求也一并去掉
+（结果不再被任何人消费；`definePage` 的 `endpoints` 清单同步删掉该条，免得清单说谎）。
+
+**没动的地方**：匿名代号在**瓶子详情页**照旧逐段可见（`page-bottle.js` 的 `.code` = 那一段的
+`ownerCode`）——那正是用户要的入口（M6 反向断言）。页面上 `.sub`（HTML 冻结）里仍有"匿名代号"
+这个词，但它是**说明文案**、不是代号串。
+
+### 31.3 判据（红 → 绿，原始输出见 `.tmp-w15/red.log` / `green-final.log`）
+
+判据件 A/B 都在**真登录 `demo/SeaDrift2026`**、真 API(8787) 上跑；M1/M2/M5a 是红→绿判据，
+M3/M4/M5b 是不回归护栏，M5c/M5d 是"同一次加载内"的几何 A/B，M6 是反向断言。
+
+**红（改前，`.tmp-w15/red.log`，EXIT=1，20 枚代号）**：
+
+```
+M1 DOM：outerHTML 命中 20 枚 —— 星河摆渡#797 | 灯塔守望#929 | …（20 枚全中）
+M1 DOM：body.innerText 命中 2 枚 —— 星河摆渡#797 | 灯塔守望#929
+M1 DOM：带代号的属性所在元素 1 个 —— div.field title=星河摆渡#797（c9383eac）…
+M2 槽位：.codeslot display=block box=[975,233,1363,293]；.field box=[975,263,1363,293]
+M5 原槽位区域=[974,232,1364,284]；区域内可见盒=3 个 —— div.codeslot / span.cat / div.field
+✗ M1a outerHTML 里没有代号字符串 20/0 命中 · ✗ M1b 渲染文本里没有代号字符串 2/0 命中
+✗ M1c 没有任何属性（含 title）带代号 1 个元素 · ✗ M2 槽位整块收掉 ✗ M5a 原槽位区域内没有残留的可见盒
+✓ M3 内袋纸面未塌陷 470x296 · ✓ M4a 全页内容叶子墨迹两两不相交 0 处
+✓ M5b 柜子表头同行、贴柜子右沿（右沿差 0px）· ✓ M6 瓶子详情页仍能看到代号 星河摆渡#797
+结论：7/12 通过（✗ M1a, M1b, M1c, M2, M5a）
+```
+
+**绿（改后，`.tmp-w15/green-final.log`，EXIT=0，29 枚代号）**：
+
+```
+M1 DOM：outerHTML 命中 0 枚 / body.innerText 命中 0 枚 / 带代号的属性 0 个
+M2 槽位：.codeslot display=none box=[0,0,0,0]；.field box=[0,0,0,0]
+M3 内袋：box=[944,8,1414,304]（470x296）可见内容底=215 ≤ 纸面底 304
+M4 全页重叠 0 处；内袋账号块 vs 卡格正文 0px²；柜子表头读数 vs 卡格正文 0px²
+M5 原槽位区域=[974,232,1364,284]；区域内可见盒=0 个 —— （空，纯纸面留白）
+M5c 对照组（临时还原 .codeslot=block）：槽位盒 [975,233,1363,293] field 盒 [975,263,1363,293]
+    → 收掉后 [0,0,0,0] / [0,0,0,0]；周边元素 22 个：漂移 0 个
+对照（还原改动前的渲染）：outerHTML 命中 29 枚 · innerText 命中 2 枚 · 属性 1 个 ·
+    .codeslot display=block 盒宽=388 · 原槽位区域内可见盒=3 个 ⇒ 五条判据全部报警（M1a/M1b/M1c/M2/M5a）
+M6 反证：/bottle.html?id=c9383eac-… 上出现了代号 星河摆渡#797
+2560x1400：内袋 box=[2044,12,2514,308] 原槽位区域可见盒=0 个；outerHTML 命中 0 枚
+结论：15/15 通过
+```
+
+**判据为什么这么写**（两条踩过的坑，写下来给下一个人）：
+
+- **几何比对必须在同一次加载内做**：第一版 M5c 把"改动前"的盒存成 json、改动后跨次跑比对，结果
+  误报 1 处漂移 —— 漂的是 `.crate .chead .cat`（左沿 1208 → 1205），根因是它的文案带**参与支数**
+  （"共 14 支"→"共 20 支"），而它是右对齐的、宽度随字形变。跨次跑的数据不同 ⇒ 最终改成
+  **页面内临时把 `html .codeslot` 还原成 `display:block`** 量一遍再撤掉量一遍（同一份数据、
+  同一字体状态、同一视口），对照组复现出的槽位盒 `[975,233,1363,293]` 与红跑实测**逐格相同**。
+- **墨迹相交用"直接文字节点的行盒"**（块盒横跨整行会把左标题与右装置误判成重叠，W5-B 已踩过），
+  且全页两两比对交给 `.tmp-w5b/lib.mjs` 的 `MEASURE_FN`（与 `tools/probe-fit.mjs` 同口径）。
+
+### 31.4 回归（同一次前台命令里 Start-Process → 跑测 → Stop-Process，站点独占 5204）
+
+| # | 命令 | 原始输出（截） | 退出码 |
+| --- | --- | --- | --- |
+| 1 | `node tools/site-guard.mjs` | `发布版补丁：10 个（…）`／`✓ 全部通过` | `GUARD_EXIT=0` |
+| 2 | `node tools/probe-fit.mjs --port=5204` | `✓` 80 行 / `✗` 0 行；`结论：0 项不达标`；8 档下 `me mode=流体 不滚动=是 被裁内容=0 重叠=0` | `PROBEFIT_EXIT=0` |
+| 3 | `node tools/walkthrough.mjs --port=5204` | `PASS=32 FAIL=0`（grep 计数）；`结论：0 项不达标`；第 9 步「我的」页三块面板与未读态全绿 | `WALKTHROUGH_EXIT=0` |
+| 4 | `pnpm lint` | `✖ 10 problems (0 errors, 10 warnings)`（10 条全是既有 `no-console`，无一条在本片改的文件里） | `LINT_EXIT=0` |
+| 5 | `read_image` 亲看 1440×900 与 2560×1400（`.tmp-w15/shots/`，冻结字节上重拍） | 内袋=孔 + 账号 + 纸面留白；柜子表头左右成行；无空框、无重叠、无代号 | — |
+
+**walkthrough 没有断言「我的」页含代号**（源码里 0 处 `codeslot`/`anonymous` 命中），所以本片的
+需求变更**不需要** W16 之外的 walkthrough 更新；它 32 项全绿（`⚠️ 预期可能红`的那条没有发生）。
+
+### 31.5 残留与自评（本片的弱点）
+
+1. **"留白 vs 空洞"是判断**：1440×900 下内袋纸面 `[944,8,1414,304]`，可见内容底 215 ⇒ 下部约
+   90px 是纸面留白（2560×1400 同形）。我判它是**留白**而不是空洞，依据是 M5a（原槽位区域 0 个可见盒）
+   + M3（纸面 470×296 未塌陷）+ M5d（22 个周边元素 0 漂移）；但这是**视觉判断**，不是量出来的定理。
+   若评审认为留白过大，替代方案是缩短 `.sleeve` 高度 —— 代价是动 W5-B 冻结的版式参数，且**孔**
+   （top 38 + 168 = 206）会顶出纸面；本片没做。
+2. **阳性对照不是"把文件改回去重跑"**：它是在页面内还原 `.codeslot` 与 W11 的画法（`.field` 塞
+   前 2 枚 + 「+M」、`title` 全量），复现出的盒与红跑逐格相同，但严格说不是同一份文件字节。
+3. **只验 Chromium**（与 §29.5 同一残余）；竖屏/极窄窗没跑（这一格已 `display:none`，与视口无关，
+   但内袋其它元素仍只有 probe-fit 的 8 档覆盖）。
+4. **`/api/me/anonymous-codes` 现在没有页面调用方**（接口本身与契约未动）：本页不再需要它，
+   瓶子详情页用的是 detail 里的 `ownerCode`。若有别的脚本依赖它，与本片无关，但值得记一笔。
+5. **树里仍有"匿名代号"这个词**：`me.html` 的 `.sub`（HTML 冻结，本片不许改）与 `DESIGN` 未涉及的
+   文案处。判据只保证**代号串**为 0 命中（29 枚逐个 grep）。
+
+---
+
+## 32. W14 执行记录：河道页心情标签可交互切换（§30.4 #5，2026-09-27）
+
+### 32.1 改动文件与 sha256（LF、无 CRLF、无 4 字节 UTF-8 起始字节 = 无 emoji）
+
+| 文件 | 行 | bytes | sha256 |
+| --- | --- | --- | --- |
+| `site/app/page-river.js` | 133 | 5863 | `0f8a99bd4e6a360ef4e005f7cec6e6692932259da3b13b72be2869a5de0220db` |
+| `site/patches/river.css` | 238 | 8671 | `3a82349645bfc1b2dea1201081bd11fc55130b529dd5bc0c289425ee3f9d3137` |
+
+**没碰**：`site/*.html`、其它 `site/app/**`、其它补丁、`tools/**`、`packages/**`、`apps/**`。
+（验收期间为了做"干净代码对照"，这两个文件曾被**逐字节还原**回改动前跑了一轮，跑完再拷回；
+最终字节 = 上表 sha256，与探针绿轮所测字节是同一份。）
+
+### 32.2 心情标签到底是什么（探针 DOM dump 原文，不是按名字猜）
+
+改动前的原始输出（探针第 ① 步）：
+
+```
+<button class="tag">全部</button> aria-pressed="true"  aria-disabled=null  title=null  rect=[76.03, 837.03, 58.41, 33]
+<button class="tag">深夜</button> aria-pressed=null    aria-disabled="true" title="演示控件：河道按心情筛选尚未接入后端"
+<button class="tag">通勤</button> aria-pressed=null    aria-disabled="true" title="…同上"
+<button class="tag">告白</button> aria-pressed=null    aria-disabled="true" title="…同上"
+<button class="tag">雨天</button> aria-pressed=null    aria-disabled="true" title="…同上"
+```
+
+⇒ 它们是**页脚里 5 个原生 `<button class="tag">`**（全部 / 深夜 / 通勤 / 告白 / 雨天），不是 `.mood`
+之类的自定义控件；定稿把第一个标了 `aria-pressed="true"`，页面自带的选中态视觉就是
+`.tag[aria-pressed='true']`（`border-color: rgba(127,209,217,.6)` + `color: var(--paper)`）。
+
+**改动前的真实状态（红证据）**：老实现给后四个加了 `aria-disabled="true"` 与一句 title ⇒ Playwright
+直接判 `element is not enabled`，点不动（`locator.click: Timeout 5000ms exceeded`）。
+
+### 32.3 单选还是多选：**单选（恰有一个选中）**
+
+依据三条（不是口味问题）：
+
+1. 这一排的第一个是「**全部**」—— 只有单选里才成立；多选会出现「全部 + 深夜」这种自相矛盾的选择；
+2. 措辞（深夜 / 通勤 / 告白 / 雨天）是**筛选取景**语义，不是"多贴几个标签"；
+3. 它们是 `aria-pressed` 的按钮组，页面自带的激活态样式只表达"一个亮"。
+
+⇒ **不存在"一个都没选"的中间态**：再点已选中的那个是空操作，点「全部」= 复位到默认。
+
+### 32.4 实现（三处，**一个 DOM 节点都没增删**）
+
+1. `syncMood()`：把 `aria-pressed` 按模块级 `mood` 拨一遍（首次采纳页面自带的默认态）——**状态存在
+   模块作用域、不挂在节点上**，所以节点被换掉也不丢；
+2. **事件委托**：`document` 上只挂一只 click 监听 + `closest('footer .tag')` ⇒ 重挂载出来的新按钮不用重绑；
+3. `MutationObserver(document.body, { childList, subtree })` → 重渲染/重挂载后调 `syncMood()` 拨回来
+   （它只改属性、不插节点 ⇒ 不会自激；本页 `draw()` 的渲染路径 `showState` 系列也动 body，一并覆盖）。
+
+CSS 只加两条，且**只用页面自己的 token**：
+
+- `footer .tag[aria-pressed='true'] { border-color: var(--glass); color: var(--paper); }`
+  —— 把定稿那句 `rgba(127,209,217,.6)` 的**硬编码 60% alpha** 换回 `--glass` 本身（同一色相、同一变量；
+  `site-guard` 只认 `DESIGN.md` 色板里的 hex，裸 rgba 不算"用 token"）；
+- `footer .tag:focus-visible { outline: 1px solid var(--glass); outline-offset: 2px; }` —— 键盘可达
+  （`<button>` 本来就能 Tab/Enter，这里只把 UA 默认焦点环换成页面的 glass；outline 不参与布局）。
+
+**无新增 hex、无新增元素、无盒模型改动、无 emoji。**
+
+### 32.5 探针六条（原始输出；脚本 `.tmp-w14/probe-tags.mjs`，端口 5203）
+
+```
+── ① 默认态：5 个 .tag，选中项="全部"，非选中="深夜,通勤,告白,雨天"          PASS ×3
+── ② 点 A（深夜）：pressed="深夜" 且唯一（其它全部取消，负向控制=1）          PASS ×3
+── ③ 点 B（雨天 = nth(4)）：pressed="雨天"，A 已取消                          PASS ×2
+── ⑤ 视觉用既有 token：
+     :root --glass = #7fd1d9（浏览器解析 = rgb(127, 209, 217)）
+     选中   computed = {"borderColor":"rgb(127, 209, 217)","color":"rgb(243, 249, 250)","borderWidth":"1px","padding":"8px 15px"}
+     未选中 computed = {"borderColor":"rgba(243, 249, 250, 0.16)","color":"rgb(169, 199, 207)"}
+     PASS 选中态边框 = var(--glass) 的算值 / 选中态文字 = var(--paper) / 未选中 = var(--line)、var(--muted)
+     PASS 选中与未选中盒模型一致（1px|1px）
+── ④ 重渲染后选中态还在
+     a) 走本页自己的渲染出口（draw() 的路径）：showLoading → stateKind=loading；showEmpty → stateKind=empty
+        渲染后选中项仍是「雨天」                                                  PASS
+     b) 把页脚整行换成页面原始 HTML 重新挂载：
+        重挂载瞬间（观察者回调之前）的 aria-pressed = ["true","false","false","false","false"] ← 新节点的默认态
+        重挂载后 = 雨天 pressed=true（观察者已拨回）；唯一选中=1；aria-disabled 残留=0；title 残留=0  PASS ×4
+── ④c 重挂载之后点击仍然有效（事件委托）：点「通勤」→ 通勤选中               PASS
+── 6b 点「全部」复位                                                          PASS
+── 6c 键盘 Enter 切到「雨天」（button 原生行为，不改 HTML）                    PASS
+── 7  pageerror 条数 = 0                                                     PASS
+
+22/22 项通过，0 项不达标        （PROBE_EXIT=0）
+```
+
+**红 → 绿**：改动前同一脚本 `14 项不达标 / 25 项`（红轮每次"点不动"都额外记一条，所以项数比绿轮多 3），
+关键红行：
+
+```
+FAIL 点击 footer .tag[1] 生效 —— TimeoutError: locator.click: Timeout 5000ms exceeded.
+     （Playwright 日志：locator resolved to <button class="tag" aria-disabled="true" …> · element is not enabled）
+FAIL A 选中且唯一 —— 实际="全部" 期望="深夜"
+FAIL 选中态边框 = var(--glass) 的算值 —— 实际="rgba(127, 209, 217, 0.6)" 期望="rgb(127, 209, 217)"
+FAIL 重挂载后不再有 aria-disabled —— 实际=4 期望=0
+```
+
+（红轮里 ③ 写的是 `nth(3)`，而 `nth(3)` 是「告白」不是「雨天」——**是探针自己的下标错**，改探针后转绿；
+实现没有因此改过一个字节。）
+
+### 32.6 构图未变的对照（1440×900，逐元素快照）
+
+口径：`document.body` 下所有元素（排除共享层浮层 `#demo-nav` / `#app-state`），键 = `body>tag:nth-child(n)>…`
+路径，值 = 视口矩形（3 位小数）；等 `document.fonts.ready` 后取。
+
+```
+改动前元素数 = 81；改动后元素数 = 81
+只在改动前存在 = []      只在改动后存在 = []
+坐标逐元素一致 = 81 / 81        坐标有差别的元素 = 0
+#doc-scroll 改动前 = [1440,900,1440,900]     改动后 = [1440,900,1440,900]
+页脚标签：body>footer:nth-child(11)>button:nth-child(1..5)
+  [76.031,837.031,58.406,33] [144.438,…] [212.844,…] [281.25,…] [349.656,…]  ← 逐个与改动前相同
+VERDICT: 构图零差异（坐标逐元素一致）
+```
+
+### 32.7 回归（全部亲跑；§15 一条前台命令起服务 → 跑 → 杀）
+
+| 命令 | 结果 |
+| --- | --- |
+| `node tools/site-guard.mjs` | `✓ 全部通过`（10 页 + 17 个 JS + 10 个补丁） |
+| `node tools/probe-fit.mjs --port=5203` | `结论：0 项不达标` |
+| `node tools/walkthrough.mjs --port=5203` | `PASS=32 FAIL=0 WARN=0` → `结论：0 项不达标` |
+
+**一处必须写下来的插曲（别让下一个人以为是我改坏了）**：本片第一次跑 walkthrough 时是
+`PASS=28 FAIL=2 WARN=2`，两条红都在第 9 步「我的」页的**通知未读**上（`通知 13 条（未读 0）`）。
+为定位它，我把这两个文件**逐字节还原**回改动前，又跑了两轮：都是 `PASS=32 FAIL=0`（未读 1 → 0，
+第 10 步"就地标记已读"也过）⇒ **与 W14 的 diff 无关**，是 demo 账号**通知未读数据态**的偶发
+（该脚本第 9/10 步依赖"演示账号此刻恰有未读"，同库并发跑会撞）。拷回最终字节后再跑，`PASS=32 FAIL=0`。
+
+### 32.8 读图（`.tmp-w14/shots/`）
+
+`river-default-footer.png`（默认「全部」选中）/ `river-mood-yeshen-footer.png`（点「深夜」后）/
+`river-default-full.png`、`river-mood-yeshen-full.png`（整页）/ `river-keyboard-focus-footer.png`（键盘焦点）。
+结论：两态都落在这一页的视觉语言里 —— **1px 细边、无填充、无 emoji**；选中项边框是页面水体那条
+`--glass`（青），未选中仍是 `--line`（灰）。整页图除被选中的那一格，其余构图（标题区 / RPM 区 /
+两个泊位 / 沟槽弧 / 页脚其余元素）完全重合。
+
+### 32.9 残留与弱点（诚实自报）
+
+1. **ARIA 语义只能到"切换按钮"**：严格的多选一该用 `role="radiogroup"` + `role="radio"` + `aria-checked`，
+   那要改 HTML（`site/*.html` 是发布副本、本片不许改）；运行时改 role 又会与页面自带
+   `.tag[aria-pressed='true']` 的 CSS 打架（那正是本页的激活态语言）。⇒ 保留 `aria-pressed`，
+   代价是读屏软件听到的是"切换按钮"而不是"单选组"。
+2. **"重挂载后状态还在"靠 MutationObserver 兜底，有一条边界**：若将来的渲染器把**整个 body**（含观察目标）
+   换掉，观察者会随节点一起消失 ⇒ 那种写法必须在渲染器里显式调一次 `syncMood()`。本页现在的数据流
+   （`showState` 系列只动 body 里的浮层）不会触发这条。
+3. **选中态没有任何实际功能**（用户明确"仅交互，无实际功能"）：点完不发请求、捞取结果不变；
+   将来要接按心情筛选，`mood` 就是那个待传的参数（⇒ 别把这排标签当"已经能筛"）。
+4. **本片唯一一处"看得见的像素变化"**：选中态边框由定稿的 `rgba(127,209,217,.6)` 变成 `var(--glass)`
+   全不透明（因为 60% 那个 alpha 是硬编码，不算"用 token"）。**坐标零变化**（见 32.6），
+   但严格说这不是逐像素复刻定稿。
+5. **没有 hover 反馈**：这一排标签的悬停态是"新视觉"，本片按"不许自造新视觉"没加；反馈只来自点击后的选中态。
+6. 探针是**临时脚手架**（`.tmp-w14/`），跑完即弃；本片的纪律证据只留在本节与 `.tmp-w14/*.log`。
+
+### 31.6 一次并发走查造成的"假红"（如实记录，别让下一个人重复排查）
+
+冻结字节上第一次跑 `walkthrough --port=5204` 时出现 **PASS=28 / FAIL=2 / WARN=2**，逐字为：
+
+```
+FAIL  「我的」接口侧：通知 ≥1 且有未读  —— 通知 15 条（未读 0）
+FAIL  「我的」页面侧：至少一条通知是未读态  —— 未读标记 0 条
+WARN  演示账号此刻没有「就地标记已读」类的未读消息（未读全是「回传 · 去看看」，点它会跳瓶子页）⇒ 本步无样本，跳过
+```
+
+**根因不是本片的改动**（两条都读 API / 读 `readAt`：`collectMe` 数的是 `/api/notifications` 里
+`readAt === null` 的行，页面只是照它画 `.pill`），而是**演示数据的并发争用**：
+
+- `walkthrough` 第 0 步 `ensureDemoData()` 会在"未读=0"时**再造一支完整入海的作品**把未读补回 1 条
+  （`tools/seed-demo.mjs` 的 ③），而第 10 步「就地标记已读」会把它**消费掉** ⇒ 演示账号的"未读"
+  是**一次性的共享资源**；
+- 那一刻**另一个 agent 正在同一套 API(8787) 上用同一个 `demo` 账号跑同一份走查**：
+  `Get-CimInstance Win32_Process` 里 PID 6084 = `tools/walkthrough.mjs --port=5203`；
+- 通知落库时间戳坐实了交替消费：`BOTTLE_COMPLETED` 的 `read_at` 分别是 05:07:07 / 05:08:11 / 05:09:15
+  （约每分钟一条），而 `node .tmp-w15/demo-unread.mjs`（直连 API 的归因件）在两边跑到的读数分别是
+  `未读 0`（并发时）与 `未读 ["BOTTLE_COMPLETED"]`（无人并发时）。
+
+**对照（同一个端口、同一份冻结字节、无并发走查）**：跑前 `{"total":17,"unread":["BOTTLE_COMPLETED"]}`
+→ 跑后 `{"total":17,"unread":[]}`，**PASS=32 / FAIL=0 / EXIT=0**（`.tmp-w15/walkthrough-final2.log`）。
+
+⇒ 结论：本片在无并发时 32 项全绿；**"演示账号必须有未读通知"这条断言在多 agent 并发时是脆的**
+（它测的是共享可变状态）。这条留给 W16/收口片参考，本片**没有改 `tools/walkthrough.mjs`**。
