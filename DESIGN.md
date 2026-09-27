@@ -147,6 +147,18 @@ motion:
   # 判据仍是"低速度"而不是"低幅度"：46s 走 320px ≈ 7px/s，比水纹还慢 ⇒ 不争夺注意力。
   passageDuration: 46000ms  # 一个来回（配 alternate）
   passageShift: 160px       # 单程位移幅度（±160px）
+  # ── 第 4 轮 #8（静态站动效，W17）补的两条 ────────────────────────────────
+  # 补这两条不是因为"想加动效"，而是落地时**确实缺这两个值**：缺了就只能在
+  # CSS/JS 里内联一个新数字，那正是 §动效纪律禁止的事。
+  reducedMotionEntryDuration: 150ms  # reduced-motion 下的入场：**只 opacity 淡入、不动位移**。
+                                     # 值不是我定的 —— 它是 §Accessibility 与「零装饰动效规则」第 4 条
+                                     # 早先写下的裁定（"入场降级为 150ms opacity 淡入"），这里只是把它
+                                     # 从散文变成 token，好让代码引用名字而不是数字。
+  castRippleDuration: 1200ms  # 投/捞落点的「事件涟漪」（§Elevation 的 ① 事件涟漪）**总时长**，
+                              # 同时就是跳转前的等待：用户裁决「播完（~1.2s）再跳转」。
+                              # 这是全站**唯一**允许用动效延后跳转的地方。
+                              # 落地与取证：`site/patches/river.css` + `site/app/page-river.js`
+                              # （探针 `.tmp-w17/probe-motion.mjs` 断言"三圈末圈 end = 这个数"）。
   animatedProperties: [transform, opacity]
 # 水域母题层（2026-09-24 amend · t43）：只在这里定装饰的**强度**与**纹理周期**。
 # 组件只能引用 --motif-*，禁止内联 alpha / px（守卫：__tests__/water-motif.test.tsx）。

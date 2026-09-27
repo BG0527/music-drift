@@ -27,6 +27,28 @@
 }
 
 /*
+ * 动效 token（W17 / 用户第 4 轮 #8）。**唯一真相在 DESIGN.md 的 `motion:` 段** ——
+ * 这里只是把它的值搬成 CSS 变量，好让 base.css 与各页补丁引用**名字**而不是数字：
+ * 内联一个新时长/新位移 = 全站手感碎裂，而且评审时没人看得出哪个是对的（motion-web §2）。
+ * 值一一对应：entryDuration / entryShift / entryEasing / hoverDuration / hoverScale /
+ * listStagger / exitDuration / driftDuration / driftShift / castRippleDuration /
+ * reducedMotionEntryDuration。**改名或改值都必须改 DESIGN.md**（`.tmp-w17/probe-motion.mjs` 逐条对表）。
+ */
+:root {
+  --motion-entry-duration: 480ms;
+  --motion-entry-shift: 16px;
+  --motion-entry-easing: ease-out;
+  --motion-hover-duration: 200ms;
+  --motion-hover-scale: 1.03;
+  --motion-stagger: 100ms;
+  --motion-exit-duration: 240ms;
+  --motion-drift-duration: 24000ms;
+  --motion-drift-shift: 10px;
+  --motion-cast-ripple-duration: 1200ms;
+  --motion-reduced-entry-duration: 150ms;
+}
+
+/*
  * 浮层落位（状态条用；仍然只作用在 `.app-state` 上）。
  *
  * 为什么是"贴视口边缘 16px"而不是"贴画布边缘"：画布 1440×900 由 fit.js 等比缩放居中，
@@ -36,6 +58,37 @@
  */
 .app-state {
   --overlay-inset: 16px;
+}
+
+/*
+ * 状态条的两条动效（W17）：
+ *   ① **入场**：`fade-in`（只 opacity，480ms = entryDuration / ease-out = entryEasing）。
+ *      为什么是"只淡入"而不是 DESIGN.md 的 `Fade + translate-Y`：状态条有一半是**就地**
+ *      挂在列表里的（`.app-state--inline`，带文字 ⇒ 会被 `tools/probe-fit.mjs` 算作内容元素），
+ *      而"进场时下移 16px"会让它在被测量的一瞬间越出视口/压到相邻元素上 ⇒ 版式门禁会随机红。
+ *      动效的位移在这里换不来任何信息，所以按契约的最低档实现（§零装饰动效规则 4 的同一条思路）。
+ *   ② **退场**：`.app-state--leaving` 的 opacity → 0，用 exitDuration（240ms）——
+ *      比入场短，因为人已经知道结果了（§Elevation「Exit animations」）；进出配对，不留透明占位
+ *      （`dom.js` 到点把节点从 DOM 摘掉，它自己的 260ms 定时器 > 240ms 过渡，见 `STATE_FADE_MS`）。
+ */
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes nav-enter {
+  from {
+    opacity: 0;
+    transform: translateY(calc(-1 * var(--motion-entry-shift)));
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
 }
 
 /* ── 状态条（底部居中，全局单例；就地状态块 .app-state--inline 挂在页面元素里） ───── */
@@ -59,7 +112,8 @@
   color: var(--paper, #f3f9fa);
   font-size: 13px;
   line-height: 1.5;
-  transition: opacity 240ms ease;
+  animation: fade-in var(--motion-entry-duration) var(--motion-entry-easing);
+  transition: opacity var(--motion-exit-duration) var(--motion-entry-easing);
 }
 
 /* 非错误态到点后由 dom.js 加这个类淡出，随后**从 DOM 摘掉**——不留透明占位。
@@ -108,16 +162,6 @@
   }
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .app-state__dot {
-    animation: none;
-  }
-
-  .app-state {
-    transition: none;
-  }
-}
-
 .app-state__retry {
   flex: none;
   padding: 2px 10px;
@@ -139,6 +183,18 @@
  *   · 底色的透明度是 `ink` 的 alpha 派生（DESIGN.md front matter 的「基色 + alpha 派生」写法，
  *     站点没有第二个底色）⇒ 读成"同一张水面上的一层玻璃"，不是贴上去的一条通用导航；
  *   · 字号 13px 与字距 .1em 取的是 `.tag`（河道页心情标签）那一档。
+ *
+ * 动效（W17，两条，都很克制）：
+ *   ① **入场**：`nav-enter` —— opacity + 从上方 entryShift(16px) 落下，时长 entryDuration、缓动 entryEasing。
+ *      它只播一次、不循环：顶栏是"每一页都在"的固定件，动一次是"落位"（continuity），
+ *      动第二次就是装饰了。方向取"-16px → 0"是因为它贴视口顶边（内容从上方进画面）。
+ *      `position: fixed` 的元素只被 transform 平移 ⇒ 不参与任何页面的构图，也不动版式。
+ *   ② **当前项 / 悬停的指示线**：`.top-nav__link::after` 用 `scaleX(0 → 1)` + opacity 放出来，
+ *      时长 hoverDuration(200ms)、缓动 entryEasing。**换成 transform 而不是过渡 `border-color`**：
+ *      契约只允许动 transform/opacity（过渡颜色不符合这条硬约束）。
+ *      线的位置/宽度/颜色与原来那条 `border-bottom` **完全一致**（贴链接盒下沿、左右各 12px 内缩），
+ *      所以"当前项 = 1px 线 + coral 字 + 字重 500"的读法一个字都没变；`border-bottom` 仍留着
+ *      （透明色，占位不动盒模型 ⇒ 切换时不跳位）。
  */
 .top-nav {
   position: fixed;
@@ -151,6 +207,7 @@
   background: rgba(5, 15, 20, 0.72);
   color: var(--muted, #a9c7cf);
   font-size: 13px;
+  animation: nav-enter var(--motion-entry-duration) var(--motion-entry-easing);
 }
 
 .top-nav__list {
@@ -167,10 +224,12 @@
 }
 
 .top-nav__link {
+  position: relative;
   display: flex;
   align-items: center;
   padding: 0 12px;
-  /* 未选中：`--muted` 字 + 一条透明线（当前项换成 coral，**线宽一致 ⇒ 切换时不跳位**）。 */
+  /* 未选中：`--muted` 字 + 一条透明线（当前项换成 coral，**线宽一致 ⇒ 切换时不跳位**）。
+   * 这条透明 border 仍然留着 —— 它占住那 1px（盒模型不变），只是不再由它变色。 */
   border-bottom: 1px solid transparent;
   color: var(--muted, #a9c7cf);
   font-size: 13px;
@@ -178,16 +237,45 @@
   text-decoration: none;
 }
 
-.top-nav__link:hover {
-  color: var(--paper, #f3f9fa);
-  border-bottom-color: var(--line, rgba(243, 249, 250, 0.16));
+/* 指示线：贴链接盒下沿的一条 1px 线 —— **位置与长度与原来那条 `border-bottom` 完全一致**
+ * （左右都到盒边，不按 padding 内缩），只是不再由它变色，而是用 transform: scaleX()
+ * 从左侧"长出来"。这样"当前项 = 1px 线 + coral 字 + 字重 500"的读法一个字都没变。 */
+.top-nav__link::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 1px;
+  background: var(--line, rgba(243, 249, 250, 0.16));
+  opacity: 0;
+  transform: scaleX(0);
+  transform-origin: left center;
+  transition:
+    transform var(--motion-hover-duration) var(--motion-entry-easing),
+    opacity var(--motion-hover-duration) var(--motion-entry-easing);
 }
 
-/* 当前页 = 站点里"当下"的那一档颜色（sea 的分页、river 的选中标签都这么用 coral）。 */
+.top-nav__link:hover {
+  color: var(--paper, #f3f9fa);
+}
+
+.top-nav__link:hover::after {
+  opacity: 1;
+  transform: scaleX(1);
+}
+
+/* 当前页 = 站点里"当下"的那一档颜色（sea 的分页、river 的选中标签都这么用 coral）。
+ * 放在 `:hover` 之后：同特异性下让"悬停当前项"仍读作 coral，而不是退回那条 `--line` 细线。 */
 .top-nav__link[aria-current='page'] {
   color: var(--coral, #d4553a);
-  border-bottom-color: var(--coral, #d4553a);
   font-weight: 500;
+}
+
+.top-nav__link[aria-current='page']::after {
+  background: var(--coral, #d4553a);
+  opacity: 1;
+  transform: scaleX(1);
 }
 
 /* 键盘可达：写法与河道页 `footer .tag:focus-visible` 同一套 token（1px glass 实线），
@@ -200,4 +288,35 @@
 .top-nav__link:focus-visible {
   outline: 1px solid var(--glass, #7fd1d9);
   outline-offset: -2px;
+}
+
+/*
+ * `prefers-reduced-motion: reduce` —— 这一块**必须放在文件最后**：它要压住的是下面那些
+ * `.top-nav` / `.top-nav__link::after` 规则（同特异性下靠声明顺序取胜，放前面等于没写，
+ * 这一点是探针实测出来的，不是推理出来的）。
+ *
+ * 判据（DESIGN.md §零装饰动效规则 4 + §Accessibility）：
+ *   · 漂移 / 涟漪 / 交错 —— **冻结**（各页补丁里各自声明，见 river/sea 补丁）；
+ *   · 入场 —— 降级为 `reducedMotionEntryDuration`（150ms）的 **opacity 淡入**，位移与缩放全去掉
+ *     （不是"把内容藏起来"，而是"瞬时状态变化"）；
+ *   · 过渡 —— 关掉（悬停的线直接出现，不再滑出来）。
+ */
+@media (prefers-reduced-motion: reduce) {
+  .app-state__dot {
+    animation: none;
+  }
+
+  .app-state {
+    animation: fade-in var(--motion-reduced-entry-duration) var(--motion-entry-easing);
+    transition: none;
+  }
+
+  .top-nav {
+    animation: fade-in var(--motion-reduced-entry-duration) var(--motion-entry-easing);
+  }
+
+  .top-nav__link::after {
+    transform: none;
+    transition: none;
+  }
 }

@@ -272,3 +272,34 @@ svg.rings {
 h1 {
   font-size: clamp(38px, 4.17vw, 76px);
 }
+
+/* ══ 动效（W17 / 用户第 4 轮 #8；`docs/deploy-plan-html.md` §35）══════════════════
+ * 只有一条：**水下光柱的漂移**。参数取共享层 `:root` 的 `--motion-*`
+ * （= `DESIGN.md` 的 `motion.driftDuration` / `driftShift`），一个数字都不内联。
+ *
+ * 为什么挑 `.shafts` 而不是水面/船队：
+ *   · 它是这页唯一的**流线纹理层**（99°/103° 两道斜向光柱），横向漂移读作"洋流"；
+ *   · 水线（`--wy` 那条）与六支瓶子**不能动** —— 水线是这页的骨架（涟漪、测深线、目录全挂在
+ *     同一个 `--wy` 上），瓶子是**内容卡片**（`tools/probe-fit.mjs` 的构图重叠判据量它们），
+ *     让它们呼吸会把"构图不重叠"变成时序问题 ⇒ 版式门禁会随机红。动效不该拿门禁去赌。
+ * 幅度 ±10px / 一个来回 24s（alternate）⇒ 低幅度 + 低速度，不争夺注意力（契约对该母题的要求）。 */
+.shafts {
+  animation: water-drift var(--motion-drift-duration) linear infinite alternate;
+}
+
+@keyframes water-drift {
+  from {
+    transform: translate(calc(-1 * var(--motion-drift-shift)), 0);
+  }
+  to {
+    transform: translate(var(--motion-drift-shift), 0);
+  }
+}
+
+/* `prefers-reduced-motion: reduce`：常驻漂移冻结（画面静止，内容与结构一个字不变）。 */
+@media (prefers-reduced-motion: reduce) {
+  .shafts {
+    animation: none;
+  }
+}
+

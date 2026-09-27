@@ -27,6 +27,59 @@ const EMPTY_RIVER_CODE = 'NO_BOTTLE_AVAILABLE';
 
 let drawing = false;
 
+/**
+ * 投/捞落点的**事件涟漪**（W17；DESIGN.md §Elevation「① 事件涟漪」：短暂、事件驱动、只播一次）。
+ *
+ * 语义（用户已裁决，别按"禁止用动效阻塞交互"改掉）：**播完再跳转** —— 涟漪是"落点标记"，
+ * 播到一半跳走等于没标记。它是全站**唯一**允许用动效延后跳转的地方。
+ *
+ * 时长的唯一真相是共享层 `:root` 的 `--motion-cast-ripple-duration`（值来自 DESIGN.md 的 motion 段）
+ * ⇒ 这里的"播完"就是契约里的那个数，**不内联新数字**。三圈涟漪的错开与末圈落点由
+ * `site/patches/river.css` 用同一组 token 推导（`castRippleDuration - 2 × listStagger`）。
+ */
+const CAST_RIPPLE_VAR = '--motion-cast-ripple-duration';
+/** 兜底余量：动画被中断/标签页被节流时也要到点，绝不让页面卡在等待上。 */
+const RIPPLE_FALLBACK_MS = 200;
+
+/** reduced-motion 下不播任何位移/扩散类动效（`DESIGN.md` §零装饰动效规则 4）。 */
+function prefersReducedMotion() {
+  return typeof window.matchMedia === 'function' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+}
+
+/** 把 `--motion-*` 的 CSS 时长读成毫秒（`480ms` / `0.48s` 两种写法都认）。 */
+function motionMs(name) {
+  const raw = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+  const value = Number.parseFloat(raw);
+  if (!Number.isFinite(value)) return 0;
+  return raw.endsWith('ms') ? value : value * 1000;
+}
+
+/**
+ * 播一次落点涟漪，返回"**播完**"的 Promise（reduced-motion 或读不到时长时立即完成 = 不等待）。
+ * @param {Element|null} port 泊位（`.port.draw` / `.port.cast`）
+ * @returns {Promise<number>} 实际等待的毫秒数（探针据此断言"跳转延迟 = 契约时长"）
+ */
+function playCastRipple(port) {
+  const total = motionMs(CAST_RIPPLE_VAR);
+  if (port === null || total <= 0 || prefersReducedMotion()) return Promise.resolve(0);
+  port.classList.add('is-casting');
+  return new Promise((resolve) => {
+    let settled = false;
+    const finish = () => {
+      if (settled) return;
+      settled = true;
+      // 摘掉 class 只是为了**下一次点击还能从头播**：动画没有 fill（结束即回静态三环），
+      // 所以这一摘不会造成视觉跳变。
+      port.classList.remove('is-casting');
+      resolve(total);
+    };
+    // 判据用最后一圈（`.r3`）：它被错开 2×listStagger，末圈结束 = castRippleDuration（补丁里有推导）。
+    const last = port.querySelector('.r3');
+    if (last !== null) on(last, 'animationend', finish, { once: true });
+    setTimeout(finish, total + RIPPLE_FALLBACK_MS);
+  });
+}
+
 /** 心情标签 = 页脚那排 `<button class="tag">`：全部 / 深夜 / 通勤 / 告白 / 雨天。 */
 const TAG_SELECTOR = 'footer .tag';
 
@@ -83,6 +136,9 @@ async function draw() {
   if (drawing) return;
   setBusy(true);
   showLoading('正在河道里撒网…');
+  // 涟漪**在点击那一刻**就起跑（feedback：先回应这个动作），再与请求并行；
+  // 跳转等的是"两件事都完成" ⇒ 网络慢时不会白等，网络快时也不会砍掉涟漪。
+  const ripple = playCastRipple(q('.port.draw'));
   try {
     const user = await requireUser();
     if (user === null) {
@@ -95,6 +151,7 @@ async function draw() {
       showError('捞取失败：服务端没有返回瓶子 id。', { onRetry: draw });
       return;
     }
+    await ripple; // 「播完再跳」
     location.assign(`/bottle.html?id=${encodeURIComponent(id)}`);
   } catch (error) {
     if (error?.code === EMPTY_RIVER_CODE) showEmpty(error.message, { onRetry: draw });
@@ -104,9 +161,15 @@ async function draw() {
   }
 }
 
+/** 投下：同样是「播完（castRippleDuration）再跳转」，只是这一跳不需要等端点。 */
+async function cast() {
+  await playCastRipple(q('.port.cast'));
+  location.assign(CAST_TARGET);
+}
+
 function wire() {
   activate(q('.port.draw'), draw);
-  activate(q('.port.cast'), () => location.assign(CAST_TARGET));
+  activate(q('.port.cast'), () => void cast());
 
   // 页脚「先去公海听听已经完成的作品」在设计稿里是 `href="#"`（点了没反应）；接到公海页。
   const sea = q('footer .go');

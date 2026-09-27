@@ -239,3 +239,92 @@ footer .tag:focus-visible {
   outline: 1px solid var(--glass);
   outline-offset: 2px;
 }
+
+/* ══ 动效（W17 / 用户第 4 轮 #8；`docs/deploy-plan-html.md` §35）══════════════════
+ * 三条，全部只动 transform / opacity，参数**一个都不内联**：引用共享层 `:root` 里的
+ * `--motion-*`（那份值逐条来自 `DESIGN.md` 的 `motion:` 段，`.tmp-w17/probe-motion.mjs` 对表）。
+ * 为什么这页配得上动效：这一页的主题就是**水**——捞取与投下是这条河的两个落点。 */
+
+/* ① 水线漂移（DESIGN.md `motion.driftDuration` / `driftShift`；§Elevation 里"唯一允许的常驻动画"）。
+ * 产品理由写在契约里：静止的水面读起来像贴图，让水纹以**极慢、极小幅度**横向流动，页面才"活着"。
+ * 为什么是 `.field i` 而不是水体/盘面层：它是这页唯一的**细水纹层**（4.4px 水位线肌理、alpha .03），
+ * 动它 = 水在流；动 `--u` 圆心那几层（`.platter`/`.center`/`.body`）= 整张画在晃，那是另一件事。
+ * 为什么是 `linear`：洋流是匀速的；缓动会让它读成"一呼一吸的泵"。共享层的 `--motion-*` 里没有
+ * 常驻动画的缓动档（`entryEasing` 是**入场**的），匀速也不需要新的数值 ⇒ 用关键字，不发明参数。
+ * 幅度 ±10px / 一个来回 24s（alternate）⇒ 0.4px/s，久看不腻；reduced-motion 下连同涟漪一起冻结。 */
+.field i {
+  animation: water-drift var(--motion-drift-duration) linear infinite alternate;
+}
+
+@keyframes water-drift {
+  from {
+    transform: translate(calc(-1 * var(--motion-drift-shift)), 0);
+  }
+  to {
+    transform: translate(var(--motion-drift-shift), 0);
+  }
+}
+
+/* ② 泊位悬停（DESIGN.md `hoverScale` / `hoverDuration`）：1.03 的放大 + 既有字形态。
+ * 泊位是这页唯一的两个 CTA，"摸得到"比"看得见"更重要。`transform` 不参与布局 ⇒ 构图零位移；
+ * 半径本来就是 `clamp()` 的图形尺寸，缩放它不会影响任何文字的可读性（字随 `--u` 走）。 */
+.port {
+  transition: transform var(--motion-hover-duration) var(--motion-entry-easing);
+}
+
+.port:hover {
+  transform: scale(var(--motion-hover-scale));
+}
+
+/* ③ 投 / 捞落点的**事件涟漪**（DESIGN.md §Elevation 的「① 事件涟漪」：短暂、事件驱动、只播一次）。
+ * 用它已有的三圈同心环（`.r1/.r2/.r3`，定稿就画在泊位上）扩散并淡出，**不新增任何节点**。
+ * 编排：三圈按 `listStagger`（100ms）错开，每圈时长 = `castRippleDuration` - 2×`listStagger`，
+ * 于是**最后一圈恰好落在 `castRippleDuration`（1200ms）**—— 这正是 `page-river.js` 等待、
+ * 然后才跳转的那个数（用户裁决「播完再跳」；全站唯一允许用动效延后跳转的地方）。
+ * 三圈同时起跑会糊成一次闪烁，错开才读得出"一圈一圈推出去"。 */
+.port.is-casting .r1,
+.port.is-casting .r2,
+.port.is-casting .r3 {
+  animation-name: port-ripple;
+  animation-duration: calc(var(--motion-cast-ripple-duration) - 2 * var(--motion-stagger));
+  animation-timing-function: var(--motion-entry-easing);
+}
+
+.port.is-casting .r2 {
+  animation-delay: var(--motion-stagger);
+}
+
+.port.is-casting .r3 {
+  animation-delay: calc(2 * var(--motion-stagger));
+}
+
+@keyframes port-ripple {
+  from {
+    transform: scale(0.88);
+    opacity: 1;
+  }
+  to {
+    transform: scale(1.34);
+    opacity: 0;
+  }
+}
+
+/* `prefers-reduced-motion: reduce`：漂移与涟漪**冻结**（不是"藏起来"），
+ * 悬停缩放也停掉 —— 只留颜色/线的状态变化，反馈不丢（DESIGN.md §零装饰动效规则 4）。 */
+@media (prefers-reduced-motion: reduce) {
+  .field i,
+  .port.is-casting .r1,
+  .port.is-casting .r2,
+  .port.is-casting .r3 {
+    animation: none;
+  }
+
+  .port:hover {
+    transform: none;
+  }
+
+  .port {
+    transition: none;
+  }
+}
+
