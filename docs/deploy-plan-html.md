@@ -1883,3 +1883,44 @@ bottle / sea / me / admin / 404）—— 判据成立，但没余量，见 34.7�
 | `site/app/demo-nav.js` | ——（**已删除**，`DEMO_PAGES` 随之消失，无孤儿） | 前任删 |
 
 本节自身不进表（写进去会改变自己的哈希）；它的 sha256 见本片汇报。
+
+---
+
+## 35. 第 4 轮（8 条）最终验收与仓级红的归属（captain，2026-09-27）
+
+### 35.1 交付侧（site 与 tools）—— 无 agent 并发时亲跑，全绿
+| 门 | 结果 |
+| --- | --- |
+| tools/site-guard.mjs | 全部通过（10 页 + 17 JS + 10 补丁，含第 7 类补丁可重放） |
+| tools/probe-fit.mjs --port=5209 | 0 项不达标（10 页 x 8 档，登录态） |
+| tools/walkthrough.mjs --port=5209 | 32 PASS / 0 FAIL（两次真 MediaRecorder；零 5xx、零页面级 JS 错误） |
+| #1 缺口位置：captain 用自己的诊断脚本复验 | 同脚本 / 同视口 1680x1003 / 同类瓶：修前 gapBox x=909..1155（第 4 格）→ 修后 x=100..346（第 1 格），中心差 1px |
+| 守卫新规则纳入 .top-nav | 实测会抓：故意追加 .top-nav{display:none} ⇒ 6 项失败；复原后全绿 |
+
+### 35.2 仓级三道门是红的 —— 归属：另一个会话在并行开发同一份代码，而且它在提交 git
+实测：pnpm lint 13 problems (3 errors，全在 apps/web/**)；pnpm -r typecheck Failed（apps/api/src/routes/sea.integration.test.ts 的 total 与 isComplete）；pnpm -r test 仅 apps/web 5 failed（water-motif.test.tsx），apps/api 与 packages/shared 的测试本身全绿。
+
+证据（不是猜）：git status 显示 apps/api/src/routes 的 sea.ts 与 sea.integration.test.ts、packages/shared/src/contracts 的 bottles.ts 与 contracts.test.ts 此刻都是未提交的在飞改动；sea.integration.test.ts mtime=13:36:28；且 git log -1 指向提交 30907cf（fix(api): 指定接唱抢占失败改为 409(HOLDING_ALREADY_TAKEN) —— 修 qa-e2e F1(P0) + 补真并发集成测试），这条提交不是本会话任何 agent 做的（本会话 agent 一律禁跑 git，也没人报过它）。它正在加 isComplete 契约字段，留下中间态红。
+
+补充（W17 查到、值得记）：apps/web/src/pages/sea-page.tsx 的文件头有页面作者自己的书面声明 —— 以稿为准落地后 water-motif 对本页的源码断言会红、断言行待整合者按稿修订。
+⇒ 那 5 条红是该应用作者**已知并声明**的冲突，不是本会话的回归。
+
+### 35.3 本轮交付物不受此影响的论证
+1. site 不是 pnpm 包（无 site/package.json）⇒ 我们的文件不进任何单测套件（W13 已证）；
+2. apps/web 对 site、page-*、patches 的引用只有 1 处注释（shell/demo-nav.tsx:4），无 import；
+3. pnpm lint 的 3 条 error 全在 apps/web 的两个页面文件（W16b 两小时采样 2→3 条，红点在动）；
+4. 本会话所有 agent 均按 AGENTS §8 未代改 apps。
+
+### 35.4 第 4 轮 8 条的落地提交
+| # | 需求 | 提交 |
+| --- | --- | --- |
+| 1 / 2 / 6 | 缺口错位 · 公海接力 · 结果态出口 | 06fb1d6 |
+| 3 | 公海分页 | a1dd0ab |
+| 4 | 顶栏导航（含收口前任半成品） | 62ec7ad + 2ef43ee |
+| 5 | 河道心情标签 | 757798d |
+| 7 | 我的页去代号 | 6e80af0 |
+| 8 | motion-web 动效 | 16c48eb |
+
+### 35.5 一条取舍（W17 报，captain 认可）
+reduced-motion 下投/捞不再等待（73ms 直接跳）：无动画可播时等 1.2s 就是纯延迟，按 motion-web 零装饰动效规则 4 处理。
+用户原裁决「播完（约 1.2s）再跳」的前提是有动画；此条在无动画场景下不适用。若用户要求「任何时候都等 1.2s」，改一行。
