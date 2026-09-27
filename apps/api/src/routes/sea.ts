@@ -33,6 +33,39 @@ export function registerSeaRoutes(app: FastifyInstance, options: SeaRoutesOption
     return rows[0]?.title ?? '';
   }
 
+  /**
+   * 该 zone 的总条数（`total`，页码一次全显的数据来源）。
+   *
+   * 过滤条件与 store `listSeaBottles` 的候选预筛**同一份**：`status = 'SEA'` + zone 缺口投影。
+   * 为什么缺口投影可以当真值用：SQL 的"缺段存在性"与内核 `isComplete` 在段号不变式下等价
+   * （ADR-015 §16.2，见 `packages/shared/src/domain/queries.ts`），store 只是多做一次内核
+   * 复核防御数据漂移。两条 SQL 各写一份是**刻意的最小改法**——不动 store 接口；口径若漂移，
+   * `sea.integration.test.ts` 的「total 与 items 轮廓一致」会直接红。
+   */
+  async function countSeaBottles(
+    zone: 'COMPLETED' | 'INCOMPLETE',
+    status: string | null,
+  ): Promise<number> {
+    const rows = await options.db.query<{ n: number }>(
+      `select count(*)::int as n
+       from bottles b
+       where b.status = 'SEA'
+         and ($2::text is null or b.status = $2)
+         and ($1 = 'COMPLETED'
+           and not exists (
+                 select 1 from generate_series(1, b.total_segments) as g(idx)
+                 where not exists (select 1 from bottle_segments s
+                                   where s.bottle_id = b.id and s."index" = g.idx and s.deleted_at is null))
+           or $1 = 'INCOMPLETE'
+           and exists (
+                 select 1 from generate_series(1, b.total_segments) as g(idx)
+                 where not exists (select 1 from bottle_segments s
+                                   where s.bottle_id = b.id and s."index" = g.idx and s.deleted_at is null)))`,
+      [zone, status],
+    );
+    return rows[0]?.n ?? 0;
+  }
+
   app.get('/api/sea', async (request, reply) => {
     /** 查询参数用**契约里那一份**（`BottleListQuerySchema`），不再维护内联 schema。 */
     const query = BottleListQuerySchema.safeParse(request.query ?? {});
@@ -52,12 +85,17 @@ export function registerSeaRoutes(app: FastifyInstance, options: SeaRoutesOption
       after = decoded;
     }
 
-    const page = await options.store.listSeaBottles({
-      zone,
-      status: query.data.status ?? null,
-      limit: query.data.limit,
-      after,
-    });
+    // `total` = 该 zone 的总条数（与列表同一过滤条件，与列表取数并行发）：
+    // 前端据此一次算出总页数，页码不再"点到哪一页才长出下一页"。
+    const [page, total] = await Promise.all([
+      options.store.listSeaBottles({
+        zone,
+        status: query.data.status ?? null,
+        limit: query.data.limit,
+        after,
+      }),
+      countSeaBottles(zone, query.data.status ?? null),
+    ]);
     const rows = page.rows;
     // 一次性把这一页用到的曲名查出来（避免每行一条查询）
     const songIds = [...new Set(rows.map((row) => row.songId))];
@@ -80,7 +118,7 @@ export function registerSeaRoutes(app: FastifyInstance, options: SeaRoutesOption
     }
     // 分区判定已由 store 交给**内核**完成（`seaZoneOf`），这里不再自己 filter
     //（"先取 limit 再过滤"会让某页静默少给行，甚至返回空页却声称到底 —— §46.2 的原始缺陷）
-    return reply.send({ items, nextCursor: page.nextCursor });
+    return reply.send({ items, nextCursor: page.nextCursor, total });
   });
 
   app.get('/api/sea/:id', async (request, reply) => {

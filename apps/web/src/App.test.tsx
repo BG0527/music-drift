@@ -22,8 +22,11 @@ describe('App 入口', () => {
     try {
       render(<App />);
       expect(await screen.findByRole('heading', { name: '暖流河道' })).toBeInTheDocument();
-      expect(screen.getByRole('navigation', { name: '主导航' })).toBeInTheDocument();
-      expect(screen.getByRole('navigation', { name: '底部导航' })).toBeInTheDocument();
+      // 返工令（2026-09-27 二轮）：侧边栏/底栏已删，导航 = 页面上方常显 top-nav（四入口）
+      expect(screen.getByTestId('top-nav')).toBeInTheDocument();
+      expect(screen.getByRole('link', { name: '河道' })).toBeInTheDocument();
+      expect(screen.queryByRole('navigation', { name: '主导航' })).not.toBeInTheDocument();
+      expect(screen.queryByRole('navigation', { name: '底部导航' })).not.toBeInTheDocument();
     } finally {
       mock.restore();
     }

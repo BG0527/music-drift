@@ -35,9 +35,15 @@ import { useCreateBottle } from '../features/api/mutations';
 import { useSongs } from '../features/api/queries';
 import { ConflictNotice } from '../features/bottle/conflict-notice';
 import { useSession } from '../features/session/session-context';
-import { BottleMark, Button, Icon, Skeleton, cn } from '../design-system';
+import { Button, Icon, Skeleton, cn } from '../design-system';
 import { AsyncBoundary } from './shell/async-boundary';
+import { Link } from './shell/router';
 import { useNavigate } from './shell/router-context';
+
+/** 稿 §5.1：格顶沿五格错落 0/6/2/8/4px。 */
+const EDGE_TILT = [0, 6, 2, 8, 4] as const;
+/** 稿 §5.2：盆体 y 错落 −5/+6/−8/+9/0（相对均值 645.4）。 */
+const BASIN_TILT = [-5, 6, -8, 9, 0] as const;
 
 /* ── 浅盆的几何（数值全部来自设计稿 SVG，不是随手调的）──────────────────────── */
 
@@ -59,8 +65,16 @@ const GROOVE_LADDER = [0.883, 0.75, 0.581, 0.324] as const;
 /** 第 1 段那道珊瑚弧：设计与沟槽 1 同心，跨度 ±16.7（占该圈宽 22.5%）。 */
 const SEG1_WIDTH_PCT = 22.5;
 
-/** 一格浅盆：`cut` = 这首歌已切好的段位数，`total` = 段位总数。 */
-function WaterBasin({ cut, total }: { cut: number; total: number }) {
+/** 一格浅盆：`cut` = 这首歌已切好的段位数，`total` = 段位总数；`tilt` = 稿的盆体 y 错落。 */
+function WaterBasin({
+  cut,
+  total,
+  tilt = 0,
+}: {
+  cut: number;
+  total: number;
+  tilt?: number;
+}) {
   const ratio = total <= 0 ? 0 : Math.min(1, Math.max(0, cut / total));
   const slots = Array.from({ length: Math.max(0, total) }, (_unused, offset) => offset + 1);
   /** 段位 s 的沟槽半径（占母版半径）：沿设计稿四档逐档取值，非 4 段时只在相邻档间线性过渡。 */
@@ -116,7 +130,10 @@ function WaterBasin({ cut, total }: { cut: number; total: number }) {
   };
 
   return (
-    <figure className="mt-auto flex flex-col items-center gap-2">
+    <figure
+      className="mt-auto flex flex-col items-center gap-2"
+      style={{ transform: `translateY(${String(tilt)}px)` }}
+    >
       <div
         aria-hidden="true"
         data-testid="basin-graphic"
@@ -154,7 +171,7 @@ function WaterBasin({ cut, total }: { cut: number; total: number }) {
               style={discFrameStyle}
               className={cn(
                 DISC_FRAME,
-                'border border-water-light/25 bg-linear-to-b from-water-bed/60 to-water-void/85',
+                'border border-water-light/[0.38] bg-linear-to-b from-water-bed/60 to-water-void/85',
               )}
             >
               {slots.map((slot) => groove(slot, 'dim'))}
@@ -211,21 +228,22 @@ function WaterBasin({ cut, total }: { cut: number; total: number }) {
   );
 }
 
-/** 一格翻页箱的槽口：左右两道向下渐隐的细线 + 一道亮顶边（设计稿 `.slot` / `.edge`）。 */
-function BayFrame() {
+/** 一格翻页箱的槽口：左右两道向下渐隐的细线 + 一道亮顶边（稿 `.slot` / `.edge`，顶边带错落）。 */
+function BayFrame({ edgeTop }: { edgeTop: number }) {
   return (
     <>
       <span
         aria-hidden="true"
-        className="pointer-events-none absolute inset-x-0 top-0 h-px bg-linear-to-r from-line/35 to-line/5"
+        style={{ top: edgeTop }}
+        className="pointer-events-none absolute inset-x-0 h-px bg-linear-to-r from-paper/[0.34] to-paper/[0.05]"
       />
       <span
         aria-hidden="true"
-        className="pointer-events-none absolute top-0 bottom-[24%] left-0 w-px bg-linear-to-b from-line/30 to-transparent"
+        className="pointer-events-none absolute top-0 bottom-[24%] left-0 w-px bg-linear-to-b from-paper/[0.11] to-transparent"
       />
       <span
         aria-hidden="true"
-        className="pointer-events-none absolute top-0 right-0 bottom-[24%] w-px bg-linear-to-b from-line/30 to-transparent"
+        className="pointer-events-none absolute top-0 right-0 bottom-[24%] w-px bg-linear-to-b from-paper/[0.11] to-transparent"
       />
     </>
   );
@@ -251,23 +269,50 @@ export function SongPickerPage() {
   const rawCount = catalog.length - cutCount;
 
   return (
-    <div className="flex flex-col gap-6">
-      <header className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-        <div className="flex flex-col gap-2">
-          {/* 元信息用契约的 `.meta` 口径：11px + .24em + paper/50（对 ink 5.07:1 ✓；不再往下压 alpha） */}
+    <div className="relative isolate flex flex-col gap-6">
+      {/* 稿 §8 背景三层：platter →（盆体在内容层）→ deep → glint；装饰零布局、token 驱动（本页守卫禁 rgba/hex） */}
+      <span
+        aria-hidden="true"
+        data-device="sp-platter"
+        className="pointer-events-none absolute inset-0 bg-[repeating-radial-gradient(circle_at_98.6%_106.7%,color-mix(in_srgb,var(--color-line)_5.5%,transparent)_0_1.2px,transparent_1.2px_6.5px)]"
+      />
+      <span
+        aria-hidden="true"
+        data-device="sp-deep"
+        className="pointer-events-none absolute inset-x-0 bottom-0 h-[200px] opacity-[0.52] bg-[linear-gradient(180deg,transparent_0%,var(--color-water-void)_70%)]"
+      />
+      <span
+        aria-hidden="true"
+        data-device="sp-glint"
+        className="pointer-events-none absolute inset-0 opacity-[0.05] mix-blend-screen bg-[linear-gradient(101deg,transparent_28%,var(--color-water-light)_50%,transparent_72%)]"
+      />
+
+      {/* 动线 G1（flow-audit）：任何状态都有语义出口（稿本身没有此键，属审计授权的动线补丁） */}
+      <Link
+        to="/river"
+        className="inline-flex min-h-11 w-fit items-center gap-2 whitespace-nowrap text-[0.875rem] text-coral underline underline-offset-4"
+      >
+        <Icon name="ArrowLeft" size={16} />
+        回河道
+      </Link>
+
+      <header className="relative flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+        <div className="flex flex-col">
+          {/* 元信息用契约的 `.meta` 口径：11px + .24em + paper/50 */}
           <p className="font-latin text-[11px] tracking-[0.24em] text-paper/50">SIDE A · 未刻</p>
-          <h1 className="text-[2rem] leading-[1.15] font-bold text-paper md:text-[3.5rem] md:leading-none">
+          {/* 稿 §1：h1 上距 22px、56px/700/lh1 */}
+          <h1 className="mt-[22px] text-[2rem] leading-[1.15] font-bold text-paper md:text-[3.5rem] md:leading-none">
             选一首歌，投出第一棒
           </h1>
-          <p className="max-w-[820px] text-[0.96875rem] leading-[1.75] text-muted">
-            这里每首歌都被切成固定段位（同一位置永远属于同一段，斩浪也不会把后面的段前移）。 你录第
-            1 段，之后交给河道里的陌生人。
+          {/* 稿 §1：sub mt16 / max820 / 15.5px / 1.75，单段逐字 */}
+          <p className="mt-4 max-w-[820px] text-[0.96875rem] leading-[1.75] text-muted">
+            这里每首歌都被切成固定段位（同一位置永远属于同一段，斩浪也不会把后面的段前移）。你录第 1 段，之后交给河道里的陌生人。
           </p>
         </div>
 
         {catalog.length === 0 ? null : (
-          <dl className="flex shrink-0 items-end gap-6">
-            <div className="flex flex-col-reverse items-end gap-1">
+          <dl className="flex shrink-0 items-end gap-[38px]">
+            <div className="flex flex-col-reverse items-end gap-[8px]">
               <dt className="font-latin text-[11px] tracking-[0.24em] text-paper/50">已切分</dt>
               <dd
                 data-testid="stat-cut"
@@ -276,7 +321,7 @@ export function SongPickerPage() {
                 {cutCount}
               </dd>
             </div>
-            <div className="flex flex-col-reverse items-end gap-1">
+            <div className="flex flex-col-reverse items-end gap-[8px]">
               <dt className="font-latin text-[11px] tracking-[0.24em] text-paper/50">未切分</dt>
               <dd
                 data-testid="stat-raw"
@@ -299,14 +344,19 @@ export function SongPickerPage() {
         }
         emptyWhen={(items) => items.length === 0}
         empty={
-          <div className="flex flex-col items-center gap-4 rounded-base border border-line/20 bg-water-void px-6 py-8 text-center">
-            <BottleMark size={56} tone="sea-glass" />
-            <div className="flex flex-col gap-1">
-              <p className="text-[1.0625rem] font-semibold text-paper">曲库还没准备好</p>
-              <p className="text-[0.875rem] leading-[1.6] text-muted">
-                这一版还没有可选的歌。曲库接入后，这里会出现可以分成 4 段的曲目。
-              </p>
-            </div>
+          // 稿 §4 状态区（空态行）：dashed 框 + cat 标签「空 态」，逐字照稿
+          <div
+            data-device="sp-states"
+            className="enter-fade rounded-base border border-dashed border-paper/[0.16] px-[14px] py-[9px]"
+          >
+            <p className="flex gap-[14px] text-[0.78125rem] leading-[1.6] text-muted">
+              <span className="shrink-0 font-latin text-[11px] tracking-[0.24em] text-paper/50">
+                空 态
+              </span>
+              <span>
+                曲库还没准备好——这一版还没有可选的歌。曲库接入后，这里会出现可以分成 4 段的曲目。
+              </span>
+            </p>
           </div>
         }
       >
@@ -352,13 +402,22 @@ export function SongPickerPage() {
               </div>
 
               {matched.length === 0 ? (
-                <p className="rounded-base border border-line/20 bg-water-void px-4 py-[10px] text-[0.9375rem] text-muted">
-                  曲库里没有名字含「{keyword}」的歌，换个词试试。
-                </p>
+                /* 稿 §4 状态区（无匹配行）：dashed 框 + cat 标签，正文带真 query */
+                <div
+                  data-device="sp-states"
+                  className="enter-fade rounded-base border border-dashed border-paper/[0.16] px-[14px] py-[9px]"
+                >
+                  <p className="flex gap-[14px] text-[0.78125rem] leading-[1.6] text-muted">
+                    <span className="shrink-0 font-latin text-[11px] tracking-[0.24em] text-paper/50">
+                      无匹配
+                    </span>
+                    <span>曲库里没有名字含「{keyword}」的歌，换个词试试。</span>
+                  </p>
+                </div>
               ) : (
                 /* 五格翻页箱：桌面五格对齐成"水位对照"，窄屏折单列（盆宽上限 260 ⇒ 比例不变） */
                 <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
-                  {matched.map((song) => {
+                  {matched.map((song, songIndex) => {
                     const firstSegment = song.segments[0];
                     const seconds =
                       firstSegment === undefined
@@ -373,9 +432,9 @@ export function SongPickerPage() {
                      */
                     const startable = song.segments.length > 0;
                     return (
-                      <li key={song.id} className="flex">
+                      <li key={song.id} className={`flex enter-rise stagger-${Math.min(songIndex + 1, 4)}`}>
                         <article className="relative flex w-full min-w-0 flex-col gap-3 pt-4 pb-1">
-                          <BayFrame />
+                          <BayFrame edgeTop={EDGE_TILT[songIndex % EDGE_TILT.length] ?? 0} />
 
                           <h2
                             className="truncate text-[1.0625rem] font-bold text-paper"
@@ -386,13 +445,13 @@ export function SongPickerPage() {
 
                           <p className="flex flex-wrap items-baseline">
                             <span className="font-latin text-[0.71875rem] text-muted">
-                              共 {song.totalSegments} 段
+                              {song.totalSegments} 段
                             </span>
                             {seconds === null ? null : (
                               <>
                                 <span
                                   aria-hidden="true"
-                                  className="mx-[9px] inline-block h-[10px] w-px bg-line/20 align-[-1px]"
+                                  className="mx-[9px] inline-block h-[10px] w-px bg-paper/[0.18] align-[-1px]"
                                 />
                                 <span className="font-latin text-[0.71875rem] text-muted">
                                   每段约 {String(seconds)} 秒
@@ -401,19 +460,12 @@ export function SongPickerPage() {
                             )}
                           </p>
                           <p className="font-latin text-[0.71875rem] break-all text-muted">
-                            来源：{song.licensedSource}
+                            来源 {song.licensedSource}
                           </p>
 
-                          {startable ? null : (
-                            <p className="flex items-start gap-2 text-[0.8125rem] leading-[1.5] text-warning">
-                              <Icon name="AlertTriangle" size={16} />
-                              <span>这首还没有切分，暂不能发起</span>
-                            </p>
-                          )}
-
                           <Button
-                            variant="primary"
-                            className="min-h-11 w-full justify-center px-4 text-[0.8125rem]"
+                            variant="ghost"
+                            className="relative h-8 min-h-0 justify-center border border-paper/25 bg-paper/[0.03] px-3 text-[0.78125rem] text-paper before:absolute before:inset-x-0 before:-inset-y-1.5 before:content-[''] hover:border-glass hover:text-glass disabled:border-dashed disabled:border-paper/[0.14] disabled:text-muted"
                             loading={create.isPending}
                             disabled={!startable}
                             icon={<Icon name="Mic" size={16} />}
@@ -431,7 +483,18 @@ export function SongPickerPage() {
                             {startable ? '选这首，录第 1 段' : '暂不可发起'}
                           </Button>
 
-                          <WaterBasin cut={song.segments.length} total={song.totalSegments} />
+                          {/* 稿 §7 .note：干盆理由在按钮下方、无图标、warm 色（原在上方带图标，按稿回改） */}
+                          {startable ? null : (
+                            <p className="text-[0.78125rem] leading-[1.5] text-warm">
+                              这首还没有切分，暂不能发起
+                            </p>
+                          )}
+
+                          <WaterBasin
+                            cut={song.segments.length}
+                            total={song.totalSegments}
+                            tilt={BASIN_TILT[songIndex % BASIN_TILT.length] ?? 0}
+                          />
                         </article>
                       </li>
                     );
@@ -445,11 +508,22 @@ export function SongPickerPage() {
 
       {create.isError ? <ConflictNotice error={create.error} retryLabel="再试一次" /> : null}
 
-      {/* 页脚说明：设计稿页脚只有文字、无任何线（DESIGN.md 亦无「页脚必须有分隔线」条文），不画分隔线 */}
-      <p className="text-[0.8125rem] leading-[1.6] text-muted">
-        {session.status === 'authed'
-          ? '发起之后你会拿到这支瓶子的匿名代号；别人看到的是代号，不是你的账号。'
-          : '发起需要登录：账号只用来认领你自己的漂流瓶，别人看到的是每个瓶子单独的匿名代号。'}
+      {/* 页脚（稿 §9）：12.5px 右对齐、无任何线；未登录底注带「先登录」出口（动线 G8） */}
+      <p className="text-[0.78125rem] leading-[1.6] text-muted md:self-end md:text-right">
+        {session.status === 'authed' ? (
+          '发起之后你会拿到这支瓶子的匿名代号；别人看到的是代号，不是你的账号。'
+        ) : (
+          <>
+            发起需要登录：
+            <Link
+              to={'/login?next=' + encodeURIComponent('/new')}
+              className="inline-flex min-h-11 items-center whitespace-nowrap text-glass underline underline-offset-4"
+            >
+              先登录
+            </Link>
+            ：账号只用来认领你自己的漂流瓶，别人看到的是每个瓶子单独的匿名代号。
+          </>
+        )}
       </p>
     </div>
   );

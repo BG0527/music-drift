@@ -259,3 +259,72 @@ describe('登录 · 认领线（代号牌 → 线 → 只露一角的瓶口）',
     expect(screen.queryByRole('tab', { name: '注册' })).not.toBeInTheDocument();
   });
 });
+
+/**
+ * 逐块照抄 p-login-record.html 的结构断言（用户返工令：完全按照 .html）。
+ * 精确值来源 = apps/web/docs/review-login-blocks.md。每条对应稿里一个可指认的块/值。
+ */
+describe('登录页 · 照稿结构（review-login-blocks）', () => {
+  it('h1 = 52px + .005em（稿 §2），不是旧 56px', () => {
+    renderWithProviders(<LoginPage />);
+    const h1 = screen.getByRole('heading', { level: 1 });
+    expect(h1.className).toContain('text-[3.25rem]');
+    expect(h1.className).toContain('tracking-[0.005em]');
+  });
+
+  it('tabs 自绘照稿：15px/700/.14em + 激活 coral 2px 下框（稿 §4.1）', () => {
+    renderWithProviders(<LoginPage />);
+    expect(screen.getByRole('tablist')).toBeInTheDocument();
+    const active = screen.getByRole('tab', { name: '登录' });
+    expect(active.className).toContain('text-[0.9375rem]');
+    expect(active.className).toContain('tracking-[0.14em]');
+    expect(active.className).toContain('border-b-2');
+  });
+
+  it('字段行 = 下划线输入框（稿 §4.3/4.4：440×32 仅底边框），不是盒状 Input', () => {
+    renderWithProviders(<LoginPage />);
+    const account = screen.getByLabelText('账号');
+    expect(account.className).toContain('border-b');
+    expect(account.className).not.toContain('rounded-');
+  });
+
+  it('密码 hint 逐字照稿且常显（两档都在）：密码规则　至少 8 位，同时含字母和数字。', () => {
+    // 注：testing-library 会把全角空格 U+3000 规范成半角空格 ⇒ 正则用 \s* 匹配（语义等价）
+    const hint = /密码规则\s*至少 8 位，同时含字母和数字。/;
+    renderWithProviders(<LoginPage />);
+    expect(screen.getByText(hint)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('tab', { name: '注册' }));
+    expect(screen.getByText(hint)).toBeInTheDocument();
+    // 稿里没有账号 hint（旧实现的「2–32 个字符…」是发明，已删）
+    expect(screen.queryByText(/2–32 个字符/)).not.toBeInTheDocument();
+  });
+  it('主按钮 238×50（稿 §4.5）', () => {
+    renderWithProviders(<LoginPage />);
+    const button = screen.getByRole('button', { name: '登录' });
+    expect(button.className).toContain('w-[238px]');
+    expect(button.className).toContain('h-[50px]');
+  });
+
+  it('瓶口 svg 四条瓶肩都在（稿 §5：含内侧两条）', () => {
+    const { container } = renderWithProviders(<LoginPage />);
+    const svg = container.querySelector('[data-device="claim-bottle"]');
+    expect(svg).not.toBeNull();
+    expect(svg?.innerHTML).toContain('M92 24 L78 28');
+    expect(svg?.innerHTML).toContain('M172 24 L186 28');
+  });
+
+  it('SIDE A 落款绝对定位在右上（稿 §1：left1240/top88 → md 右上角）', () => {
+    const { container } = renderWithProviders(<LoginPage />);
+    const colophon = Array.from(container.querySelectorAll('p')).find((p) =>
+      p.textContent?.includes('SIDE A'),
+    );
+    expect(colophon?.className).toContain('absolute');
+  });
+
+  it('誓词逐字在页（稿 §4.6）', () => {
+    renderWithProviders(<LoginPage />);
+    expect(
+      screen.getByText(/不用真名，不用露脸，只要一段声音。同一个瓶子里，不同的人看到的是不同的匿名代号。/),
+    ).toBeInTheDocument();
+  });
+});

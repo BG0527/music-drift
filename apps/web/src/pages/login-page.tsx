@@ -29,7 +29,7 @@ import { ApiError } from '../features/api/client';
 import { useLogin, useRegister } from '../features/api/mutations';
 import { useSession } from '../features/session/session-context';
 import { ConflictNotice } from '../features/bottle/conflict-notice';
-import { Button, Glint, Icon, Input, Platter, Tabs } from '../design-system';
+import { Button, Glint, Icon, Platter, cn } from '../design-system';
 import { Link } from './shell/router';
 import { useNavigate, useSearch } from './shell/router-context';
 import { safeNextPath } from './shell/routes';
@@ -101,56 +101,121 @@ export function LoginPage() {
   }
 
   /**
-   * 表单本体。两种模式共用同一份状态（都在这个组件里），所以切换档位不会丢掉已经输入的值 ——
-   * 设计系统的 `Tabs` 只负责 tablist / tabpanel 与键盘，内容由这里给（`content` 为活动项时才渲染）。
+   * 表单本体（逐块照稿 review-login-blocks §4：图注 → 字段行(下划线) → 按钮 → 誓词；
+   * 间距照稿：tip mt20 / 账号 mt32 / 密码 mt26 / 按钮 mt36 / 誓词 mt40）。
+   * 两种模式共用同一份状态，切换档位不丢输入。
    */
   const form = (
-    <form className="flex max-w-[26rem] flex-col gap-4" onSubmit={submit} noValidate>
-      <p className="max-w-[26rem] text-[0.78125rem] leading-[1.8] text-muted">
+    <form className="enter-rise flex max-w-[452px] flex-col" onSubmit={submit} noValidate>
+      {/* §4.2 图注（稿 12.5px/1.8，rgba(.54) → paper/55） */}
+      <p className="mt-5 max-w-[452px] text-[0.78125rem] leading-[1.8] text-paper/55">
         登录和注册都只用这两项：账号、密码。
       </p>
 
-      <Input
-        label="账号"
-        name="account"
-        type="text"
-        autoComplete="username"
-        value={account}
-        onChange={(event) => {
-          setAccount(event.target.value);
-        }}
-        {...(mode === 'register'
-          ? { hint: '2–32 个字符，别人看到的是每个瓶子里单独的匿名代号。' }
-          : {})}
-        {...(fieldErrors.account === undefined ? {} : { error: fieldErrors.account })}
-      />
+      {/* §4.3 账号行：稿 = 440×32 仅底边框（不是盒状 Input） */}
+      <div className="mt-8 flex flex-col">
+        <label
+          htmlFor="login-account"
+          className="text-[0.6875rem] tracking-[0.24em] text-paper/50"
+        >
+          账号
+        </label>
+        <input
+          id="login-account"
+          name="account"
+          type="text"
+          autoComplete="username"
+          value={account}
+          aria-invalid={fieldErrors.account === undefined ? undefined : true}
+          {...(fieldErrors.account === undefined
+            ? {}
+            : { 'aria-describedby': 'login-account-err' })}
+          onChange={(event) => {
+            setAccount(event.target.value);
+          }}
+          className={cn(
+            'mt-2 h-8 w-full max-w-[440px] border-0 border-b bg-transparent px-px pb-1.5 text-[1rem] text-paper',
+            'focus:outline-none focus:border-glass',
+            fieldErrors.account === undefined ? 'border-paper/40' : 'border-coral',
+          )}
+        />
+        {fieldErrors.account === undefined ? null : (
+          <p id="login-account-err" role="alert" className="mt-2 text-[0.75rem] leading-[1.7] text-coral">
+            {fieldErrors.account}
+          </p>
+        )}
+      </div>
 
-      <Input
-        label="密码"
-        name="password"
-        type="password"
-        autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
-        value={password}
-        onChange={(event) => {
-          setPassword(event.target.value);
-        }}
-        {...(mode === 'register' ? { hint: '至少 8 位，且要同时包含字母和数字。' } : {})}
-        {...(fieldErrors.password === undefined ? {} : { error: fieldErrors.password })}
-      />
+      {/* §4.4 密码行：稿 mt26；hint 常显逐字（稿 §8-7）；strong 态 = 错误时 2px 底边 */}
+      <div className="mt-[26px] flex flex-col">
+        <label
+          htmlFor="login-password"
+          className="text-[0.6875rem] tracking-[0.24em] text-paper/50"
+        >
+          密码
+        </label>
+        <input
+          id="login-password"
+          name="password"
+          type="password"
+          autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
+          value={password}
+          aria-invalid={fieldErrors.password === undefined ? undefined : true}
+          {...(fieldErrors.password === undefined
+            ? {}
+            : { 'aria-describedby': 'login-password-err login-password-hint' })}
+          onChange={(event) => {
+            setPassword(event.target.value);
+          }}
+          className={cn(
+            'mt-2 h-8 w-full max-w-[440px] border-0 border-b bg-transparent px-px pb-1.5 text-[1rem] text-paper',
+            'focus:outline-none focus:border-glass',
+            fieldErrors.password === undefined ? 'border-paper/40' : 'border-coral border-b-2',
+          )}
+        />
+        {fieldErrors.password === undefined ? null : (
+          <p
+            id="login-password-err"
+            role="alert"
+            className="mt-1.5 text-[0.75rem] leading-[1.7] text-coral"
+          >
+            {fieldErrors.password}
+          </p>
+        )}
+        <p
+          id="login-password-hint"
+          className="mt-1.5 text-[0.75rem] leading-[1.7] text-muted"
+        >
+          {/* 稿逐字含全角空格（U+3000）：转义写法保字节、过 no-irregular-whitespace */}
+          {'密码规则　至少 8 位，同时含字母和数字。'}
+        </p>
+      </div>
 
       {formError === null ? null : <ConflictNotice error={formError} />}
 
+      {/* §4.5 主按钮：稿 238×50 / 15px / 700 / .05em / coral 底 ink 字（稿无图标） */}
       <Button
         type="submit"
         variant="primary"
         loading={busy}
-        className="self-start whitespace-nowrap"
-        icon={<Icon name={mode === 'login' ? 'LogIn' : 'UserPlus'} size={18} />}
+        className="mt-9 h-[50px] w-[238px] self-start whitespace-nowrap text-[0.9375rem] font-bold tracking-[0.05em]"
       >
         {mode === 'login' ? '登录' : '注册并进入'}
       </Button>
 
-      <p className="max-w-[28rem] text-[0.84375rem] leading-[1.9] text-muted">
+      {/* §1.9-2 提交进行态：状态文字（enter-fade）+ aria-live —— 动效不是唯一反馈，禁 spinner */}
+      {busy ? (
+        <p
+          role="status"
+          aria-live="polite"
+          className="enter-fade mt-3 text-[0.75rem] leading-[1.7] text-muted"
+        >
+          {mode === 'login' ? '正在登录…' : '正在注册…'}
+        </p>
+      ) : null}
+
+      {/* §4.6 誓词（稿 mt40 / 13.5px / 1.9） */}
+      <p className="mt-10 max-w-[452px] text-[0.84375rem] leading-[1.9] text-muted">
         不用真名，不用露脸，只要一段声音。同一个瓶子里，不同的人看到的是不同的匿名代号。
       </p>
     </form>
@@ -161,6 +226,11 @@ export function LoginPage() {
       {/* 世界的底与上方：盘面沟槽 + 斜穿的掠光（背景层，零布局高度） */}
       <Platter />
       <Glint />
+
+      {/* §1 落款（稿 absolute left1240/top88 → md 右上角；移动端避让顶部导航栏） */}
+      <p className={`${META} absolute right-6 top-16 md:right-24 md:top-[88px]`}>
+        SIDE A · {authed ? '已登录' : '未登录'}
+      </p>
 
       {/* 认领线（装饰层）：代号牌 → 线 → 线那头只露一角瓶口。
           一根 flex 列把「牌在上、瓶口在下、线自己撑满中间」写成结构，不写魔法像素。 */}
@@ -189,9 +259,11 @@ export function LoginPage() {
             className="block h-[28px] w-full text-water-mid"
             fill="none"
           >
-            {/* 瓶肩：口沿以下只留两侧玻璃壁，中间不画 —— 全页没有一条横贯的线 */}
+            {/* 瓶肩：口沿以下四条（稿 §5：外侧两条 + 内侧两条） */}
             <path d="M96 20 L84 28" stroke="currentColor" strokeOpacity="0.5" />
             <path d="M168 20 L180 28" stroke="currentColor" strokeOpacity="0.46" />
+            <path d="M92 24 L78 28" stroke="currentColor" strokeOpacity="0.44" />
+            <path d="M172 24 L186 28" stroke="currentColor" strokeOpacity="0.42" />
             {/* 玻璃口：暗的开口；近唇亮、远唇暗，只露这半边 */}
             <ellipse
               cx="132"
@@ -212,15 +284,15 @@ export function LoginPage() {
       </div>
 
       <div className="flex flex-1 flex-col gap-6 pr-[84px] md:pr-[144px]">
-        <p className={`${META} self-start md:self-end`}>SIDE A · {authed ? '已登录' : '未登录'}</p>
-
         <header className="flex flex-col gap-4">
-          <h1 className="text-[1.625rem] font-bold leading-[1.05] text-paper md:text-[3.5rem]">
+          {/* §2 标题：稿 52px/700/1.1/.005em */}
+          <h1 className="text-[1.625rem] font-bold leading-[1.05] tracking-[0.005em] text-paper md:text-[3.25rem]">
             每一段旋律，
             <br />
             都在寻找下一个声音
           </h1>
-          <p className="max-w-[31rem] text-[0.90625rem] leading-[1.85] text-muted">
+          {/* 导语：稿 w500 / 14.5px / 1.85 */}
+          <p className="max-w-[31.25rem] text-[0.90625rem] leading-[1.85] text-muted">
             这是一个由歌声、回音和宿命组成的角落。
             <br />
             你只录一段，剩下的交给漂流。
@@ -228,14 +300,34 @@ export function LoginPage() {
         </header>
 
         {authed ? null : (
-          <Tabs
-            items={[
-              { key: 'login', label: '登录', content: form },
-              { key: 'register', label: '注册', content: form },
-            ]}
-            value={mode}
-            onChange={switchMode}
-          />
+          <>
+            {/* §4.1 tabs 自绘照稿：15px/700/.14em、gap26；激活 coral 2px 下框、未激活 muted 1px */}
+            <div role="tablist" className="flex gap-[26px]">
+              {(['login', 'register'] as const).map((key) => {
+                const activeTab = mode === key;
+                return (
+                  <button
+                    key={key}
+                    type="button"
+                    role="tab"
+                    aria-selected={activeTab}
+                    onClick={() => {
+                      switchMode(key);
+                    }}
+                    className={cn(
+                      'cursor-pointer border-0 bg-transparent pb-2 text-[0.9375rem] font-bold tracking-[0.14em]',
+                      activeTab
+                        ? 'border-b-2 border-coral text-coral'
+                        : 'border-b border-paper/40 text-muted hover:text-paper',
+                    )}
+                  >
+                    {key === 'login' ? '登录' : '注册'}
+                  </button>
+                );
+              })}
+            </div>
+            {form}
+          </>
         )}
 
         {/* 装置说明：375 走正文列，桌面靠右贴着那根线 */}
@@ -253,7 +345,7 @@ export function LoginPage() {
                 <strong className="font-semibold text-paper">{session.user?.handle}</strong>
                 ，不用再登录一次。
               </span>
-              <Link to="/river" className={`ml-auto ${TEXT_LINK_COOL}`}>
+              <Link to="/river" className={`ml-auto ${TEXT_LINK_COOL} text-[0.875rem]`}>
                 直接去河道捞一个瓶子
               </Link>
             </div>

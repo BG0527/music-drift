@@ -1,56 +1,49 @@
 /**
  * 河道（`/river`；`/` 是它的旧入口，已规范化，见 `routes.ts` 的 `canonicalHref`）= 全站门面。
  *
- * ## 本轮：把设计定稿 `docs/ui-review/design-explore/f4-groove.png` 落成响应式真实页面
- * 三件**必须存活**的装置（实施计划 §5.1）：
+ * ## 本轮：按定稿 `docs/ui-review/design-explore/f4-groove.html` 逐块落地
+ * 唯一值源是块清单 `docs/review-river-blocks.md`（逐字文案 / SVG 参数 / 排版参数 / 差异预读）。
+ * 稿是 1440×900 固定画布，这里是同一套语言的**流式重排** —— 允许的唯一翻译 =
+ * 固定 px → 流体（1440 基准半径/沟距 ÷14.4 → vw；圆心 (1420,960) → 98.61% 106.67%）。
+ * 色值纪律：**源码禁 hex** —— 旧珊瑚一律 `var(--color-coral)`，稿的叠层参数用 rgba 原样落地。
  *
- * ① **一条被点亮的沟槽 = 一条河道**。整页是一张**躺在水里的唱片**：盘面（同心沟槽）+ 掠光，
- *    水面以下横贯一条**被点亮的沟槽**（两条岸夹一道水）。装置一律**从设计系统取**
- *    （`<Platter>` / `<Glint>` / `<Groove>`）—— 页面不重画母题，这是 `water-motif.test.tsx`
- *    那一组的明确口径（"页面从设计系统取，不许各自重画"）。
- * ② **两枚错落的圆盘泊位**：捞取（下游 · 左 · 冷边）与投下（上游 · 右 · 暖边）**共用同一份尺寸**
- *    （用户 2026-09-23 裁决的"等权"），只把其中一枚沿竖直方向错开一档。盘身是 `disc-core`
- *    （**不填彩色**），彩色只出现在 3 圈外环与 `disc-edge-cool/warm` 的边缘微光上。
- *    它们读起来是"同一条河上的两个位置"，不是两张同宽同高同圆角的卡片。
- * ③ **默认态没有漂流瓶**（用户第 ④ 条硬约束：「默认态只有水在流」）。常驻层**不出现**任何瓶子母题：
- *    "空河道在等"由**被点亮却空着的水槽**读出来；瓶子只在捞/投的一次操作动效里现身
- *    （见下一轮）。常驻层把瓶子加回来，本页测试会红。
+ * 块序（稿 = 页面）：
+ *  - B1 背景五层（稿 §5：底 `platter/body`、面 `center` 与 `field>i`、光 `light`）+ B2 唱片表面 SVG
+ *    （稿 §4：圆族 / 河道 r900 六层水槽 / 擦痕弧 / 尘点 / 转向箭头「顺槽 · 33⅓」）——
+ *    一个 `aria-hidden` 的 backdrop 宿主（`pointer-events-none absolute inset-0 z-0`，零信息零高度）；
+ *  - B3 左上标题（cat 带 `· 0001` / h1 84px 档 / 副标题两行逐字）；
+ *  - B4 右上信息（33⅓ + `RPM · 匿名接力` + 两行说明；稿右上没有「参与记录」链接 ⇒ 删）；
+ *  - B5/B6 两枚**错落不等**的圆盘泊位（捞取 190×190 / 投下 150×150，固定 px → clamp 流体；
+ *    captain 裁决：不再共用同一份尺寸定义，「等权」由同结构 + 同三圈外环 + 同盘身表达）；
+ *  - B7 页脚 `<footer>`：心情 chips（aria-pressed 单选）+ 去公海链接。
+ * 现页有稿无 ⇒ 删：波形带（CurrentLines h-48）、重试块（错误提示 + 重试出口）、右上「参与记录」链接。
  *
- * ## 本轮（任务 E）：把 `docs/ui-review/design-explore/f0-sequence.html` 的三段分镜落进本页
- * ① 常驻态只有水在流：`data-river-decor` 一层装饰（漂移虚线 46s 一个来回 + 两圈错拍的
- *    场景涟漪），`aria-hidden`、零信息、零布局高度；
- * ② 捞取 / 投下：瓶子**只在一次操作里出现**（入场 → 收拢涟漪 → 退场三段状态机），
- *    样式在 `river-motion.css`，参数只取 `--motion-*` token；
- * ③ **动画播完再跳转**（architecture §103.3 用户裁决）：导航挂在 `finishFlow` 上，
- *    同位 `aria-live` 文字状态全程可读；`prefers-reduced-motion` 下不起动画、立即跳
- *    （同一裁决的回归守卫在 `__tests__/river-page.test.tsx`）。
+ * ## 必须存活的三件装置（本页测试「三件装置」一组盯着）
+ * ① **被点亮的沟槽＝河道**：唱片 SVG 里 r900 一族的**六层水槽**（底槽 26 / 水面亮线 7 /
+ *    下岸 887 / 上岸 913 / 两道错拍的水流虚线），挂在 `data-device="river"`；
+ * ② 两枚错落圆盘泊位：盘身 `disc-core` **不填彩色**，冷/暖只在 `disc-edge-cool/warm` 与外环；
+ * ③ **默认态没有漂流瓶**（用户第 ④ 条硬约束）：常驻层不出现瓶母题，瓶只在一次操作动效里现身。
  *
- * ## 响应式（设计稿是 1440×900 固定画布，这里是同一套语言的**重排**）
- * 装饰的几何由设计系统的装置负责（`platter` 的圆心取百分比、`groove` 取 `inset-x-0`），
- * 页面只给位置：多列在 768px 以下折单列（`md:`）、可点目标 ≥44px（`min-h-11`）、
- * 两枚泊位（`data-anchor`）都在 375×812 的首屏内。出血装饰一律包在 `overflow-hidden` 宿主里。
+ * ## f0 三段分镜（`f0-sequence.html` + architecture §103.3，**本轮保留不动**）
+ * 常驻装饰 `data-river-decor`（46s 漂移虚线 + 两圈错拍场景涟漪）仍在水体容器内；
+ * 捞/投 = enter → ripple → exit 状态机，样式在 `river-motion.css`（只引用 `--motion-*` token）；
+ * 动画播完再跳转，`prefers-reduced-motion` 下不起动画立即跳；同位 `aria-live` 文字状态全程可读。
  *
- * 契约：`DESIGN.md` 的 `## Composition` / `## Elevation & Depth`（母题装置库）；
- * 机器守卫：本页测试的「三件装置」一组 + `design-system/__tests__/water-motif.test.tsx`（水域母题层）。
+ * 契约：`DESIGN.md`（token）+ `docs/review-river-blocks.md`（稿参数）；机器守卫：本页测试。
  */
-import { useCallback, useEffect, useRef, useState, type MouseEvent as ReactMouseEvent } from 'react';
+import { useCallback, useEffect, useRef, useState, type CSSProperties, type MouseEvent as ReactMouseEvent } from 'react';
 import {
-  CurrentLines,
-  Glint,
-  Groove,
   LightShafts,
-  Platter,
   Ripple,
   RippleRing,
-  SurfaceLine,
   WaterSheen,
   WaterTexture,
   cn,
   motion,
   prefersReducedMotion,
 } from '../design-system';
+import { toApiErrorView } from '../features/api/errors';
 import { useDrawBottle, useInvalidateBottle } from '../features/api/mutations';
-import { ConflictNotice } from '../features/bottle/conflict-notice';
 import { MoodChips } from '../features/bottle/mood-chips';
 import { useSession } from '../features/session/session-context';
 import { Link } from './shell/router';
@@ -60,11 +53,12 @@ import { TEXT_LINK } from './shell/link-styles';
 import './river-motion.css';
 
 /**
- * 两个泊位**共用这一份尺寸定义** —— 「投下与捞起等权」的机器可检形式（守卫断言它至少被引用两次）：
- * 只改其中一个会让等权静默失衡，所以这里不允许各写一份。
- * 焦点/边界装置**故意留在各自元素上**（不抽公共常量）：`deep-surface-cta.test.ts` 要读到真实的 class。
+ * 两枚泊位**各自一份尺寸**（稿 §4.8：捞取 190×190、投下 150×150 —— 错落，小一档且更靠下；
+ * captain 裁决：不再共用同一份尺寸定义）。固定 px → 流体：`clamp(下限, 1440 基准 vw, 稿值)`。
+ * 焦点/边界装置**故意留在各自元素上**：`deep-surface-cta.test.ts` 要读到真实的 class。
  */
-const PORT_SIZE = 'h-[76px] w-[76px] rounded-full md:h-[110px] md:w-[110px]';
+const PORT_DRAW_SIZE = 'h-[clamp(88px,13.194vw,190px)] w-[clamp(88px,13.194vw,190px)] rounded-full';
+const PORT_CAST_SIZE = 'h-[clamp(72px,10.417vw,150px)] w-[clamp(72px,10.417vw,150px)] rounded-full';
 
 /** 泊位盘身 + 3 圈外环（外环位移 13 / 29 / 45px 由 `--motif-ring-*` 定，页面不写死）。 */
 function PortRings() {
@@ -76,6 +70,51 @@ function PortRings() {
     </>
   );
 }
+
+/* ── B1 背景五层（稿 §5）──────────────────────────────────────────────────────
+   稿的固定画布 px → 流体：圆心 (1420px, 960px) = 98.61% 106.67%（与设计系统 `.platter`
+   同一口径），半径/沟距/遮罩一律 ÷14.4 → vw（1440 基准，整张盘等比缩放）。
+   两档沟距：中心区 11px → 0.764vw（约 35 条沟的录音区）、外圈 land 4.4px → 0.306vw。 */
+const RECORD_ORIGIN = 'circle at 98.61% 106.67%';
+
+/** ① 底 · 台面：贴外缘的接触阴影（1276/1285/1366）+ 台面抬 2.2% 的底色。 */
+const PLATTER_LAYER: CSSProperties = {
+  opacity: 1,
+  backgroundColor: 'rgba(127,209,217,0.022)',
+  backgroundImage: `radial-gradient(${RECORD_ORIGIN}, transparent 0 88.611vw, rgba(2,9,13,0.52) 89.236vw, transparent 94.861vw)`,
+};
+
+/** ① 底 · 盘身：比台面亮一档（1210 → 1330）。 */
+const BODY_LAYER: CSSProperties = {
+  backgroundImage: `radial-gradient(${RECORD_ORIGIN}, rgba(127,209,217,0.055) 0 84.028vw, transparent 92.361vw)`,
+};
+
+/** ② 面 · 录音区：11px 档沟距（0.764vw）；遮罩只放行 340–790（23.611–54.861vw）那段圈。 */
+const CENTER_LAYER: CSSProperties = {
+  backgroundImage: `repeating-radial-gradient(${RECORD_ORIGIN}, rgba(216,243,246,0.07) 0 1.25px, transparent 1.25px 0.764vw)`,
+  maskImage: `radial-gradient(${RECORD_ORIGIN}, transparent 0 23.611vw, white 27.778vw, white 54.861vw, transparent 61.111vw)`,
+};
+
+/** ② 面 · 外圈 land：遮罩只放行 930–1258（64.583–87.361vw）；830–930 是无沟 land，河道 r900 恰落其中。 */
+const FIELD_LAYER: CSSProperties = {
+  maskImage: `radial-gradient(${RECORD_ORIGIN}, transparent 0 64.583vw, white 68.75vw, white 87.361vw, transparent 90.278vw)`,
+};
+
+/** ② 面 · `field > i`：4.4px 档沟距（0.306vw）+ 按左上角衰减（字角安静）。 */
+const FIELD_GROOVE_LAYER: CSSProperties = {
+  backgroundImage: `repeating-radial-gradient(${RECORD_ORIGIN}, rgba(214,241,247,0.03) 0 1px, transparent 1px 0.306vw)`,
+  maskImage: 'radial-gradient(circle at 0 0, transparent 0 23.611vw, white 56.944vw)',
+};
+
+/** ③ 光 · 掠光：环光（r980–1140）+ 101° 灯带（53%→55% 陡降 = 灯管被盘面切断的硬边）；screen 混合。 */
+const LIGHT_LAYER: CSSProperties = {
+  mixBlendMode: 'screen',
+  backgroundImage: [
+    `radial-gradient(${RECORD_ORIGIN}, transparent 0 68.056vw, rgba(210,240,246,0.034) 73.611vw, transparent 79.167vw)`,
+    'linear-gradient(101deg, transparent 26%, rgba(210,240,246,0.03) 40%, rgba(210,240,246,0.058) 50%, rgba(210,240,246,0.05) 53%, rgba(210,240,246,0.012) 55%, rgba(210,240,246,0.006) 62%, transparent 74%)',
+  ].join(', '),
+  maskImage: `radial-gradient(${RECORD_ORIGIN}, white 0 87.361vw, transparent 90.278vw)`,
+};
 
 /** f0 三段的舞台：瓶子只在**一次操作**里出现（enter → ripple → exit），默认态没有它。 */
 type FlowKind = 'draw' | 'cast';
@@ -93,9 +132,8 @@ const STAGE_DURATION: Record<FlowStage, number> = {
 };
 
 /**
- * 分镜里的那只瓶子（f0-sequence ①-02 / ②-02 的形态值：玻璃瓶身 rx7 + 珊瑚木塞 + 一道纸条）。
- * 纯装饰（外层 `aria-hidden`）：色值一律走 `var(--color-*)`，不写 hex。
- * 它**只在一次操作的动效里**出现 —— 常驻态没有它（用户第 ④ 条硬约束，守卫③盯着）。
+ * 分镜里的那只瓶子（玻璃瓶身 rx7 + 木塞 + 一道纸条）。纯装饰（外层 `aria-hidden`）：
+ * 色值一律 `var(--color-*)`，不写 hex。它**只在一次操作的动效里**出现（守卫③盯着）。
  */
 function FlowVessel() {
   return (
@@ -112,15 +150,9 @@ function FlowVessel() {
         strokeOpacity={0.9}
         strokeWidth={2}
       />
-      {/* 木塞：coral = 被记下的那一下（record-v1 唯一强调色；不用分镜里的旧字面色） */}
+      {/* 木塞：coral = 被记下的那一下（record-v1 唯一强调色） */}
       <rect x="4" y="1" width="10" height="8" rx="3" fill="var(--color-coral)" />
-      <path
-        d="M0 30 h18"
-        fill="none"
-        stroke="var(--color-paper)"
-        strokeOpacity={0.7}
-        strokeWidth={1.6}
-      />
+      <path d="M0 30 h18" fill="none" stroke="var(--color-paper)" strokeOpacity={0.7} strokeWidth={1.6} />
     </svg>
   );
 }
@@ -132,7 +164,6 @@ export function RiverPage() {
   const session = useSession();
   const newHref =
     session.status === 'authed' ? '/new' : `/login?next=${encodeURIComponent('/new')}`;
-  const mineHref = session.status === 'authed' ? '/me' : `/login?next=${encodeURIComponent('/me')}`;
 
   /** f0 三段状态机：瓶子只在一次操作里出现（null = 常驻态，只有水在流）。 */
   const [flow, setFlow] = useState<FlowState | null>(null);
@@ -144,6 +175,9 @@ export function RiverPage() {
   const pendingNavRef = useRef<string | null>(null);
   /** 同一拍内的重复点击（mutation 状态还没回到 React）挡在 ref 层。 */
   const busyRef = useRef(false);
+
+  /** 稿无重试块：失败只给同位 aria-live 状态 + 这一块只读 alert（可读文案来自契约层）。 */
+  const errorView = draw.isError ? toApiErrorView(draw.error) : null;
 
   const startFlow = (kind: FlowKind): void => {
     const next: FlowState = { kind, stage: 'enter' };
@@ -234,60 +268,160 @@ export function RiverPage() {
   }
 
   return (
-    // 出血到外壳的内边距之外：唱片因此是一整面，而不是被内容宽度切出来的一块
-    // （负外边距正好抵消 `app-shell` 的 `px-[24px] md:px-[48px]`，不会产生横向滚动）。
-    <div className="relative isolate -mx-6 flex flex-col gap-6 md:-mx-12 md:gap-8">
-      {/* ── 唱片表面：盘面（同心沟槽）+ 掠光 ────────────────────────────────────
-          放在 `z-0`：它要压在下面的**水体之上**（"沟槽里流的是水"，语言契约 §7.3），
-          但在全部正文之下（正文一律 `relative z-10`）—— 所以正文永远不会被装饰压住。 */}
-      <div aria-hidden="true" className="pointer-events-none absolute inset-0 z-0">
-        <Platter />
-        <Glint />
+    // 页面自带 <main>（外壳不渲染，且外壳不给 padding ⇒ main 贴视口宽全出血，
+    // 不得再写负外边距：-mx-6/md:-mx-12 曾把 scrollWidth 撑成 1488>1440 / 399>375）。
+    // 唱片出血由 backdrop 的 absolute inset-0 承担；正文边距是 header/section/footer 各自的 px-6。
+    <main className="relative isolate flex flex-col gap-6 md:gap-8">
+      {/* ── B1 背景五层 + B2 唱片表面 SVG（稿 §5/§4）───────────────────────────
+          放在 z-0：它压在水体之上（"沟槽里流的是水"），但在全部正文之下（正文 relative z-10）。
+          纯装饰：aria-hidden、pointer-events-none、绝对定位零布局高度。 */}
+      <div
+        aria-hidden="true"
+        data-river-backdrop=""
+        className="pointer-events-none absolute inset-0 z-0"
+      >
+        {/* ① 底：台面接触阴影 + 盘身亮一档 */}
+        <div className="platter absolute inset-0" style={PLATTER_LAYER} />
+        <div className="body absolute inset-0" style={BODY_LAYER} />
+        {/* ② 面：两档沟距的同心纹理（遮罩分段 = 录音区 / 外圈 land / 左上角安静） */}
+        <div className="center absolute inset-0" style={CENTER_LAYER} />
+        <div className="field absolute inset-0" style={FIELD_LAYER}>
+          <i className="absolute inset-0 block" style={FIELD_GROOVE_LAYER} />
+        </div>
+        {/* ③ 光：掠光（screen 混合，灯带 53%→55% 陡降 = 灯管被盘面切断的硬边） */}
+        <div className="light absolute inset-0" style={LIGHT_LAYER} />
+
+        {/* ── B2 唱片表面 SVG（稿 §4 全参数；画布 1440×900，viewBox 等比流体）────
+            圆族圆心统一 (1420,960)（画布外右下）；装饰无交互，一整块 aria-hidden。 */}
+        <svg
+          aria-hidden="true"
+          focusable="false"
+          viewBox="0 0 1440 900"
+          preserveAspectRatio="xMaxYMax slice"
+          className="absolute inset-0 h-full w-full"
+        >
+          <defs>
+            {/* sheen：右下角的玻璃青掠光 */}
+            <radialGradient id="river-sheen" cx="0.99" cy="1" r="0.42">
+              <stop offset="0" style={{ stopColor: 'var(--color-glass)' }} stopOpacity={0.06} />
+              <stop offset="0.4" style={{ stopColor: 'var(--color-glass)' }} stopOpacity={0} />
+            </radialGradient>
+            {/* label：平的纸标签（珊瑚 19% 平铺到 97%，不再填渐变） */}
+            <radialGradient id="river-label" cx="0.5" cy="0.5" r="0.5">
+              <stop offset="0.97" style={{ stopColor: 'var(--color-coral)' }} stopOpacity={0.19} />
+              <stop offset="1" style={{ stopColor: 'var(--color-coral)' }} stopOpacity={0} />
+            </radialGradient>
+            {/* rim：下半圈亮、上半圈隐的外缘 */}
+            <linearGradient id="river-rim" gradientUnits="userSpaceOnUse" x1={0} y1={800} x2={0} y2={330}>
+              <stop offset="0" stopColor="rgb(230,248,251)" stopOpacity={0.5} />
+              <stop offset="0.5" stopColor="rgb(230,248,251)" stopOpacity={0.17} />
+              <stop offset="1" stopColor="rgb(230,248,251)" stopOpacity={0} />
+            </linearGradient>
+          </defs>
+
+          <rect width={1440} height={900} fill="url(#river-sheen)" />
+
+          {/* 标签盘面 + 硬边内圈 + 纸白外沿（稿 §4.2 前三行） */}
+          <circle cx={1420} cy={960} r={268} fill="url(#river-label)" />
+          <circle cx={1420} cy={960} r={262} fill="none" stroke="var(--color-coral)" strokeOpacity={0.52} strokeWidth={1.6} />
+          <circle cx={1420} cy={960} r={275} fill="none" stroke="var(--color-paper)" strokeOpacity={0.2} strokeWidth={1} />
+          {/* 录音区外界 lead-out（262–336 = 无沟平滑留白） */}
+          <circle cx={1420} cy={960} r={336} fill="none" stroke="rgba(214,241,247,0.13)" strokeWidth={1} />
+          {/* 外缘 rim + 倒角内线（14px 内补一条，双线 = 车削边唇） */}
+          <circle cx={1420} cy={960} r={1276} fill="none" stroke="url(#river-rim)" strokeWidth={2} />
+          <circle cx={1420} cy={960} r={1268} fill="none" stroke="rgba(214,241,247,0.14)" strokeWidth={1} />
+
+          {/* ── 河道（稿 §4.3）：被点亮的沟槽 = r900 一族的**六层水槽**
+              底槽(26) / 水面亮线(7) / 下岸(887) / 上岸(913) / 水流虚线 A(r900) / 虚线 B(r906)。
+              830–930 是无沟 land，r900 恰落其中 ⇒ 河道不长在纹理上，是单独一条水槽。 */}
+          <g data-device="river" fill="none">
+            <circle cx={1420} cy={960} r={900} stroke="rgba(42,157,177,0.2)" strokeWidth={26} />
+            <circle cx={1420} cy={960} r={900} stroke="rgba(159,230,237,0.42)" strokeWidth={7} />
+            <circle cx={1420} cy={960} r={887} stroke="rgba(216,243,246,0.5)" strokeWidth={1.4} />
+            <circle cx={1420} cy={960} r={913} stroke="rgba(216,243,246,0.44)" strokeWidth={1.4} />
+            <circle cx={1420} cy={960} r={900} stroke="rgba(243,249,250,0.42)" strokeWidth={2} strokeDasharray="16 30" strokeLinecap="round" />
+            <circle cx={1420} cy={960} r={906} stroke="rgba(243,249,250,0.2)" strokeWidth={1.6} strokeDasharray="10 40" strokeLinecap="round" />
+          </g>
+
+          {/* 擦痕弧（稿 §4.4）：顺槽方向的短弧，butt 端点，一条 dash 画一道 */}
+          <g fill="none" stroke="rgb(230,247,251)" strokeLinecap="butt">
+            <circle cx={1420} cy={960} r={1180} strokeWidth={1.1} strokeOpacity={0.17} strokeDasharray="126 9999" strokeDashoffset={-4120} />
+            <circle cx={1420} cy={960} r={1214} strokeWidth={1} strokeOpacity={0.12} strokeDasharray="92 9999" strokeDashoffset={-4460} />
+            <circle cx={1420} cy={960} r={1128} strokeWidth={1.2} strokeOpacity={0.14} strokeDasharray="158 9999" strokeDashoffset={-3700} />
+            <circle cx={1420} cy={960} r={1246} strokeWidth={1} strokeOpacity={0.1} strokeDasharray="70 9999" strokeDashoffset={-4830} />
+          </g>
+
+          {/* 尘点（稿 §4.5）：4 颗聚一撮 */}
+          <g fill="var(--color-foam)">
+            <circle cx={556} cy={700} r={1.5} fillOpacity={0.26} />
+            <circle cx={578} cy={712} r={1.1} fillOpacity={0.2} />
+            <circle cx={540} cy={716} r={1.2} fillOpacity={0.22} />
+            <circle cx={592} cy={698} r={1} fillOpacity={0.16} />
+          </g>
+
+          {/* 转向箭头（稿 §4.6）：河在往哪边流 */}
+          <g opacity={0.8} fill="none" stroke="var(--color-coral)" strokeWidth={2} strokeLinecap="round">
+            <path d="M1296 700 Q 1366 640 1442 674" strokeOpacity={0.55} />
+            <path d="M1442 674 l -6 -15 l -15 6" strokeOpacity={0.55} />
+          </g>
+          <text
+            x={1146}
+            y={712}
+            fill="var(--color-coral)"
+            fillOpacity={0.62}
+            fontFamily="ui-monospace, Consolas, monospace"
+            fontSize={10}
+            letterSpacing="1.6"
+          >
+            顺槽 · 33⅓
+          </text>
+        </svg>
       </div>
 
-      {/* ── 岸（水线以上）：标题立在被压暗的盘面上 ───────────────────────────── */}
+      {/* ── B3/B4 岸（水线以上）：标题立在被压暗的盘面上 ─────────────────────── */}
       <header className="relative z-10 flex flex-wrap items-start justify-between gap-x-6 gap-y-4 px-6 md:px-12">
+        {/* B3 左上：cat（带编号）→ h1（84px 档）→ 副标题两行（逐字照稿） */}
         <div className="flex min-w-0 flex-col gap-2">
-          <p className="font-latin text-[0.6875rem] tracking-[0.24em] text-muted">
-            音乐共创 · 匿名接力
+          <p className="font-latin text-[0.6875rem] tracking-[0.24em] text-paper/50">
+            音乐共创 · 匿名接力 · 0001
           </p>
           <h1 className="text-[clamp(2.5rem,6vw,5.25rem)] font-bold leading-none text-paper">
             暖流河道
           </h1>
-          <p className="max-w-[820px] text-[0.9375rem] leading-[1.85] text-muted">
-            拾起那些搁浅在黑夜里的声线
+          <p className="text-[0.96875rem] leading-[1.9] text-muted">
+            一条沟槽就是一条河。
+            <br />
+            唱一段，让它顺水去找下一个陌生人。
           </p>
         </div>
-        <div className="flex flex-col items-start gap-2 md:items-end">
-          <p className="text-right font-latin text-[0.6875rem] tracking-[0.24em] text-muted">
-            {/* 26px = 字号阶梯的 h1 档（设计稿这里也是 26px） */}
-            <span className="block text-[1.625rem] leading-none tracking-normal text-paper">
-              33⅓
-            </span>
-            RPM
+        {/* B4 右上：33⅓ → RPM · 匿名接力 → 两行说明（稿右上没有「参与记录」链接） */}
+        <div className="flex flex-col items-start gap-2 md:items-end md:text-right">
+          {/* 26px = 字号阶梯的 h1 档（稿 .rpm 也是 26px，色 = --glass） */}
+          <span className="font-latin text-[1.625rem] leading-none text-glass">33⅓</span>
+          <p className="font-latin text-[0.6875rem] tracking-[0.24em] text-paper/50">
+            RPM · 匿名接力
           </p>
-          <Link to={mineHref} className={TEXT_LINK}>
-            我参与过的漂流瓶
-          </Link>
+          <p className="text-[0.6875rem] leading-[2] tracking-[0.06em] text-paper/[0.82]">
+            唱一段，投进河里，让陌生人接棒
+            <br />
+            四段齐了入海，成为公共作品
+          </p>
         </div>
       </header>
 
-      {/* ── 水线以下：一整片水（水面光 / 水纹 / 水下光柱 / 被点亮的沟槽 / 主流）────
+      {/* ── 水线以下：一整片水（水面光 / 水纹 / 水下光柱 / 常驻装饰）────────────
           两个泊位骑在这条河上 —— 它们**没有各自的背景、边框与阴影**，浮在同一片水上，
-          这是"同一条河上的两个位置"的关键（`DESIGN.md` §Composition）。
-          顶部那段留白是**水面**：既让水线立住，也让正文落在足够深的底色上（对比度）。
-          正文用 `paper` 而不是 `muted`：水体顶段是这道渐变最亮的地方，`muted` 在那里只有 4.0:1。 */}
+          这是"同一条河上的两个位置"的关键（`DESIGN.md` §Composition）。 */}
       <section className="river-body relative isolate overflow-hidden px-6 pb-6 pt-16 md:px-12 md:pb-8 md:pt-24">
-        <SurfaceLine className="top-0" />
+        {/* 一比一复刻（2026-09-27 用户点名）：稿 f4-groove 全页无横贯直线 ⇒
+            原 SurfaceLine 横实线与 .river-flowline 横虚线一并删除；水感由 backdrop 五层承担。 */}
         <WaterSheen />
         <WaterTexture drift />
         <LightShafts />
 
-        {/* ── f0① 常驻态「只有水在流」：漂移虚线（46s 一个来回，契约 .passage-drift 只动
-            transform）+ 两圈错拍的场景涟漪（偶尔扩散）。装饰零信息 —— aria-hidden、
-            pointer-events-none、绝对定位零布局高度；reduced-motion 下全静止。 */}
+        {/* ── f0① 常驻态「只有水在流」：两圈错拍的场景涟漪。
+            装饰零信息 —— aria-hidden、pointer-events-none、绝对定位零布局高度。 */}
         <div aria-hidden="true" data-river-decor="" className="pointer-events-none absolute inset-0">
-          <span className="river-flowline passage-drift absolute top-[62px] md:top-[87px]" />
           <span className="absolute bottom-[20px] left-[30%] h-[56px] w-[160px]">
             <RippleRing />
           </span>
@@ -296,22 +430,9 @@ export function RiverPage() {
           </span>
         </div>
 
-        {/* 河道 = 那条**被点亮的沟槽**。`progress` 这一页不编码段位（这里没有作品）：
-            整条点亮 = 河道通着、水在流（用户第 ④ 条：默认态只有水在流）。
-            极轻微地逆时针旋转（1.2°）让"上游在右、水往左下走"与「投下在右、捞取在左」同向。 */}
-        <div
-          data-device="river"
-          className="pointer-events-none absolute inset-x-0 top-[52px] z-0 -rotate-[1.2deg] md:top-[76px]"
-        >
-          <Groove progress={1} tone="cool" />
-        </div>
-
         <h2 className="sr-only">河道</h2>
 
-        {/* ── f0②③ 操作动效：瓶子**只在一次操作里出现**（常驻态没有它，守卫③盯着）。
-            两层结构（同设计系统「外层定位、内层动画」的口径）：外层给位置 —— 河中央 =
-            水平居中、与两枚泊位同高；内层才是被动画的位移载体（类名与参数在
-            river-motion.css，只动 transform/opacity）。 */}
+        {/* ── f0②③ 操作动效：瓶子**只在一次操作里出现**（常驻态没有它，守卫③盯着）。 */}
         {flow !== null ? (
           <div
             aria-hidden="true"
@@ -346,17 +467,20 @@ export function RiverPage() {
           </div>
         ) : null}
 
-        <div className="relative z-10 grid gap-4 md:grid-cols-2 md:items-start md:gap-12">
-          {/* 下游 · 捞取（左）：新用户的第一动作，按阅读顺序放先。 */}
+        {/* 一比一复刻：桌面下泊位按稿绝对坐标骑在河道弧上
+            （draw 60,400 / cast 380,580 ⇒ 容器左缘≈稿 x76，draw 贴左、cast 右移 23.6%、垂直错落 180px）；
+            <md 维持流式单列（375 锚点进首屏的现行判据靠流式保证）。 */}
+        <div className="relative z-10 grid gap-4 md:block md:h-[clamp(440px,31.9vw,470px)]">
+          {/* B5 · 下游 · 捞取（稿 60,400 190×190）：新用户的第一动作，按阅读顺序放先。 */}
           <section
             data-anchor="river-draw"
             aria-labelledby="draw-heading"
-            className="flex items-start gap-4 md:gap-6"
+            className="flex items-start gap-4 md:absolute md:left-0 md:top-0 md:gap-6"
           >
             <h2 id="draw-heading" className="sr-only">
               从河道捞一个漂流瓶
             </h2>
-            <div data-port="draw" className={cn(PORT_SIZE, 'relative shrink-0')}>
+            <div data-port="draw" className={cn(PORT_DRAW_SIZE, 'relative shrink-0')}>
               <PortRings />
               {/* 盘身用本地元素而不是设计系统的 `Button`：`Button` 的基类会填一层彩色底
                   （`bg-*`），而 `cn()` 不做冲突合并 —— 泊位的盘身必须是 `disc-core`（不填彩色）。 */}
@@ -368,8 +492,7 @@ export function RiverPage() {
                   'focus-visible:ring-[3px] focus-visible:ring-sea-glass focus-visible:ring-offset-2',
                   'transition-transform duration-[var(--motion-hover-duration)] ease-[var(--motion-entry-easing)]',
                   'motion-safe:hover:scale-[var(--motion-hover-scale)] motion-safe:active:translate-y-[-1px]',
-                  // 打捞中：按钮不可点，且必须与可用态有**形态差异**（DESIGN.md §Interaction States）——
-                  // 只动 opacity（不触发重排）；同时用 `role="status"` 文案给出文字反馈。
+                  // 打捞中：按钮不可点，且必须与可用态有**形态差异**（DESIGN.md §Interaction States）
                   'disabled:cursor-not-allowed disabled:opacity-60',
                 )}
                 aria-busy={draw.isPending ? true : undefined}
@@ -378,50 +501,43 @@ export function RiverPage() {
               >
                 <span aria-hidden="true" className="disc-core absolute inset-0 rounded-full" />
                 <span aria-hidden="true" className="disc-edge-cool absolute inset-0 rounded-full" />
-                <span className="relative flex flex-col items-center gap-[1px]">
-                  <span className="text-[0.8125rem] font-bold tracking-[0.12em] md:text-[1rem]">
+                <span className="relative flex flex-col items-center gap-[3px]">
+                  <span className="text-[clamp(1rem,1.39vw,1.25rem)] font-bold tracking-[0.12em]">
                     捞取
                   </span>
-                  <span lang="en" className="font-latin text-[0.625rem] tracking-[0.28em] opacity-70">
+                  <span lang="en" className="font-latin text-[0.625rem] font-normal tracking-[0.28em] opacity-70">
                     DRAW
                   </span>
                 </span>
               </button>
             </div>
 
-            <div className="flex min-w-0 flex-col gap-[6px]">
-              <p className="text-[0.9375rem] font-semibold text-paper md:text-[1.0625rem]">
-                捞一个漂流瓶
-              </p>
-              <p className="max-w-[32rem] text-[0.8125rem] leading-[1.7] text-paper/85">
-                捞取深海深处传来的匿名哼唱，接续她的下一句旋律。
-                <span className="whitespace-nowrap">捞到即持有</span>
-                ：同一时刻，同一条河道上只有你拿着它。
-              </p>
-              <p className="max-w-[32rem] text-[0.8125rem] leading-[1.7] text-paper/85">
-                河道只能随机打捞，没有搜索，也不能指定某个人来接。
+            {/* B5 cap：稿宽 240（固定 px → 流体 clamp），位于盘右侧、比盘顶低 40px（稿 top:40） */}
+            <div className="flex min-w-0 flex-col gap-[6px] md:mt-[40px] md:w-[clamp(200px,16.667vw,240px)]">
+              <p className="block text-[0.9375rem] text-paper">捞一个漂流瓶</p>
+              <p className="text-[0.78125rem] leading-[1.75] text-muted">
+                捞到别人的半句，接下一句。捞到即持有：同一时刻只有你拿着它。
               </p>
               {/* 同位 aria-live 状态（f0①-03）：待 → 成功 / 失败都在这一格里换字，
                   动效永远不是唯一反馈。 */}
               {drawStatus !== null ? (
-                <p role="status" aria-live="polite" className="text-[0.9375rem] font-semibold text-paper">
+                <p role="status" aria-live="polite" className="enter-fade text-[0.9375rem] font-semibold text-paper">
                   {drawStatus}
                 </p>
               ) : null}
             </div>
           </section>
 
-          {/* 上游 · 投下（右）：与捞取**等权**（同一份 `PORT_SIZE`、同一套盘身与外环），
-              只有两处不同 —— 暖边（"投下"一侧的暖光）与竖直方向错开一档（错落）。 */}
+          {/* B6 · 上游 · 投下（稿 380,580 150×150，较捞取右移 23.6%、下沉 180px）：暖边 + 小一档（captain 裁决不等大）。 */}
           <section
             data-anchor="river-drop"
             aria-labelledby="cast-heading"
-            className="mt-4 flex items-start gap-4 md:mt-16 md:gap-6"
+            className="mt-4 flex flex-row-reverse items-start gap-4 md:absolute md:left-[23.6%] md:top-[180px] md:gap-6"
           >
             <h2 id="cast-heading" className="sr-only">
               投下一支漂流瓶
             </h2>
-            <div data-port="cast" className={cn(PORT_SIZE, 'relative shrink-0')}>
+            <div data-port="cast" className={cn(PORT_CAST_SIZE, 'relative shrink-0')}>
               <PortRings />
               <Link
                 to={newHref}
@@ -436,58 +552,51 @@ export function RiverPage() {
               >
                 <span aria-hidden="true" className="disc-core absolute inset-0 rounded-full" />
                 <span aria-hidden="true" className="disc-edge-warm absolute inset-0 rounded-full" />
-                <span className="relative flex flex-col items-center gap-[1px]">
-                  <span className="text-[0.8125rem] font-bold tracking-[0.12em] md:text-[1rem]">
+                <span className="relative flex flex-col items-center gap-[3px]">
+                  <span className="text-[clamp(1rem,1.39vw,1.25rem)] font-bold tracking-[0.12em]">
                     投下
                   </span>
-                  <span lang="en" className="font-latin text-[0.625rem] tracking-[0.28em] opacity-70">
+                  <span lang="en" className="font-latin text-[0.625rem] font-normal tracking-[0.28em] opacity-70">
                     CAST
                   </span>
                 </span>
               </Link>
             </div>
 
-            <div className="flex min-w-0 flex-col gap-[6px]">
-              <p className="text-[0.9375rem] font-semibold text-paper md:text-[1.0625rem]">
-                投下一支漂流瓶
-              </p>
-              <p className="max-w-[32rem] text-[0.8125rem] leading-[1.7] text-paper/85">
-                选一首歌，录下第 1 段（时长以该段为准），然后投进河道等一个陌生人接下一棒。
-              </p>
-              <p className="max-w-[32rem] text-[0.8125rem] leading-[1.7] text-paper/85">
-                投河之后就交出去了；想找回来看，去「我参与过的漂流瓶」。
+            {/* B6 cap：稿宽 300，位于盘**左下**（flex-row-reverse ⇒ 视觉在盘左侧；稿 top:165 ⇒ 下沉到盘下方偏左） */}
+            <div className="flex min-w-0 flex-col gap-[6px] md:mt-[165px] md:w-[clamp(240px,20.833vw,300px)]">
+              <p className="block text-[0.9375rem] text-paper">投下一支漂流瓶</p>
+              <p className="text-[0.78125rem] leading-[1.75] text-muted">
+                选一首歌，录下第 1 段，投进河道，等一个陌生人接棒。
               </p>
               {castStatus !== null ? (
-                <p role="status" aria-live="polite" className="text-[0.9375rem] font-semibold text-paper">
+                <p role="status" aria-live="polite" className="enter-fade text-[0.9375rem] font-semibold text-paper">
                   {castStatus}
                 </p>
               ) : null}
             </div>
           </section>
         </div>
-
-        {/* 河底：主流 = 声波包络（音乐母题）—— 河道剖面的最后一条线，浮标（心情标签）落在它下面的岸上。 */}
-        <div className="relative z-10 mt-4 h-[48px] overflow-hidden md:h-16">
-          <CurrentLines className="inset-x-0 bottom-0 h-full" />
-        </div>
       </section>
 
-      {draw.isError ? (
-        <ConflictNotice
-          error={draw.error}
-          onRetry={onDraw}
-          retryLabel="再捞一次"
-          className="relative z-10 mx-6 max-w-[46rem] md:mx-12"
-        />
+      {/* 稿无重试块：失败只留这一块只读 alert + 上面的 aria-live（不再渲染带重试出口的错误提示）。 */}
+      {errorView !== null ? (
+        <div
+          role="alert"
+          className="relative z-10 mx-6 flex max-w-[46rem] flex-col gap-1 rounded-base border border-warning-border bg-warning-tint px-4 py-4 text-warning md:mx-12"
+        >
+          <p className="text-[0.9375rem] font-semibold">{errorView.title}</p>
+          <p className="text-[0.875rem] leading-[1.6]">{errorView.detail}</p>
+        </div>
       ) : null}
 
-      {/* 浮标与出口**停在岸上**（不是水里）：心情标签的文字色是珊瑚，压在深水面上只有 3.4:1。 */}
-      <div className="relative z-10 flex flex-wrap items-start justify-between gap-x-8 gap-y-4 px-6 md:px-12">
+      {/* B7 页脚：心情 chips 停在岸上；出口链接右挂（稿 left/right 76 → 现行流体内边距）。 */}
+      <footer className="relative z-10 flex flex-wrap items-start justify-between gap-x-8 gap-y-4 px-6 md:px-12">
         <MoodChips />
         <Link to="/sea" className={TEXT_LINK}>
           先去公海听听已经完成的作品
         </Link>
-      </div>
-    </div>
+      </footer>
+    </main>
   );
 }

@@ -103,12 +103,42 @@ describe('我参与过的漂流瓶（服务端）', () => {
 });
 
 /**
- * 装置断言（docs/impl-plan-record-v1.md §5.1 `/me` 行）：**每格一根沉积柱，4 层位＝4 段位**。
- * 柱子是承载信息的装置（不是贴纸）：层位数来自服务端 `totalSegments`，已录＝实心沉积、
- * 缺口＝层位还在但内容挖空；文字行已给盲读等价物，所以柱子本体 `aria-hidden`。
+ * 装置断言（返工令：逐块照抄 p-profile-record.html 的 `.crate` / `.window` / `.lay`）：
+ * **每格一根沉积柱，4 层位＝4 段位**；柱子 `aria-hidden`，文字行给盲读等价物。
+ * 层位状态由服务端字段推：`missingSegmentIndexes` → `.wt` 空腔、其余 → `.sd` 实心、
+ * `mySegmentIndexes` → `.mine` 珊瑚刻记；行结构（.veil/.r1/.slot/.role/.t/.d/.lk）按稿。
  */
-describe('装置：沉积柱（4 层位＝4 段位，被斩/缺口＝层位还在、内容挖空）', () => {
-  it('每格一根柱：层位数 = totalSegments；已录段实心、缺口段空腔、我唱的那层带刻记', async () => {
+describe('装置：稿 .window 行 + .lay 沉积柱（4 层位＝4 段位）', () => {
+  it('稿块在位：.crate/.chead(共 N 支=真数据)/.csub/.window/.veil/.txt(r1·slot·role·t·d·lk)', async () => {
+    const { container } = renderWithProviders(<MyBottles />, {
+      handlers: [
+        {
+          path: /\/api\/me\/bottles/,
+          respond: () => ({ body: { items: [myBottle()], nextCursor: null } }),
+        },
+      ],
+    });
+
+    expect(await screen.findByText('共 1 支')).toBeInTheDocument();
+    const crate = container.querySelector('.crate');
+    expect(crate?.querySelector('.chead h2')?.textContent).toBe('我参与过的漂流瓶');
+    expect(crate?.querySelector('.csub')?.textContent).toBe(
+      '我发起的、以及我唱过一段的瓶子都会在这里（按最近活跃排序，时间线来自服务端）。',
+    );
+    const win = crate?.querySelector('.window');
+    expect(win, '稿 .window 列表窗').not.toBeNull();
+    const row = win?.querySelector('ul > li');
+    expect(row?.querySelector('.lay'), '行左沉积柱').not.toBeNull();
+    expect(row?.querySelector('.veil'), '稿 .veil 幕').not.toBeNull();
+    expect(row?.querySelector('.txt .r1 .slot')?.textContent).toBe('01');
+    expect(row?.querySelector('.txt .r1 .role')?.textContent).toBe('我接唱的');
+    expect(row?.querySelector('.txt .t')?.textContent).toBe('深海鲸落');
+    // 夹具：已录 2/4 + 我唱的第 2 段 + 缺第 3、4 段
+    expect((row?.querySelectorAll('.txt .d') ?? []).length).toBe(3);
+    expect((row?.querySelectorAll('.lk a') ?? []).length).toBe(2);
+  });
+
+  it('每格一根柱：层位数 = totalSegments；已录段 .sd 实心、缺口段 .wt 空腔、我唱的那层带刻记', async () => {
     const { container } = renderWithProviders(<MyBottles />, {
       handlers: [
         {
@@ -119,21 +149,22 @@ describe('装置：沉积柱（4 层位＝4 段位，被斩/缺口＝层位还�
     });
 
     await screen.findByText('深海鲸落');
-    const layers = container.querySelectorAll('[data-sediment-layer]');
+    const layers = container.querySelectorAll('.lay i[data-segment]');
     expect(layers, '每格必须有一根沉积柱，层位数 = totalSegments（4）').toHaveLength(4);
     // 夹具：缺口 [3,4]、我唱第 2 段
-    expect(
-      container.querySelector('[data-sediment-layer][data-segment="3"]')?.getAttribute('data-state'),
-    ).toBe('cavity');
-    expect(
-      container.querySelector('[data-sediment-layer][data-segment="2"]')?.getAttribute('data-state'),
-    ).toBe('sediment');
-    expect(
-      container.querySelector('[data-sediment-layer][data-segment="2"]')?.getAttribute('data-mine'),
-    ).toBe('true');
+    const b3 = container.querySelector('.lay i[data-segment="3"]');
+    expect(b3?.getAttribute('data-state')).toBe('cavity');
+    expect(b3?.classList.contains('wt'), '稿：缺口层 = .wt 水腔').toBe(true);
+    const b2 = container.querySelector('.lay i[data-segment="2"]');
+    expect(b2?.getAttribute('data-state')).toBe('sediment');
+    expect(b2?.classList.contains('sd'), '稿：已录层 = .sd 沉积').toBe(true);
+    expect(b2?.getAttribute('data-mine')).toBe('true');
+    expect(b2?.classList.contains('mine'), '稿：我唱的层加 .mine 刻记').toBe(true);
+    expect(container.querySelector('.lay i[data-segment="1"]')?.classList.contains('b1')).toBe(true);
+    expect(container.querySelector('.lay i[data-segment="4"]')?.classList.contains('b4')).toBe(true);
   });
 
-  it('被斩：mySegmentIndexes 被清空后层位**仍留在柱上**（4 层不少一层），被挖走的那层是空腔', async () => {
+  it('被斩：mySegmentIndexes 被清空后层位**仍留在柱上**（4 层不少一层），被挖走的那层是稿的 .cut', async () => {
     const { container } = renderWithProviders(<MyBottles />, {
       handlers: [
         {
@@ -149,20 +180,25 @@ describe('装置：沉积柱（4 层位＝4 段位，被斩/缺口＝层位还�
     });
 
     await screen.findByText('深海鲸落');
-    expect(container.querySelectorAll('[data-sediment-layer]')).toHaveLength(4);
-    expect(
-      container.querySelector('[data-sediment-layer][data-segment="2"]')?.getAttribute('data-state'),
-    ).toBe('cavity');
+    expect(container.querySelectorAll('.lay i[data-segment]')).toHaveLength(4);
+    const cutLayer = container.querySelector('.lay i[data-segment="2"]');
+    // 稿 row5：我的那段被斩 = 层位还在、内容挖走（虚线珊瑚 .cut），且可从唯一缺口 + 我段清空推出
+    expect(cutLayer?.getAttribute('data-state')).toBe('cut');
+    expect(cutLayer?.classList.contains('cut')).toBe(true);
+    expect(cutLayer?.classList.contains('wt'), '被斩层不是水腔（它是被挖走，不是没录）').toBe(false);
+    expect(screen.getByText(/我唱的那一段被斩浪删除了/)).toBeInTheDocument();
+    expect(screen.getByText(/缺第 2 段/)).toBeInTheDocument();
   });
 });
 
 /**
- * 「收到回传 · 等你操作」（W6，`MyBottle.awaitingMyAction`）：任一条为 true 才出提示；
- * 一条都不是 true 时**整块提示不出现**（安全降级 —— 宁可不弹，也不误报）。
+ * 行内回传待办（稿 .window 行的 `.st` 实心暖牌 + `.due`，柱口 `.lay.ret`/`.shaft`/`.hoop` 回航泊位）：
+ * 只在 `awaitingMyAction=true` 时出现；false / 字段缺失都不出现（安全降级 —— 宁可不弹，也不误报）。
+ * 整块回传提示已按返工令移到 profile 页的 `.msgs li.hero`（profile-and-settings-page.test.tsx 守三态）。
  */
-describe('回传提示：awaitingMyAction 的出现与不出现两态', () => {
-  it('有一条 awaitingMyAction=true → 出现「收到回传 · 等你操作」整块提示，该行挂「等你操作」牌', async () => {
-    renderWithProviders(<MyBottles />, {
+describe('回传待办：awaitingMyAction 行内 .st 牌的出现与不出现三态', () => {
+  it('有一条 true → 该行挂 .st「等你操作」+.due，柱子是 .lay.ret（shaft+hoop 回航泊位）', async () => {
+    const { container } = renderWithProviders(<MyBottles />, {
       handlers: [
         {
           path: /\/api\/me\/bottles/,
@@ -173,24 +209,29 @@ describe('回传提示：awaitingMyAction 的出现与不出现两态', () => {
       ],
     });
 
-    expect(await screen.findByText('收到回传 · 等你操作')).toBeInTheDocument();
-    expect(screen.getByText('等你操作')).toBeInTheDocument();
+    expect(await screen.findByText('等你操作')).toBeInTheDocument();
+    expect(container.querySelector('.window li .st')).not.toBeNull();
+    expect(container.querySelector('.window li .due')?.textContent).toBe('回传决策时限 48 小时');
+    expect(container.querySelector('.lay.ret .shaft'), '回航泊位：柱身暖光 shaft').not.toBeNull();
+    expect(container.querySelector('.lay .hoop'), '回航泊位：柱口系缆环 hoop').not.toBeNull();
   });
 
-  it('没有任何一条为 true（字段缺失 = 契约 default false）→ 整块提示不出现', async () => {
-    renderWithProviders(<MyBottles />, {
+  it('没有任何一条为 true（字段缺失 = 契约 default false）→ .st 牌与 ret/hoop 都不出现', async () => {
+    const { container } = renderWithProviders(<MyBottles />, {
       handlers: [
         { path: /\/api\/me\/bottles/, respond: () => ({ body: { items: [myBottle()], nextCursor: null } }) },
       ],
     });
 
     expect(await screen.findByText('深海鲸落')).toBeInTheDocument();
-    expect(screen.queryByText('收到回传 · 等你操作')).not.toBeInTheDocument();
+    expect(container.querySelector('.window li .st')).toBeNull();
+    expect(container.querySelector('.lay.ret')).toBeNull();
+    expect(container.querySelector('.lay .hoop')).toBeNull();
     expect(screen.queryByText('等你操作')).not.toBeInTheDocument();
   });
 
   it('awaitingMyAction 显式为 false 同样不出现（不靠"字段在不在"判断）', async () => {
-    renderWithProviders(<MyBottles />, {
+    const { container } = renderWithProviders(<MyBottles />, {
       handlers: [
         {
           path: /\/api\/me\/bottles/,
@@ -202,7 +243,8 @@ describe('回传提示：awaitingMyAction 的出现与不出现两态', () => {
     });
 
     expect(await screen.findByText('深海鲸落')).toBeInTheDocument();
-    expect(screen.queryByText('收到回传 · 等你操作')).not.toBeInTheDocument();
+    expect(container.querySelector('.window li .st')).toBeNull();
+    expect(container.querySelector('.lay.ret')).toBeNull();
     expect(screen.queryByText('等你操作')).not.toBeInTheDocument();
   });
 });

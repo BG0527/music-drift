@@ -42,4 +42,21 @@ describe('契约组合子', () => {
     const result = page.safeParse({ items: [{ id: 'not-a-uuid' }], nextCursor: null });
     expect(result.success).toBe(false);
   });
+
+  it('pageOf 透传可选 total（页码一次全显的数据源）：带则保留、缺则无、脏值拒绝', () => {
+    const page = pageOf(BottleSummarySchema);
+
+    const withTotal = page.safeParse({ items: [], nextCursor: null, total: 39 });
+    expect(withTotal.success).toBe(true);
+    if (withTotal.success) expect(withTotal.data.total).toBe(39);
+
+    // 向后兼容：老响应没有 total 照常通过，且不凭空长出字段
+    const withoutTotal = page.safeParse({ items: [], nextCursor: null });
+    expect(withoutTotal.success).toBe(true);
+    if (withoutTotal.success) expect(withoutTotal.data.total).toBeUndefined();
+
+    // 脏值不能静默吞掉（负数/小数会让页码算出假值）
+    expect(page.safeParse({ items: [], nextCursor: null, total: -1 }).success).toBe(false);
+    expect(page.safeParse({ items: [], nextCursor: null, total: 1.5 }).success).toBe(false);
+  });
 });

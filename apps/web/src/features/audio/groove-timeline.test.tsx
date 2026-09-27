@@ -109,3 +109,55 @@ describe('装饰层零信息（读屏不念装饰）', () => {
     expect(screen.getByTestId('groove-slots').tagName).toBe('OL');
   });
 });
+
+/**
+ * 一屏门禁（§46.3）下的时间轴紧凑化：
+ * - 桌面（≥1024）：刻度 meta 行**折叠**（`lg:hidden`，整页高度让位给门禁）；
+ * - 窄屏（<1024）：说明文案（次要 meta）收起、唱臂本就不画；
+ *   **槽带与段号保留**（折叠 ≠ 删除：窄屏仍能读段号与静音标注）。
+ */
+describe('一屏门禁：meta 折叠与窄屏紧凑化', () => {
+  it('刻度 meta 行桌面折叠、说明文案窄屏收起；槽带与段号两边都还在', () => {
+    render(
+      <GroovePlaybackProvider>
+        <GrooveTimeline
+          segments={SEGMENTS}
+          totalSegments={4}
+          missingSegmentIndexes={[2, 4]}
+        />
+      </GroovePlaybackProvider>,
+    );
+
+    const marks = screen.getByTestId('groove-marks');
+    expect(marks.className, '刻度 meta 行必须桌面折叠').toContain('lg:hidden');
+
+    const desc = screen.getByText('唱针跟着播放走；一格 = 一个段位，缺口留成静音。');
+    expect(desc.className, '说明文案窄屏必须收起').toContain('hidden');
+    expect(desc.className, '桌面仍显示说明文案').toContain('lg:inline');
+
+    // 折叠 ≠ 删除：槽带（槽位列表）与段号在任何断点都渲染
+    expect(screen.getByTestId('groove-slots').querySelectorAll('li')).toHaveLength(4);
+    expect(marks.textContent).toContain('第 1 段');
+    expect(marks.textContent).toContain('静音');
+  });
+
+  it('窄屏不画唱臂（去唱臂）：唱臂 svg 只在 lg 出现', () => {
+    render(
+      <GroovePlaybackProvider>
+        <PlaybackDriver
+          snapshot={{ segmentIndex: 1, positionRatio: 0, playbackState: 'playing' }}
+        />
+        <GrooveTimeline
+          segments={SEGMENTS}
+          totalSegments={4}
+          missingSegmentIndexes={[2, 4]}
+        />
+      </GroovePlaybackProvider>,
+    );
+    const arm = screen.getByTestId('groove-arm');
+    // svg 的 className 是 SVGAnimatedString，断言走 getAttribute
+    const armClass = arm.getAttribute('class') ?? '';
+    expect(armClass).toContain('hidden');
+    expect(armClass).toContain('lg:block');
+  });
+});

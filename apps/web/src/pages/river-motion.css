@@ -10,21 +10,10 @@
  *    `ocean-ripple` 的 1.08 → 0.92（方向反转即「由外向内」），强度起点取 `--motif-ripple-ring-alpha`。
  */
 
-/* ── ① 常驻装饰：漂移虚线 ───────────────────────────────────────────────────
-   f0 图例「46s 一个来回 · 只动 transform」= 契约已有的 `.passage-drift`
-   （ocean-passage 关键帧：±--passage-shift / --passage-duration，本文件只给虚线形态）。
-   左右各出血一段行程（--motion-passage-shift），平移往返时不会露出缺口。 */
-.river-flowline {
-  left: calc(-1 * var(--motion-passage-shift));
-  right: calc(-1 * var(--motion-passage-shift));
-  height: 2px;
-  background-image: repeating-linear-gradient(
-    90deg,
-    var(--color-paper) 0 14px,
-    transparent 14px 38px
-  );
-  opacity: 0.4;
-}
+/* ── ① 常驻装饰（一比一复刻 2026-09-27 收编）─────────────────────────────
+   稿 f4-groove 全页**没有任何横贯直线** ⇒ 原 `.river-flowline` 漂移虚线已按用户
+   「河道中间多了一条」的裁决删除；本文件只保留场景涟漪错拍与 f0 三段状态机动效
+   （状态机/时序/reduced-motion 语义一字未动）。 */
 
 /* 场景涟漪「偶尔扩散」：第二圈推迟一个涟漪周期（错拍），两圈不再同步呼吸。 */
 .ripple-ring.river-scene-delay {
@@ -115,7 +104,6 @@
    状态机在 reduce 下根本不起动画、立即跳转（§103.3）；本块是样式层的逐项确认，
    与 motion.css 的全局 `animation: none !important` 兜底构成双保险。 */
 @media (prefers-reduced-motion: reduce) {
-  .river-flowline,
   .ripple-ring.river-scene-delay,
   .river-gather,
   .river-vessel-enter-draw,

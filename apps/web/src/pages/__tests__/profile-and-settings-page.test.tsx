@@ -1,4 +1,6 @@
-import { fireEvent, screen, waitFor } from '@testing-library/react';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import { BOTTLE_ID, USER_A, bottleSummary } from '../../test/fixtures';
 import { renderWithProviders } from '../../test/harness';
@@ -128,6 +130,78 @@ describe('个人中心', () => {
   });
 });
 
+/**
+ * flow-audit G7（P2）：「我的」非空态没有横向出口 —— 去河道/公海的链只在空态里。
+ * 修法：页头（header 尾）加**常显**两条语义出口，任何数据状态下都渲染；
+ * record-v1 文字链语态（TEXT_LINK_STRONG，min-h-11 热区 ≥44px）。
+ */
+describe('我的：页头常显横向出口（flow-audit G7）', () => {
+  it('非空态（有瓶子）也有「← 去河道捞一个」→ /river 与「公海听完成的作品」→ /sea', async () => {
+    const { container } = renderWithProviders(<ProfilePage />, {
+      route: '/me',
+      handlers: [
+        ...authedHandlers(),
+        {
+          path: /\/api\/notifications/,
+          respond: () => ({ body: { items: [], nextCursor: null } }),
+        },
+        {
+          path: /\/api\/me\/bottles/,
+          respond: () => ({
+            body: {
+              items: [
+                {
+                  ...bottleSummary({ status: 'IN_RIVER', seaZone: null, isComplete: false }),
+                  role: 'SINGER',
+                  mySegmentIndexes: [2],
+                },
+              ],
+              nextCursor: null,
+            },
+          }),
+        },
+      ],
+    });
+
+    // 非空态前提：列表有真行 —— 此时空态出口不在场，出口只能来自页头
+    expect(await screen.findByText('深海鲸落')).toBeInTheDocument();
+
+    const river = screen.getByRole('link', { name: '← 去河道捞一个' });
+    expect(river).toHaveAttribute('href', '/river');
+    expect(river.className, '热区 ≥44px').toContain('min-h-11');
+    const sea = screen.getByRole('link', { name: '公海听完成的作品' });
+    expect(sea).toHaveAttribute('href', '/sea');
+    expect(sea.className, '热区 ≥44px').toContain('min-h-11');
+
+    // 出口在页头区（header 内）—— main 块序（waterlight→header→bleed→crate→bottom）不被破坏
+    const header = container.querySelector('header');
+    expect(header, '页头必须存在').not.toBeNull();
+    expect(header?.contains(river), '河道出口须在页头内').toBe(true);
+    expect(header?.contains(sea), '公海出口须在页头内').toBe(true);
+  });
+
+  it('空态也渲染同样两条页头出口（与空态窗内出口不同位、不重复）', async () => {
+    const { container } = renderWithProviders(<ProfilePage />, {
+      route: '/me',
+      handlers: [
+        ...authedHandlers(),
+        {
+          path: /\/api\/notifications/,
+          respond: () => ({ body: { items: [], nextCursor: null } }),
+        },
+        { path: /\/api\/me\/bottles/, respond: () => ({ body: { items: [], nextCursor: null } }) },
+      ],
+    });
+
+    const river = await screen.findByRole('link', { name: '← 去河道捞一个' });
+    expect(river).toHaveAttribute('href', '/river');
+    const sea = await screen.findByRole('link', { name: '公海听完成的作品' });
+    expect(sea).toHaveAttribute('href', '/sea');
+    const header = container.querySelector('header');
+    expect(header?.contains(river) && header?.contains(sea)).toBe(true);
+  });
+});
+
 describe('设置页（Figma 无此帧，captain 裁决必须补最简版）', () => {
   it('展示匿名原则、契约版本与登出入口', async () => {
     renderWithProviders(<SettingsPage />, { route: '/settings', handlers: authedHandlers() });
@@ -170,10 +244,13 @@ describe('我的：收藏与徽章入口', () => {
       ],
     });
 
+    // 稿里 pocket 的 h3 与弹窗标题同名（照稿保留）⇒ 标题断言必须限定在 dialog 内，避免撞名
     fireEvent.click(await screen.findByRole('button', { name: '我的收藏' }));
-    expect(await screen.findByRole('heading', { name: '我的收藏' })).toBeInTheDocument();
+    const collections = await screen.findByRole('dialog');
+    expect(within(collections).getByRole('heading', { name: '我的收藏' })).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: '我的徽章' }));
-    expect(await screen.findByRole('heading', { name: '我的徽章' })).toBeInTheDocument();
+    const badges = await screen.findByRole('dialog');
+    expect(within(badges).getByRole('heading', { name: '我的徽章' })).toBeInTheDocument();
   });
 });
 
@@ -205,5 +282,272 @@ describe('我的：内袋身份卡（record-v1 装置）', () => {
     //（副标题里解释"别人看到的是匿名代号"是合法文案，所以用整串匹配而不是正则子串）
     expect(sleeve?.textContent).not.toContain('匿名代号');
     expect(screen.queryByText('匿名代号')).not.toBeInTheDocument();
+  });
+});
+
+/**
+ * 返工令：把 profile-page **逐块照抄** `docs/ui-review/design-explore/p-profile-record.html`。
+ * 这组是「按稿改红」的结构断言 —— 块名、层级、顺序、逐字文案都以稿 DOM 为准。
+ */
+describe('我的：p-profile-record.html 逐块照稿（返工）', () => {
+  function structureHandlers() {
+    return [
+      ...authedHandlers(),
+      {
+        path: /\/api\/notifications/,
+        respond: () => ({
+          body: {
+            items: [
+              {
+                id: '44444444-4444-4444-8444-444444444444',
+                type: 'MESSAGE_DELIVERED',
+                payload: { bottleId: BOTTLE_ID, songTitle: '深海鲸落' },
+                readAt: null,
+                createdAt: '2026-09-23T02:00:00.000Z',
+              },
+            ],
+            nextCursor: null,
+          },
+        }),
+      },
+      {
+        path: /\/api\/me\/bottles/,
+        respond: () => ({
+          body: {
+            items: [
+              {
+                ...bottleSummary({
+                  status: 'IN_RIVER',
+                  seaZone: null,
+                  isComplete: false,
+                  recordedCount: 1,
+                  missingSegmentIndexes: [2, 3, 4],
+                }),
+                role: 'INITIATOR',
+                mySegmentIndexes: [1],
+              },
+              {
+                ...bottleSummary({ id: '9f1d6c2e-0f1a-4a1e-9f2b-bbbbbbbbbbbb' }),
+                role: 'SINGER',
+                mySegmentIndexes: [2],
+              },
+            ],
+            nextCursor: null,
+          },
+        }),
+      },
+    ];
+  }
+
+  it('页面自带 <main>：.waterlight 背景层 + header 逐字（eyebrow / h1 / lede），块顺序照稿', async () => {
+    const { container } = renderWithProviders(<ProfilePage />, {
+      route: '/me',
+      handlers: structureHandlers(),
+    });
+
+    const main = container.querySelector('main.p-record');
+    expect(main, '页面自带 <main class="p-record">（稿 main 的 padding 归页面自己）').not.toBeNull();
+    expect(main?.querySelector('.waterlight'), '稿 .waterlight 背景层').not.toBeNull();
+
+    const header = main?.querySelector('header');
+    expect(header?.querySelector('.cat')?.textContent).toBe('ACCOUNT · 认领');
+    expect(header?.querySelector('h1')?.textContent).toBe('我的');
+    expect(header?.querySelector('.sub')?.textContent).toBe(
+      '账号只用来认领你自己的漂流瓶。别人在瓶子里看到的是匿名代号，看不到你的账号。',
+    );
+
+    // 稿 DOM 顺序：waterlight → header → .bleed(内袋) → .crate(柜) → .bottom
+    expect(main, '缺 .bleed 内袋出血层').not.toBeNull();
+    expect(main?.querySelector('.bleed .sleeve'), '稿 .bleed > .sleeve').not.toBeNull();
+    expect(main?.querySelector('.crate'), '稿 .crate 沉积柜').not.toBeNull();
+    expect(main?.querySelector('.bottom'), '稿 .bottom 下区').not.toBeNull();
+    const children = [...(main?.children ?? [])];
+    const at = (selector: string) => children.indexOf(main!.querySelector(selector)!);
+    expect(at('.waterlight')).toBeLessThan(at('header'));
+    expect(at('.bleed')).toBeLessThan(at('.crate'));
+    expect(at('.crate')).toBeLessThan(at('.bottom'));
+  });
+
+  it('稿 .sleeve 内袋卡：.stop/.hole>.label(r1,r2,hub)/.who(handle,mail,stamp)；无 .codeslot', async () => {
+    const { container } = renderWithProviders(<ProfilePage />, {
+      route: '/me',
+      handlers: structureHandlers(),
+    });
+
+    expect(await screen.findByText('午夜歌手')).toBeInTheDocument();
+    const sleeve = container.querySelector('.sleeve');
+    expect(sleeve?.querySelector('.stop')?.textContent).toBe('内袋');
+    const label = sleeve?.querySelector('.hole > .label');
+    expect(label, '稿 .hole > .label').not.toBeNull();
+    expect(label?.querySelector(':scope > i.r1')).not.toBeNull();
+    expect(label?.querySelector(':scope > i.r2')).not.toBeNull();
+    expect(label?.querySelector(':scope > i.hub')).not.toBeNull();
+    expect(sleeve?.querySelector('.who .handle')?.textContent).toBe('午夜歌手');
+    expect(sleeve?.querySelector('.who .mail')?.textContent).toBe('a@example.com');
+    expect(sleeve?.querySelector('.who .stamp')?.textContent).toBe('普通用户');
+    // 用户裁决：匿名代号行不出现 —— 稿的 .codeslot 不移植
+    expect(sleeve?.querySelector('.codeslot')).toBeNull();
+  });
+
+  it('稿 .crate：.chead(共 N 支=真数据) + .csub + .window 行结构（lay/veil/r1/slot/role/t/d/lk）', async () => {
+    const { container } = renderWithProviders(<ProfilePage />, {
+      route: '/me',
+      handlers: structureHandlers(),
+    });
+
+    // 计数位只填真数据：2 条 → 共 2 支（加载中不填假数）
+    expect(await screen.findByText('共 2 支')).toBeInTheDocument();
+    const crate = container.querySelector('.crate');
+    expect(crate?.querySelector('.chead h2')?.textContent).toBe('我参与过的漂流瓶');
+    expect(crate?.querySelector('.csub')?.textContent).toBe(
+      '我发起的、以及我唱过一段的瓶子都会在这里（按最近活跃排序，时间线来自服务端）。',
+    );
+
+    const win = crate?.querySelector('.window');
+    expect(win, '稿 .window 列表窗').not.toBeNull();
+    const rows = win?.querySelectorAll('ul > li') ?? [];
+    expect(rows).toHaveLength(2);
+    const first = rows[0]!;
+    expect(first.querySelector('.lay'), '行左沉积柱 .lay').not.toBeNull();
+    expect(first.querySelectorAll('.lay i[data-segment]')).toHaveLength(4);
+    expect(first.querySelector('.lay .b1')).not.toBeNull();
+    expect(first.querySelector('.lay .b2')).not.toBeNull();
+    expect(first.querySelector('.lay .b3')).not.toBeNull();
+    expect(first.querySelector('.lay .b4')).not.toBeNull();
+    expect(first.querySelector('.veil'), '稿 .veil 暗渐变幕').not.toBeNull();
+    const txt = first.querySelector('.txt');
+    expect(txt?.querySelector('.r1 .slot')?.textContent).toBe('01');
+    expect(txt?.querySelector('.r1 .role')?.textContent).toBe('我发起的');
+    expect(txt?.querySelector('.r1 .role.mine'), '发起者角色牌挂 .mine').not.toBeNull();
+    expect(txt?.querySelector('.t')?.textContent).toBe('深海鲸落');
+    expect((txt?.querySelectorAll('.d') ?? []).length).toBeGreaterThanOrEqual(2);
+    const links = txt?.querySelectorAll('.lk a') ?? [];
+    expect(links).toHaveLength(2);
+    expect(links[0]?.textContent).toBe('去看这个瓶子');
+    expect(links[1]?.textContent).toBe('漂流日志');
+  });
+
+  it('稿 .bottom：.msgs(h2 消息 + .msub + ul 里 .mrow/.lab/.pill/.go/.mdet) + .pockets 两个 .pocket', async () => {
+    const { container } = renderWithProviders(<ProfilePage />, {
+      route: '/me',
+      handlers: structureHandlers(),
+    });
+
+    const bottom = container.querySelector('.bottom');
+    const msgs = bottom?.querySelector('.msgs');
+    expect(msgs?.querySelector('h2#notifications-heading')?.textContent).toBe('消息');
+    expect(msgs?.querySelector('.msub')?.textContent).toBe(
+      '只显示你自己的消息（留言送达 / 未送达 · 作品进公海）；别人的消息读不到，权限在服务端判定。',
+    );
+
+    // 标题先渲染、数据后到：行内容必须等通知到达（同步查询撞上骨架态）
+    expect(await screen.findByText('收到一条私密留言')).toBeInTheDocument();
+    const row = msgs?.querySelector('ul li:not(.hero)');
+    expect(row, '通知行').not.toBeNull();
+    expect(row?.querySelector('.mrow .lab')?.textContent).toBe('收到一条私密留言');
+    expect(row?.querySelector('.mrow .pill')?.textContent).toBe('未读');
+    expect(row?.querySelector('.mrow a.go')).toHaveAttribute('href', `/bottles/${BOTTLE_ID}`);
+    expect(row?.querySelector('.mdet')?.textContent).toContain('留言已送达');
+
+    const pockets = bottom?.querySelectorAll('.pockets > .pocket') ?? [];
+    expect(pockets).toHaveLength(2);
+    expect(pockets[0]?.querySelector('h3')?.textContent).toBe('我的收藏');
+    expect(pockets[0]?.querySelector('p')?.textContent).toBe(
+      '收藏只对已完成并进入公海的作品开放：听到想再听的，把它收起来。',
+    );
+    expect(pockets[0]?.querySelector('button')?.textContent).toBe('我的收藏');
+    expect(pockets[1]?.querySelector('h3')?.textContent).toBe('我的徽章');
+    expect(pockets[1]?.querySelector('p')?.textContent).toBe(
+      '徽章是派生的（不落库）：服务端按你参与过的事件当场算出来，作品被撤下就跟着消失。',
+    );
+    expect(pockets[1]?.querySelector('button')?.textContent).toBe('我的徽章');
+  });
+});
+
+/**
+ * 回传提示改挂稿的 `.msgs li.hero`（返工令：有 awaitingMyAction=true 才出现；三态行为必须保住）。
+ * 行内「等你操作」暖牌仍在我参与过的瓶列表行里（稿 .window 行的 .st/.due），由 my-bottles 测试守。
+ */
+describe('回传提示：.msgs li.hero 三态（awaitingMyAction）', () => {
+  function heroHandlers(awaiting: true | false | undefined) {
+    const bottle = {
+      ...bottleSummary({ status: 'IN_RIVER', seaZone: null, isComplete: false }),
+      role: 'SINGER',
+      mySegmentIndexes: [2],
+      ...(awaiting === undefined ? {} : { awaitingMyAction: awaiting }),
+    };
+    return [
+      ...authedHandlers(),
+      { path: /\/api\/notifications/, respond: () => ({ body: { items: [], nextCursor: null } }) },
+      { path: /\/api\/me\/bottles/, respond: () => ({ body: { items: [bottle], nextCursor: null } }) },
+    ];
+  }
+
+  it('有一条 true → .msgs ul 首位出现 li.hero（稿文案：回传到你手里了）', async () => {
+    const { container } = renderWithProviders(<ProfilePage />, {
+      route: '/me',
+      handlers: heroHandlers(true),
+    });
+
+    expect(await screen.findByText('《深海鲸落》回传到你手里了')).toBeInTheDocument();
+    const hero = container.querySelector('.msgs ul li.hero');
+    expect(hero, '回传提示必须是 .msgs 列表里的 li.hero').not.toBeNull();
+    expect(hero?.textContent).toContain('完整版本已经沿父链回到发起者手里 —— 你只能把它送进公海。');
+    expect(hero?.querySelector('.pill')?.textContent).toBe('未读');
+    expect(hero?.querySelector('a.go')).toHaveAttribute('href', `/bottles/${BOTTLE_ID}`);
+    expect(container.querySelector('.msgs ul')?.firstElementChild).toBe(hero);
+  });
+
+  it('字段缺失（契约 default(false)）→ hero 整块不出现', async () => {
+    const { container } = renderWithProviders(<ProfilePage />, {
+      route: '/me',
+      handlers: heroHandlers(undefined),
+    });
+
+    expect(await screen.findByText('深海鲸落')).toBeInTheDocument();
+    expect(container.querySelector('.msgs ul li.hero')).toBeNull();
+    expect(screen.queryByText(/回传到你手里了/)).not.toBeInTheDocument();
+  });
+
+  it('显式 false → 同样不出现（不靠"字段在不在"判断）', async () => {
+    const { container } = renderWithProviders(<ProfilePage />, {
+      route: '/me',
+      handlers: heroHandlers(false),
+    });
+
+    expect(await screen.findByText('深海鲸落')).toBeInTheDocument();
+    expect(container.querySelector('.msgs ul li.hero')).toBeNull();
+    expect(screen.queryByText(/回传到你手里了/)).not.toBeInTheDocument();
+  });
+});
+
+/**
+ * one-screen 实测（/me）：1440 档 **横向溢出 scrollWidth=1584>1440**（根因：稿装饰层
+ * `.waterlight` `left:-8% + width:118%` ⇒ 右沿 110% 视口 = 1584px）+ **整页高 1031>900**；
+ * 375 档 **scrollWidth=413>375**（同一根因：-8%+118% ⇒ 412.5px）。修复点用源码钉住：
+ * ① `.p-record` 水平裁剪出血（装饰不改形、裁在视口边）；
+ * ② 超高只**收紧流体表达**（柜上段间距 / 列表窗高 / 下区内距走 clamp），四块构图不动。
+ */
+describe('我的：one-screen 门禁修复点（源码钉住）', () => {
+  function pageSource(): string {
+    // 源码读取用仓内已证模式（settings/river/admin 同款）：cwd = apps/web
+    return readFileSync(join(process.cwd(), 'src', 'pages', 'profile-page.tsx'), 'utf8');
+  }
+
+  it('横向溢出：.p-record 设 overflow-x: clip（.waterlight 出血裁在视口边，1584/413 根因）', () => {
+    expect(
+      pageSource(),
+      '缺 overflow-x:clip ⇒ 出血装饰仍把 scrollWidth 撑到 110% 视口',
+    ).toMatch(/\.p-record\s*\{\s*overflow-x:\s*clip\s*\}/);
+  });
+
+  it('整页高：列表窗高与柜上段间距收紧为 clamp 流体值（1031 → ≤900）', () => {
+    const code = pageSource();
+    expect(code, '列表窗高必须流体收紧（稿 260 定高）').toMatch(
+      /\.p-record \.window\s*\{\s*height:\s*clamp\(/,
+    );
+    expect(code, '柜上段间距必须流体收紧（稿 59px）').toMatch(
+      /\.p-record \.crate\s*\{\s*margin-top:\s*clamp\(/,
+    );
   });
 });

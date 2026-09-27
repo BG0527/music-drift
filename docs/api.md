@@ -130,7 +130,7 @@
 
 | 方法 | 路径                            | 请求            | 响应                  | 说明                                                                        |
 | ---- | ------------------------------- | --------------- | --------------------- | --------------------------------------------------------------------------- |
-| GET  | `/api/sea`                      | `BottleListQuerySchema`（`seaZone` / `zone`（旧名）/ `status` / `limit` / `cursor`） | `Page<BottleSummarySchema>`                                                 | **默认只看已完成区**（CONTEXT §6.1）；**真游标分页**（见下） |
+| GET  | `/api/sea`                      | `BottleListQuerySchema`（`seaZone` / `zone`（旧名）/ `status` / `limit` / `cursor`） | `SeaBottleListSchema`（`Page<BottleSummarySchema>` + **可选** `total` = 该 zone 总条数） | **默认只看已完成区**（CONTEXT §6.1）；**真游标分页**（见下） |
 | GET  | `/api/sea/:id`                  | —               | `BottleSummarySchema` | 不在公海的瓶子 → `404`（不是 403，避免探测）                                |
 | POST | `/api/sea/:id/targeted-segment` | —               | `BottleSummarySchema` | 指定接唱未完成作品：抢占持有权；父节点 = 该作品**最后一段**的接唱者（§6.2） |
 
@@ -139,6 +139,8 @@
 遍历期间新插入的作品排在游标之前 ⇒ 既不重复、也不会挤掉尚未取到的旧行。`nextCursor === null`
 当且仅当后面没有更多行 ⇒「某页不满 `limit` 却仍有下一页」在实现上不可能。畸形 `cursor` → `400`
 （**不静默忽略**：忽略等于每次悄悄回到第一页）。分区判定由内核 `seaZoneOf` 给出（SQL 的分区子查询只做候选预筛 + 候选超取）。
+**`total`（可选，向后兼容）**：每页响应附带该 zone 的总条数（与列表同一过滤条件的 `count(*)`），
+供公海大厅一次性算出总页数（页码全显，不再"点到哪页才长出下一页"）；老响应/缓存缺该字段时客户端回退旧口径。
 
 指定接唱的判定全部来自内核导出，路由不发明规则：已完成 → `422 BOTTLE_ALREADY_COMPLETE`（完成品只能听）；
 在该瓶唱过（含被斩的软删段）→ `422 ALREADY_SANG_IN_BOTTLE`；不在公海 → `404`；未登录 → `401`。

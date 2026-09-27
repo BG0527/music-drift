@@ -24,12 +24,45 @@ const META = 'text-[0.6875rem] tracking-[0.24em] text-paper/50';
     作为"这条链接是可点目标"的静态判据（同 `pages/shell/link-styles.ts` 的两个常量）。 */
 const TEXT_LINK_COOL =
   'inline-flex min-h-11 items-center gap-2 whitespace-nowrap text-glass underline underline-offset-5';
+
+/**
+ * 稿 §1-4 水路纹理组（review-404-blocks；坐标按 1440 画布换算，纵偏移相对水线 y=355）。
+ * 全部装饰：aria-hidden + 绝对定位 ⇒ 零布局高度。
+ */
+/** 水面短波：left% / 相对水线偏移(px) / width% / alpha */
+const FLOWS = [
+  ['40.83%', -53, '14.31%', 0.22],
+  ['60.56%', -29, '20.83%', 0.24],
+  ['12.5%', -25, '15.97%', 0.16],
+  ['84.44%', -43, '13.89%', 0.2],
+] as const;
+/** 断口漏滴：left% / 顶偏移(px) / 长度(px) / 是否带水珠（稿第 5 道无珠） */
+const DRIPS = [
+  ['13.61%', 5, 62, true],
+  ['29.86%', 7, 44, true],
+  ['39.31%', 5, 78, true],
+  ['49.03%', 7, 50, true],
+  ['57.78%', 7, 36, false],
+  ['70.28%', 7, 68, true],
+  ['86.94%', 9, 48, true],
+] as const;
+/** 干裂纹：left% / 顶偏移(px) / 宽(px) / 旋转角（稿登记角 ≤1.6°） */
+const CRACKS = [
+  ['62.64%', 151, 214, -1.6],
+  ['73.89%', 189, 236, 1.4],
+  ['65.14%', 241, 160, -1],
+  ['80.28%', 283, 196, 1.1],
+  ['60.28%', 79, 170, -1.2],
+  ['86.11%', 117, 150, 1.3],
+  ['7.78%', 393, 196, -1.1],
+  ['27.5%', 421, 154, 1.2],
+] as const;
 /** 划痕（= 水线的断口两侧）：同一根线，被豁口切开。 */
 const SCRATCH = 'absolute inset-y-0 bg-water-mid';
 
 export function NotFoundPage() {
   return (
-    <div className="relative isolate flex flex-col gap-6 overflow-hidden">
+    <div className="enter-fade relative isolate flex flex-col gap-6 overflow-hidden">
       {/* 世界的底与上方：盘面沟槽（划痕刻在一张盘上）+ 掠光 */}
       <Platter />
       <Glint />
@@ -99,6 +132,82 @@ export function NotFoundPage() {
             className={`${SCRATCH} right-0 w-[24%] opacity-[0.55]`}
           />
         </span>
+        {/* 断口前攒光（稿 .lip：线下 42px 带渐亮）+ 水面短波 4 条（稿 .flows） */}
+        <span
+          data-device="water-lip"
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-x-0 top-[calc(50%-42px)] h-[42px] bg-[linear-gradient(180deg,transparent,rgba(203,238,246,0.14)_62%,rgba(203,238,246,0.28))]"
+        />
+        <span data-device="water-flows" aria-hidden="true" className="pointer-events-none absolute inset-0">
+          {FLOWS.map(([left, offset, width, alpha]) => (
+            <i
+              key={`flow-${left}`}
+              className="absolute block h-px"
+              style={{
+                left,
+                top: `calc(50% + ${String(offset)}px)`,
+                width,
+                background: `rgba(203,238,246,${String(alpha)})`,
+              }}
+            />
+          ))}
+        </span>
+
+        {/* 伤口压暗（稿 .edge：线下 22px）+ 干河床沟槽残影（稿 .ghost） */}
+        <span
+          data-device="water-edge"
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-x-0 top-1/2 h-[22px] bg-[linear-gradient(180deg,transparent,rgba(2,8,11,0.72))]"
+        />
+        <span
+          data-device="water-ghost"
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-x-0 top-1/2 h-[160px]"
+          style={{
+            background:
+              'repeating-radial-gradient(circle at 1500px 1400px, rgba(216,243,246,0.09) 0 1px, transparent 1px 15px)',
+            maskImage: 'linear-gradient(180deg, rgba(255,255,255,0.7), rgba(255,255,255,0.08) 62%, rgba(255,255,255,0))',
+            WebkitMaskImage:
+              'linear-gradient(180deg, rgba(255,255,255,0.7), rgba(255,255,255,0.08) 62%, rgba(255,255,255,0))',
+          }}
+        />
+
+        {/* 断口往下漏的细流 + 水珠（稿 .drips：7 道、6 颗珠） */}
+        <span data-device="water-drips" aria-hidden="true" className="pointer-events-none absolute inset-0">
+          {DRIPS.map(([left, offset, height]) => (
+            <span key={`drip-${left}`} className="absolute block w-px" style={{
+              left,
+              top: `calc(50% + ${String(offset)}px)`,
+              height,
+              background: 'linear-gradient(180deg, rgba(203,238,246,0.5), rgba(203,238,246,0))',
+            }} />
+          ))}
+          {DRIPS.filter((drip) => drip[3]).map(([left, offset, height]) => (
+            <i key={`droplet-${left}`} className="absolute block h-[3px] w-[3px] rounded-full" style={{
+              left,
+              top: `calc(50% + ${String(offset + height + 6)}px)`,
+              background: 'rgba(203,238,246,0.34)',
+            }} />
+          ))}
+        </span>
+
+        {/* 干裂纹 8 条（稿 .crack，登记角 ≤1.6°，落在下半的干河床里） */}
+        <span data-device="water-cracks" aria-hidden="true" className="pointer-events-none absolute inset-0">
+          {CRACKS.map(([left, offset, width, rotate]) => (
+            <i
+              key={`crack-${left}-${String(offset)}`}
+              className="absolute block h-px"
+              style={{
+                left,
+                top: `calc(50% + ${String(offset)}px)`,
+                width,
+                transform: `rotate(${String(rotate)}deg)`,
+                background: 'rgba(216,243,246,0.2)',
+              }}
+            />
+          ))}
+        </span>
+
         {/* 干裂的水位痕：曾经有水的地方，现在只剩一道白印 */}
         <span
           aria-hidden="true"

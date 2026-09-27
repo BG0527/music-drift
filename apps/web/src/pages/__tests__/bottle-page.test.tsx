@@ -1,4 +1,4 @@
-import { fireEvent, screen, waitFor } from '@testing-library/react';
+import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import {
   BOTTLE_ID,
@@ -7,7 +7,6 @@ import {
   USER_A,
   USER_B,
   bottleDetail,
-  bottleSummary,
 } from '../../test/fixtures';
 import { fakeRecorderEnvironment, renderWithProviders } from '../../test/harness';
 import { song } from '../../test/fixtures';
@@ -210,7 +209,8 @@ describe('漂流瓶接唱页', () => {
       },
     );
 
-    await screen.findByText('午夜歌手#042');
+    // 锚到播放器挂载（代号文本现在出现在发起者徽记与瓶身格两处，不能再当唯一锚点）
+    await screen.findByRole('button', { name: '播放' });
     // 逐秒推进（每步 <1500ms，否则会被判成"拖动不计"）；段长 20s → 覆盖率 100%
     for (let second = 0; second <= 20; second += 1) {
       element.currentTime = second;
@@ -305,7 +305,8 @@ describe('漂流瓶接唱页', () => {
       ],
     });
 
-    expect(await screen.findByRole('button', { name: /选择去向/ })).toBeInTheDocument();
+    // 去向入口 = 稿上 destCol 的三条水路（行即入口；服务端给了 RIVER/SEA）
+    expect(await screen.findByRole('button', { name: /继续投河/ })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /录第 \d 段/ })).not.toBeInTheDocument();
     expect(screen.queryByText(/现在不在你手上/)).not.toBeInTheDocument();
   });
@@ -331,7 +332,8 @@ describe('漂流瓶接唱页', () => {
 
     expect(await screen.findByText(/现在不在你手上/)).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /录第 \d 段/ })).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: /选择去向/ })).not.toBeInTheDocument();
+    // availableResolutions 为空 ⇒ 稿上的三条水路一条都不画
+    expect(screen.queryByRole('button', { name: /继续投河|回传|入海/ })).not.toBeInTheDocument();
   });
 
   it('非持有者：不出现录制区，说明"不在你手上"并给去河道的出口', async () => {
@@ -349,7 +351,7 @@ describe('漂流瓶接唱页', () => {
     expect(screen.getByRole('link', { name: /去河道捞一个/ })).toHaveAttribute('href', '/river');
   });
 
-  it('作品已完整：不再提供录制，改为提示选择去向', async () => {
+  it('作品已完整：不再提供录制，改为直接摆出去向行（稿上没有"已经录满"提示行）', async () => {
     renderWithProviders(<BottlePage id={BOTTLE_ID} />, {
       route: `/bottles/${BOTTLE_ID}`,
       handlers: [
@@ -366,9 +368,9 @@ describe('漂流瓶接唱页', () => {
         },
       ],
     });
-    expect(await screen.findByText(/已经录满/)).toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: /入海/ })).toBeInTheDocument();
     expect(screen.queryByRole('heading', { name: /共 4 段/ })).not.toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /选择去向/ })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /录第 \d 段/ })).not.toBeInTheDocument();
   });
 
   it('去向三选一只给服务端允许的选项（发起者投河时没有"回传"）', async () => {
@@ -387,10 +389,16 @@ describe('漂流瓶接唱页', () => {
         },
       ],
     });
-    fireEvent.click(await screen.findByRole('button', { name: /选择去向/ }));
-    expect(screen.getByRole('button', { name: /继续投河/ })).toBeInTheDocument();
+    // 稿上的三条水路：行本身就是三选一入口，服务端给哪条画哪条
+    const riverRow = await screen.findByRole('button', { name: /继续投河/ });
     expect(screen.getByRole('button', { name: /入海/ })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /回传/ })).not.toBeInTheDocument();
+    // 行点击打开三选一确认弹窗（行为保留：弹窗内同样按服务端列表过滤）
+    fireEvent.click(riverRow);
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByRole('button', { name: /继续投河/ })).toBeInTheDocument();
+    expect(within(dialog).getByRole('button', { name: /入海/ })).toBeInTheDocument();
+    expect(within(dialog).queryByRole('button', { name: /回传/ })).not.toBeInTheDocument();
   });
 
   it('确认去向后提交，并在页面上播报结果（aria-live，不只靠动效）', async () => {
@@ -410,17 +418,77 @@ describe('漂流瓶接唱页', () => {
         {
           method: 'POST',
           path: `/api/bottles/${BOTTLE_ID}/resolution`,
-          respond: () => ({ body: bottleSummary({ seaZone: 'COMPLETED' }) }),
+          // 契约：useChooseResolution 用 BottleDetailSchema 校验响应 —— 回 summary 会被 safeParse 打回，
+          // mutation 走 catch，播报与下一步键都不会出现（原 handler 返回 summary，测试是假绿）
+          respond: () => ({
+            body: bottleDetail({
+              status: 'SEA',
+              seaZone: 'COMPLETED',
+              isComplete: true,
+              missingSegmentIndexes: [],
+              availableResolutions: [],
+              isHolder: false,
+            }),
+          }),
         },
       ],
     });
-    fireEvent.click(await screen.findByRole('button', { name: /选择去向/ }));
-    fireEvent.click(screen.getByRole('button', { name: /入海/ }));
-    fireEvent.click(screen.getByRole('button', { name: '确认投递' }));
+    fireEvent.click(await screen.findByRole('button', { name: /入海/ }));
+    const dialog = await screen.findByRole('dialog');
+    fireEvent.click(within(dialog).getByRole('button', { name: /入海/ }));
+    fireEvent.click(within(dialog).getByRole('button', { name: '确认投递' }));
 
     await waitFor(() => {
       expect(fetchMock.calls.some((call) => call.url.endsWith('/resolution'))).toBe(true);
     });
+
+    // G2/P0（flow-audit）：成功不能只活在 aria-live 播报里 —— 播报容器内必须留下语义下一步键
+    expect(await screen.findByText('已入海：这件作品现在所有人都能听到。')).toBeInTheDocument();
+    const seaNext = screen.getByRole('link', { name: /去公海听这一版/ });
+    expect(seaNext).toHaveAttribute('href', '/sea');
+    expect(seaNext.className, '热区 ≥44px').toContain('min-h-11');
+    expect(screen.getByRole('link', { name: /回河道继续/ })).toHaveAttribute('href', '/river');
+  });
+
+  it('投河成功后给「回河道继续」出口、不给「去公海听这一版」（下一步键跟去向语义走）', async () => {
+    const { fetchMock } = renderWithProviders(<BottlePage id={BOTTLE_ID} />, {
+      route: `/bottles/${BOTTLE_ID}`,
+      handlers: [
+        {
+          path: `/api/bottles/${BOTTLE_ID}`,
+          respond: () => ({
+            body: bottleDetail({
+              isComplete: true,
+              missingSegmentIndexes: [],
+              availableResolutions: ['RIVER'],
+            }),
+          }),
+        },
+        {
+          method: 'POST',
+          path: `/api/bottles/${BOTTLE_ID}/resolution`,
+          respond: () => ({
+            body: bottleDetail({
+              isComplete: true,
+              missingSegmentIndexes: [],
+              availableResolutions: [],
+            }),
+          }),
+        },
+      ],
+    });
+    fireEvent.click(await screen.findByRole('button', { name: /继续投河/ }));
+    const dialog = await screen.findByRole('dialog');
+    fireEvent.click(within(dialog).getByRole('button', { name: /继续投河/ }));
+    fireEvent.click(within(dialog).getByRole('button', { name: '确认投递' }));
+
+    await waitFor(() => {
+      expect(fetchMock.calls.some((call) => call.url.endsWith('/resolution'))).toBe(true);
+    });
+
+    expect(await screen.findByText('已投河：等下一位陌生人捞到它。')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /回河道继续/ })).toHaveAttribute('href', '/river');
+    expect(screen.queryByRole('link', { name: /去公海听这一版/ })).not.toBeInTheDocument();
   });
 
   it('去向被并发抢走（409）时不静默失败：解释 + 两个出口动作', async () => {
@@ -457,9 +525,10 @@ describe('漂流瓶接唱页', () => {
         },
       ],
     });
-    fireEvent.click(await screen.findByRole('button', { name: /选择去向/ }));
-    fireEvent.click(screen.getByRole('button', { name: /继续投河/ }));
-    fireEvent.click(screen.getByRole('button', { name: '确认投递' }));
+    fireEvent.click(await screen.findByRole('button', { name: /继续投河/ }));
+    const dialog = await screen.findByRole('dialog');
+    fireEvent.click(within(dialog).getByRole('button', { name: /继续投河/ }));
+    fireEvent.click(within(dialog).getByRole('button', { name: '确认投递' }));
 
     expect(await screen.findByText(/已被别人接走/)).toBeInTheDocument();
     expect(screen.getByRole('link', { name: '换一段继续' })).toHaveAttribute('href', '/river');
@@ -553,7 +622,7 @@ describe('瓶子详情：播放沟槽 + 唱针', () => {
     });
   });
 
-  it('一屏门禁（<1024）：时间轴用 flex order 给播放/录制区让位，lg: 恢复「时间轴在上」的桌面构图', async () => {
+  it('稿上部对应位：播放沟槽排在标题区之后、瓶身剖面与播放区之前（装置不许删/藏）', async () => {
     renderWithProviders(<BottlePage id={BOTTLE_ID} />, {
       route: `/bottles/${BOTTLE_ID}`,
       handlers: [
@@ -567,25 +636,19 @@ describe('瓶子详情：播放沟槽 + 唱针', () => {
     expect(await screen.findByText(/现在不在你手上/)).toBeInTheDocument();
     const groove = document.querySelector('[data-anchor="groove-timeline"]');
     const play = document.querySelector('[data-anchor="bottle-play"]');
+    const device = document.querySelector('[data-testid="bottle-water-level"]');
     expect(groove, '沟槽时间轴必须还在（装置不许删/藏）').not.toBeNull();
     expect(play, '播放区锚点必须在').not.toBeNull();
+    expect(device, '瓶身剖面装置必须在').not.toBeNull();
+    const h1 = screen.getByRole('heading', { level: 1 });
 
-    // 桌面构图靠 DOM 顺序：时间轴仍排在播放区之前（lg 及以上渲染成设计稿的「时间轴在上」）
-    expect(
-      Boolean(groove!.compareDocumentPosition(play!) & Node.DOCUMENT_POSITION_FOLLOWING),
-      'DOM 顺序：时间轴必须仍在播放区之前',
-    ).toBe(true);
-
-    // <1024 靠 flex order 把时间轴推到首屏之后（375 一屏门禁），lg: 归位
-    const grooveClass = groove!.getAttribute('class') ?? '';
-    expect(grooveClass, '时间轴要有窄屏 order-1').toContain('order-1');
-    expect(grooveClass, '时间轴要 lg 归位').toContain('lg:order-none');
-
-    // 页脚跟着时间轴一起下移（否则页脚会插到时间轴前面）
-    const footer = screen.getByText('看这只瓶子的漂流日志').parentElement;
-    const footerClass = footer?.getAttribute('class') ?? '';
-    expect(footerClass, '页脚要有窄屏 order-2').toContain('order-2');
-    expect(footerClass, '页脚要 lg 归位').toContain('lg:order-none');
+    const precedes = (a: Element, b: Element) =>
+      Boolean(a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING);
+    expect(precedes(h1, groove!), '沟槽必须在标题区之后').toBe(true);
+    expect(precedes(groove!, device!), '沟槽必须在瓶身剖面之前（稿上部对应位）').toBe(true);
+    expect(precedes(device!, play!), '剖面必须在播放区之前').toBe(true);
+    // 窄屏视觉让位用 CSS order（DOM 块序照稿不动，见下方「门禁锚点与窄屏 order 让位」）；
+    // ≥1024（lg）全部归位到本测试钉住的稿序。
   });
 
   /**
@@ -607,5 +670,298 @@ describe('瓶子详情：播放沟槽 + 唱针', () => {
     const h1 = await screen.findByRole('heading', { level: 1 });
     expect(h1.className, 'h1 clamp 上限必须是 3.5rem').toContain('3.5rem');
     expect(h1.className, '不得再是压余量用的 2.75rem').not.toContain('2.75rem');
+  });
+});
+
+/**
+ * 逐块照抄 `docs/ui-review/design-explore/p-bottle-record.html`（用户重写令）：
+ * 块顺序 / 装置 / 文案逐字 / 值逐值，不省块不发明不重组；唯一翻译 = 固定 px → 流体。
+ * 两个保留例外：① 沟槽时间轴+唱针放在稿上部对应位；② 录制/去向/放回/留言/赞踩行为全保留。
+ */
+describe('逐块照抄 p-bottle-record.html', () => {
+  const defaultHandlers = [
+    { path: `/api/bottles/${BOTTLE_ID}`, respond: () => ({ body: bottleDetail() }) },
+  ];
+
+  it('页面自带 <main>，稿的 76/30/16px 边距翻译成流体值', async () => {
+    renderWithProviders(<BottlePage id={BOTTLE_ID} />, {
+      route: `/bottles/${BOTTLE_ID}`,
+      handlers: defaultHandlers,
+    });
+    await screen.findByRole('heading', { level: 1 });
+
+    const main = document.querySelector('main');
+    expect(main, '页面必须自带 <main>（外壳不再渲染）').not.toBeNull();
+    const cls = main!.getAttribute('class') ?? '';
+    expect(cls, '水平边距 = 稿 76px 的流体值').toContain('px-[max(1.5rem,5.278vw)]');
+    expect(cls, '顶部边距 = 稿 30px 的流体值').toContain('pt-[max(1.5rem,2.083vw)]');
+    expect(cls, '底部边距 = 稿 16px 的流体值').toContain('pb-[max(1rem,1.111vw)]');
+  });
+
+  it('文案逐字 + 值逐值：稿上每块的固定文案原样出现（动态值用服务端事实）', async () => {
+    renderWithProviders(<BottlePage id={BOTTLE_ID} />, {
+      route: `/bottles/${BOTTLE_ID}`,
+      handlers: defaultHandlers,
+    });
+    await screen.findByRole('heading', { level: 1 });
+
+    // 顶栏与标题区（稿 .crumb/.h1/.work/.metaRow/.note/.maker）
+    expect(screen.getByRole('link', { name: '回河道' })).toBeInTheDocument();
+    expect(screen.getByText('有人持有')).toBeInTheDocument();
+    expect(screen.getByText('深海鲸落')).toBeInTheDocument();
+    expect(screen.getByText('已录 1 / 4 段')).toBeInTheDocument();
+    expect(screen.getByText('作品还不完整：缺第 2、3、4 段')).toBeInTheDocument();
+    expect(
+      screen.getByText('缺口是歌里固定的段位，不会被别人的段顶替。成品里这段时间会留成静音。'),
+    ).toBeInTheDocument();
+    expect(screen.getByText('发起者')).toBeInTheDocument();
+    expect(document.querySelector('[aria-label="发起者徽记"]')).not.toBeNull();
+
+    // 瓶身装置（稿 .heroLab/.callout/.corkLab 的逐字文案）
+    expect(screen.getByText('瓶身剖面 · 水只到第 1 段')).toBeInTheDocument();
+    expect(screen.getByText('河道水面')).toBeInTheDocument();
+    expect(screen.getByText('瓶塞 · 有人持有')).toBeInTheDocument();
+
+    // 第 4 格录制入口（稿 .gapBox）
+    expect(screen.getByText('第 2 段由你开第一句')).toBeInTheDocument();
+    expect(
+      screen.getByText('这一段按该段的固定时长录，录完再选去向。不点开就不会占用你的麦克风。'),
+    ).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '录第 2 段' })).toBeInTheDocument();
+
+    // 试听与投票（稿 .listenCol）
+    expect(screen.getByText('还没有听满这一段，继续听一会儿再点踩吧。')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /放回海中，继续漂流/ })).toBeInTheDocument();
+    expect(screen.getByText('还没想好要不要唱？放回去不会记录任何东西。')).toBeInTheDocument();
+
+    // 选择去向（稿 .destCol）
+    expect(
+      screen.getByText('接下来决定它去哪。发起者的第一棒没有「回传」，可选去向由服务端给。'),
+    ).toBeInTheDocument();
+
+    // 底栏（稿 .bottom）
+    expect(screen.getByText('捞取 / 录音 / 投河 / 回传 / 入海 全部记在服务端。')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /看这只瓶子的漂流日志/ })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /私密留言/ })).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: /举报（进人工队列，不是自动删除）/ }),
+    ).toBeInTheDocument();
+
+    // h2 副标题的稿式格式（全角空格分隔，逐字）
+    const sub = screen.getByText(/在瓶身上点「听」换段/);
+    expect(sub.textContent).toBe('第 1 段　午夜歌手#042　在瓶身上点「听」换段');
+  });
+
+  it('块顺序照稿（不重组）：顶栏→标题区→沟槽(例外①)→瓶身装置→录制入口→试听→去向→底栏', async () => {
+    renderWithProviders(<BottlePage id={BOTTLE_ID} />, {
+      route: `/bottles/${BOTTLE_ID}`,
+      handlers: defaultHandlers,
+    });
+    await screen.findByRole('heading', { level: 1 });
+
+    const groove = document.querySelector('[data-anchor="groove-timeline"]');
+    const seal = document.querySelector('[aria-label="发起者徽记"]');
+    const heroLab = document.querySelector('[data-testid="bottle-water-level"]');
+    expect(groove, '例外①：沟槽时间轴必须在').not.toBeNull();
+    expect(seal).not.toBeNull();
+    expect(heroLab).not.toBeNull();
+
+    const seq: [string, Element][] = [
+      ['回河道', screen.getByRole('link', { name: '回河道' })],
+      ['状态 pill', screen.getByText('有人持有')],
+      ['h1', screen.getByRole('heading', { level: 1 })],
+      ['.work 曲名', screen.getByText('深海鲸落')],
+      ['.metaRow①', screen.getByText('已录 1 / 4 段')],
+      ['.metaRow②', screen.getByText('作品还不完整：缺第 2、3、4 段')],
+      ['.note', screen.getByText(/缺口是歌里固定的段位/)],
+      ['.maker 徽记', seal!],
+      ['沟槽时间轴（例外①）', groove!],
+      ['.heroLab 瓶身剖面', heroLab!],
+      ['.gapBox 录制入口', screen.getByText('第 2 段由你开第一句')],
+      ['.listenCol 标题', screen.getByRole('heading', { name: /试听与投票/ })],
+      ['.votesNote', screen.getByText('还没有听满这一段，继续听一会儿再点踩吧。')],
+      ['.putBack', screen.getByRole('button', { name: /放回海中/ })],
+      ['.destCol 标题', screen.getByRole('heading', { name: '选择去向' })],
+      ['.bottom 漂流日志', screen.getByRole('link', { name: /看这只瓶子的漂流日志/ })],
+      ['.bottom 举报', screen.getByRole('button', { name: /举报（进人工队列，不是自动删除）/ })],
+    ];
+    for (let i = 0; i < seq.length - 1; i += 1) {
+      const [from, a] = seq[i]!;
+      const [to, b] = seq[i + 1]!;
+      expect(
+        Boolean(a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING),
+        `块顺序乱了：「${from}」必须排在「${to}」之前`,
+      ).toBe(true);
+    }
+  });
+
+  it('三选一去向 = 稿的三条水路（文案逐字），服务端给哪条画哪条', async () => {
+    renderWithProviders(<BottlePage id={BOTTLE_ID} />, {
+      route: `/bottles/${BOTTLE_ID}`,
+      handlers: [
+        {
+          path: `/api/bottles/${BOTTLE_ID}`,
+          respond: () => ({
+            body: bottleDetail({
+              isComplete: true,
+              missingSegmentIndexes: [],
+              availableResolutions: ['RIVER', 'RETURN', 'SEA'],
+            }),
+          }),
+        },
+      ],
+    });
+
+    const river = await screen.findByRole('button', { name: /继续投河/ });
+    const back = screen.getByRole('button', { name: /回传/ });
+    const sea = screen.getByRole('button', { name: /入海/ });
+    expect(within(river).getByText('继续投河')).toBeInTheDocument();
+    expect(
+      within(river).getByText('把当前版本重新投进河道，交给下一位陌生人接下一棒。'),
+    ).toBeInTheDocument();
+    expect(within(back).getByText('回传')).toBeInTheDocument();
+    expect(
+      within(back).getByText('沿父链把当前版本交回投给你的那个人，由他决定下一步。'),
+    ).toBeInTheDocument();
+    expect(within(sea).getByText('入海')).toBeInTheDocument();
+    expect(
+      within(sea).getByText('把当下的版本送进公海，成为所有人都能听到的公共作品。'),
+    ).toBeInTheDocument();
+  });
+});
+
+/**
+ * 一屏门禁（`tools/one-screen-check.mjs`，captain §46.3 判据）：
+ * - 桌面 1440×900：整页高 ≤900；手机 375×812：锚点下沿 ≤812（锚点缺失 = FAIL，不静默跳过）。
+ * - 本页声明两个锚点：`bottle-play`（播放区，保留）与 `bottle-action`（去向/动作区容器）——
+ *   容器**任何渲染态**都在 DOM 里（有录制入口 / 无去向可选 / 三条水路都在，各测一次）。
+ * - 窄屏（<1024）用 CSS order 让位：播放/录制区提前、守卫与时间轴、页脚后移；
+ *   DOM 块序照稿（上面的稿序测试继续钉），≥1024 由 `lg:order-none` 全部归位。
+ */
+describe('门禁锚点与窄屏 order 让位', () => {
+  /** 取元素上的 `order-<n>` / `order-[-9999]`（无 = 默认 0）；`lg:order-none` 不含数字，不误配。 */
+  const orderOf = (element: Element): number => {
+    const match = (element.getAttribute('class') ?? '').match(
+      /(?:^|\s)order-\[?(-?\d+)\]?(?=\s|$)/,
+    );
+    return match === null ? 0 : Number(match[1]);
+  };
+  const cls = (element: Element | null): string => element?.getAttribute('class') ?? '';
+
+  it('持有者态（画录制入口、没画去向行）：bottle-action 在，且罩住 bottle-play', async () => {
+    renderWithProviders(<BottlePage id={BOTTLE_ID} />, {
+      route: `/bottles/${BOTTLE_ID}`,
+      handlers: [
+        songsHandler,
+        { path: '/api/auth/me', respond: () => ({ body: SESSION_B }) },
+        { path: `/api/bottles/${BOTTLE_ID}`, respond: () => ({ body: bottleDetail() }) },
+      ],
+    });
+    await screen.findByRole('button', { name: '录第 2 段' });
+
+    const action = document.querySelector('[data-anchor="bottle-action"]');
+    expect(action, '缺 data-anchor="bottle-action"（门禁量它的下沿）').not.toBeNull();
+    expect(
+      action!.querySelector('[data-anchor="bottle-play"]'),
+      'bottle-play 必须保留在动作区容器内',
+    ).not.toBeNull();
+    expect(action!.textContent).toContain('选择去向');
+  });
+
+  it('非持有者态（录制入口、去向行都不画）：bottle-action 仍在，守卫提示让位到播放区之后', async () => {
+    renderWithProviders(<BottlePage id={BOTTLE_ID} />, {
+      route: `/bottles/${BOTTLE_ID}`,
+      handlers: [
+        {
+          path: `/api/bottles/${BOTTLE_ID}`,
+          respond: () =>
+            ({ body: bottleDetail({ isHolder: false, holderId: USER_B, availableResolutions: [] }) }),
+        },
+      ],
+    });
+    await screen.findByText(/现在不在你手上/);
+
+    const action = document.querySelector('[data-anchor="bottle-action"]');
+    expect(action, '非持有者态也不许丢 bottle-action').not.toBeNull();
+    expect(action!.querySelector('[data-anchor="bottle-play"]')).not.toBeNull();
+    const guard = screen.getByText(/现在不在你手上/).closest('p');
+    expect(orderOf(guard!), '守卫排在播放/动作区（1）之后').toBe(2);
+    expect(cls(guard), '守卫在 lg 归位稿序').toContain('lg:order-none');
+    expect(orderOf(action!), '播放/动作区最先让位').toBe(1);
+  });
+
+  it('作品完整态（三条水路都画）：bottle-action 罩住三选一入口', async () => {
+    renderWithProviders(<BottlePage id={BOTTLE_ID} />, {
+      route: `/bottles/${BOTTLE_ID}`,
+      handlers: [
+        {
+          path: `/api/bottles/${BOTTLE_ID}`,
+          respond: () => ({
+            body: bottleDetail({
+              isComplete: true,
+              missingSegmentIndexes: [],
+              availableResolutions: ['RIVER', 'RETURN', 'SEA'],
+            }),
+          }),
+        },
+      ],
+    });
+    const river = await screen.findByRole('button', { name: /继续投河/ });
+
+    const action = document.querySelector('[data-anchor="bottle-action"]');
+    expect(action, '完整态也不许丢 bottle-action').not.toBeNull();
+    expect(within(action! as HTMLElement).getByText('继续投河')).toBeInTheDocument();
+    expect(action!.querySelector('[data-anchor="bottle-play"]')).not.toBeNull();
+    expect(river).toBeInTheDocument();
+  });
+
+  it('窄屏 order 让位：播放/录制提前、时间轴与页脚后移；DOM 块序不动，lg 全归位', async () => {
+    renderWithProviders(<BottlePage id={BOTTLE_ID} />, {
+      route: `/bottles/${BOTTLE_ID}`,
+      handlers: [
+        songsHandler,
+        { path: '/api/auth/me', respond: () => ({ body: SESSION_B }) },
+        { path: `/api/bottles/${BOTTLE_ID}`, respond: () => ({ body: bottleDetail() }) },
+      ],
+    });
+    await screen.findByRole('button', { name: '录第 2 段' });
+
+    const grid = document.querySelector('[data-anchor="bottle-action"]');
+    const record = document.querySelector('[data-anchor="bottle-record"]');
+    const device = record?.parentElement ?? null;
+    const groove = document.querySelector('[data-anchor="groove-timeline"]');
+    const footer = document.querySelector('a[href$="/log"]')?.parentElement ?? null;
+    const rule = document.querySelector('main div.h-px[aria-hidden="true"]');
+    expect(grid && record && device && groove && footer && rule, '让位块必须都在').toBeTruthy();
+
+    // <1024 视觉序：录制入口（装置内最前）→ 播放/动作两栏 → 瓶身装置 → 时间轴 → 底栏
+    expect(orderOf(grid!), '播放/动作两栏最先让位').toBe(1);
+    expect(orderOf(device!), '瓶身装置随后').toBe(3);
+    expect(orderOf(groove!), '时间轴后移').toBe(4);
+    expect(orderOf(rule!), '底栏线后移').toBe(5);
+    expect(orderOf(footer!), '页脚最后').toBe(5);
+    expect(orderOf(record!), '录制入口在装置容器内让到最前').toBe(-9999);
+    for (const [name, element] of [
+      ['两栏', grid],
+      ['装置', device],
+      ['时间轴', groove],
+      ['底栏线', rule],
+      ['底栏', footer],
+      ['录制入口', record],
+    ] as const) {
+      expect(cls(element), `${name} 必须有 lg:order-none（≥1024 归位稿序）`).toContain(
+        'lg:order-none',
+      );
+    }
+
+    // CSS order 不改 DOM 块序：稿序（时间轴在装置前、装置在播放区前）原样成立
+    expect(
+      Boolean(groove!.compareDocumentPosition(grid!) & Node.DOCUMENT_POSITION_FOLLOWING),
+      'DOM 里时间轴仍排在两栏之前',
+    ).toBe(true);
+    expect(
+      Boolean(device!.compareDocumentPosition(record!) & Node.DOCUMENT_POSITION_FOLLOWING),
+      'DOM 里录制入口仍在装置之后',
+    ).toBe(true);
   });
 });

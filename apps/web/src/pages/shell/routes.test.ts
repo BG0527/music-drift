@@ -66,6 +66,8 @@ describe('路由表', () => {
     expect(activeNavKey('profile')).toBe('mine');
     expect(activeNavKey('settings')).toBe('settings');
     expect(activeNavKey('login')).toBeNull();
+    // G4/P1：admin 页高亮归「审核台」，不是河道（route-view 兜底会把 null 错标成河道）
+    expect(activeNavKey('admin')).toBe('admin');
   });
 
   it('safeNextPath 只接受站内相对路径（防开放重定向）', () => {

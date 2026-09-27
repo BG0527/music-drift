@@ -4,7 +4,12 @@
  */
 import { describe, expect, it } from 'vitest';
 import { CONTRACT_VERSION, ErrorResponseSchema, RuleCodeSchema, UuidSchema } from './common';
-import { BottleDetailSchema, BottleSummarySchema, RecordSegmentRequestSchema } from './bottles';
+import {
+  BottleDetailSchema,
+  BottleSummarySchema,
+  RecordSegmentRequestSchema,
+  SeaBottleListSchema,
+} from './bottles';
 import { CastVoteRequestSchema } from './interactions';
 import { SongSchema } from './songs';
 
@@ -147,5 +152,40 @@ describe('契约：ADR-015 三条硬语义', () => {
       damagedAt: null,
     });
     expect(detail.success).toBe(true);
+  });
+});
+
+describe('契约：公海列表响应的可选 total（页码一次全显的数据来源）', () => {
+  it('带 total 解析成功且原样保留（前端据此一次性算出总页数）', () => {
+    const parsed = SeaBottleListSchema.safeParse({
+      items: [summaryPayload()],
+      nextCursor: '游标一',
+      total: 39,
+    });
+    expect(parsed.success).toBe(true);
+    if (parsed.success) {
+      expect(parsed.data.total).toBe(39);
+      expect(parsed.data.items).toHaveLength(1);
+      expect(parsed.data.nextCursor).toBe('游标一');
+    }
+  });
+
+  it('缺 total 仍成功（向后兼容：旧响应/缓存没有该字段，不得把老服务端当坏数据拒掉）', () => {
+    expect(SeaBottleListSchema.safeParse({ items: [], nextCursor: null }).success).toBe(true);
+    expect(
+      SeaBottleListSchema.safeParse({ items: [summaryPayload()], nextCursor: null }).success,
+    ).toBe(true);
+  });
+
+  it('total 出现时必须是非负整数（负数/小数是坏数据，拒绝而不是算出假页码）', () => {
+    expect(
+      SeaBottleListSchema.safeParse({ items: [], nextCursor: null, total: -1 }).success,
+    ).toBe(false);
+    expect(
+      SeaBottleListSchema.safeParse({ items: [], nextCursor: null, total: 1.5 }).success,
+    ).toBe(false);
+    expect(
+      SeaBottleListSchema.safeParse({ items: [], nextCursor: null, total: 0 }).success,
+    ).toBe(true);
   });
 });

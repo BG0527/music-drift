@@ -209,12 +209,20 @@ describe('t44 漂流瓶与航迹母题', () => {
     expect(container.firstElementChild?.getAttribute('class')).toMatch(/pointer-events-none/);
   });
 
-  it('公海大厅：整页水位线（浅底）+ 水面光带 + 页头瓶子 + 潮线', () => {
+  it('公海大厅（照抄批次 2026-09-27）：稿级装置 .clip/.surface/.rings/.fleet + 空态潮位线 + isolate 宿主', () => {
+    /**
+     * ⚠️ 守卫改动（原文 → 新文，整合者执行）：
+     * 原文断 `<WaterTexture tone="light">/<WaterSheen>/<BottleMark>/<TideLine>` 四个组件标签。
+     * 新文断稿同源装置结构。为什么必须改：用户返工令「完全按照 .html」后，公海大厅逐块照抄
+     * p-sea-hall.html（组件级母题被稿的 .clip 十块底图/.surface 水线/.rings 涟漪/.fleet 六瓶取代；
+     * 空态是稿的 lowtide 潮位线而不是 BottleMark）。判据从「用了哪个组件」变成「稿的装置在不在」。
+     */
     const sea = pageSource('sea-page.tsx');
-    expect(sea, '公海大厅缺浅底水位线').toMatch(/<WaterTexture\s+tone="light"/);
-    expect(sea, '公海大厅缺水面光带').toMatch(/<WaterSheen\s+tone="light"/);
-    expect(sea, '公海大厅缺漂流瓶母题（用户点名）').toContain('<BottleMark');
-    expect(sea, '公海大厅缺潮线').toContain('<TideLine');
+    expect(sea, '缺稿 .clip 十块底图容器').toContain('className="clip"');
+    expect(sea, '缺稿 .surface 页级水线').toContain('className="surface"');
+    expect(sea, '缺稿 .rings 涟漪（内圈 4 段断弧）').toContain('className="rings"');
+    expect(sea, '缺稿 .fleet 六瓶舰队').toContain('className="fleet"');
+    expect(sea, '缺稿空态潮位线 .lowtide').toContain('className="lowtide"');
     expect(sea, '母题宿主必须是 isolate 容器（否则 z-underlay 看不见）').toMatch(
       /relative isolate/,
     );
@@ -248,8 +256,25 @@ describe('t44 漂流瓶与航迹母题', () => {
    判据（机器可检）：① 每个页面至少一处母题；② 用整面水层（WaterTexture/WaterSheen）
    的页面，宿主必须 `isolate`（否则 z-underlay 会掉到背景之下而看不见 —— t43 踩过）；
    ③ 空状态里要有"漂流瓶"（用户点名）。 */
-const MOTIF_TAGS = ['<BottleMark', '<TideLine', '<WakeLine', '<WaterSheen', '<WaterTexture'];
-/** 页面里是否出现任一母题组件（用 includes 而不是正则：避免转义坑）。 */
+/**
+ * ⚠️ 守卫改动（整合者 2026-09-27）：照抄批次后，母题不再只有组件标签一种形态 ——
+ * 稿同源装置（.clip/.waterlight/backdrop/data-device 族）同样是「水或漂流瓶母题」。
+ * 原 MOTIF_TAGS 五件组件标签全部保留（仍是最强形态），只**追加**稿装置标记，不删旧判据。
+ */
+const MOTIF_TAGS = [
+  '<BottleMark',
+  '<TideLine',
+  '<WakeLine',
+  '<WaterSheen',
+  '<WaterTexture',
+  // 逐块照抄批次新增（每条对应一页的稿装置落点）
+  'className="clip"', // sea-page：p-sea-hall 的 .clip 十块底图
+  'className="waterlight"', // profile-page：p-profile 的 .waterlight
+  'data-river-backdrop', // river-page：f4-groove 的背景五层
+  'data-device="river"', // river-page：唱片 SVG 的 r900 六层水槽
+  'data-testid="basin-graphic"', // song-picker：五口浅盆水体（稿装置，BottleMark 已按稿移除）
+];
+/** 页面里是否出现任一母题（组件标签 或 稿同源装置；用 includes 避免转义坑）。 */
 const hasMotif = (src: string): boolean => MOTIF_TAGS.some((tag) => src.includes(tag));
 const FULL_SURFACE_TAGS = ['<WaterTexture', '<WaterSheen'];
 const hasFullSurface = (src: string): boolean => FULL_SURFACE_TAGS.some((tag) => src.includes(tag));
@@ -281,9 +306,21 @@ describe('t46 扩面：每个页面至少一处水或漂流瓶母题', () => {
     expect(offenders, '这些页面有整面水层但宿主没 isolate（装饰会看不见）').toEqual([]);
   });
 
-  it('空状态里有漂流瓶（用户点名）：选歌页与公海页', () => {
-    expect(pageSource('song-picker-page.tsx'), '选歌页空状态缺漂流瓶').toContain('BottleMark');
-    expect(pageSource('sea-page.tsx'), '公海页空状态缺漂流瓶').toContain('BottleMark');
+  it('空状态带装置（用户点名「漂流瓶」→ 照抄批次按各页稿落地）', () => {
+    /**
+     * ⚠️ 守卫改动（原文 → 新文，整合者执行）：
+     * 原文：两页都断 `BottleMark`。
+     * 新文：公海 = 稿 p-sea-hall 的 lowtide 潮位线（稿空态本就没有瓶）；
+     *       选歌 = 稿 p-songpicker 的空态装置（BottleMark 或稿状态区「空 态」行，二选一）。
+     * 用户「空状态要有漂流瓶」的点名诉求由上述**稿自己的空态装置**承接（瓶的语言在 fleet/…
+     * 各页装置里，不强制进空态文案区）。
+     */
+    expect(pageSource('sea-page.tsx'), '公海空态缺稿 lowtide 潮位线').toContain(
+      'className="lowtide"',
+    );
+    expect(pageSource('song-picker-page.tsx'), '选歌空态缺装置（BottleMark 或稿状态区）').toMatch(
+      /BottleMark|空 态/,
+    );
   });
 });
 
@@ -342,11 +379,21 @@ describe('t46 水流漂移：走契约 + reduced-motion 可静止（能真的区
     );
   });
 
-  it('至少 3 个页面真的用了漂移（不是写了没人用）', () => {
-    const users = ['sea-page.tsx', 'profile-page.tsx', 'settings-page.tsx'].filter((page) =>
+  it('有页面真的在用漂移（照抄批次口径：≥2 —— river + settings）', () => {
+    /**
+     * ⚠️ 守卫改动（原文 → 新文，整合者执行）：
+     * 原文：`['sea-page.tsx','profile-page.tsx','settings-page.tsx'] … ≥3`。
+     * 新文：名单换成**真实在用**的页面并把下限定为 2。
+     * 为什么必须改：照抄批次（2026-09-27 返工令）后，公海/我的的组件级 `<WaterTexture drift>`
+     * 被各自稿的装置取代（稿是静态 mock，没有组件级漂移），真实用户只剩 river（passage-drift
+     * 族 + WaterTexture）与 settings。**这不是悄悄放宽**：t46「≥3」的回升路径已登记 ——
+     * motion-plan（apps/web/docs/motion-plan.md）逐页应用阶段会把常驻漂移按页补回，届时把
+     * 名单与下限改回 ≥3。
+     */
+    const users = ['river-page.tsx', 'settings-page.tsx'].filter((page) =>
       usesDrift(pageSource(page)),
     );
-    expect(users.length, `只有 ${String(users.length)} 个页面用了 drift`).toBeGreaterThanOrEqual(3);
+    expect(users.length, `只有 ${String(users.length)} 个页面用了 drift`).toBeGreaterThanOrEqual(2);
   });
 
   it('旧硬约束③已从 DESIGN.md 删除，且新条文在位（不许两份规则并存）', () => {
@@ -526,11 +573,17 @@ describe('河道剖面：契约先补（本轮的构图需要新 token）', () =
 describe('河道剖面：页面真的接入了（不是写了组件没人用）', () => {
   const river = pageSource('river-page.tsx');
 
-  it('河道页有水体 + 水线 + 光柱 + 主流；**默认态无瓶**（缺席可读）', () => {
+  it('河道页（照抄批次）：稿五层背景 + r900 六层水槽 + river-body；**默认态无瓶**（缺席可读）', () => {
+    /**
+     * ⚠️ 守卫改动（原文 → 新文，整合者执行）：
+     * 原文断 `<SurfaceLine>/<LightShafts>/<CurrentLines>` 三个旧组件标签。
+     * 新文断 f4-groove 冻结稿的照抄结构：data-river-backdrop 背景五层 + data-device="river"
+     * 唱片 SVG（r900 六层水槽在 river-page.test 里逐层数）+ river-body 水体容器。
+     * 为什么必须改：用户返工令「完全按照 .html」，旧三组件（含波形带 CurrentLines）按稿删除。
+     */
+    expect(river, '缺稿 backdrop（data-river-backdrop）').toContain('data-river-backdrop');
+    expect(river, '缺稿唱片 SVG 唱道容器').toContain('data-device="river"');
     expect(river, '缺水体容器 river-body').toContain('river-body');
-    expect(river, '缺水线构件').toContain('<SurfaceLine');
-    expect(river, '缺水下光柱构件').toContain('<LightShafts');
-    expect(river, '缺河道主流构件').toContain('<CurrentLines');
     /**
      * ⚠️ **本轮改掉的断言（原文 → 新文）**：
      * 原文：`expect(river, '缺沿主流漂过的漂流瓶').toContain('<DriftingBottle')`。
@@ -555,17 +608,25 @@ describe('河道剖面：页面真的接入了（不是写了组件没人用）'
     expect(river, '缺投下的可访问名').toContain('aria-label="投下一支漂流瓶"');
   });
 
-  it('「投下与捞起等权」仍成立：两个泊位共用同一份尺寸定义', () => {
-    // 用共享常量而不是"两处恰好都写了 110px"：后者会在有人只改一处时静默失衡
-    const uses = river.split('PORT_SIZE').length - 1;
-    expect(uses, `PORT_SIZE 只被引用 ${String(uses)} 次（两个泊位都要用）`).toBeGreaterThanOrEqual(
-      3,
-    );
-    const size = /const PORT_SIZE\s*=\s*'([^']+)'/.exec(river)?.[1] ?? '';
-    expect(size, '缺 PORT_SIZE 定义').not.toBe('');
-    expect(size, 'PORT_SIZE 必须定义圆形与桌面尺寸').toContain('rounded-full');
-    expect(size, 'PORT_SIZE 必须定义桌面 110px 档').toContain('md:h-[110px]');
-    expect(size, 'PORT_SIZE 必须定义桌面 110px 档').toContain('md:w-[110px]');
+  it('泊位按冻结稿 f4 错落不等：捞取 190 / 投下 150（captain 裁决 2026-09-27）', () => {
+    /**
+     * ⚠️ 守卫改动（原文 → 新文，整合者执行）：
+     * 原文：两个泊位必须共用同一份 `PORT_SIZE`（md:h-[110px] 等权同尺寸，≥3 处引用）。
+     * 新文：按冻结稿 f4-groove 的 190×190 / 150×150 错落不等断言。
+     * 为什么必须改：用户返工令「完全按照 .html」覆盖旧「等权同尺寸」解读 ——
+     * 稿本身就是一大一小；裁决原文见 river-page.test 同名断言的 原文→新文 记录。
+     */
+    const fluidMax = (decl: string): number =>
+      Number(/w-\[clamp\([^,]+,[^,]+,(\d+)px\)\]/.exec(decl)?.[1] ?? 0);
+    const draw = /const PORT_DRAW_SIZE\s*=\s*'([^']+)'/.exec(river)?.[1] ?? '';
+    const cast = /const PORT_CAST_SIZE\s*=\s*'([^']+)'/.exec(river)?.[1] ?? '';
+    expect(draw, '缺 PORT_DRAW_SIZE 定义').not.toBe('');
+    expect(cast, '缺 PORT_CAST_SIZE 定义').not.toBe('');
+    expect(draw, '捞取尺寸必须是流体 clamp').toContain('clamp(');
+    expect(cast, '投下尺寸必须是流体 clamp').toContain('clamp(');
+    expect(fluidMax(draw), '捞取按稿 190×190').toBe(190);
+    expect(fluidMax(cast), '投下按稿 150×150（小一档）').toBe(150);
+    expect(fluidMax(cast), '错落不等（不再共用同一份尺寸）').not.toBe(fluidMax(draw));
   });
 });
 

@@ -13,7 +13,7 @@ describe('选歌页', () => {
       handlers: [{ path: '/api/songs', respond: () => ({ body: [song()] }) }],
     });
     expect(await screen.findByText('深海鲸落')).toBeInTheDocument();
-    expect(screen.getByText(/共 4 段/)).toBeInTheDocument();
+    expect(screen.getByText('4 段')).toBeInTheDocument(); // 稿逐字「4 段」（不带「共」，返工令 2026-09-27）
     expect(screen.getByText(/每段约 20 秒/)).toBeInTheDocument();
     expect(container.querySelector('img')).toBeNull();
   });
@@ -317,9 +317,13 @@ describe('选歌页：record-v1 语言（源码守卫）', () => {
     expect(code.match(/\brgba?\(/g) ?? []).toEqual([]);
   });
 
-  it('保留路由锚点与空态漂流瓶（一屏判据 + 母题判据都靠它）', () => {
+  it('保留路由锚点与稿空态装置（一屏判据 + 母题判据都靠它）', () => {
     expect(code, '缺 /new 的锚点').toContain('data-anchor="new-catalog"');
-    expect(code, '空态缺漂流瓶母题').toContain('BottleMark');
+    // 照抄批次（2026-09-27 返工令）：空态从 BottleMark 换成稿的状态区装置（「空 态」行）；
+    // 本页的母题 = 五口浅盆水体（basin-graphic），water-motif 的 MOTIF_TAGS 已同步追加该标记。
+    expect(code, '空态缺稿状态区装置').toContain('data-device="sp-states"');
+    expect(code, '缺稿空态行「空 态」').toContain('空 态');
+    expect(code, '稿里空态没有瓶（BottleMark 已按稿移除）').not.toContain('<BottleMark');
   });
 
   /**
@@ -412,5 +416,91 @@ describe('选歌页：设计稿偏差复核（E12 / B2 / B4·B5 / F3）', () => 
     const foot = screen.getByText(/匿名代号/);
     expect(foot.className).not.toContain('border-t');
     expect(foot.className).not.toContain('pt-4');
+  });
+});
+
+/**
+ * 逐块照抄收尾（用户返工令 2026-09-27：完全按照 .html）。
+ * 差值清单 = apps/web/docs/review-songpicker-blocks.md §1–§9 与 R3 复核的剩余偏差。
+ * 源码级断言（本页守卫连 rgba 都禁，值只能是 token 工具类或 var()）。
+ */
+describe('选歌页：照稿差值收尾', () => {
+  const raw = readFileSync(
+    resolve(process.cwd(), 'src', 'pages', 'song-picker-page.tsx'),
+    'utf8',
+  );
+  const code = raw
+    .replace(/\/\*[\s\S]*?\*\//g, '')
+    .split('\n')
+    .filter((line) => {
+      const trimmed = line.trim();
+      return !trimmed.startsWith('//') && !trimmed.startsWith('*');
+    })
+    .join('\n');
+
+  it('页头节奏照稿：h1 上距 22px、副标单段逐字（无折行引入的双空格）', () => {
+    expect(code).toContain('mt-[22px]');
+    expect(code, '副标逐字（折叠为一段）').toContain(
+      '这里每首歌都被切成固定段位（同一位置永远属于同一段，斩浪也不会把后面的段前移）。你录第 1 段，之后交给河道里的陌生人。',
+    );
+    expect(code, 'JSX 折行引入的双空格要清掉').not.toContain('）。 你录');
+  });
+
+  it('tally 照稿：组间 gap 38（不是 24）', () => {
+    expect(code).toContain('gap-[38px]');
+  });
+
+  it('状态区照稿：dashed 框 + 两行 cat 标签「无匹配」「空 态」', () => {
+    expect(code).toContain('data-device="sp-states"');
+    expect(code).toContain('border-dashed');
+    expect(code).toContain('无匹配');
+    expect(code).toContain('空 态');
+  });
+
+  it('曲目行文案照稿：段数无「共」、来源空格形（无全角冒号）', () => {
+    expect(code, '「共 {n} 段」是发明').not.toContain('共 {song.totalSegments}');
+    expect(code).toContain('来源 {song.licensedSource}');
+  });
+
+  it('干盆理由照稿：note 在按钮之后、无图标、warm 色', () => {
+    const noteAt = code.indexOf('这首还没有切分');
+    const buttonAt = code.indexOf('选这首，录第 1 段');
+    expect(noteAt, '缺 note 文案').toBeGreaterThan(0);
+    expect(buttonAt, '缺按钮文案').toBeGreaterThan(0);
+    expect(noteAt, 'note 必须在按钮之后（稿 top132 > 按钮 84+32）').toBeGreaterThan(buttonAt);
+    expect(code, 'note 不带图标').not.toContain('AlertTriangle');
+    expect(code, 'note 是 warm 色').toContain('text-warm');
+  });
+
+  it('发起按钮照稿语态：32px 描边幽灵 + 透明扩边保热区（44px 触控底线用 hit-area 实现）', () => {
+    expect(code).toContain('before:absolute');
+    expect(code).toContain('border-paper/25');
+    expect(code).toContain('bg-paper/[0.03]');
+  });
+
+  it('格顶沿错落 0/6/2/8/4 与盆体 ±8 错落（稿的两组常量）', () => {
+    expect(code).toContain('EDGE_TILT');
+    expect(code).toContain('BASIN_TILT');
+  });
+
+  it('母版外圈描边 .38（稿值，不是 .25）', () => {
+    expect(code).toContain('border-water-light/[0.38]');
+  });
+
+  it('页脚照稿：12.5px 右对齐；未登录底注带「先登录」出口（动线 G8）', () => {
+    expect(code).toContain('text-[0.78125rem]');
+    expect(code).toContain('md:text-right');
+    expect(code).toContain('/login?next=');
+  });
+
+  it('动线 G1：页头左上常显「← 回河道」→ /river', () => {
+    expect(code, '缺回河道链接').toContain('to="/river"');
+    expect(code, '缺回河道文案').toContain('回河道');
+  });
+
+  it('背景三层照稿：platter / deep / glint（data-device 标记，token 驱动无 rgba）', () => {
+    expect(code).toContain('data-device="sp-platter"');
+    expect(code).toContain('data-device="sp-deep"');
+    expect(code).toContain('data-device="sp-glint"');
   });
 });

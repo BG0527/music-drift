@@ -131,3 +131,42 @@ describe('404 · 逐值对齐 p-404-record.html', () => {
     expect(container.querySelector('[data-anchor="notfound-scratch"]')).not.toBeNull();
   });
 });
+
+/**
+ * 照稿水路纹理组（用户返工令 2026-09-27；清单 = docs/review-404-blocks.md §1-4）。
+ * 「水从断口漏干」的具象层：水面短波 flows、断口漏滴 drips、干裂纹 cracks、
+ * 伤口压暗 edge、断口前攒光 lip、干河床沟槽残影 ghost。
+ */
+describe('404：照稿水路纹理组', () => {
+  const readSource = (): string =>
+    readFileSync(join(process.cwd(), 'src', 'pages', 'not-found-page.tsx'), 'utf8');
+
+  it('六个纹理块的 data-device 都在（稿 §1-4 映射）', () => {
+    const src = readSource();
+    for (const name of ['water-flows', 'water-drips', 'water-cracks', 'water-edge', 'water-lip', 'water-ghost']) {
+      expect(src, `缺 ${name}`).toContain(`data-device="${name}"`);
+    }
+  });
+
+  it('计数照稿：水面短波 4 条、断口漏滴 7 道、干裂纹 8 条', () => {
+    const { container } = renderWithProviders(<NotFoundPage />);
+    expect(container.querySelectorAll('[data-device="water-flows"] > i').length, 'flows ×4').toBe(4);
+    expect(container.querySelectorAll('[data-device="water-drips"] > span').length, 'drips ×7').toBe(7);
+    expect(container.querySelectorAll('[data-device="water-cracks"] > i').length, 'cracks ×8').toBe(8);
+  });
+
+  it('漏滴的水珠只挂 6 道（稿第 5 道 832,362 无珠）', () => {
+    const { container } = renderWithProviders(<NotFoundPage />);
+    expect(container.querySelectorAll('[data-device="water-drips"] > i').length, 'droplet ×6').toBe(6);
+  });
+
+  it('纹理全部是装饰层：aria-hidden + 绝对定位（零布局）', () => {
+    const { container } = renderWithProviders(<NotFoundPage />);
+    for (const name of ['water-flows', 'water-drips', 'water-cracks', 'water-edge', 'water-lip', 'water-ghost']) {
+      const node = device(container, name);
+      expect(node, `${name} 缺失`).not.toBeNull();
+      expect(node?.getAttribute('aria-hidden'), `${name} 必须 aria-hidden`).toBe('true');
+      expect(node?.className, `${name} 必须绝对定位`).toContain('absolute');
+    }
+  });
+});

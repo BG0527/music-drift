@@ -102,16 +102,16 @@ export function GrooveTimeline({
       className={cn('flex flex-col', className)}
     >
       <div className="flex flex-wrap items-baseline gap-x-[14px] gap-y-1">
-        <h2 id={headingId} className="text-[1.0625rem] font-semibold text-paper">
+        <h2 id={headingId} className="text-[1.0625rem] font-semibold leading-none text-paper">
           播放沟槽
         </h2>
-        <span className="text-[0.8125rem] leading-[1.6] text-muted">
+        <span className="hidden text-[0.8125rem] leading-[1.6] text-muted lg:inline">
           唱针跟着播放走；一格 = 一个段位，缺口留成静音。
         </span>
       </div>
 
-      {/* 沟槽带（设计稿 .band：92px，上下两条细线靠右淡出；上下留白收到 4px —— 一屏门禁优先） */}
-      <div className="relative mt-1 h-[92px]">
+      {/* 沟槽带（设计稿 .band：92px，上下两条细线靠右淡出；桌面收到 64px —— 一屏门禁优先，窄屏仍是 92px） */}
+      <div className="relative mt-1 h-[92px] lg:h-[64px]">
         <span
           aria-hidden="true"
           className="pointer-events-none absolute inset-x-0 top-0 h-px bg-linear-to-r from-line/[0.13] to-transparent"
@@ -301,10 +301,11 @@ export function GrooveTimeline({
         )}
       </div>
 
-      {/* 刻度行：段号与时长来自真实数据（缺口 = 静音；时长缺失不编造） */}
+      {/* 刻度行：段号与时长来自真实数据（缺口 = 静音；时长缺失不编造）
+          一屏门禁（§46.3）：桌面折叠（lg:hidden，整页高度让位）；窄屏保留段号与静音标注 */}
       <ol
         data-testid="groove-marks"
-        className="mt-1 grid lg:ml-[5%] lg:mr-[20%]"
+        className="mt-1 grid lg:hidden lg:ml-[5%] lg:mr-[20%]"
         style={{ gridTemplateColumns: `repeat(${count}, minmax(0, 1fr))` }}
       >
         {slots.map((slot) => {

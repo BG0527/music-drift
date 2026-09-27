@@ -1,0 +1,677 @@
+/**
+ * 我的 · 沉积剖面 —— 逐块照抄 `docs/ui-review/design-explore/p-profile-record.html` 的 <style>。
+ *
+ * 纪律（返工令）：
+ * - 唯一允许的翻译：固定 px → 流体（%/clamp）；块结构 / 视觉语法与稿一致，所有选择器加 `.p-record` 作用域；
+ * - 与稿的刻意差异（都是授权项，不是发挥）：
+ *   ① `.codeslot`（匿名代号行）不移植 —— 用户裁决「系统里不存在你的代号」；
+ *   ② 稿的 `.crate`/`.bottom` 是写死 top:250/596 的绝对定位（稿是 900px 定高画布）；
+ *      真实数据行数不定，照搬会互相压盖 ⇒ 改流内 margin-top（间隙取稿的间隙值流体化）；
+ *   ③ `.bleed > .sleeve` 的叠放在 ≥1280（稿的视口）按稿 absolute；窄屏落回流内，否则盖住页头正文；
+ *   ④ 柱层高度用 flex 均分（层高 = 柱高 ÷ 段数）替代稿写死的 65px：4 层位时与稿逐像素同构，
+ *      段数 >4 时柱子不裂（契约 totalSegments 上限 8）；
+ *   ⑤ `.waterlight` 给 `z-index:-1`（稿里它在 body 层的 `.clip`、天然在 main 之后）——
+ *      页面根是 stacking context，负层保证它在正文之下而不是盖住文字。
+ */
+
+.p-record {
+  /* 稿 :root 调色板（作用域内，不外泄）：值与 DESIGN.md record-v1 同源 */
+  --ink: #050f14;
+  --paper: #f3f9fa;
+  --muted: #a9c7cf;
+  --glass: #7fd1d9;
+  --coral: #d4553a;
+  --warm: #f6d79a;
+  --line: rgba(243, 249, 250, 0.13);
+
+  position: relative;
+  z-index: 2;
+  /* 稿 main：padding 64px 76px 0 → 流体（1440 处收敛到 64/76）；≥1280 铺满（从不设 max-width） */
+  padding: clamp(40px, 4.45vw, 64px) clamp(24px, 5.28vw, 76px) 0;
+  color: var(--paper);
+  font-family: 'LXGW WenKai', serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* 水面光带：世界的「上方」，瓶子来的方向（稿 .waterlight 原样，仅 z-index 见文件头⑤） */
+.p-record .waterlight {
+  position: absolute;
+  left: -8%;
+  top: -4%;
+  width: 118%;
+  height: 290px;
+  z-index: -1;
+  pointer-events: none;
+  mix-blend-mode: screen;
+  background: linear-gradient(
+    186deg,
+    rgba(203, 238, 246, 0.1) 0%,
+    rgba(203, 238, 246, 0.042) 32%,
+    transparent 70%
+  );
+}
+
+/* ── 页头（稿 header：cat / h1 / sub 逐字） ─────────────────────────────── */
+.p-record .cat {
+  font-family: var(--font-latin);
+  font-size: 11px;
+  letter-spacing: 0.24em;
+  color: rgba(243, 249, 250, 0.5);
+}
+.p-record h1 {
+  margin-top: 14px;
+  font-size: 58px;
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: 0.02em;
+}
+.p-record .sub {
+  margin-top: 14px;
+  font-size: 15px;
+  line-height: 1.85;
+  color: var(--muted);
+  max-width: 740px;
+}
+/* 叠放模式（≥1280）下给右侧内袋让位，否则 lede 会钻到内袋底下 */
+@media (min-width: 1280px) {
+  .p-record .sub {
+    max-width: min(740px, calc(100% - 520px));
+  }
+}
+
+/* ── 内袋（稿 .bleed / .sleeve / .hole / .label / .who）───────────────────
+   默认（<1280）：流内右贴（同稿 DOM 顺序：header 之后、柜之前）；
+   ≥1280：按稿 absolute 叠在页头/柜口右上（right:26 top:8，pointer-events:none）。 */
+.p-record .bleed {
+  position: static;
+}
+.p-record .sleeve {
+  position: relative;
+  display: block;
+  width: min(470px, 100%);
+  margin-left: auto;
+  margin-top: clamp(16px, 2vw, 24px);
+  padding: 16px 20px 20px;
+  border: 1px solid rgba(243, 249, 250, 0.18);
+  border-radius: 2px;
+  background: linear-gradient(
+    158deg,
+    rgba(243, 249, 250, 0.085),
+    rgba(243, 249, 250, 0.022) 62%,
+    rgba(243, 249, 250, 0.055)
+  );
+}
+.p-record .sleeve .stop {
+  position: static;
+  display: block;
+}
+.p-record .hole {
+  position: static;
+  margin-top: 12px;
+  width: min(168px, 100%);
+  height: 168px;
+  border-radius: 50%;
+  background: rgba(2, 9, 13, 0.92);
+  border: 2px solid rgba(243, 249, 250, 0.26);
+  display: grid;
+  place-items: center;
+}
+.p-record .who {
+  position: static;
+  margin-top: 12px;
+}
+@media (min-width: 1280px) {
+  .p-record .bleed {
+    position: absolute;
+    inset: 0;
+    overflow: hidden;
+    z-index: 5;
+    pointer-events: none;
+  }
+  .p-record .sleeve {
+    position: absolute;
+    right: clamp(8px, 1.8vw, 26px);
+    top: 8px;
+    width: min(470px, calc(100% - 52px));
+    height: 296px;
+    margin-left: 0;
+    margin-top: 0;
+    padding: 0;
+  }
+  .p-record .sleeve .stop {
+    position: absolute;
+    left: 30px;
+    top: 16px;
+  }
+  .p-record .hole {
+    position: absolute;
+    left: 30px;
+    top: 38px;
+    margin-top: 0;
+    width: 168px;
+    height: 168px;
+  }
+  .p-record .who {
+    position: absolute;
+    left: 216px;
+    top: 74px;
+    margin-top: 0;
+  }
+}
+
+/* 标签盘（中心孔里那张还没印字的盘；用户裁决：不存在「你的代号」） */
+.p-record .label {
+  position: relative;
+  width: 104px;
+  height: 104px;
+  border-radius: 50%;
+  background: radial-gradient(76% 76% at 34% 26%, rgba(10, 48, 60, 0.5), rgba(3, 17, 23, 0.78));
+  border: 1px solid rgba(228, 249, 252, 0.26);
+}
+.p-record .label .r1 {
+  position: absolute;
+  inset: -13px;
+  border-radius: 50%;
+  border: 1px solid rgba(228, 249, 252, 0.42);
+}
+.p-record .label .r2 {
+  position: absolute;
+  inset: -29px;
+  border-radius: 50%;
+  border: 1px solid rgba(228, 249, 252, 0.2);
+}
+.p-record .label .hub {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 7px;
+  height: 7px;
+  margin: -3.5px 0 0 -3.5px;
+  border-radius: 50%;
+  background: var(--ink);
+  border: 1px solid rgba(127, 209, 217, 0.42);
+}
+.p-record .who .handle {
+  font-size: 20px;
+  font-weight: 700;
+  line-height: 1.2;
+  overflow-wrap: anywhere;
+}
+.p-record .who .mail {
+  margin-top: 6px;
+  font-family: var(--font-latin);
+  font-size: 12px;
+  color: var(--muted);
+  word-break: break-all;
+}
+.p-record .who .stamp {
+  display: inline-block;
+  margin-top: 12px;
+  padding: 4px 10px;
+  border-radius: 2px;
+  border: 1px solid rgba(212, 85, 58, 0.62);
+  background: rgba(212, 85, 58, 0.14);
+  color: var(--paper);
+  font-size: 12px;
+  letter-spacing: 0.06em;
+}
+
+/* ── 沉积柜（稿 .crate / .chead / .csub / .window） ──────────────────────
+   稿 crate top:250（页头之下 59px 的空气）→ 流内 margin-top 同值流体化。 */
+.p-record .crate {
+  position: static;
+  margin-top: clamp(28px, 4.1vw, 59px);
+}
+.p-record .chead {
+  display: flex;
+  align-items: baseline;
+}
+.p-record .chead h2 {
+  font-size: 17px;
+  font-weight: 700;
+}
+.p-record .chead .cat {
+  margin-left: auto;
+}
+.p-record .csub {
+  margin-top: 8px;
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--muted);
+  max-width: 660px;
+}
+.p-record .window {
+  position: relative;
+  margin-top: 20px;
+  height: 260px;
+  overflow: hidden;
+  border: 1px solid rgba(243, 249, 250, 0.16);
+  border-radius: 2px;
+  background: rgba(3, 17, 23, 0.42);
+  display: flex;
+}
+.p-record .window ul {
+  list-style: none;
+  display: flex;
+  width: 100%;
+}
+.p-record .window li {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  padding: 16px 12px 14px 68px;
+  border-right: 1px solid rgba(243, 249, 250, 0.1);
+}
+.p-record .window li:last-child {
+  border-right: 0;
+}
+/* 状态家具（骨架/空态/错误，稿里没有的三态）：装进定高窗里不撑破、不截断出口 */
+.p-record .window > :not(ul) {
+  flex: 1 1 auto;
+  min-width: 0;
+  max-height: 100%;
+  overflow: auto;
+}
+
+/* ── 柱：50px 宽的沉积管（稿 .lay；层高由 flex 均分，见文件头④） ──────── */
+.p-record .lay {
+  position: absolute;
+  left: 1px;
+  top: 0;
+  width: 50px;
+  height: 100%;
+  display: flex;
+  flex-direction: column-reverse;
+}
+.p-record .lay > i {
+  position: absolute;
+  left: 0;
+  width: 50px;
+  display: block;
+}
+/* 层位（shaft/hoop/iface 之外的 i）：回到 flex 流里自下而上均分 */
+.p-record .lay > i:not(.shaft):not(.hoop):not(.iface) {
+  position: relative;
+  left: auto;
+  flex: 1 1 0;
+  min-height: 0;
+}
+/* 沉积层：层位深度分档（稿逐值：顶色 .21/.17/.13/.10、底色 .065/.05/.035/.02） */
+.p-record .sd {
+  border-top: 1px solid rgba(243, 249, 250, 0.16);
+}
+.p-record .sd.b1 {
+  background: linear-gradient(180deg, rgba(246, 215, 154, 0.1), rgba(243, 249, 250, 0.02));
+}
+.p-record .sd.b2 {
+  background: linear-gradient(180deg, rgba(246, 215, 154, 0.13), rgba(243, 249, 250, 0.035));
+}
+.p-record .sd.b3 {
+  background: linear-gradient(180deg, rgba(246, 215, 154, 0.17), rgba(243, 249, 250, 0.05));
+}
+.p-record .sd.b4 {
+  background: linear-gradient(180deg, rgba(246, 215, 154, 0.21), rgba(243, 249, 250, 0.065));
+}
+.p-record .sd::before {
+  content: '';
+  position: absolute;
+  left: 6px;
+  right: 6px;
+  bottom: 13px;
+  height: 1px;
+  background: rgba(243, 249, 250, 0.09);
+}
+.p-record .sd.mine::after {
+  content: '';
+  position: absolute;
+  right: 3px;
+  top: 6px;
+  bottom: 6px;
+  width: 2px;
+  background: rgba(212, 85, 58, 0.78);
+}
+/* 水腔：还没落下来的段位（段号还刻着，只是那一层是空的） */
+.p-record .wt {
+  background: linear-gradient(180deg, rgba(127, 209, 217, 0.2), rgba(127, 209, 217, 0.07));
+}
+.p-record .wt.b4 {
+  border-top: 1px solid rgba(203, 238, 246, 0.2);
+}
+.p-record .wt::before {
+  content: '';
+  position: absolute;
+  left: 12px;
+  bottom: 14px;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  border: 1px solid rgba(203, 238, 246, 0.6);
+}
+.p-record .wt::after {
+  content: '';
+  position: absolute;
+  left: 30px;
+  bottom: 34px;
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+  border: 1px solid rgba(203, 238, 246, 0.46);
+}
+/* 被斩浪删掉的那一段：段号还刻着，内容被挖走了（虚线珊瑚边） */
+.p-record .cut {
+  border-top: 1px dashed rgba(212, 85, 58, 0.68);
+  background: rgba(212, 85, 58, 0.06);
+}
+.p-record .cut::before {
+  content: '';
+  position: absolute;
+  left: 6px;
+  right: 6px;
+  top: 17px;
+  height: 1px;
+  background: rgba(212, 85, 58, 0.3);
+}
+/* 沉积面：水下的那一面，是一道弧，不是直线（bottom% 由行内样式按缺口位置给） */
+.p-record .iface {
+  position: absolute;
+  left: 1px;
+  width: 50px;
+  height: 10px;
+  border-radius: 50%;
+  border-top: 1px solid rgba(203, 238, 246, 0.44);
+}
+.p-record .iface::before {
+  content: '';
+  position: absolute;
+  left: 4px;
+  right: 4px;
+  top: 4px;
+  height: 10px;
+  border-radius: 50%;
+  border-top: 1px solid rgba(203, 238, 246, 0.18);
+}
+.p-record .no {
+  position: absolute;
+  left: 6px;
+  top: 24px;
+  font-family: var(--font-latin);
+  font-size: 10px;
+  color: rgba(243, 249, 250, 0.55);
+}
+.p-record .no.ghost {
+  color: rgba(203, 238, 246, 0.4);
+}
+.p-record .cut .no {
+  color: rgba(212, 85, 58, 0.85);
+}
+.p-record .float {
+  position: absolute;
+  left: 14px;
+  z-index: 3;
+}
+.p-record .fstand {
+  left: 17px;
+  top: 1px;
+}
+.p-record .flask {
+  display: block;
+  transform: rotate(-16deg);
+}
+/* 回航泊位：柱口套一枚暖色系缆环，瓶立在环里（只有「等你操作」那一格有） */
+.p-record .lay .shaft {
+  left: 0;
+  top: 0;
+  width: 50px;
+  height: 100%;
+  background: linear-gradient(
+    180deg,
+    rgba(246, 215, 154, 0.38),
+    rgba(246, 215, 154, 0.2) 52%,
+    rgba(246, 215, 154, 0.09)
+  );
+}
+.p-record .lay .hoop {
+  left: -1px;
+  top: 2px;
+  width: 52px;
+  height: 20px;
+  border-radius: 50%;
+  z-index: 4;
+  border: 2px solid rgba(246, 215, 154, 0.9);
+}
+.p-record .lay .hoop::before {
+  content: '';
+  position: absolute;
+  inset: 2px;
+  border-radius: 50%;
+  background: rgba(246, 215, 154, 0.14);
+}
+/* 文字压在暗色渐变上：柱子在左，文字在右，互不打架 */
+.p-record .veil {
+  position: absolute;
+  left: 52px;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  border-left: 1px solid rgba(243, 249, 250, 0.13);
+  background: linear-gradient(90deg, rgba(3, 17, 23, 0.86), rgba(3, 17, 23, 0.93));
+}
+.p-record .txt {
+  position: relative;
+  z-index: 2;
+}
+
+/* ── 行内文字（稿 .r1/.slot/.role/.t/.d/.st/.due/.lk 逐值） ─────────────── */
+.p-record .r1 {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+.p-record .slot {
+  font-family: var(--font-latin);
+  font-size: 10.5px;
+  letter-spacing: 0.1em;
+  color: rgba(243, 249, 250, 0.5);
+}
+.p-record .role {
+  padding: 2px 8px;
+  border-radius: 2px;
+  font-size: 11.5px;
+  letter-spacing: 0.04em;
+  border: 1px solid rgba(243, 249, 250, 0.22);
+  color: var(--muted);
+}
+.p-record .role.mine {
+  border-color: rgba(127, 209, 217, 0.42);
+  color: var(--glass);
+}
+.p-record .t {
+  margin-top: 7px;
+  font-size: 17px;
+  font-weight: 700;
+  line-height: 1.3;
+}
+.p-record .d {
+  margin-top: 5px;
+  font-size: 12.5px;
+  line-height: 1.55;
+  color: var(--muted);
+}
+.p-record .d.ok {
+  color: var(--glass);
+}
+.p-record .d.warn {
+  color: var(--warm);
+}
+/* 唯一的「要你动手」状态：全页仅此一枚实心暖牌（牌面记号＝柱口那枚系缆环） */
+.p-record .st {
+  margin-top: 8px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 2px;
+  background: var(--warm);
+  color: var(--ink);
+  font-size: 12.5px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+.p-record .st svg {
+  display: block;
+  flex: none;
+}
+.p-record .due {
+  margin-top: 6px;
+  font-family: var(--font-latin);
+  font-size: 10.5px;
+  letter-spacing: 0.08em;
+  color: rgba(246, 215, 154, 0.76);
+}
+.p-record .lk {
+  margin-top: 9px;
+  display: flex;
+  gap: 15px;
+  font-size: 12.5px;
+  color: var(--glass);
+}
+
+/* ── 剖面下（稿 .bottom：左消息条、右两个内袋口） ───────────────────────── */
+/* 稿 bottom top:596（柜底之下 13px 的空气）→ 流内 margin-top 同值流体化 */
+.p-record .bottom {
+  position: static;
+  margin-top: clamp(8px, 0.97vw, 14px);
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+@media (min-width: 1024px) {
+  .p-record .bottom {
+    flex-direction: row;
+    gap: clamp(16px, 2.78vw, 40px);
+  }
+}
+/* 稿 msgs 624 + gap 40 + pockets 624（1288 = 1440−2×76）→ 双栏 flex 均分，同值同构 */
+.p-record .msgs {
+  flex: 1 1 0;
+  min-width: 0;
+}
+.p-record .msgs h2 {
+  font-size: 17px;
+  font-weight: 700;
+}
+.p-record .msgs .msub {
+  margin-top: 8px;
+  font-size: 12.5px;
+  line-height: 1.6;
+  color: var(--muted);
+  max-width: 600px;
+}
+.p-record .msgs ul {
+  list-style: none;
+  margin-top: 12px;
+}
+.p-record .msgs li {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 6px 0;
+  border-bottom: 1px solid rgba(243, 249, 250, 0.07);
+}
+.p-record .mrow {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+.p-record .mrow svg {
+  display: block;
+  flex: none;
+}
+.p-record .mrow .lab {
+  font-size: 14.5px;
+  font-weight: 700;
+}
+.p-record .mrow .pill {
+  padding: 2px 7px;
+  border-radius: 2px;
+  background: var(--glass);
+  color: var(--ink);
+  font-size: 10.5px;
+  letter-spacing: 0.1em;
+}
+.p-record .mrow .read {
+  font-size: 11px;
+  color: rgba(243, 249, 250, 0.5);
+}
+.p-record .mrow .go {
+  margin-left: auto;
+  font-size: 12.5px;
+  color: var(--glass);
+}
+.p-record .mdet {
+  font-size: 12.5px;
+  line-height: 1.55;
+  color: var(--muted);
+}
+/* 回传提示：这条是「要你动手」——引线伸出正文栏、说明更亮、实心暖牌 */
+.p-record .msgs li.hero {
+  margin-left: -12px;
+  padding-left: 12px;
+  border-left: 2px solid rgba(246, 215, 154, 0.85);
+  background: linear-gradient(90deg, rgba(246, 215, 154, 0.14), rgba(246, 215, 154, 0) 80%);
+}
+.p-record .msgs li.hero .lab {
+  color: var(--warm);
+}
+.p-record .msgs li.hero .mdet {
+  color: rgba(243, 249, 250, 0.82);
+}
+.p-record .msgs li.hero .pill {
+  background: var(--warm);
+  color: var(--ink);
+}
+.p-record .msgs li.hero .go {
+  color: var(--warm);
+  font-weight: 700;
+}
+.p-record .pockets {
+  flex: 1 1 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+.p-record .pocket {
+  position: relative;
+  flex: 1;
+  border: 1px solid var(--line);
+  border-top: 0;
+  border-radius: 0 0 4px 4px;
+  background: rgba(243, 249, 250, 0.028);
+  padding: 34px 24px 24px;
+}
+.p-record .pocket::before {
+  content: '';
+  position: absolute;
+  left: 22px;
+  right: 22px;
+  top: 0;
+  height: 2px;
+  background: rgba(243, 249, 250, 0.2);
+}
+.p-record .pocket h3 {
+  font-size: 16px;
+  font-weight: 700;
+}
+.p-record .pocket p {
+  margin-top: 10px;
+  font-size: 12.5px;
+  line-height: 1.65;
+  color: var(--muted);
+  max-width: 520px;
+}
+/* 收藏 / 徽章弹窗入口（返工令授权：放在稿的 pocket 位置；稿本身无按钮） */
+.p-record .pocket button {
+  margin-top: 14px;
+}

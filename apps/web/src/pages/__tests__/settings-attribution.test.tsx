@@ -258,3 +258,67 @@ describe('设置页 · 逐值对齐 p-settings-record.html', () => {
     expect(source()).toContain('data-anchor="settings-attribution"');
   });
 });
+
+/**
+ * 逐块照抄 p-settings-record.html 的结构断言（用户返工令）。
+ * 值来源 = apps/web/docs/review-settings-blocks.md；每条对应稿里一个可指认的块。
+ */
+describe('设置页 · 照稿结构（review-settings-blocks）', () => {
+  // 注：上面逐值 describe 的 source() 在其闭包内 —— 本 describe 自带同款读取器（折叠空白）
+  const source = (): string =>
+    readFileSync(join(process.cwd(), 'src', 'pages', 'settings-page.tsx'), 'utf8').replace(
+      /\s+/g,
+      ' ',
+    );
+
+  it('页面级背景层五件套在（稿 §1：air/sea/shaft/grooves-wet/surf，水线 y=520≈57.8%）', () => {
+    const src = source();
+    expect(src).toContain('data-device="sheet-air"');
+    expect(src).toContain('data-device="sheet-sea"');
+    expect(src).toContain('data-device="sheet-shaft"');
+    expect(src).toContain('data-device="sheet-grooves"');
+    expect(src).toContain('data-device="sheet-surf"');
+  });
+
+  it('导语后有 rule 分隔线（稿 §5.1：.rule mt26 1px）', () => {
+    expect(source(), '缺 rule').toContain('mt-[26px] h-px bg-line/13');
+  });
+
+  it('登出区前有 hr（稿 §5.4：.hr mt18 1px）', () => {
+    expect(source(), '缺 hr').toContain('mt-[18px] h-px bg-line/13');
+  });
+
+  it('h1 加 .01em 字距（稿 §5.1：58px/700/ls .01em）', () => {
+    const src = source();
+    expect(src).toContain('text-[3.625rem]');
+    expect(src).toContain('tracking-[0.01em]');
+  });
+
+  it('瓶是稿的完整构件（§4：身/肩/颈/唇/塞 + 7 根声波 + 两圈涟漪）', () => {
+    // 循环渲染的 data-part 源码里只有 1 处 ⇒ 用 DOM 计数（不靠源码文本计数）
+    const { container } = renderWithProviders(<SettingsPage />, {
+      route: '/settings',
+      handlers: handlers(() => ({ body: METADATA })),
+    });
+    const bottle = container.querySelector('[data-device="sheet-bottle"]');
+    expect(bottle, '缺瓶装置').not.toBeNull();
+    expect(bottle?.querySelectorAll('[data-part="wave-bar"]').length, '声波 7 根').toBe(7);
+    expect(
+      (bottle?.querySelectorAll('[data-part="rip"]') ?? []).length,
+      '涟漪 a/b 两圈',
+    ).toBeGreaterThanOrEqual(2);
+    expect(bottle?.querySelector('[data-part="bot-cork"]'), '软木塞').not.toBeNull();
+    expect(bottle?.querySelector('[data-part="contact"]'), '接触亮水皮').not.toBeNull();
+  });
+
+  it('水线内嵌 6 条反光短划（稿 §3：wline 六 dash）', () => {
+    const { container } = renderWithProviders(<SettingsPage />, {
+      route: '/settings',
+      handlers: handlers(() => ({ body: METADATA })),
+    });
+    expect(
+      container.querySelectorAll('[data-part="wline-dash"]').length,
+      '反光短划 6 条',
+    ).toBe(6);
+  });
+});

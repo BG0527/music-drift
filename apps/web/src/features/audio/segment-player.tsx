@@ -146,13 +146,13 @@ export function SegmentPlayer({
       className={cn(
         // record-v1（DESIGN.md §Components）：播放条 = 浮动层 L2 —— `water-void` 底 + 1px `rgba(line,.2)`
         // + 阴影（阴影只允许给浮层与浮动条，这是全站少数允许阴影的地方之一）
-        // 间距 p-3/gap-3：一屏门禁（§46.3）下播放条压高，行距让位于整页高度
-        'flex flex-col gap-3 rounded-xl border border-line/20 bg-water-void p-3 shadow-floating',
+        // 间距 p-[6px]/gap-[6px]：一屏门禁（§46.3）下播放条再压一档，行距让位于整页高度
+        'flex flex-col gap-[6px] rounded-xl border border-line/20 bg-water-void p-[6px] shadow-floating',
         className,
       )}
     >
       <div className="flex items-start justify-between gap-4">
-        <h3 className="text-[1.125rem] font-semibold text-paper">
+        <h3 className="text-[1.125rem] font-semibold leading-none text-paper">
           第 {segmentIndex} 段{ownerCode === null ? '' : ` · ${ownerCode}`}
         </h3>
         {/* DESIGN.md：段位时长用 Quattrocento 数字（引用字体 token，不新增值） */}

@@ -1,137 +1,278 @@
 /**
- * 个人中心（「我的」）—— record-v1：**内袋身份卡 + 消息 + 沉积剖面**。
+ * 个人中心（「我的」）—— record-v1：**逐块照抄**
+ * `docs/ui-review/design-explore/p-profile-record.html`（返工令 2026-09-28）。
  *
- * 设计稿：`docs/ui-review/design-explore/p-profile-record.html`（精确值来源，§5.5 口径）。
- * 构图是**两区分栏**，不是一路纵向堆叠（实测：`main` 900px；上排 `.window` 高 260px 的固定列表窗
- * 与 `.sleeve` 内袋卡 470×296；下排 `.bottom` 自 `top:596` 起左右两栏，左消息、右 pocket 各 624px）：
- *   上排 [列表窗 | 内袋卡]、下排 [通知 | 收藏/徽章入口]。
- * 桌面（≥1024px）走网格分栏，列表窗在窗内滚动（设计稿本身就是 overflow:hidden 的固定窗，
- * 这里用 max-height + overflow-y-auto —— 锚点挂在标题上，不受滚动影响）；
- * 单列时 DOM 顺序 = 内袋 → 列表窗 → 消息（设计稿「窗口在上、消息在下」）——
- * 通知若排在列表窗前面，375 下 `me-bottles` 锚点会被它顶出首屏。
+ * 稿 DOM 顺序（块结构照稿，不重组、不省块、不加稿外块）：
+ *   `.waterlight` 背景层 → `header`（eyebrow/h1/lede 逐字）→ `.bleed > .sleeve` 内袋卡
+ *   → `.crate`（我参与过的瓶列表，交给我参与过的漂流瓶组件）→ `.bottom`（`.msgs` 消息列 + `.pockets` 口袋列）。
+ * 样式全在 `profile-page.css`（稿 <style> 逐值照抄 + 唯一允许的 px→fluid 翻译）。
  *
- * 两处刻意的取舍：
- * 1. **不显示匿名代号**（用户 2026-09-23 裁决 + 本轮重申）：`CONTEXT.md` §12.1 是"同一用户在不同瓶子里代号不同"，
- *    所以不存在"你的代号"这一行 —— 内袋中心孔里那张标签盘是**空白的**（还没印字）；
- * 2. 「我参与过的漂流瓶」来自服务端（跨设备可见、被斩的段仍算参与过），不是本机书签。
+ * React 只做四件（返工令授权）：
+ * 1. 真数据：会话（内袋 handle/mail/stamp）、`useMyBottles`（共 N 支 + 回传提示）、`useNotifications`（消息列）；
+ * 2. `awaitingMyAction` 回传提示接稿的 `.msgs li.hero`：有 true 才出现，false/缺失不出现（三态测试在案）；
+ * 3. 收藏 / 徽章弹窗入口按钮放在稿的 `.pocket` 位置（§46.2：入口 + 弹窗，不摊首屏）；
+ * 4. 语义等价替换：稿的静态 svg/文本行 → 等价 React（Link/aria-hidden），文案逐字照稿。
+ *
+ * 两处用户裁决（稿里有、产品里禁）：
+ * - **不显示匿名代号**：稿的 `.codeslot` 行不移植（系统里不存在「你的代号」）；
+ * - 稿静态计数「共 5 支」→ 位留着，只填服务端真条数（加载中不填假数）。
  */
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import { BadgesPanel } from '../features/bottle/badges-panel';
 import { CollectionsPanel } from '../features/bottle/collections-panel';
-import { NotificationList } from '../features/bottle/notification-list';
 import { MyBottles } from '../features/bottle/my-bottles';
+import { describeNotification } from '../features/bottle/notification-labels';
+import { useMyBottles, useNotifications } from '../features/api/queries';
 import { useSession } from '../features/session/session-context';
-import { BottleMark, Button, Icon, TideLine, WaterTexture } from '../design-system';
+import { Button } from '../design-system';
+import { AsyncBoundary } from './shell/async-boundary';
+import { TEXT_LINK_STRONG } from './shell/link-styles';
+import { Link } from './shell/router';
+import './profile-page.css';
+
+type Tone = 'info' | 'success' | 'warning' | 'danger';
+
+/**
+ * one-screen 门禁修复（页级收紧；基线 `profile-page.css` 照抄稿不动，本页压一份更紧的流体表达）：
+ * ① 横向溢出：稿装饰层 `.waterlight` `left:-8% + width:118%` ⇒ 右沿 110% 视口
+ *    （实测 scrollWidth 1440 档=1584、375 档=413，唯一 offenders 就是它）→ 主体水平裁剪；
+ * ② 整页高：1440 实测 1031>900，按分段实测只收紧**流体表达**（页顶距 / 页头段距 / 柜上距 /
+ *    窗口高 / 下区距 / 口袋内距）—— 四块构图、沉积柱、中心孔、回传 hero 一个不删。
+ */
+const ME_FIX_CSS = `
+.p-record{overflow-x:clip}
+.p-record{padding:clamp(32px,2.8vw,40px) clamp(24px,5.28vw,76px) 0}
+.p-record h1{margin-top:8px}
+.p-record .sub{margin-top:10px}
+.p-record .crate{margin-top:clamp(24px,2.8vw,40px)}
+.p-record .window{height:clamp(176px,15.3vw,220px)}
+.p-record .bottom{margin-top:clamp(8px,0.6vw,9px)}
+.p-record .msgs ul{margin-top:8px}
+.p-record .pocket{padding:clamp(16px,1.5vw,22px) clamp(14px,1.4vw,20px) clamp(14px,1.3vw,18px)}
+.p-record .pocket p{margin-top:8px}
+.p-record .pocket button{margin-top:10px}
+`;
+
+/** 稿 .mrow 里的三枚 16px 图标（逐值照抄；danger 现无通知类型可达，复用警示三角）。 */
+const TONE_SVG: Record<Tone, ReactNode> = {
+  info: (
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+      <circle cx="8" cy="8" r="6.2" stroke="rgba(127,209,217,.75)" strokeWidth="1.3" />
+      <circle cx="8" cy="8" r="1.5" fill="rgba(127,209,217,.75)" />
+    </svg>
+  ),
+  success: (
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+      <circle cx="8" cy="8" r="6.2" stroke="rgba(127,209,217,.75)" strokeWidth="1.3" />
+      <path
+        d="M5 8.2 7.1 10.3 11.2 5.8"
+        stroke="rgba(127,209,217,.95)"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  ),
+  warning: (
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+      <path
+        d="M8 1.8 14.6 13.2H1.4Z"
+        stroke="rgba(246,215,154,.8)"
+        strokeWidth="1.3"
+        strokeLinejoin="round"
+      />
+      <path d="M8 6.4v3.1" stroke="rgba(246,215,154,.9)" strokeWidth="1.4" strokeLinecap="round" />
+    </svg>
+  ),
+  danger: (
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+      <path
+        d="M8 1.8 14.6 13.2H1.4Z"
+        stroke="rgba(246,215,154,.8)"
+        strokeWidth="1.3"
+        strokeLinejoin="round"
+      />
+      <path d="M8 6.4v3.1" stroke="rgba(246,215,154,.9)" strokeWidth="1.4" strokeLinecap="round" />
+    </svg>
+  ),
+};
 
 export function ProfilePage() {
   const session = useSession();
-  /** 收藏 / 徽章都是**声明式内容**（§46.2）⇒ 只做入口，内容进弹窗（入口落在下排右栏）。 */
+  const myBottles = useMyBottles();
+  const notifications = useNotifications();
+  /** 收藏 / 徽章都是**声明式内容**（§46.2）⇒ 只做入口，内容进弹窗。 */
   const [panel, setPanel] = useState<'collections' | 'badges' | null>(null);
 
+  /** 回传提示（W6）：任一条 awaitingMyAction=true 才出现；查询未到/失败时宁可不弹（安全降级）。 */
+  const awaiting = myBottles.data?.items.find((bottle) => bottle.awaitingMyAction) ?? null;
+
   return (
-    <div className="relative isolate flex flex-col gap-4">
-      {/* 水域母题（t46 扩面）：整面水位线 + 页头潮线 + 一只漂流瓶（全部绝对定位、零布局高度） */}
-      <WaterTexture tone="light" drift />
-      <header className="relative flex flex-col gap-2 pb-[12px]">
-        <BottleMark size={52} className="absolute right-0 -bottom-[6px] hidden text-coral md:block" />
-        <BottleMark size={36} className="absolute right-0 -bottom-[4px] text-coral md:hidden" />
-        <TideLine />
-        <p className="text-[0.6875rem] tracking-[0.24em] text-paper/50">ACCOUNT · 认领</p>
-        <h1 className="text-[3.625rem] font-bold leading-none text-paper">我的</h1>
-        <p className="max-w-[46.25rem] text-[0.9375rem] leading-[1.85] text-muted">
+    <main className="p-record">
+      <style>{ME_FIX_CSS}</style>
+
+      {/* 水面光带：世界的「上方」，瓶子来的方向（稿 .waterlight） */}
+      <div className="waterlight" aria-hidden="true" />
+
+      {/* 页头：eyebrow / h1 / lede 逐字照稿（§1.6-1 档案头入场 enter-rise） */}
+      <header className="enter-rise">
+        <div className="cat">ACCOUNT · 认领</div>
+        <h1>我的</h1>
+        <p className="sub">
           账号只用来认领你自己的漂流瓶。别人在瓶子里看到的是匿名代号，看不到你的账号。
         </p>
+        {/* flow-audit G7：常显横向出口 —— 任何数据状态下都渲染（空态出口在列表窗内，不同位不重复）
+            （mt-2：one-screen 1440 整页高收紧的一环，热区仍由 TEXT_LINK_STRONG 的 min-h-11 保证） */}
+        <nav aria-label="站内去路" className="mt-2 flex flex-wrap items-center gap-x-6 gap-y-2">
+          <Link to="/river" className={TEXT_LINK_STRONG}>
+            ← 去河道捞一个
+          </Link>
+          <Link to="/sea" className={TEXT_LINK_STRONG}>
+            公海听完成的作品
+          </Link>
+        </nav>
       </header>
 
-      {/* ── 上排：[列表窗 | 内袋卡]。DOM 里内袋在前（单列阅读顺序），桌面用网格把它放回右栏 ── */}
-      <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_470px] lg:items-start">
-        {/* 内袋身份卡（装置）：从柜里抽出来的内套，中心孔是纸被挖掉的一块，
-             透出来的标签盘还没印字 —— 这张唱片上不存在「你的代号」 ─────── */}
-        <section
-          data-anchor="me-identity"
-          aria-label="内袋身份卡"
-          className="flex flex-col gap-[12px] rounded-base border border-line/15 bg-gradient-to-br from-paper/[0.085] via-paper/[0.022] to-paper/[0.055] p-[16px] lg:col-start-2 lg:row-start-1"
-        >
-          <p className="text-[0.6875rem] tracking-[0.24em] text-paper/50">内袋</p>
-          <div className="flex flex-col gap-[16px] sm:flex-row sm:gap-[24px]">
-            {/* 中心孔：空白标签盘（aria-hidden —— 它编码的是"没有代号"这一缺席，文字行已说明） */}
-            <span
-              aria-hidden="true"
-              className="grid h-[120px] w-[120px] shrink-0 place-items-center self-start rounded-full border-2 border-line/30 bg-water-void/90 md:h-[168px] md:w-[168px]"
-            >
-              <span className="relative block h-[72px] w-[72px] rounded-full border border-water-deep/30 bg-gradient-to-br from-water-bed/[0.5] to-water-void/[0.8] md:h-[104px] md:w-[104px]">
-                <i className="absolute -inset-[13px] rounded-full border border-water-deep/40" />
-                <i className="absolute -inset-[29px] hidden rounded-full border border-water-deep/20 md:block" />
-                <i className="absolute left-1/2 top-1/2 h-[7px] w-[7px] -translate-x-1/2 -translate-y-1/2 rounded-full border border-glass/40 bg-ink" />
-              </span>
-            </span>
-
-            <div className="flex min-w-0 flex-1 flex-col">
-              <p className="break-words text-[1.25rem] font-bold leading-[1.2] text-paper">
-                {session.user?.handle}
-              </p>
-              <p className="mt-[6px] break-all font-latin text-[0.75rem] text-muted">
-                {session.user?.email}
-              </p>
-              <span className="mt-[12px] w-fit rounded-base border border-coral/60 bg-coral/[0.14] px-[10px] py-[4px] text-[0.75rem] tracking-[0.06em] text-danger">
-                {session.isAdmin ? '管理员账号' : '普通用户'}
-              </span>
+      {/* 内袋：从柜里抽出来的内套，中心孔里那张标签盘还没印字 ——
+          这张唱片上不存在「你的代号」（稿的 .codeslot 按用户裁决不移植） */}
+      <div className="bleed">
+        <aside className="sleeve" data-anchor="me-identity" aria-label="内袋身份卡">
+          <span className="cat stop">内袋</span>
+          <div className="hole">
+            <div className="label">
+              <i className="r1" />
+              <i className="r2" />
+              <i className="hub" />
             </div>
           </div>
-        </section>
-
-        {/* 列表窗（沉积剖面）：锚点挂标题；桌面窗内滚动，窗高与设计稿 .window 同为 260px */}
-        <MyBottles className="lg:col-start-1 lg:row-start-1" />
+          <div className="who">
+            <p className="handle">{session.user?.handle}</p>
+            <p className="mail">{session.user?.email}</p>
+            <span className="stamp">{session.isAdmin ? '管理员账号' : '普通用户'}</span>
+          </div>
+        </aside>
       </div>
 
-      {/* ── 下排：[通知 | 收藏/徽章入口]（设计稿 bottom 左消息、右 pocket）────── */}
-      <div className="grid gap-4 lg:grid-cols-2 lg:items-start">
-        <section className="flex flex-col gap-3" aria-labelledby="notifications-heading">
-          <h2 id="notifications-heading" className="text-[1.0625rem] font-bold text-paper">
-            通知
-          </h2>
-          <p className="text-[0.8125rem] leading-[1.6] text-muted">
+      {/* 沉积柜：我参与过的漂流瓶（.crate/.chead/.csub/.window 归这个组件） */}
+      <MyBottles />
+
+      {/* 剖面下：左消息条（.msgs，含回传 li.hero）、右两个内袋口（.pockets） */}
+      <div className="bottom">
+        <section className="msgs" aria-labelledby="notifications-heading">
+          <h2 id="notifications-heading">消息</h2>
+          <p className="msub">
             只显示你自己的消息（留言送达 / 未送达 · 作品进公海）；别人的消息读不到，权限在服务端判定。
           </p>
-          <NotificationList />
+          <ul>
+            {/* 稿 .msgs li.hero：回传到你手里了（有 true 才出现） */}
+            {awaiting === null ? null : (
+              <li className="hero enter-rise stagger-1" data-anchor="me-awaiting">
+                <div className="mrow">
+                  <svg width="17" height="17" viewBox="0 0 17 17" fill="none" aria-hidden="true">
+                    <ellipse
+                      cx="8.5"
+                      cy="10.7"
+                      rx="7"
+                      ry="3.9"
+                      stroke="rgba(246,215,154,.88)"
+                      strokeWidth="1.4"
+                    />
+                    <rect
+                      x="7.3"
+                      y="2.2"
+                      width="2.4"
+                      height="8.2"
+                      rx="1.2"
+                      fill="rgba(246,215,154,.9)"
+                    />
+                  </svg>
+                  <span className="lab">《{awaiting.songTitle}》回传到你手里了</span>
+                  <span className="pill">未读</span>
+                  <Link
+                    to={`/bottles/${awaiting.id}`}
+                    className="go min-h-11 whitespace-nowrap"
+                  >
+                    去看看
+                  </Link>
+                </div>
+                <p className="mdet">完整版本已经沿父链回到发起者手里 —— 你只能把它送进公海。</p>
+              </li>
+            )}
+
+            {/* 消息列真数据（useNotifications）：行结构 .mrow(.lab/.pill|.read/.go) + .mdet 按稿 */}
+            <AsyncBoundary
+              query={notifications}
+              emptyWhen={(page) => page.items.length === 0}
+              empty={
+                awaiting === null ? (
+                  <li>还没有新消息：有人接唱、留言送达或作品入海时才会出现。</li>
+                ) : null
+              }
+            >
+              {(page) =>
+                page.items.map((notification, index) => {
+                  const view = describeNotification(notification);
+                  const unread = notification.readAt === null;
+                  return (
+                    <li
+                      key={notification.id}
+                      className={`enter-rise stagger-${Math.min(index + 1, 4)}`}
+                    >
+                      <div className="mrow">
+                        {TONE_SVG[view.tone]}
+                        <span className="lab">{view.label}</span>
+                        {unread ? (
+                          <span className="pill">未读</span>
+                        ) : (
+                          <span className="read">已读</span>
+                        )}
+                        {view.href === null ? null : (
+                          <Link
+                            to={view.href}
+                            className="go min-h-11 whitespace-nowrap"
+                          >
+                            去看一眼
+                          </Link>
+                        )}
+                      </div>
+                      <p className="mdet">{view.detail}</p>
+                    </li>
+                  );
+                })
+              }
+            </AsyncBoundary>
+          </ul>
         </section>
 
-        <section
-          className="flex flex-col gap-[12px] rounded-base border border-line/15 bg-gradient-to-br from-paper/[0.085] via-paper/[0.022] to-paper/[0.055] p-[16px]"
-          aria-labelledby="pockets-heading"
-        >
-          <p className="text-[0.6875rem] tracking-[0.24em] text-paper/50">内袋口</p>
-          <h2 id="pockets-heading" className="text-[1.0625rem] font-bold text-paper">
-            收藏与徽章
-          </h2>
-          <p className="text-[0.8125rem] leading-[1.6] text-muted">
-            收藏的作品与拿到的徽章都收在这里，点开各自的面板看明细。
-          </p>
-
-          {/* 收藏 / 徽章入口（§46.2：入口 + 弹窗，不摊在首屏） */}
-          <span className="flex flex-wrap items-center gap-[8px]">
+        {/* 两个内袋口：文案逐字照稿；入口按钮放稿的 pocket 位置（返工令授权） */}
+        <div className="pockets">
+          <section className="pocket">
+            <h3>我的收藏</h3>
+            <p>收藏只对已完成并进入公海的作品开放：听到想再听的，把它收起来。</p>
             <Button
               variant="ghost"
-              className="h-[44px] min-h-[44px] px-[12px] text-[0.875rem]"
-              icon={<Icon name="Anchor" size={16} />}
+              className="whitespace-nowrap"
               onClick={() => {
                 setPanel('collections');
               }}
             >
               我的收藏
             </Button>
+          </section>
+          <section className="pocket">
+            <h3>我的徽章</h3>
+            <p>徽章是派生的（不落库）：服务端按你参与过的事件当场算出来，作品被撤下就跟着消失。</p>
             <Button
               variant="ghost"
-              className="h-[44px] min-h-[44px] px-[12px] text-[0.875rem]"
-              icon={<Icon name="CheckCircle2" size={16} />}
+              className="whitespace-nowrap"
               onClick={() => {
                 setPanel('badges');
               }}
             >
               我的徽章
             </Button>
-          </span>
-        </section>
+          </section>
+        </div>
       </div>
 
       <CollectionsPanel
@@ -146,6 +287,6 @@ export function ProfilePage() {
           setPanel(null);
         }}
       />
-    </div>
+    </main>
   );
 }

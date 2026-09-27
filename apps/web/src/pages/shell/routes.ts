@@ -134,7 +134,8 @@ export function activeNavKey(name: RouteName): AppNavItem['key'] | null {
     case 'settings':
       return 'settings';
     case 'admin':
-      return null;
+      // G4/P1：审核台高亮归「审核台」入口（此前 return null ⇒ route-view 兜底成 river，错标河道）
+      return 'admin';
     default:
       return null;
   }

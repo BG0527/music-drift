@@ -8,7 +8,7 @@
  * 2. **分区口径来自内核**（`isComplete` / `seaZoneOf`），路由不重算；默认只看已完成区（CONTEXT §6.1）。
  */
 import { createSystemClock } from '@music-drift/shared/domain';
-import { BottleSummarySchema, ErrorResponseSchema } from '@music-drift/shared/contracts';
+import { BottleSummarySchema, ErrorResponseSchema, SeaBottleListSchema } from '@music-drift/shared/contracts';
 import type { FastifyInstance } from 'fastify';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { buildApp } from '../app.js';
@@ -343,6 +343,78 @@ describe('公海列表真分页（§46.2）：cursor 真消费 + 真 nextCursor 
       const response = await app.inject({ method: 'GET', url: '/api/sea?limit=2&cursor=' + encodeURIComponent(bad) });
       expect(response.statusCode, `cursor=${bad} 应被拒绝`).toBe(400);
     }
+  });
+});
+
+describe('公海列表 total：一次性回该 zone 总条数（页码一次全显，不再渐进出现）', () => {
+  /** 造已完成作品（与 §46.2 那组同一套路：4 段必须换人录，同瓶二次接唱会被内核拒）。 */
+  async function seedComplete(authorCookie: string): Promise<string> {
+    const bottleId = await createBottle(authorCookie);
+    await sing(authorCookie, bottleId);
+    await resolve(authorCookie, bottleId, 'SEA');
+    for (let hop = 0; hop < 3; hop += 1) {
+      const singer = (await register('tc')).cookie;
+      expect(await take(singer, bottleId)).toBe(200);
+      await sing(singer, bottleId);
+      await resolve(singer, bottleId, 'SEA');
+    }
+    return bottleId;
+  }
+
+  /** 全量取回一个 zone（limit=100 一页装得下）并**过契约**解析。
+   *  返回类型从 `SeaBottleListSchema` 解析结果**推导**（显式窄注解会撞
+   *  exactOptionalPropertyTypes 的 `total?: number`，且把 items 压成 `{id}` 丢掉 isComplete）。 */
+  async function fetchZone(zone: string) {
+    const response = await app.inject({ method: 'GET', url: `/api/sea?zone=${zone}&limit=100` });
+    expect(response.statusCode).toBe(200);
+    const body = SeaBottleListSchema.parse(response.json());
+    return { total: body.total, items: body.items };
+  }
+
+  it('两个 zone 各自 total 正确（随该 zone 数据增减），且与 items 轮廓一致', async () => {
+    const author = await register('tf');
+    const beforeCompleted = await fetchZone('COMPLETED');
+    const beforeIncomplete = await fetchZone('INCOMPLETE');
+    // total 与**同一过滤条件**下的 items 轮廓一致（一页装得下 ⇒ total = items.length）
+    expect(beforeCompleted.total).toBe(beforeCompleted.items.length);
+    expect(beforeIncomplete.total).toBe(beforeIncomplete.items.length);
+    expect(beforeCompleted.items.every((item) => item.isComplete)).toBe(true);
+    expect(beforeIncomplete.items.every((item) => !item.isComplete)).toBe(true);
+
+    // 新增 2 支已完成 + 1 支未完成：只有对应 zone 的 total 涨，且涨幅 = 新增条数
+    await seedComplete(author.cookie);
+    await seedComplete(author.cookie);
+    await seedIncompleteSeaBottle(author.cookie);
+
+    const afterCompleted = await fetchZone('COMPLETED');
+    const afterIncomplete = await fetchZone('INCOMPLETE');
+    expect(afterCompleted.total).toBe((beforeCompleted.total ?? -1) + 2);
+    expect(afterIncomplete.total).toBe((beforeIncomplete.total ?? -1) + 1);
+    expect(afterCompleted.items.length).toBe(afterCompleted.total);
+    expect(afterIncomplete.items.length).toBe(afterIncomplete.total);
+  });
+
+  it('翻页（cursor）时 total 恒为 zone 总数，不是本页数、也不是已取页数', async () => {
+    const author = await register('tp');
+    await seedIncompleteSeaBottle(author.cookie);
+    await seedIncompleteSeaBottle(author.cookie);
+
+    const full = await fetchZone('INCOMPLETE');
+    expect((full.total ?? 0)).toBeGreaterThanOrEqual(2);
+
+    const first = await app.inject({ method: 'GET', url: '/api/sea?zone=INCOMPLETE&limit=1' });
+    const body1 = SeaBottleListSchema.parse(first.json());
+    expect(body1.total).toBe(full.total); // 第 1 页就带总数，而不是翻出来才补
+    expect(body1.items).toHaveLength(1);
+    expect(body1.nextCursor).not.toBeNull();
+
+    const second = await app.inject({
+      method: 'GET',
+      url: '/api/sea?zone=INCOMPLETE&limit=1&cursor=' + encodeURIComponent(String(body1.nextCursor)),
+    });
+    const body2 = SeaBottleListSchema.parse(second.json());
+    expect(body2.total).toBe(full.total);
+    expect(body2.items[0]?.id).not.toBe(body1.items[0]?.id); // 换页不重复，total 仍是同一个
   });
 });
 

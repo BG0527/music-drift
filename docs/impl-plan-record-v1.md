@@ -231,8 +231,7 @@ node apps/web/tools/one-screen-check.mjs --viewport=375x812  --shot=docs/ui-revi
 2. **bottle 页 h1**：**用户裁决→已修**：恢复 `3.5rem`(56px)（h1 带 52–62、与 drift-log 一致），一屏余量改由外层 `gap-3→gap-2` 补回；`bottle-page.test` 新增断言钉住（红→绿），双档门禁复跑全绿。
 3. **印章语义色缺 token**（`seal-ink/seal-due/danger-light`，§6.1 已建议）：审核台现就近映射 danger/warm；**用户裁决：记账，下轮 S1b/frontend-ds 收编**（本轮不动 DESIGN.md，避让并行工作流）。
 4. **口令 vs 密码**：**用户裁决→已统一**：`AUTH_ERROR_MESSAGES`（INVALID_CREDENTIALS/WEAK_PASSWORD）、web `errors.ts` 兜底、`docs/api.md` 码表两行全部改「密码」；shared 新增反潮断言（文案表不得含「口令」，红→绿）。`passwordPolicy.ts` 等**代码注释**里的「口令」属内部用语，不面向用户，保留。
-5. `DESIGN.md` h2 阶梯 19px vs 设置稿 17px：按「HTML 为准」实现 17px，契约阶梯待 frontend-ds 记账（同 §6#3 方式）。
-6. `/me` 桌面通知 ≥2 条时下排可能再顶破 900（hermetic 种子只 1 条）→ 若真数据复现，加 `lg:max-h + overflow` 一行。
+5. `DESIGN.md` h2 阶梯 19px vs 设置稿 17px：按「HTML 为准」实现 17px，契约阶梯待 frontend-ds 记账（同 §6#3 方式）。6. `/me` 桌面通知 ≥2 条时下排可能再顶破 900（hermetic 种子只 1 条）→ 若真数据复现，加 `lg:max-h + overflow` 一行。
 7. `/bottles` 桌面余量仅 12px；「还有 N 段看不到」提示渲染时约 +50px 会再红 → 联调留意。
 8. 移动端 bottle 整页变高（时间轴/页脚 order 下移，1993px）——手机口径不测总高，取舍在案。
 9. 被斩 vs 未唱在沉积柱不可分（契约 `missingSegmentIndexes` 合并两者）→ 契约加字段才可还原，记 architecture 待办。
@@ -247,3 +246,41 @@ node apps/web/tools/one-screen-check.mjs --viewport=375x812  --shot=docs/ui-revi
 | 瓶子详情 | ✅ 存活 | 顶部沟槽时间轴+唱针（移植成功，即用户点名的"进度条"）+ 横躺瓶剖面并存、语义分工清晰；一屏内 |
 | 选一首歌 | ✅ 存活 | 五口浅盆+水位、检索牌挂片「找 歌」、沟槽半径梯逐档值在图上成立 |
 | 河道/设置/审核台/日志/登录/404 | ✅ | 分别由 S3/S3b 既往验收、R1/R2c 逐值复核（红→绿）与本轮双档门禁背书 |
+
+## 9. 一比一返工批次（2026-09-27 第二轮用户裁决 → 执行记录）
+
+> 用户裁决（覆盖 §8 的「响应式重排」解释）：**完全按照 .html 一比一复刻、删侧边栏、页面上方同主题导航栏（河道/公海/我的/设置）、全站动线打通、动效按 motion-web skill 持续优化、所有页面不滚动即可完整展示**。spec 已按此重录。
+
+### 9.1 交付构成（subagent 并行 + 整合者亲手，全部红→绿）
+- **10/10 页逐块照抄**：河道(f4)、公海(p-sea-hall)、我的(p-profile)、瓶子(p-bottle+沟槽时间轴)、选歌(p-songpicker)、漂流日志(p-driftlog)、设置(p-settings)、登录(p-login)、审核台(s2-admin)、404(p-404)；每页块清单落盘于 `apps/web/docs/review-*-blocks.md`（river 另有 `review-river-diff.md`）。
+- **shell**：侧边栏/底栏删除 → 页面上方常显 top-nav（四入口+管理员审核台、fixed 零布局、全局含登录/404=G5）。
+- **动线**：flow-audit.md 九缺口 G1–G8 全清（选歌返回键+登录链、瓶页成功下一步、公海回河道、审核台出口+activeNavKey、我的常显出口、设置出口、顶栏覆盖登录页）；返回键语汇统一「回河道」。
+- **分页**：`total` 全栈（shared 可选字段 → api count → 前端 ceil 全显 + >7 折叠 + 无 total 回退）。
+- **动效**：motion-plan.md 37 条，阶段1（设置/登录/我的+全局）+ 阶段2（其余 7 页+my-bottles stagger）落地；`motion-apply.test.tsx` 28 断言；阶段3（skill 直装进阶）4 次派发全灭于读入，未交付（top-nav 微动效另试）。
+- **一比一终修（整合者亲手）**：河道双横线删除（flowline/SurfaceLine，稿全页无水平线）+ 泊位绝对坐标骑弧（draw 60,400 / cast 380,580、错落 180px、cap 下沉 40/165，md 画布 clamp(440,31.9vw,470)）；/me 1031→876 且 overflow-x:clip；瓶子 bottle-action 锚点+375 order 让位+桌面收紧；sea-list 锚点零高透传层；**等待接力点不进去真凶=全屏 ul.fleet 压住 zones tablist（树序 z-auto 命中）→ `.zones{z-index:1}` + 层叠钉子断言**。
+
+### 9.2 本批守卫改动（全部显式，原文→新文见各测试注释）
+| # | 守卫 | 改动 | 依据 |
+| --- | --- | --- | --- |
+| 1 | water-motif 公海四组件断言 | → 稿级结构（.clip/.surface/.rings/.fleet/.lowtide） | 逐块照抄 p-sea-hall |
+| 2 | water-motif MOTIF_TAGS | 追加稿装置标记（clip/waterlight/backdrop/data-device/basin-graphic），旧五标签保留 | 照抄批次母题形态扩展 |
+| 3 | water-motif 空态瓶 | 公海=lowtide、选歌=BottleMark 或空态行 | 稿空态本无瓶 |
+| 4 | water-motif drift≥3 | 名单改真实用户 [river,settings]≥2；**回升路径=motion 应用阶段恢复 ≥3** | 稿是静态 mock，组件级漂移仅存两页 |
+| 5 | water-motif 河道水线构件 | → f4 照抄结构（backdrop/data-device=river 六层） | 旧三组件按稿删除 |
+| 6 | water-motif 泊位等权 | → 稿 190/150 不等大（fluidMax 断言） | 用户「一比一」覆盖旧解读 |
+| 7 | river f0 flowline 断言 | 常驻漂移虚线删除、断言反向钉「无横线」；reduced-motion 清单同步 | 用户「河道中间多了一条」 |
+| 8 | river 旧错落机制断言 | md:mt- → md:absolute+top-[180px] | 泊位骑弧重定位 |
+| 9 | sea-page 层叠钉子（新增） | zones z > fleet z + 控制组点击→路由 | 等待接力命中修复防回潮 |
+| 10 | App.test 顶栏、songpicker 空态/文案、login 照稿结构、settings 照稿结构等 | 随照抄裁决更新（各文件内注释有原文→新文） | 返工令 |
+
+### 9.3 收口门禁（最终字节上的串行结果）
+- `pnpm -r test` EXIT=0：shared **254** / api **180** / web **923 passed | 1 skipped**（70 文件）。
+- `pnpm -r typecheck` EXIT=0；`pnpm lint` EXIT=0（0 error，警告全在站外 no-console）。
+- `one-screen-check` **1440×900 ✅ 12/12 全部达标 exit 0**；**375×812 ✅ 全部达标 exit 0**。
+- 看图复核：河道 vs f4-groove.png 并排——页中无横线、泊位骑弧错落一致；（§5.3 其余页见 docs/ui-review/impl-1440/ 截图）。
+
+### 9.4 遗留/裁决项（本批新增）
+1. 沟槽带桌面 92→64px（瓶子门禁向压缩，窄屏仍 92）——DESIGN 记账待裁。
+2. motion-plan 阶段3（skill 直装进阶）与 Modal 退场/日志 hover-lift/审核行 stagger/选歌确认 4 条——方案条目改写或契约补退场类后补。
+3. 一比一之下仍**保留的有意差异**：河道 WaterTexture/LightShafts/场景涟漪（非线状装饰，t47 drift 契约亦需 WaterTexture）、选歌触控 44px 扩边、印章色 token（§8.4-3 仍挂）。
+4. subagent 派发层后期大面积静默死亡（读入超限+环境），河道/设置/登录/选歌/404 与全部终修由整合者亲手完成；报告类任务（A 阶段落盘协议）5/5 存活，已成标准拆法。

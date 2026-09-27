@@ -88,6 +88,18 @@ export const MyBottleSchema = BottleSummarySchema.extend({
 
 export const MyBottleListSchema = PageSchema(MyBottleSchema);
 
+/**
+ * 公海列表响应：`PageSchema` + **可选** `total`（该 zone 的总条数）。
+ *
+ * 为什么只给这一个列表加 `total`：公海大厅要一次性显示全部页码，而游标分页只回
+ * `nextCursor` 不回总数（`pageCount = 已取页数 + hasNextPage` 会让页码渐进出现）。
+ * `total` 是**可选**的 —— 老响应/缓存里没有它时解析照常成功（向后兼容），
+ * 前端缺它时回退旧口径。其它 `Page` 用法（通知、我的瓶子…）不携带此字段，不动 `PageSchema` 本身。
+ */
+export const SeaBottleListSchema = PageSchema(BottleSummarySchema).extend({
+  total: z.number().int().nonnegative().optional(),
+});
+
 export const BottleDetailSchema = BottleSummarySchema.extend({
   initiatorCode: z.string().min(1),
   holderId: UuidSchema.nullable(),
