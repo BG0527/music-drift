@@ -240,7 +240,7 @@ for (const name of patchFiles) {
   if (/fit-stage/.test(text)) {
     fail(`${rel} 引用了 #fit-stage（补丁页根本不装缩放 ⇒ 这里的规则永远不会命中，是死代码）`);
   }
-  if (/\.demo-nav|\.app-state/.test(text)) {
+  if (/\.top-nav|\.app-state/.test(text)) {
     fail(`${rel} 改了共享层浮层（.demo-nav/.app-state 归 base.css，补丁不许碰）`);
   }
 

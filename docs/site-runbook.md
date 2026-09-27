@@ -232,7 +232,7 @@ curl.exe -s -i -c .tmp-w0-cookies.txt -X POST http://127.0.0.1:5173/api/auth/log
 | `session.js` | `currentUser({refresh})` / `requireUser({redirect})` / `login(email,pwd)` / `register(handle,email,pwd)` / `logout()` / `cachedUser()` / `invalidateSession()` / `nextTarget(fallback)` | `currentUser()` 只给 user 或 `null`（401）；网络/5xx **抛** `ApiError`。`requireUser()` 未登录时自动跳 `/login.html?next=当前页` |
 | `top-nav.js` | `mountDemoNav()` / `TOP_NAV` | 幂等；`page.js` 已自动挂载，一般不用手动调 |
 | `page.js` | `definePage({name, owner, endpoints, note, init})` | 注入样式 + 挂站点导航 + console 打本页端点 + `DOMContentLoaded` 后自动跑一次 `init()`。**接线完成信号（W3 新增）**：`init()` 全部 await 完之后写 `document.documentElement.dataset.pageReady = name` 与 `window.__pageReady = name`；`init()` 抛错则写 `dataset.pageError = name` 且**不**置 ready（原来的未捕获 rejection 语义不变） |
-| `assets/base.css` | `.demo-nav*` `.app-state*` 与 `[hidden]` | **只服务共享层**；设计稿的七色 token/字体/构图一律没动 |
+| `assets/base.css` | `.top-nav*` `.app-state*` 与 `[hidden]` | **只服务共享层**；设计稿的七色 token/字体/构图一律没动 |
 
 典型页面写法（W1）：
 
