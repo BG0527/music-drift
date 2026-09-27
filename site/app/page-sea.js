@@ -109,15 +109,17 @@ async function start() {
   if (fleet !== null) fleet.style.pointerEvents = 'none';
   for (const block of emptyBlocks) hide(block);
   for (const node of countNodes) if (node !== null) node.textContent = '';
+  // 页脚那三个页码（1 / 2 / 3）同样是稿子里的演示数据：真页码渲染前不留**点了没反应**的号
+  // （冷启动可能几十秒，这段时间页面上挂着三个点不动的页码，与用户报的"点击无反应"同形）。
+  pagesList?.replaceChildren();
 
-  /** zoneKey → { pages: [{ items, nextCursor }], index, loaded }（`pages[0]` = 第一页）。 */
-  const zones = new Map(ZONES.map((zone) => [zone.key, { pages: [], index: 0, loaded: false }]));
+  /**
+   * zoneKey → { pages: [{ items, nextCursor }], index, loaded, pending }（`pages[0]` = 第一页）。
+   * `pending` = 该分区正在取页：取页**单飞** —— 同一个游标取两次会把同一页 push 两遍，
+   * `pages.length` 虚增 ⇒ 页码集合又会多出一个取不到的号（W13 修的正是这类假页码）。
+   */
+  const zones = new Map(ZONES.map((zone) => [zone.key, { pages: [], index: 0, loaded: false, pending: false }]));
   let current = ZONES[0].key;
-
-  const lastPageOf = (zoneKey) => {
-    const pages = zones.get(zoneKey)?.pages ?? [];
-    return pages.length === 0 ? null : pages[pages.length - 1];
-  };
 
   async function fetchPage(zoneKey, cursor) {
     return await get('/api/sea', {
@@ -158,7 +160,13 @@ async function start() {
     const state = zones.get(current);
     const page = state.pages[state.index];
     const known = state.pages.length;
-    const hasMore = page.nextCursor !== null;
+    // 「服务端确认还有下一页」只能看**最后取到的那一页**的 nextCursor。
+    // 拿**当前页**的 nextCursor 当判据是错的：翻回前面的页时，当前页后面还有内容这件事
+    // 被读成"已取到的页之外还有一页" ⇒ 页码多出一个取不到的号（点它没反应）。
+    const lastFetched = state.pages[known - 1];
+    const hasMore = lastFetched.nextCursor !== null;
+    /** 当前页之后是否还有内容：已取到的后续页，或服务端确认的下一页。 */
+    const moreAfterCurrent = state.index < known - 1 || hasMore;
     const label = ZONES.find((zone) => zone.key === current)?.key === 'INCOMPLETE' ? '等待接力' : '完整作品';
 
     // 每次都**重查** `.tail`：上一次渲染把它整个换掉了，抓着旧引用会让页脚永远停在第 1 页。
@@ -176,7 +184,8 @@ async function start() {
 
     if (pagesList !== null) {
       pagesList.replaceChildren();
-      // 只画「已取到的页」+「服务端确认还有的下一页」：`nextCursor === null` 时不伪造页码。
+      // 只画「已取到的页」+「服务端确认还有的下一页」（判据 = `lastFetched.nextCursor !== null`）：
+      // 末页不伪造页码 ⇒ 画出来的每个号都一定有内容可取、点了必然落在它自己身上。
       const pageCount = known + (hasMore ? 1 : 0);
       for (let number = 1; number <= pageCount; number += 1) {
         const link = el('a', {
@@ -194,7 +203,7 @@ async function start() {
       }
     }
     if (pagesNote !== null) {
-      pagesNote.textContent = `第 ${state.index + 1} 页 · ${hasMore ? '后面还有更多' : '已到最后一页'}`;
+      pagesNote.textContent = `第 ${state.index + 1} 页 · ${moreAfterCurrent ? '后面还有更多' : '已到最后一页'}`;
     }
     if (pagesNav !== null) hide(pagesNav);
     if (pagesNav !== null) show(pagesNav);
@@ -305,18 +314,28 @@ async function start() {
       render();
       return;
     }
-    const last = lastPageOf(current);
-    if (last === null || last.nextCursor === null) return;
+    // 需要取页时**单飞**：并发取同一游标会把同一页 push 两遍（`pages.length` 虚增 ⇒ 又长出假页码）。
+    // 挡掉的那次点击不会被吞：它想要的正是这趟飞行要落的那一页。
+    if (state.pending === true) return;
+    const zoneKey = current;
+    state.pending = true;
     showLoading('正在翻页…');
     try {
-      const page = await fetchPage(current, last.nextCursor);
-      state.pages.push(page);
-      state.index = state.pages.length - 1;
+      // 一页一页取到第 `number` 页为止：画出来的号必然有内容，绝不落在一个取不到的号上。
+      while (state.pages.length < number) {
+        const last = state.pages[state.pages.length - 1];
+        if (last === undefined || last.nextCursor === null) break; // 服务端说到头了：不画也就点不到
+        state.pages.push(await fetchPage(zoneKey, last.nextCursor));
+      }
       clearState();
-      render();
     } catch (error) {
       showRequestFailure(error, { onRetry: () => void goToPage(number) });
+      return;
+    } finally {
+      state.pending = false;
     }
+    state.index = Math.min(number, state.pages.length) - 1;
+    render();
   }
 
   async function selectZone(index) {
