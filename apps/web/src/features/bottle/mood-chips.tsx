@@ -43,14 +43,14 @@ export function MoodChips({ className }: MoodChipsProps) {
                   setSelected(tag);
                 }}
                 className={cn(
-                  'flex h-[44px] items-center rounded-pill px-[12px] text-[0.8125rem] md:px-[18px] md:text-[0.875rem]',
+                  'flex h-[44px] items-center rounded-base px-[12px] text-[0.8125rem] md:px-[18px] md:text-[0.875rem]',
                   // 只动 transform/opacity，参数全部来自契约 token（时长 200ms / ease-out / 放大 1.03）
                   'transition-transform',
                   'duration-[var(--motion-hover-duration)] ease-[var(--motion-entry-easing)]',
                   'motion-safe:active:translate-y-[-1px]',
                   active
-                    ? 'scale-[var(--motion-hover-scale)] bg-peacock font-semibold text-wave-white'
-                    : 'border border-driftline bg-transparent text-peacock hover:scale-[var(--motion-hover-scale)]',
+                    ? 'scale-[var(--motion-hover-scale)] bg-coral font-semibold text-ink'
+                    : 'border border-line/25 bg-transparent text-coral hover:scale-[var(--motion-hover-scale)]',
                 )}
               >
                 {tag}
@@ -59,7 +59,7 @@ export function MoodChips({ className }: MoodChipsProps) {
           );
         })}
       </ul>
-      <p className="text-[0.8125rem] leading-[1.5] text-slate-current">
+      <p className="text-[0.8125rem] leading-[1.5] text-muted">
         心情标签这一版只作展示：点它只是换个心情，不会筛选下面的作品。
       </p>
     </section>

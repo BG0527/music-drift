@@ -17,7 +17,13 @@ export interface TabsProps {
   className?: string;
 }
 
-/** Tabs（公海三入口）：tablist / tab / tabpanel + 方向键可达；tab 触控高度 ≥44px。 */
+/**
+ * Tabs（公海三入口）：tablist / tab / tabpanel + 方向键可达；tab 触控高度 ≥44px。
+ *
+ * record-v1 的选中语态（DESIGN.md §Components 导航条）：**当前项用 coral 指示 —— 1px 细线 + 字重 500**，
+ * 而不是上一版的实心药丸。竖排导航里那根线是竖的，横排 tablist 里就是 tablist 下沿那道 1px ——
+ * 同一件"被点亮的沟槽"：coral 压 ink 4.76:1（≥3:1，非文本图形下限）。
+ */
 export function Tabs({ items, value, defaultValue, onChange, className }: TabsProps) {
   const baseId = useId();
   const [internal, setInternal] = useState(defaultValue ?? items[0]?.key ?? '');
@@ -48,7 +54,7 @@ export function Tabs({ items, value, defaultValue, onChange, className }: TabsPr
 
   return (
     <div className={cn('flex flex-col gap-4', className)}>
-      <div role="tablist" className="flex flex-wrap gap-2">
+      <div role="tablist" className="flex flex-wrap gap-x-6 border-b border-hairline">
         {items.map((item, index) => {
           const selected = item.key === active?.key;
           return (
@@ -66,13 +72,11 @@ export function Tabs({ items, value, defaultValue, onChange, className }: TabsPr
               onClick={() => select(item.key)}
               onKeyDown={(event) => handleKeyDown(event, index)}
               className={cn(
-                'min-h-11 rounded-pill px-4 text-[0.875rem] font-medium',
-                'focus-visible:ring-2 focus-visible:ring-peacock focus-visible:ring-offset-2 focus-visible:ring-offset-wave-white',
+                'min-h-11 rounded-none border-b border-transparent px-1 text-[0.875rem] font-medium',
+                'focus-visible:ring-2 focus-visible:ring-coral focus-visible:ring-offset-2 focus-visible:ring-offset-ink',
                 // feedback（motion-web §1）：选中态原来是瞬变，颜色过渡让「切到哪一档」看得见
                 'transition-colors duration-200 ease-out',
-                selected
-                  ? 'bg-peacock text-wave-white'
-                  : 'border border-driftline bg-transparent text-peacock hover:bg-info-tint',
+                selected ? 'border-coral text-coral' : 'text-muted hover:text-paper',
               )}
             >
               {item.label}
@@ -84,7 +88,7 @@ export function Tabs({ items, value, defaultValue, onChange, className }: TabsPr
         role="tabpanel"
         id={active === undefined ? undefined : `${baseId}-panel-${active.key}`}
         aria-labelledby={active === undefined ? undefined : `${baseId}-tab-${active.key}`}
-        className="rounded-base border border-mist bg-wave-white p-4"
+        className="rounded-base border border-hairline bg-ink p-4"
       >
         {active?.content ?? null}
       </div>

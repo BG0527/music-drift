@@ -10,6 +10,9 @@
  * - 持有者且有缺口 → 录制区；
  * - 持有者且已完整 → 只能选去向；
  * - 非持有者 → 只读试听 + 「去河道捞一个」（不提供指定接唱，那属下一片切片）。
+ *
+ * record-v1 的装置在左边那一列：**横躺的玻璃瓶剖面**（水只到已录段位、干格＝缺口、
+ * 瓶塞＝有人持有）—— 它由 `features/bottle/relay-timeline` 承担，本页只把服务端事实传进去。
  */
 import { useState } from 'react';
 import type { BottleDetail, RecordSegmentResponse, Resolution } from '@music-drift/shared';
@@ -35,12 +38,13 @@ import {
   BOTTLE_STATUS_LABEL,
 } from '../features/bottle/relay-status';
 import { useSession } from '../features/session/session-context';
+import { GroovePlaybackProvider, GrooveTimeline } from '../features/audio/groove-timeline';
 import {
   type AudioElementLike,
   type RecorderEnvironment,
   type UploadTransport,
 } from '../features/audio';
-import { Button, Card, EmptyState, Icon, Modal, Toast } from '../design-system';
+import { Button, EmptyState, Icon, Modal, Toast } from '../design-system';
 import { AsyncBoundary } from './shell/async-boundary';
 import { Link } from './shell/router';
 import { useNavigate } from './shell/router-context';
@@ -56,6 +60,11 @@ export interface BottlePageProps {
     segmentElementFactory?: ((src: string) => AudioElementLike) | undefined;
   };
 }
+
+/** 页内小动作（页脚那一排）：2px 圆角 + 1px 细线的幽灵按钮，44px 触控底线。 */
+const FOOTER_ACTION =
+  'inline-flex min-h-11 items-center gap-[6px] rounded-base border border-line/25 px-[12px] ' +
+  'text-[0.875rem] text-coral transition-colors duration-200 ease-out hover:border-coral';
 
 export function BottlePage({ id, seams }: BottlePageProps) {
   const bottle = useBottle(id);
@@ -140,34 +149,55 @@ function BottleView({ bottle, seams }: { bottle: BottleDetail; seams?: BottlePag
   const canPutBack = bottle.isHolder && bottle.status === 'HELD' && !mySegmentRecorded;
 
   return (
-    <div className="flex flex-col gap-6">
+    <GroovePlaybackProvider>
+    {/* 一屏门禁（§46.3）：外层段间距 gap-2（h1 恢复 56px 后由这里补回余量，用户裁决 2026-09-27）；
+        <1024 下时间轴/页脚用 order 让位给播放·录制区（lg 归位） */}
+    <div className="flex flex-col gap-2">
       <nav aria-label="面包屑" className="flex flex-wrap items-center gap-3 text-[0.875rem]">
-        <Link
-          to="/river"
-          className="inline-flex min-h-11 items-center gap-2 text-peacock underline"
-        >
+        <Link to="/river" className="inline-flex min-h-11 items-center gap-2 text-coral underline">
           <Icon name="ArrowLeft" size={16} />
           回河道
         </Link>
-        <span className="text-slate-current">漂流瓶详情</span>
-        <span className="rounded-pill bg-tide-pool px-3 py-1 font-medium text-abyss">
+        <span className="text-muted">漂流瓶详情</span>
+        <span className="rounded-base border border-coral px-3 py-1 text-[0.8125rem] font-medium text-coral">
           {BOTTLE_STATUS_LABEL[bottle.status]}
         </span>
       </nav>
 
-      <header className="flex flex-col gap-2">
-        <h1 className="text-[1.75rem] font-bold text-abyss">{bottle.songTitle}</h1>
+      <header className="relative flex flex-col gap-1">
+        <h1 className="text-[clamp(2rem,3.9vw,3.5rem)] font-bold leading-none text-paper">
+          漂流瓶详情
+        </h1>
         {/* 元信息不用 `·` 串联（frontend-design 把 "A · B · C" 点名为生成页特征）：拆成并列短语 */}
-        <p className="flex flex-wrap items-center gap-x-[16px] gap-y-[4px] text-[0.9375rem] leading-[1.6] text-slate-current">
-          <span>{progressLabel(bottle)}</span>
-          <span>{relayHeadline(bottle)}</span>
-          <span>发起者 {bottle.initiatorCode}</span>
+        <p className="flex flex-wrap items-baseline gap-x-[20px] gap-y-[4px]">
+          <span className="text-[1.1875rem] font-bold text-paper">{bottle.songTitle}</span>
+          <span className="text-[0.875rem] leading-[1.6] text-muted">{progressLabel(bottle)}</span>
+          <span className="text-[0.875rem] leading-[1.6] text-muted">{relayHeadline(bottle)}</span>
         </p>
         {gapNotice(bottle.missingSegmentIndexes) === null ? null : (
-          <p className="text-[0.9375rem] leading-[1.6] text-warning">
-            缺口是歌里固定的段位，不会被别人的段顶替；成品里这段时间会留成静音。
+          <p className="flex items-start gap-[11px] text-[0.9375rem] leading-[1.6] text-warning">
+            {/* 缺口标记：一颗 5×5 的珊瑚方点（不是一个句首的圆角标签） */}
+            <span aria-hidden="true" className="mt-[8px] h-[5px] w-[5px] shrink-0 bg-coral" />
+            <span>缺口是歌里固定的段位，不会被别人的段顶替。成品里这段时间会留成静音。</span>
           </p>
         )}
+
+        {/* 发起者徽记：谁起的头（双环 + 珊瑚点；桌面靠右，窄屏跟在标题下面，不挤掉首屏锚点） */}
+        <div className="flex items-center gap-[16px] md:absolute md:right-0 md:top-0">
+          <span
+            role="img"
+            aria-label="发起者徽记"
+            className="flex h-[52px] w-[52px] shrink-0 items-center justify-center rounded-full border border-coral/60"
+          >
+            <span className="flex h-[40px] w-[40px] items-center justify-center rounded-full border border-paper/15">
+              <span className="h-[9px] w-[9px] rounded-full bg-coral" />
+            </span>
+          </span>
+          {/* 徽记与代号同一个文本块：'发起者' 与代号是**同一条文字**，不是一个孤立的代号 */}
+          <span className="text-[0.9375rem] leading-[1.5] text-paper">
+            发起者 {bottle.initiatorCode}
+          </span>
+        </div>
       </header>
 
       {announcement === null ? null : <Toast tone="success" message={announcement} />}
@@ -188,19 +218,33 @@ function BottleView({ bottle, seams }: { bottle: BottleDetail; seams?: BottlePag
             </Button>
           }
         >
-          <p className="text-[0.9375rem] leading-[1.6] text-slate-current">{listenShortReason}</p>
+          <p className="text-[0.9375rem] leading-[1.6] text-muted">{listenShortReason}</p>
         </Modal>
       )}
       {voteError === null ? null : (
         <ConflictNotice error={voteError} bottleId={bottle.id} onRetry={() => { setVoteError(null); }} />
       )}
 
+      {/*
+        沟槽时间轴 + 唱针（用户第 3 轮裁决：公海详情页删除，它顶部的"进度条"复刻进本页）。
+        与左边的瓶身剖面**语义不同、并存不重复**：剖面回答"哪些段录了、缺哪段"，
+        这里回答"现在放到哪儿、这一段多长"（唱针跟随下面播放器的真实播放进度）。
+      */}
+      <GrooveTimeline
+        className="order-1 lg:order-none"
+        segments={liveSegments}
+        totalSegments={bottle.totalSegments}
+        missingSegmentIndexes={bottle.missingSegmentIndexes}
+      />
+
       <div className="grid gap-6 xl:grid-cols-2 xl:items-start">
+        {/* 装置：横躺的玻璃瓶剖面（水只到已录段位 / 干格＝缺口 / 瓶塞＝有人持有） */}
         <div className="flex flex-col gap-3">
           <RelayTimeline
             segments={liveSegments}
             totalSegments={bottle.totalSegments}
             missingSegmentIndexes={bottle.missingSegmentIndexes}
+            status={bottle.status}
             selectedSegmentId={selectedSegment?.id ?? null}
             onSelectSegment={setSelectedSegmentId}
             onReportSegment={(segmentId) => {
@@ -211,7 +255,7 @@ function BottleView({ bottle, seams }: { bottle: BottleDetail; seams?: BottlePag
           {bottle.hiddenLaterSegmentCount === 0 ? null : (
             <p
               role="status"
-              className="rounded-base border border-info-border bg-info-tint px-[12px] py-[8px] text-[0.875rem] leading-[1.5] text-peacock"
+              className="rounded-base border border-info-border bg-info-tint px-[12px] py-[8px] text-[0.875rem] leading-[1.5] text-info"
             >
               还有 {bottle.hiddenLaterSegmentCount}{' '}
               段现在看不到（CONTEXT §9.1：漂流中只能听到自己这一棒之前的部分），入海后全部解锁。
@@ -219,10 +263,10 @@ function BottleView({ bottle, seams }: { bottle: BottleDetail; seams?: BottlePag
           )}
         </div>
 
-        <div className="order-first flex flex-col gap-4 xl:order-none" data-anchor="bottle-play">
-          <h2 id="playback-heading" className="text-[1.0625rem] font-semibold text-abyss">
+        <div className="order-first flex flex-col gap-3 xl:order-none" data-anchor="bottle-play">
+          <h2 id="playback-heading" className="text-[1.0625rem] font-semibold text-paper">
             试听与投票
-            <span className="ml-2 text-[0.875rem] font-normal text-slate-current">
+            <span className="ml-2 text-[0.875rem] font-normal text-muted">
               {selectedSegment === null
                 ? '还没有人唱过'
                 : `第 ${String(selectedSegment.index)} 段（在左边点"听"换段）`}
@@ -265,11 +309,11 @@ function BottleView({ bottle, seams }: { bottle: BottleDetail; seams?: BottlePag
           )}
 
       <section
-        className="flex flex-col gap-4"
+        className="flex flex-col gap-3"
         aria-labelledby="action-heading"
         data-anchor="bottle-action"
       >
-        <h2 id="action-heading" className="text-[1.0625rem] font-semibold text-abyss">
+        <h2 id="action-heading" className="text-[1.0625rem] font-semibold text-paper">
           你的这一步
         </h2>
 
@@ -297,7 +341,7 @@ function BottleView({ bottle, seams }: { bottle: BottleDetail; seams?: BottlePag
             >
               录第 {String(nextIndex)} 段
             </Button>
-            <span className="text-[0.875rem] text-slate-current">
+            <span className="text-[0.875rem] text-muted">
               录这一段（时长以该段的固定时长为准，页面里会写明），录完再选去向 ——
               不点开就不会占用你的麦克风。
             </span>
@@ -331,26 +375,32 @@ function BottleView({ bottle, seams }: { bottle: BottleDetail; seams?: BottlePag
         ) : null}
 
         {canChooseResolution && !canRecord ? (
-          <Card className="flex flex-wrap items-center gap-4 py-[12px]">
-            <p className="text-[0.9375rem] leading-[1.6] text-slate-current">
+          <div className="flex flex-col gap-2 rounded-base border border-line/15 bg-ink px-4 py-2">
+            <p className="text-[0.9375rem] leading-[1.6] text-muted">
               {bottle.isComplete
                 ? '这个作品已经录满了，请先选择去向。'
                 : '第 1 段已经录好了，接下来决定它去哪。'}
             </p>
-            <Button
-              variant="primary"
-              onClick={() => {
-                setModalOpen(true);
-              }}
-              icon={<Icon name="Send" size={18} />}
-            >
-              选择去向
-            </Button>
-          </Card>
+            {/* 三选一的口径：可选值来自服务端 `availableResolutions`（顺序即展示顺序） */}
+            <p className="text-[0.8125rem] leading-[1.5] text-muted">
+              可选去向由服务端给：发起者的第一棒没有「回传」。
+            </p>
+            <div>
+              <Button
+                variant="primary"
+                onClick={() => {
+                  setModalOpen(true);
+                }}
+                icon={<Icon name="Send" size={18} />}
+              >
+                选择去向
+              </Button>
+            </div>
+          </div>
         ) : null}
 
         {!canActOnBottle ? (
-          <p className="flex flex-wrap items-center gap-x-[12px] gap-y-[4px] rounded-base border border-mist bg-foam px-4 py-[12px] text-[0.9375rem] leading-[1.6] text-slate-current">
+          <p className="flex flex-wrap items-center gap-x-[12px] gap-y-[4px] rounded-base border border-line/15 bg-ink px-4 py-2 text-[0.9375rem] leading-[1.6] text-muted">
             <Icon name="Waves" size={18} />
             <span>这个瓶子现在不在你手上（同一条河道同一时刻只有一个人拿着它）。</span>
             <Link to="/river" className={TEXT_LINK_STRONG}>
@@ -379,7 +429,7 @@ function BottleView({ bottle, seams }: { bottle: BottleDetail; seams?: BottlePag
             >
               放回海中，继续漂流
             </Button>
-            <span className="text-[0.875rem] text-slate-current">
+            <span className="text-[0.875rem] text-muted">
               还没想好要不要唱？放回去不会记录任何东西。
             </span>
           </div>
@@ -393,31 +443,33 @@ function BottleView({ bottle, seams }: { bottle: BottleDetail; seams?: BottlePag
         </div>
       </div>
 
-      <div className="flex flex-wrap items-center gap-x-[16px] gap-y-[8px] text-[0.875rem] leading-[1.6] text-slate-current">
+      <div className="order-2 flex flex-wrap items-center gap-x-[16px] gap-y-[8px] border-t border-line/12 pt-1 text-[0.875rem] leading-[1.6] text-muted lg:order-none">
         <Link to={`/bottles/${bottle.id}/log`} className={TEXT_LINK}>
           看这只瓶子的漂流日志
         </Link>
         <span>捞取 / 录音 / 投河 / 回传 / 入海 全部记在服务端。</span>
-        <Button
-          variant="ghost"
-          className="h-[36px] min-h-[36px] px-[12px] text-[0.875rem]"
-          icon={<Icon name="ScrollText" size={16} />}
-          onClick={() => {
-            setMessagesOpen(true);
-          }}
-        >
-          私密留言
-        </Button>
-        <Button
-          variant="ghost"
-          className="h-[36px] min-h-[36px] px-[12px] text-[0.875rem]"
-          icon={<Icon name="Flag" size={16} />}
-          onClick={() => {
-            setReportTarget({ type: 'BOTTLE', id: bottle.id });
-          }}
-        >
-          举报（进人工队列，不是自动删除）
-        </Button>
+        <span className="flex flex-wrap items-center gap-[8px] md:ml-auto">
+          <button
+            type="button"
+            className={FOOTER_ACTION}
+            onClick={() => {
+              setMessagesOpen(true);
+            }}
+          >
+            <Icon name="ScrollText" size={16} />
+            <span className="whitespace-nowrap">私密留言</span>
+          </button>
+          <button
+            type="button"
+            className={FOOTER_ACTION}
+            onClick={() => {
+              setReportTarget({ type: 'BOTTLE', id: bottle.id });
+            }}
+          >
+            <Icon name="Flag" size={16} />
+            <span className="whitespace-nowrap">举报（进人工队列，不是自动删除）</span>
+          </button>
+        </span>
       </div>
 
       <PrivateMessages
@@ -473,5 +525,6 @@ function BottleView({ bottle, seams }: { bottle: BottleDetail; seams?: BottlePag
         }}
       />
     </div>
+    </GroovePlaybackProvider>
   );
 }

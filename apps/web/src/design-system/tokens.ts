@@ -115,6 +115,23 @@ export const motif = {
   wakeDash: '7px',
   wakeGap: '11px',
   wakeAlpha: 0.45,
+  // 河道剖面
+  currentLineAlpha: 0.42,
+  lightShaftAlpha: 0.05,
+  surfaceLineAlpha: 0.7,
+  // record-v1 装置（S2）：盘面 / 掠光 / 沟槽 / 涟漪 / 圆盘外环
+  platterAlpha: 0.055,
+  glintAlpha: 0.065,
+  hairlineMix: '13%',
+  grooveLitAlpha: 0.9,
+  rippleRingAlpha: 0.32,
+  ringAlpha: 0.42,
+  ringFalloff: 0.5,
+  ringInset: '13px',
+  ringStep: '16px',
+  discCoreAlpha: 0.78,
+  discEdgeCoolAlpha: 0.7,
+  discEdgeWarmAlpha: 0.66,
 } as const;
 
 /** 水流漂移契约（与 theme.css 的 --motion-drift-* 同值）。 */

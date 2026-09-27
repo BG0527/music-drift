@@ -104,8 +104,9 @@
 
   /* ── 阴影（record-v1：**不用阴影造层次**，只给浮层与浮动条）──────
      颜色基色统一取 water-void 的 rgba（旧值 rgba(11,58,74) 是 ocean-v1 的
-     深水色，属色板外泄漏；本次只换基色、不改几何，阴影的去留是 S2 组件层的事）。 */
-  --shadow-card: 0 2px 12px rgba(3, 17, 23, 0.06);
+     深水色，属色板外泄漏；本次只换基色、不改几何）。
+     record-v1 **删掉了 `--shadow-card`**：卡片改用「ink 底 + 1px 细线」表达层级
+     （DESIGN.md §Elevation：阴影只剩浮层 / 浮动条两处）。守卫：record-v1.test.tsx。 */
   --shadow-lift: 0 4px 14px rgba(3, 17, 23, 0.18);
   --shadow-floating: 0 8px 24px rgba(3, 17, 23, 0.12);
 }
@@ -190,6 +191,23 @@
   --motif-current-line-alpha: 0.42;
   --motif-light-shaft-alpha: 0.05;
   --motif-surface-line-alpha: 0.7;
+
+  /* ── record-v1 装置（S2）──────────────────────────────────────────────
+     契约：DESIGN.md front matter 的 `motif:` 块（platter / glint / groove / waterline
+     / ripple / bottleMark 六件装置）。**所有强度与几何只在这里落地**，
+     water.css 与组件层一律引用 var(--motif-*)；内联值会被 water-motif.test.tsx 拒收。 */
+  --motif-platter-alpha: 0.055;
+  --motif-glint-alpha: 0.065;
+  --motif-hairline-mix: 13%;
+  --motif-groove-lit-alpha: 0.9;
+  --motif-ripple-ring-alpha: 0.32;
+  --motif-ring-alpha: 0.42;
+  --motif-ring-falloff: 0.5;
+  --motif-ring-inset: 13px;
+  --motif-ring-step: 16px;
+  --motif-disc-core-alpha: 0.78;
+  --motif-disc-edge-cool-alpha: 0.7;
+  --motif-disc-edge-warm-alpha: 0.66;
 }
 
 /* ── z-index 契约落成 utilities（Tailwind v4 无 z-index 命名空间）── */
@@ -220,6 +238,14 @@
 }
 @utility mb-safe {
   margin-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+/* ── 细线（record-v1 的层次语言）─────────────────────────────────────────
+   「不用阴影造层次，用亮度差 + 1px 细线」：细线的合成色 = line 以 motif.hairlineMix
+   叠在页面底上（深浅底层同值 ⇒ 卡片/导航/沟槽只有一条规则）。
+   强度仍然来自契约（--motif-hairline-mix），组件只写 `border border-hairline`。 */
+@utility border-hairline {
+  border-color: color-mix(in srgb, var(--color-line) var(--motif-hairline-mix), transparent);
 }
 
 @layer base {

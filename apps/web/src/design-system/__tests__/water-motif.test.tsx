@@ -59,6 +59,19 @@ const MOTIF_TOKENS = [
   'currentLineAlpha',
   'lightShaftAlpha',
   'surfaceLineAlpha',
+  // S2 record-v1 装置：盘面 / 掠光 / 沟槽 / 涟漪 / 圆盘外环（强度与几何都只能来自契约）
+  'platterAlpha',
+  'glintAlpha',
+  'hairlineMix',
+  'grooveLitAlpha',
+  'rippleRingAlpha',
+  'ringAlpha',
+  'ringFalloff',
+  'ringInset',
+  'ringStep',
+  'discCoreAlpha',
+  'discEdgeCoolAlpha',
+  'discEdgeWarmAlpha',
 ] as const;
 
 const kebab = (name: string): string =>
@@ -127,12 +140,8 @@ describe('水域母题：页面确实接入了（不是写了组件没人用）'
     expect(river, 'river-page 未接入 WaterSheen').toContain('<WaterSheen');
     expect(river, 'river-page 未接入 WaterTexture').toContain('<WaterTexture');
   });
-
-  it('公海作品页的深底页头加了水面光带', () => {
-    expect(pageSource('sea-detail-page.tsx'), 'sea-detail-page 未接入 WaterSheen').toContain(
-      '<WaterSheen',
-    );
-  });
+  // ⚠️ 守卫改动（整合者记录，2026-09-27）：原「公海作品页的深底页头加了水面光带」一条已删 ——
+  // 用户 §17 裁决删除公海详情页（sea-detail-page.tsx 已不存在），其沟槽时间轴+唱针移植进瓶子详情。
 });
 
 describe('t44 水感增强：不再是等距直线阵列', () => {
@@ -249,7 +258,6 @@ describe('t46 扩面：每个页面至少一处水或漂流瓶母题', () => {
   const PAGES = [
     'river-page.tsx',
     'sea-page.tsx',
-    'sea-detail-page.tsx',
     'drift-log-page.tsx',
     'profile-page.tsx',
     'settings-page.tsx',
@@ -365,18 +373,10 @@ const countDriftTags = (src: string, tag: string): number => {
  * 深底容器（`bg-deep-current`）里是否**有**带 drift 的水层。
  * 判据放在"深底容器之后 700 字符"的窗口里 —— 因为装饰层是该容器的子节点，
  * 而 className 在容器标签上、装饰在它之后。
+ * ⚠️ 守卫改动（整合者记录，2026-09-27）：`darkSurfaceDrifts` 的唯一调用点
+ * 「作品详情深底页头也有 drift 水层」已随用户 §17 裁决（删除公海详情页）一并删除；
+ * 函数若保留会触发 TS6133（未使用）。
  */
-const darkSurfaceDrifts = (src: string): 'none' | 'all' | 'partial' => {
-  const hits: boolean[] = [];
-  let i = src.indexOf('bg-deep-current');
-  while (i !== -1) {
-    hits.push(src.slice(i, i + 700).includes(' drift'));
-    i = src.indexOf('bg-deep-current', i + 1);
-  }
-  if (hits.length === 0) return 'none';
-  return hits.every(Boolean) ? 'all' : 'partial';
-};
-
 describe('t47 深底水面也流动（消除"浅底活在流、深底是贴图"）', () => {
   /* 本轮河道页从「两张深色卡片」改成「一整片水体」：深底容器数 2 → 1。
      断言跟着**新结构**走，不删不改意 —— 判据仍是"深底水面必须是活的"。 */
@@ -389,11 +389,6 @@ describe('t47 深底水面也流动（消除"浅底活在流、深底是贴图"�
       countDriftTags(src, 'WaterTexture'),
       '河道页带 drift 的水层少于 1 处',
     ).toBeGreaterThanOrEqual(1);
-  });
-
-  it('作品详情深底页头（bg-deep-current）里也有 drift 水层', () => {
-    const src = pageSource('sea-detail-page.tsx');
-    expect(darkSurfaceDrifts(src), '详情页深底页头没开漂移').toBe('all');
   });
 
   it('降级通道唯一：water.css 里不得有 JS 驱动动画（否则 reduced-motion 会被绕过）', () => {
@@ -441,16 +436,15 @@ function blockAfter(source: string, marker: string): string {
   return '';
 }
 
-/**
- * 取 `marker` 起、到顶层 `\n}` 为止的整段**函数声明**。
- * 不能复用 `blockAfter`：TSX 的函数签名里有解构（`{ className, size = 26 }`），
- * 那个 `{}` 不是函数体 —— 上一版就是这样只拿到参数列表而误判的。
- */
-function declarationAfter(source: string, marker: string): string {
-  const start = source.indexOf(marker);
-  if (start === -1) return '';
-  const end = source.indexOf('\n}', start);
-  return end === -1 ? source.slice(start) : source.slice(start, end);
+/** 取 `marker` 起、到顶层 `\n}` 为止的整段**函数声明的数量**（用于"某构件确实存在"的源码断言）。 */
+function declarationsOf(source: string, marker: string): number {
+  let count = 0;
+  let at = source.indexOf(marker);
+  while (at !== -1) {
+    count += 1;
+    at = source.indexOf(marker, at + 1);
+  }
+  return count;
 }
 
 describe('河道剖面：契约先补（本轮的构图需要新 token）', () => {
@@ -532,18 +526,22 @@ describe('河道剖面：契约先补（本轮的构图需要新 token）', () =
 describe('河道剖面：页面真的接入了（不是写了组件没人用）', () => {
   const river = pageSource('river-page.tsx');
 
-  it('河道页有水体 + 水线 + 光柱 + 主流 + 漂着的瓶子', () => {
+  it('河道页有水体 + 水线 + 光柱 + 主流；**默认态无瓶**（缺席可读）', () => {
     expect(river, '缺水体容器 river-body').toContain('river-body');
     expect(river, '缺水线构件').toContain('<SurfaceLine');
     expect(river, '缺水下光柱构件').toContain('<LightShafts');
     expect(river, '缺河道主流构件').toContain('<CurrentLines');
-    expect(river, '缺沿主流漂过的漂流瓶').toContain('<DriftingBottle');
-    // 「漂流瓶」是用户点名的母题：漂过河道的那一只里面必须是 `BottleMark`（不另画一个瓶子）
-    const waveSrc = readIfPresent(join(DS_DIR, 'wave.tsx'));
-    expect(
-      declarationAfter(waveSrc, 'export function DriftingBottle'),
-      '漂过的瓶子没有复用 BottleMark',
-    ).toContain('<BottleMark');
+    /**
+     * ⚠️ **本轮改掉的断言（原文 → 新文）**：
+     * 原文：`expect(river, '缺沿主流漂过的漂流瓶').toContain('<DriftingBottle')`。
+     * 新文：河道页**不得**出现那只沿主流漂过的瓶。
+     * 为什么必须改：用户第 ④ 条硬约束与语言契约 §7.1-5 都写明「**河道页默认态只有水在流**，
+     * 不许出现漂流瓶 —— 瓶子的**缺席本身**要可读」。S2/S3 的河道页因此改由
+     * **沟槽（被点亮的水槽）+ 两枚圆盘泊位**立住，旧语言那件「漂过河道的瓶」退场。
+     * 这不是放宽：它把一条**用户裁决过的硬约束**第一次变成机器可检的断言
+     * （原来那条只证明了"某个组件被 import"）。
+     */
+    expect(river, '河道页出现漂流瓶 ⇒ 违反「默认态只有水在流」').not.toContain('<DriftingBottle');
   });
 
   it('母题宿主是 isolate 容器（否则 z-underlay 看不见）', () => {
@@ -568,5 +566,116 @@ describe('河道剖面：页面真的接入了（不是写了组件没人用）'
     expect(size, 'PORT_SIZE 必须定义圆形与桌面尺寸').toContain('rounded-full');
     expect(size, 'PORT_SIZE 必须定义桌面 110px 档').toContain('md:h-[110px]');
     expect(size, 'PORT_SIZE 必须定义桌面 110px 档').toContain('md:w-[110px]');
+  });
+});
+
+/* ── S2：record-v1 装置（盘面 / 掠光 / 沟槽 / 水线 / 涟漪 / 圆盘外环）─────────────
+   语言契约（`DESIGN.md §Elevation & Depth · 母题装置库`）已把六个装置写死：
+   platter / glint / groove / waterline / ripple / bottleMark。
+   本组只把**能机器判的部分**变成会红的断言：
+     ① 六个装置名在契约里（不是只在代码里）；
+     ② water.css 里每个装置都**只引用 var(--motif-*)**（强度与周期不许内联）；
+     ③ 旧语言（水纹 / 潮线 / 航迹 / 光柱 / 主流 / 剖面的四个类）**仍然在**——
+        因为 `pages/*` 这一片还挂着它们（S3+ 才逐页改名），S2 不许把页面弄成裸样式；
+     ④ 漂移与通过动画的参数、降级通道保持不变（本次换语言不动动效物理）。 */
+describe('S2 record-v1 装置：契约与样式层（强度只来自 --motif-*）', () => {
+  it('DESIGN.md 的母题装置库登记了六个装置名', () => {
+    for (const device of ['platter', 'glint', 'groove', 'waterline', 'ripple', 'bottleMark']) {
+      expect(designMd, `DESIGN.md 未登记装置 ${device}`).toContain(device);
+    }
+  });
+
+  const DEVICES: ReadonlyArray<readonly [string, readonly string[]]> = [
+    // 盘面 = 同心沟槽（repeating-radial-gradient），周期取契约定下的纹理线距
+    ['.platter', ['var(--motif-platter-alpha)', 'var(--motif-texture-line-gap)']],
+    // 掠光 = 101° 斜向光带 + screen 混合（方向由契约正文钉死）
+    ['.glint', ['var(--motif-glint-alpha)', 'mix-blend-mode: screen', '101deg']],
+    ['.groove-bed', ['var(--motif-hairline-mix)']],
+    ['.groove-lit', ['var(--motif-groove-lit-alpha)', 'var(--color-glass)']],
+    ['.waterline', ['var(--motif-surface-line-alpha)']],
+    ['.ripple', ['var(--motif-ripple-ring-alpha)']],
+    ['.disc-core', ['var(--motif-disc-core-alpha)']],
+    [
+      '.disc-ring',
+      [
+        'var(--motif-ring-alpha)',
+        'var(--motif-ring-falloff)',
+        'var(--motif-ring-inset)',
+        'var(--motif-ring-step)',
+      ],
+    ],
+    ['.disc-edge-cool', ['var(--motif-disc-edge-cool-alpha)']],
+    ['.disc-edge-warm', ['var(--motif-disc-edge-warm-alpha)']],
+  ];
+
+  /** `marker` 起的一段窗口 —— 由**多条规则**组成的装置（圆盘 = 三圈环 + 冷/暖边）用窗口，
+      单条规则仍用 `blockAfter`（配对花括号，更严）。 */
+  const regionAfter = (source: string, marker: string, window = 900): string => {
+    const at = source.indexOf(marker);
+    return at === -1 ? '' : source.slice(at, at + window);
+  };
+
+  for (const [selector, tokens] of DEVICES) {
+    it(`water.css 的 ${selector} 存在，且强度/几何只引用契约变量`, () => {
+      const block = regionAfter(waterCss, selector);
+      expect(block, `water.css 缺少 ${selector} 规则`).not.toBe('');
+      for (const token of tokens) {
+        expect(block, `${selector} 未引用契约变量 ${token}`).toContain(token);
+      }
+    });
+  }
+
+  it('圆盘外环是**三档**（13/29/45），强度逐圈 × ringFalloff —— 不是同一圈画三遍', () => {
+    expect(waterCss, '缺少外环第 1 圈').toContain('.disc-ring {');
+    expect(waterCss, '缺少外环第 2 圈').toContain('.disc-ring-2 {');
+    expect(waterCss, '缺少外环第 3 圈').toContain('.disc-ring-3 {');
+    const ring = blockAfter(waterCss, '.disc-ring {');
+    expect(ring).toContain('var(--motif-ring-inset)');
+    expect(ring).toContain('var(--motif-ring-alpha)');
+    const ring2 = blockAfter(waterCss, '.disc-ring-2 {');
+    expect(ring2).toContain('var(--motif-ring-step)');
+    expect(ring2).toContain('var(--motif-ring-falloff)');
+  });
+
+  it('盘面是**同心**沟槽（repeating-radial-gradient），不是一组平行线', () => {
+    expect(blockAfter(waterCss, '.platter')).toContain('repeating-radial-gradient');
+  });
+
+  it('圆盘外环最多 3 圈：步长 ×2 恰好是 13 / 29 / 45（与语言契约 §1.5 一致）', () => {
+    const inset = Number(/(\d+)px/.exec(/ringInset:\s*(\d+px)/.exec(frontMatter)?.[1] ?? '')?.[1] ?? 0);
+    const step = Number(/(\d+)px/.exec(/ringStep:\s*(\d+px)/.exec(frontMatter)?.[1] ?? '')?.[1] ?? 0);
+    expect(inset, 'DESIGN.md 缺少 motif.ringInset').toBe(13);
+    expect(step, 'DESIGN.md 缺少 motif.ringStep').toBe(16);
+    expect([inset, inset + step, inset + 2 * step]).toEqual([13, 29, 45]);
+  });
+
+  it('旧语言的六个类仍在（pages 这一片还挂着它们，S3+ 才逐页改名）', () => {
+    for (const legacy of [
+      '.water-sheen',
+      '.water-texture',
+      '.tide-line',
+      '.wake-line',
+      '.surface-line',
+      '.river-current',
+    ]) {
+      expect(waterCss, `S2 不能顺手删掉 ${legacy}（pages/* 还在用）`).toContain(legacy);
+    }
+  });
+});
+
+describe('S2 record-v1 装置：六个构件真的存在（不是只写了 CSS 没人用）', () => {
+  const waveSrc = readIfPresent(join(DS_DIR, 'wave.tsx'));
+
+  for (const device of ['Platter', 'Glint', 'Groove', 'Waterline', 'Ripple', 'BottleMark']) {
+    it(`wave.tsx 恰好导出一个 ${device}`, () => {
+      expect(declarationsOf(waveSrc, `export function ${device}(`), `缺 ${device} 构件`).toBe(1);
+    });
+  }
+
+  it('index.ts 把六个装置都转出去了（页面从设计系统取，不许各自重画）', () => {
+    const indexTs = readFileSync(join(DS_DIR, 'index.ts'), 'utf8');
+    for (const device of ['Platter', 'Glint', 'Groove', 'Waterline', 'Ripple', 'BottleMark']) {
+      expect(indexTs, `index.ts 未导出 ${device}`).toContain(device);
+    }
   });
 });

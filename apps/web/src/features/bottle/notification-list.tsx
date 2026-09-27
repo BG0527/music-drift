@@ -44,7 +44,7 @@ export function NotificationList({ className }: NotificationListProps) {
       query={notifications}
       emptyWhen={(page) => page.items.length === 0}
       empty={
-        <p className="flex flex-wrap items-center gap-x-[12px] rounded-base border border-mist bg-foam px-4 py-[10px] text-[0.9375rem] text-slate-current">
+        <p className="flex flex-wrap items-center gap-x-[12px] rounded-base border border-line/15 bg-ink px-4 py-[10px] text-[0.9375rem] text-muted">
           <Icon name="Info" size={18} />
           <span>还没有新消息：有人接唱、留言送达或作品入海时才会出现。</span>
         </p>
@@ -70,17 +70,17 @@ function NotificationItem({ notification }: { notification: NotificationLike }) 
     <li className={cn('flex flex-col gap-2 rounded-base border px-4 py-3', TONE_CLASS[view.tone])}>
       <div className="flex flex-wrap items-center gap-3">
         <Icon name={TONE_ICON[view.tone]} size={18} />
-        <p className="text-[1rem] font-semibold text-abyss">{view.label}</p>
+        <p className="text-[1rem] font-semibold text-paper">{view.label}</p>
         {unread ? (
-          <span className="rounded-pill bg-peacock px-3 py-1 text-[0.75rem] font-medium text-wave-white">
+          <span className="rounded-base bg-coral px-3 py-1 text-[0.75rem] font-medium text-ink">
             未读
           </span>
         ) : (
-          <span className="text-[0.75rem] text-slate-current">已读</span>
+          <span className="text-[0.75rem] text-muted">已读</span>
         )}
       </div>
 
-      <p className="text-[0.875rem] leading-[1.6] text-slate-current">{view.detail}</p>
+      <p className="text-[0.875rem] leading-[1.6] text-muted">{view.detail}</p>
 
       <div className="flex flex-wrap items-center gap-4">
         {view.href === null ? null : (

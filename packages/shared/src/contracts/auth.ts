@@ -106,13 +106,13 @@ export const AUTH_ERROR_CODES = [
   'EMAIL_TAKEN',
   /** 注册用户名已被占用（409）。 */
   'HANDLE_TAKEN',
-  /** 凭证错误（401）：**不区分**「邮箱不存在」与「口令错误」，防账号枚举。 */
+  /** 凭证错误（401）：**不区分**「邮箱不存在」与「密码错误」，防账号枚举。 */
   'INVALID_CREDENTIALS',
   /** 未登录或 cookie 缺失/畸形（401）。 */
   'UNAUTHENTICATED',
   /** 会话已过期（401）：与「未登录」分开，便于前端清 cookie 并提示重新登录。 */
   'SESSION_EXPIRED',
-  /** 口令强度不足（422）。 */
+  /** 密码强度不足（422）。 */
   'WEAK_PASSWORD',
 ] as const;
 
@@ -122,10 +122,10 @@ export type AuthErrorCode = (typeof AUTH_ERROR_CODES)[number];
 export const AUTH_ERROR_MESSAGES: Record<AuthErrorCode, string> = {
   EMAIL_TAKEN: '这个邮箱已经注册过了，直接登录试试？',
   HANDLE_TAKEN: '这个名字已经有人用了，换一个吧。',
-  INVALID_CREDENTIALS: '账号或口令不正确。',
+  INVALID_CREDENTIALS: '账号或密码不正确。',
   UNAUTHENTICATED: '请先登录。',
   SESSION_EXPIRED: '登录状态已过期，请重新登录。',
-  WEAK_PASSWORD: '口令太弱了：至少 8 位，且要同时包含字母和数字。',
+  WEAK_PASSWORD: '密码太弱了：至少 8 位，且要同时包含字母和数字。',
 };
 
 /** 状态映射与领域 `RULE_HTTP_STATUS` 同构（码 → 默认 HTTP 状态）。 */

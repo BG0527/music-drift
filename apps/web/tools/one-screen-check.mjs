@@ -352,7 +352,8 @@ function routesFor(seed) {
     { path: '/river', anchors: ['river-draw', 'river-drop'] },
     { path: '/sea', anchors: ['sea-list'] },
     { path: '/new', anchors: ['new-catalog'] },
-    { path: `/sea/${seed.seaId}`, anchors: ['sea-play'] },
+    // ⚠️ 2026-09-27：`/sea/:id` 路由已按用户 §17 裁决删除（公海详情并入瓶子详情）⇒ 不再量这一页；
+    // seed.seaId 仍保留（`/sea` 列表需要一支完整作品才量得到真实内容）。
     { path: '/me', anchors: ['me-bottles'], needsAuth: true },
     { path: '/settings', anchors: ['settings-attribution'], needsAuth: true },
     { path: `/bottles/${seed.riverId}`, anchors: ['bottle-play', 'bottle-action'], needsAuth: true },

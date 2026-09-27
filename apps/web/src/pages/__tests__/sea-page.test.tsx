@@ -1,10 +1,10 @@
 import { fireEvent, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
-import { bottleSummary } from '../../test/fixtures';
+import { BOTTLE_ID, bottleSummary } from '../../test/fixtures';
 import { renderWithProviders } from '../../test/harness';
 import { SeaPage } from '../sea-page';
 
-/** 公海（Figma `public-sea` 采纳 IA）：默认只看**完整作品**，未完成作品要显式切分区。 */
+/** 公海（record-v1 设计稿 p-sea-hall）：默认只看**完整作品**，未完成作品要显式切分区。 */
 describe('公海大厅', () => {
   it('默认请求完整作品分区，并列出作品（曲名 + 段数）', async () => {
     const { fetchMock } = renderWithProviders(<SeaPage />, {
@@ -186,5 +186,93 @@ describe('公海大厅', () => {
     });
     expect(await screen.findByRole('alert')).toHaveTextContent('服务器暂时不可用');
     expect(screen.getByRole('button', { name: '重试' })).toBeInTheDocument();
+  });
+});
+
+/** record-v1 设计装置（p-sea-hall）：静海水线 + 涟漪内圈 4 段断弧 + 六支到岸的瓶。 */
+describe('公海大厅 · 设计装置', () => {
+  const oneBottle = [
+    {
+      path: '/api/sea?zone=COMPLETED&limit=6',
+      respond: () => ({ body: { items: [bottleSummary()], nextCursor: null } }),
+    },
+  ];
+
+  it('每支作品骑在静海水线上（装饰 SVG 对读屏隐藏）', async () => {
+    const { container } = renderWithProviders(<SeaPage />, { handlers: oneBottle });
+    expect(await screen.findByText('深海鲸落')).toBeInTheDocument();
+
+    const waterlines = container.querySelectorAll('[data-part="waterline"]');
+    expect(waterlines.length, '水线必须存在').toBeGreaterThan(0);
+    for (const line of waterlines) {
+      const svg = line.closest('svg');
+      expect(svg, '水线画在 SVG 里').not.toBeNull();
+      expect(svg?.getAttribute('aria-hidden')).toBe('true');
+    }
+  });
+
+  it('涟漪内圈 = 4 段断弧（断=缺口）：pathLength 100 上数出 4 段 4 缺口', async () => {
+    const { container } = renderWithProviders(<SeaPage />, { handlers: oneBottle });
+    expect(await screen.findByText('深海鲸落')).toBeInTheDocument();
+
+    const inners = container.querySelectorAll('[data-part="ripple-inner"]');
+    expect(inners.length, '每支瓶子配一枚内圈').toBeGreaterThan(0);
+    for (const ring of inners) {
+      expect(ring.getAttribute('pathLength')).toBe('100');
+      const dash = ring.getAttribute('stroke-dasharray');
+      expect(dash, '断弧参数来自设计稿 18 7').toBeTruthy();
+      const [on = 0, off = 0] = (dash ?? '').split(/\s+/).map(Number);
+      expect(100 % (on + off), '弧+缺口必须整除一圈').toBe(0);
+      expect(100 / (on + off), '一圈 = 4 段弧').toBe(4);
+      expect(100 / (on + off), '一圈 = 4 个断口').toBe(4);
+    }
+  });
+
+  it('默认区一页六支到岸的瓶：玻璃瓶身 + 木塞，整瓶对读屏隐藏', async () => {
+    const items = Array.from({ length: 6 }, (_unused, index) =>
+      bottleSummary({
+        id: `30000000-0000-4000-8000-00000000000${String(index + 1)}`,
+        songTitle: `到岸之${String(index + 1)}`,
+      }),
+    );
+    const { container } = renderWithProviders(<SeaPage />, {
+      handlers: [
+        {
+          path: '/api/sea?zone=COMPLETED&limit=6',
+          respond: () => ({ body: { items, nextCursor: null } }),
+        },
+      ],
+    });
+    expect(await screen.findByText('到岸之6')).toBeInTheDocument();
+
+    expect(container.querySelectorAll('[data-part="bottle"]')).toHaveLength(6);
+    expect(container.querySelectorAll('[data-part="cork"]')).toHaveLength(6);
+    expect(container.querySelectorAll('[data-part="waterline"]')).toHaveLength(6);
+    for (const bottle of container.querySelectorAll('[data-part="bottle"]')) {
+      expect(bottle.closest('[aria-hidden="true"]'), '瓶子是装饰，不进读屏').not.toBeNull();
+    }
+  });
+
+  it('「听这支作品」用 buildPath 指向瓶页 /bottles/<id>（不手拼路径）', async () => {
+    renderWithProviders(<SeaPage />, { handlers: oneBottle });
+    const link = await screen.findByRole('link', { name: '听这支作品' });
+    expect(link).toHaveAttribute('href', `/bottles/${BOTTLE_ID}`);
+  });
+
+  it('主列表容器保留 data-anchor="sea-list"，栅格 <768 单列 / ≥1024 三列', async () => {
+    const { container } = renderWithProviders(<SeaPage />, { handlers: oneBottle });
+    expect(await screen.findByText('深海鲸落')).toBeInTheDocument();
+
+    const list = container.querySelector('[data-anchor="sea-list"]');
+    expect(list, '锚点必须保留').not.toBeNull();
+    const grid = list?.querySelector('ul');
+    expect(grid).not.toBeNull();
+    const className = grid?.className ?? '';
+    expect(className, '≥1024 三列').toContain('lg:grid-cols-3');
+    expect(className, '768–1023 两列').toContain('md:grid-cols-2');
+    expect(
+      /(^|\s)grid-cols-/.test(className),
+      '基线（<768）不写 grid-cols ⇒ 默认单列',
+    ).toBe(false);
   });
 });

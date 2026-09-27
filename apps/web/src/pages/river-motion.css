@@ -1,0 +1,127 @@
+/**
+ * 河道页 · f0 三段动效（任务 E）。
+ * 分镜：`docs/ui-review/design-explore/f0-sequence.html`；裁决：`docs/architecture.md` §103.3
+ * （捞/投动画播完再跳转，reduced-motion 下立即跳）。
+ *
+ * 纪律（river-page.test.tsx 逐条扫描守住）：
+ *  - 只动 transform / opacity（keyframes 属性白名单）；
+ *  - 时长、缓动、位移只引用 theme.css 的 `--motion-*` 契约变量，不内联毫秒/缓动/hex；
+ *  - 形态值取自分镜或既有契约：虚线断续 14/24 来自分镜；收拢涟漪的幅度复用契约
+ *    `ocean-ripple` 的 1.08 → 0.92（方向反转即「由外向内」），强度起点取 `--motif-ripple-ring-alpha`。
+ */
+
+/* ── ① 常驻装饰：漂移虚线 ───────────────────────────────────────────────────
+   f0 图例「46s 一个来回 · 只动 transform」= 契约已有的 `.passage-drift`
+   （ocean-passage 关键帧：±--passage-shift / --passage-duration，本文件只给虚线形态）。
+   左右各出血一段行程（--motion-passage-shift），平移往返时不会露出缺口。 */
+.river-flowline {
+  left: calc(-1 * var(--motion-passage-shift));
+  right: calc(-1 * var(--motion-passage-shift));
+  height: 2px;
+  background-image: repeating-linear-gradient(
+    90deg,
+    var(--color-paper) 0 14px,
+    transparent 14px 38px
+  );
+  opacity: 0.4;
+}
+
+/* 场景涟漪「偶尔扩散」：第二圈推迟一个涟漪周期（错拍），两圈不再同步呼吸。 */
+.ripple-ring.river-scene-delay {
+  animation-delay: var(--motion-ripple-duration);
+}
+
+/* ── ② 捞取：顺水漂进河中央 → 收拢涟漪 → 被捞起 ────────────────────────── */
+@keyframes river-arrive {
+  from {
+    transform: translate3d(var(--motion-passage-shift), 0, 0);
+    opacity: 0;
+  }
+  to {
+    transform: translate3d(0, 0, 0);
+    opacity: 1;
+  }
+}
+
+@keyframes river-lift {
+  from {
+    transform: translate3d(0, 0, 0);
+    opacity: 1;
+  }
+  to {
+    transform: translate3d(0, calc(-1 * var(--motion-passage-shift)), 0);
+    opacity: 0;
+  }
+}
+
+/* ── ③ 投下：从上方落进河中央 → 收拢涟漪（confirmation）→ 顺河而下离开 ─────
+   河向：上游在右、水往左走（见 river-page 河道注释）⇒ 退场向左。 */
+@keyframes river-drop {
+  from {
+    transform: translate3d(0, calc(-1 * var(--motion-passage-shift)), 0);
+    opacity: 0;
+  }
+  to {
+    transform: translate3d(0, 0, 0);
+    opacity: 1;
+  }
+}
+
+@keyframes river-float {
+  from {
+    transform: translate3d(0, 0, 0);
+    opacity: 1;
+  }
+  to {
+    transform: translate3d(calc(-1 * var(--motion-passage-shift)), 0, 0);
+    opacity: 0;
+  }
+}
+
+/* 入场 480ms / 退场 240ms（f0 进出配对：退场更短，因为人已经知道结果了）。 */
+.river-vessel-enter-draw {
+  animation: river-arrive var(--motion-entry-duration) var(--motion-entry-easing) both;
+}
+
+.river-vessel-enter-cast {
+  animation: river-drop var(--motion-entry-duration) var(--motion-entry-easing) both;
+}
+
+.river-vessel-exit-draw {
+  animation: river-lift var(--motion-exit-duration) var(--motion-entry-easing) both;
+}
+
+.river-vessel-exit-cast {
+  animation: river-float var(--motion-exit-duration) var(--motion-entry-easing) both;
+}
+
+/* 收拢涟漪（事件涟漪：feedback / confirmation，只播一次 —— iteration = 1）。 */
+@keyframes river-gather {
+  from {
+    transform: scale(1.08);
+    opacity: var(--motif-ripple-ring-alpha);
+  }
+  to {
+    transform: scale(0.92);
+    opacity: 0;
+  }
+}
+
+.river-gather {
+  animation: river-gather var(--motion-ripple-duration) var(--motion-entry-easing) 1 both;
+}
+
+/* ── ④ reduced-motion：本页动效全部静止，只留 aria-live 文字状态 ─────────────
+   状态机在 reduce 下根本不起动画、立即跳转（§103.3）；本块是样式层的逐项确认，
+   与 motion.css 的全局 `animation: none !important` 兜底构成双保险。 */
+@media (prefers-reduced-motion: reduce) {
+  .river-flowline,
+  .ripple-ring.river-scene-delay,
+  .river-gather,
+  .river-vessel-enter-draw,
+  .river-vessel-enter-cast,
+  .river-vessel-exit-draw,
+  .river-vessel-exit-cast {
+    animation: none;
+  }
+}

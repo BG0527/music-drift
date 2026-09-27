@@ -50,7 +50,7 @@
   .water-sheen {
     background-image: linear-gradient(
       to bottom,
-      color-mix(in srgb, var(--color-sea-glass) 100%, transparent) 0%,
+      color-mix(in srgb, var(--color-glass) 100%, transparent) 0%,
       transparent 55%
     );
     opacity: var(--motif-sheen-alpha-dark);
@@ -59,7 +59,7 @@
   .water-sheen-light {
     background-image: linear-gradient(
       to bottom,
-      color-mix(in srgb, var(--color-lagoon) 100%, transparent) 0%,
+      color-mix(in srgb, var(--color-water-mid) 100%, transparent) 0%,
       transparent 40%
     );
     opacity: var(--motif-sheen-alpha-light);
@@ -75,15 +75,15 @@
     background-image:
       repeating-linear-gradient(
         to bottom,
-        color-mix(in srgb, var(--color-sea-glass) 100%, transparent) 0,
-        color-mix(in srgb, var(--color-sea-glass) 100%, transparent) 1px,
+        color-mix(in srgb, var(--color-glass) 100%, transparent) 0,
+        color-mix(in srgb, var(--color-glass) 100%, transparent) 1px,
         transparent 1px,
         transparent var(--motif-texture-line-gap)
       ),
       repeating-linear-gradient(
         to bottom,
-        color-mix(in srgb, var(--color-lagoon) 100%, transparent) 0,
-        color-mix(in srgb, var(--color-lagoon) 100%, transparent) 1px,
+        color-mix(in srgb, var(--color-water-mid) 100%, transparent) 0,
+        color-mix(in srgb, var(--color-water-mid) 100%, transparent) 1px,
         transparent 1px,
         transparent var(--motif-texture-line-gap-alt)
       );
@@ -118,8 +118,8 @@
     background-image: linear-gradient(
       to right,
       transparent 0%,
-      color-mix(in srgb, var(--color-sea-glass) 100%, transparent) 22%,
-      color-mix(in srgb, var(--color-sea-glass) 100%, transparent) 78%,
+      color-mix(in srgb, var(--color-glass) 100%, transparent) 22%,
+      color-mix(in srgb, var(--color-glass) 100%, transparent) 78%,
       transparent 100%
     );
     opacity: var(--motif-tide-line-alpha);
@@ -132,8 +132,8 @@
     height: 1px;
     background-image: repeating-linear-gradient(
       to right,
-      color-mix(in srgb, var(--color-lagoon) 100%, transparent) 0,
-      color-mix(in srgb, var(--color-lagoon) 100%, transparent) var(--motif-wake-dash),
+      color-mix(in srgb, var(--color-water-mid) 100%, transparent) 0,
+      color-mix(in srgb, var(--color-water-mid) 100%, transparent) var(--motif-wake-dash),
       transparent var(--motif-wake-dash),
       transparent calc(var(--motif-wake-dash) + var(--motif-wake-gap))
     );
@@ -156,8 +156,8 @@
   .water-lights {
     background-image: repeating-linear-gradient(
       104deg,
-      color-mix(in srgb, var(--color-sea-glass) 100%, transparent) 0,
-      color-mix(in srgb, var(--color-sea-glass) 100%, transparent) 2px,
+      color-mix(in srgb, var(--color-glass) 100%, transparent) 0,
+      color-mix(in srgb, var(--color-glass) 100%, transparent) 2px,
       transparent 2px,
       transparent 104px
     );
@@ -172,8 +172,8 @@
     background-image: linear-gradient(
       to right,
       transparent 0%,
-      color-mix(in srgb, var(--color-sea-glass) 100%, transparent) 14%,
-      color-mix(in srgb, var(--color-sea-glass) 100%, transparent) 86%,
+      color-mix(in srgb, var(--color-glass) 100%, transparent) 14%,
+      color-mix(in srgb, var(--color-glass) 100%, transparent) 86%,
       transparent 100%
     );
     opacity: var(--motif-surface-line-alpha);
@@ -198,5 +198,138 @@
 
   .passage-drift {
     animation: ocean-passage var(--passage-duration) ease-in-out infinite alternate;
+  }
+}
+
+/* ══ record-v1 装置层（S2）══════════════════════════════════════════════════════
+   语言契约：`DESIGN.md §Elevation & Depth · 母题装置库`。六个装置各承担一件信息：
+     platter（盘面）   世界的底：同心沟槽 + 径向内层 —— 周期取 textureLineGap、强度取 platterAlpha
+     glint（掠光）     世界的"上方"、瓶子来的方向 —— 101° 斜向光带，峰值取 glintAlpha
+     groove（沟槽）    **被点亮的沟槽 = 河道**：两条 1px 细线夹出一条水道，点亮段 = 已录段位
+     waterline（水线） 分界：岸/水、线上/线下、浮上来/沉下去
+     ripple（涟漪）    刚刚发生过的事（落下 / 捞起 / 入海），断弧可编码缺口
+     disc（圆盘）      承载动作的盘身：不填彩色，彩色只在边缘微光，外环最多 3 圈
+   纪律与上面九件**完全相同**：只引用 var(--color-*) / var(--motif-*)，不写 hex / rgb / rgba；
+   全部由 wave.tsx 的组件以 `absolute inset-0 z-underlay` 挂载 ⇒ 零布局高度、不遮挡正文。
+   ⚠️ 旧语言（.water-sheen / .water-texture / .tide-line / .wake-line / .surface-line /
+   .river-current / .river-body / .water-lights）**仍然保留**：`pages/*` 这一片还挂着它们
+   （S3+ 逐页改名，S8 整批删除）。它们本轮只做一件事：把颜色引用从**会撒谎的过渡别名**
+   换成本版色板的真名（值一字未变：sea-glass→glass、lagoon→water-mid）。 */
+@layer components {
+  /* ⑩ 盘面（platter）：同心沟槽（不是一组平行线）+ 径向内层。
+     圆心落在**右下**（唱片在画面里的实际位置），用百分比 ⇒ 响应式不靠魔法 px。 */
+  .platter {
+    background-image:
+      repeating-radial-gradient(
+        circle at 99% 107%,
+        color-mix(in srgb, var(--color-line) 100%, transparent) 0 1px,
+        transparent 1px var(--motif-texture-line-gap)
+      ),
+      radial-gradient(
+        circle at 99% 107%,
+        color-mix(in srgb, var(--color-water-bed) 100%, transparent) 0 30%,
+        transparent 68%
+      );
+    opacity: var(--motif-platter-alpha);
+  }
+
+  /* ⑪ 掠光（glint）：101° 斜向光带，**53%→55% 之间给一个陡降**。
+     黑胶的材质来自"反射有硬边"：全柔的带子会把盘面读成哑光球体。 */
+  .glint {
+    background-image: linear-gradient(
+      101deg,
+      transparent 26%,
+      color-mix(in srgb, var(--color-water-deep) 100%, transparent) 40%,
+      color-mix(in srgb, var(--color-water-deep) 100%, transparent) 53%,
+      transparent 55%,
+      transparent 74%
+    );
+    mix-blend-mode: screen;
+    opacity: var(--motif-glint-alpha);
+  }
+
+  /* ⑫ 沟槽（groove）：两条 1px 细线夹出一条水道。
+     底（还没人唱的那一段）用细线强度；被点亮的那一段用 glass 近全亮 —— 它承载"已录段位"。 */
+  .groove-bed {
+    border-top: 1px solid;
+    border-bottom: 1px solid;
+    border-color: color-mix(in srgb, var(--color-line) var(--motif-hairline-mix), transparent);
+  }
+
+  .groove-lit {
+    background-color: var(--color-glass);
+    opacity: var(--motif-groove-lit-alpha);
+  }
+
+  /* 「投下」一侧 = 暖光（与河道两泊位同一套冷暖分工） */
+  .groove-lit-warm {
+    background-color: var(--color-warm);
+  }
+
+  /* ⑬ 水线（waterline）：全页唯一一条横向实线，两端渐隐。 */
+  .waterline {
+    height: 1px;
+    background-image: linear-gradient(
+      to right,
+      transparent 0%,
+      color-mix(in srgb, var(--color-line) 100%, transparent) 14%,
+      color-mix(in srgb, var(--color-line) 100%, transparent) 86%,
+      transparent 100%
+    );
+    opacity: var(--motif-surface-line-alpha);
+  }
+
+  /* ⑭ 涟漪（ripple）：强度在这里；同心扁椭圆的形状与断弧由 wave.tsx 的内联 SVG 提供。 */
+  .ripple {
+    opacity: var(--motif-ripple-ring-alpha);
+  }
+
+  /* ⑮ 圆盘（disc）：**盘身不填彩色** —— 径向内层只在水色族里走（water-bed → water-void），
+     彩色留给边缘微光（.disc-edge-*）与主 CTA 的填充。 */
+  .disc-core {
+    background-image: radial-gradient(
+      76% 76% at 34% 26%,
+      color-mix(in srgb, var(--color-water-bed) 100%, transparent),
+      color-mix(in srgb, var(--color-water-void) 100%, transparent)
+    );
+    opacity: var(--motif-disc-core-alpha);
+  }
+
+  /* 外环：13 / 29 / 45（ringInset + n × ringStep），强度逐圈 × ringFalloff（.42 / .21 / .105）。
+     第 1 圈合成后对 ink ≥3:1（承重的边界装置），后面两圈是氛围。 */
+  .disc-ring,
+  .disc-ring-2,
+  .disc-ring-3 {
+    border-radius: 50%;
+    border: 1px solid color-mix(in srgb, var(--color-water-light) 100%, transparent);
+    pointer-events: none;
+  }
+
+  .disc-ring {
+    inset: calc(var(--motif-ring-inset) * -1);
+    opacity: var(--motif-ring-alpha);
+  }
+
+  .disc-ring-2 {
+    inset: calc((var(--motif-ring-inset) + var(--motif-ring-step)) * -1);
+    opacity: calc(var(--motif-ring-alpha) * var(--motif-ring-falloff));
+  }
+
+  .disc-ring-3 {
+    inset: calc((var(--motif-ring-inset) + var(--motif-ring-step) * 2) * -1);
+    opacity: calc(var(--motif-ring-alpha) * var(--motif-ring-falloff) * var(--motif-ring-falloff));
+  }
+
+  /* 边缘微光：冷（捞取）/ 暖（投下）。**盘身不填彩色**，彩色只在这一圈 1px 上。 */
+  .disc-edge-cool {
+    border: 1px solid color-mix(in srgb, var(--color-water-mid) 100%, transparent);
+    opacity: var(--motif-disc-edge-cool-alpha);
+    pointer-events: none;
+  }
+
+  .disc-edge-warm {
+    border: 1px solid color-mix(in srgb, var(--color-warm) 100%, transparent);
+    opacity: var(--motif-disc-edge-warm-alpha);
+    pointer-events: none;
   }
 }

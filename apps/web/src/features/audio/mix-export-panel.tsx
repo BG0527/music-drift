@@ -21,7 +21,7 @@ import {
   type AlignmentReport,
   type MixPlan,
 } from '@music-drift/shared/audio';
-import { Button, Card, Icon, cn } from '../../design-system';
+import { Button, Icon, cn } from '../../design-system';
 import { useMixExport, type MixExportEnvironment, type MixExportPhase } from './use-mix-export';
 import { formatSeconds } from './format';
 
@@ -64,18 +64,25 @@ export function MixExportPanel({
     view.phase === 'encoding';
 
   return (
-    <Card className={cn('flex flex-col gap-4 rounded-xl', className)}>
+    <div
+      className={cn(
+        // record-v1：成品试听是**沉浸式区块**（L4 deep，DESIGN.md §Elevation & Depth）→ 水体底色，
+        // 不是通用卡片：这一段画面就是"沉进水里听成品"
+        'flex flex-col gap-4 rounded-xl border border-water-surface/50 bg-water-body p-4 text-paper',
+        className,
+      )}
+    >
       <header className="flex flex-wrap items-baseline justify-between gap-3">
-        <h3 className="text-[1.125rem] font-semibold text-abyss">{title}</h3>
-        <p className="text-[0.875rem] text-slate-current">{mixSummaryLabel(plan)}</p>
+        <h3 className="text-[1.125rem] font-semibold text-paper">{title}</h3>
+        <p className="text-[0.875rem] text-muted">{mixSummaryLabel(plan)}</p>
       </header>
 
-      <p className="text-[0.875rem] leading-[1.6] text-slate-current">
+      <p className="text-[0.875rem] leading-[1.6] text-muted">
         阶段一只拼接人声、不加伴奏（曲库到位后再按固定时间轴叠加）；成品为 WAV，可直接试听与下载。
       </p>
 
       {!view.canExport ? (
-        <p role="status" className="text-[0.875rem] leading-[1.6] text-slate-current">
+        <p role="status" className="text-[0.875rem] leading-[1.6] text-muted">
           还没有人接唱，暂时没有可导出的成品。等第 1 段录好之后就能生成。
         </p>
       ) : null}
@@ -88,7 +95,7 @@ export function MixExportPanel({
           <Icon name="AlertTriangle" size={16} />
           <span>
             {missing} ·
-            这段时间在成品里留成静音，**不会被别人的段顶替**（段号是歌里的固定位置，永不压缩）。
+            这段时间在成品里留成静音，不会被别人的段顶替（段号是歌里的固定位置，永不压缩）。
           </span>
         </p>
       )}
@@ -104,7 +111,7 @@ export function MixExportPanel({
       ) : null}
 
       {busy ? (
-        <p role="status" aria-live="polite" className="text-[0.875rem] text-slate-current">
+        <p role="status" aria-live="polite" className="text-[0.875rem] text-muted">
           {PHASE_LABEL[view.phase]}
           {view.progress.total > 0
             ? ` （${String(view.progress.done)}/${String(view.progress.total)} 段）`
@@ -115,7 +122,7 @@ export function MixExportPanel({
       {view.error === null ? null : (
         <p
           role="alert"
-          className="flex items-start gap-2 rounded-base border border-danger-border bg-danger-tint px-4 py-3 text-[0.875rem] leading-[1.6] text-coral-deep"
+          className="flex items-start gap-2 rounded-base border border-danger-border bg-danger-tint px-4 py-3 text-[0.875rem] leading-[1.6] text-danger"
         >
           <Icon name="AlertCircle" size={18} />
           <span>{view.error}</span>
@@ -134,7 +141,7 @@ export function MixExportPanel({
           <a
             href={view.objectUrl}
             download={view.fileName}
-            className="inline-flex min-h-11 w-fit items-center gap-2 rounded-base border-[1.5px] border-driftline px-6 text-[0.9375rem] font-semibold text-peacock transition-transform duration-200 ease-out hover:scale-[1.03] focus-visible:ring-2 focus-visible:ring-peacock focus-visible:ring-offset-2"
+            className="inline-flex min-h-11 w-fit items-center gap-2 rounded-base border-[1.5px] border-line/30 px-6 text-[0.9375rem] font-semibold text-coral transition-transform duration-200 ease-out hover:scale-[1.03] focus-visible:ring-2 focus-visible:ring-coral focus-visible:ring-offset-2 focus-visible:ring-offset-ink"
           >
             <Icon name="UploadCloud" size={18} />
             下载成品（WAV · {view.fileName}）
@@ -161,7 +168,7 @@ export function MixExportPanel({
           </Button>
         )}
       </div>
-    </Card>
+    </div>
   );
 }
 

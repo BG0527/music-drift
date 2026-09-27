@@ -48,7 +48,7 @@ describe('我的收藏', () => {
     setup([{ bottleId: COLLECTED_ID, createdAt: '2026-09-23T03:00:00.000Z' }]);
 
     const link = await screen.findByRole('link', { name: /听这支作品/ });
-    expect(link).toHaveAttribute('href', `/sea/${COLLECTED_ID}`);
+    expect(link).toHaveAttribute('href', `/bottles/${COLLECTED_ID}`);
   });
 
   it('空态说明"在哪里收藏"，并给公海大厅的出口', async () => {

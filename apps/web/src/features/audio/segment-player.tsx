@@ -8,11 +8,13 @@
  *   不依赖颜色表达进度（DESIGN.md §Accessibility 媒体条款）；
  * - 只给**结构性提示**（第几段 / 时长），不显示歌词正文（版权约束，CONTEXT §3.2 的 Demo 口径）。
  */
+import { useEffect } from 'react';
 import type { AudioElementLike } from './use-segment-player';
 import { useSegmentPlayer, type PlaybackState } from './use-segment-player';
+import { useGrooveReporter } from './groove-playback';
 import { DislikeButton } from './dislike-button';
 import { formatClock, formatSeconds } from './format';
-import { Button, Card, Icon, cn } from '../../design-system';
+import { Button, Icon, cn } from '../../design-system';
 
 /**
  * 透给消费者的"当前段已听状态"。语义唯一来源是 `ListenTracker`（覆盖率并集），
@@ -116,22 +118,50 @@ export function SegmentPlayer({
   const listenedSeconds = formatSeconds(player.coveredMs);
   const totalSeconds = formatSeconds(typeof durationMs === 'number' ? durationMs : 0);
 
+  /**
+   * 沟槽时间轴的唱针（deploy-plan §17：唱针 = 播放头，跟随**真实播放进度**）。
+   * 这里上报的是**段内播放位置**（currentTime / 服务端段长），不是覆盖率 ——
+   * 覆盖率是"听进去多少"（点踩门槛），播放位置是"现在放到哪儿"（唱针），两者语义不同。
+   * 页面没包 `GroovePlaybackProvider` 时 reporter 是 no-op，其它播放器用法不受影响。
+   */
+  const grooveReport = useGrooveReporter();
+  const groovePositionRatio =
+    typeof durationMs === 'number' && durationMs > 0
+      ? Math.min(1, Math.max(0, player.positionMs / durationMs))
+      : 0;
+  useEffect(() => {
+    grooveReport({
+      segmentIndex,
+      positionRatio: groovePositionRatio,
+      playbackState: player.playbackState,
+    });
+    return () => {
+      // 播放器卸载（换段 / 页面离开）⇒ 唱针退回"没有播放器"，不留在旧段上
+      grooveReport({ segmentIndex: null, positionRatio: 0, playbackState: 'idle' });
+    };
+  }, [groovePositionRatio, grooveReport, player.playbackState, segmentIndex]);
+
   return (
-    <Card className={cn('flex flex-col gap-4 rounded-xl', className)}>
+    <div
+      className={cn(
+        // record-v1（DESIGN.md §Components）：播放条 = 浮动层 L2 —— `water-void` 底 + 1px `rgba(line,.2)`
+        // + 阴影（阴影只允许给浮层与浮动条，这是全站少数允许阴影的地方之一）
+        // 间距 p-3/gap-3：一屏门禁（§46.3）下播放条压高，行距让位于整页高度
+        'flex flex-col gap-3 rounded-xl border border-line/20 bg-water-void p-3 shadow-floating',
+        className,
+      )}
+    >
       <div className="flex items-start justify-between gap-4">
-        <h3 className="text-[1.125rem] font-semibold text-abyss">
+        <h3 className="text-[1.125rem] font-semibold text-paper">
           第 {segmentIndex} 段{ownerCode === null ? '' : ` · ${ownerCode}`}
         </h3>
-        {/* DESIGN.md：段位时长用 Quattrocento 数字（引用既有字体 token，不新增值） */}
-        <span
-          className="shrink-0 text-[0.875rem] text-slate-current"
-          style={{ fontFamily: 'var(--font-latin)' }}
-        >
+        {/* DESIGN.md：段位时长用 Quattrocento 数字（引用字体 token，不新增值） */}
+        <span className="font-latin shrink-0 text-[0.875rem] text-muted">
           {typeof durationMs === 'number' && durationMs > 0 ? formatClock(durationMs) : '--:--'}
         </span>
       </div>
 
-      <div className="flex items-center gap-3">
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
         <Button
           aria-label={PLAYBACK_UI[player.playbackState].label}
           onClick={player.toggle}
@@ -139,28 +169,29 @@ export function SegmentPlayer({
         >
           {PLAYBACK_UI[player.playbackState].label}
         </Button>
-        <p aria-live="polite" className="text-[0.875rem] text-slate-current">
+        <p aria-live="polite" className="text-[0.875rem] text-muted">
           已听 {listenedSeconds} 秒 / 共 {totalSeconds} 秒（{percent}%）
         </p>
+
+        {/*
+          状态文字（**节点保持稳定**，不靠改 `key` 逼动画重播 —— `motion-web` §5 明令禁止
+          "靠改 key 造成子树重建"：会丢焦点、丢输入、丢滚动位置，而且这里也根本不需要重建）。
+          与播放按钮**同一个行容器**（flex-wrap，窄屏自然换行）：一屏门禁下不给它单独占一行。
+
+          状态变化的可见性由**三条彼此独立的通道**保证（`motion-web` §7「动效不得是唯一反馈」）：
+          ① 结构/文字：这行文案本身随状态改变；② 按钮：文案与图标同时换（播放→暂停→继续播放→重新播放）；
+          ③ 无障碍：`aria-live="polite"` 播报。
+          这里的 `enter-fade` 只负责"这个区块初次出现时的入场"（DESIGN.md 的入场动效契约），
+          它**只动 opacity**，时长/缓动来自 DS token（不内联新值），reduced-motion 由 motion.css 全局降级。
+        */}
+        <p
+          data-testid="playback-state"
+          aria-live="polite"
+          className="enter-fade text-[0.875rem] leading-[1.6] text-muted"
+        >
+          {PLAYBACK_UI[player.playbackState].state}
+        </p>
       </div>
-
-      {/*
-        状态文字（**节点保持稳定**，不靠改 `key` 逼动画重播 —— `motion-web` §5 明令禁止
-        "靠改 key 造成子树重建"：会丢焦点、丢输入、丢滚动位置，而且这里也根本不需要重建）。
-
-        状态变化的可见性由**三条彼此独立的通道**保证（`motion-web` §7「动效不得是唯一反馈」）：
-        ① 结构/文字：这行文案本身随状态改变；② 按钮：文案与图标同时换（播放→暂停→继续播放→重新播放）；
-        ③ 无障碍：`aria-live="polite"` 播报。
-        这里的 `enter-fade` 只负责"这个区块初次出现时的入场"（DESIGN.md 的入场动效契约），
-        它**只动 opacity**，时长/缓动来自 DS token（不内联新值），reduced-motion 由 motion.css 全局降级。
-      */}
-      <p
-        data-testid="playback-state"
-        aria-live="polite"
-        className="enter-fade text-[0.875rem] leading-[1.6] text-slate-current"
-      >
-        {PLAYBACK_UI[player.playbackState].state}
-      </p>
 
       <div
         role="progressbar"
@@ -168,11 +199,11 @@ export function SegmentPlayer({
         aria-valuemin={0}
         aria-valuemax={100}
         aria-valuenow={percent}
-        className="h-2 w-full overflow-hidden rounded-pill bg-tide-pool"
+        className="h-2 w-full overflow-hidden rounded-sm bg-line/10"
       >
-        {/* 只动 transform：DESIGN.md 禁止动画 width/height */}
+        {/* 只动 transform：DESIGN.md 禁止动画 width/height；已播进度用唯一的强调色 coral */}
         <div
-          className="h-2 origin-left rounded-pill bg-peacock transition-transform duration-200 ease-out"
+          className="h-2 origin-left rounded-sm bg-coral transition-transform duration-200 ease-out"
           style={{ transform: `scaleX(${player.ratio})` }}
         />
       </div>
@@ -184,6 +215,6 @@ export function SegmentPlayer({
           onCast={() => onCastDislike?.(segmentIndex)}
         />
       ) : null}
-    </Card>
+    </div>
   );
 }

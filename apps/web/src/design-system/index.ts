@@ -27,6 +27,12 @@ export {
   LightShafts,
   CurrentLines,
   DriftingBottle,
+  // record-v1 装置（S2）：盘面 / 掠光 / 沟槽=河道 / 水线 / 涟漪
+  Platter,
+  Glint,
+  Groove,
+  Waterline,
+  Ripple,
   type DecorProps,
 } from './wave';
 export { Icon, type IconName, type IconProps } from './icon';

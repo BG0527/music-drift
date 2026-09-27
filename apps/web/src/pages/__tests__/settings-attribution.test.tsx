@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fireEvent, screen, within } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
+import { CONTRACT_VERSION } from '@music-drift/shared';
 import { LIBRARY_LICENSE, LIBRARY_METADATA_URL } from '@music-drift/shared/audio';
 import { USER_A } from '../../test/fixtures';
 import { renderWithProviders } from '../../test/harness';
@@ -85,5 +86,175 @@ describe('设置页 · 伴奏署名（CC BY 4.0）', () => {
       LIBRARY_LICENSE.licenseUrl,
     );
     expect(within(section).getByText(/曲目列表暂时读不到/)).toBeInTheDocument();
+  });
+});
+
+/**
+ * 设置页的装置是「**折页 + 水线切开「匿名的边界」**」（record-v1，`docs/impl-plan-record-v1.md` §5.1）：
+ * 折页给出两栏，一条水线横切整张纸 —— **线上的两条别人看得到、线下的那一条只有你知道**。
+ *
+ * 为什么这里要机器钉住：响应式重排最容易毁掉的就是这类"顺序承担语义"的装置
+ * （把三条边界排成一列之后，"哪两条在水上"就读不出来了）。机器判据只能证明
+ * 「375 无横向滚动 + `settings-attribution` 锚点进首屏」，证明不了水线两侧各是几条。
+ */
+describe('设置页 · 折页 + 水线切开「匿名的边界」', () => {
+  async function renderSettings(): Promise<HTMLElement> {
+    const { container } = renderWithProviders(<SettingsPage />, {
+      route: '/settings',
+      handlers: handlers(() => ({ body: METADATA })),
+    });
+    await screen.findByRole('heading', { name: '匿名的边界' });
+    return container;
+  }
+
+  it('折页：两栏之间有折线，且折线只在桌面出现（375 折成一页）', async () => {
+    const container = await renderSettings();
+    const fold = container.querySelector('[data-device="fold"]');
+    expect(fold, '缺折线').not.toBeNull();
+    expect(fold?.className, '折线必须在 768px 以下收起').toContain('md:');
+    expect(fold?.getAttribute('aria-hidden')).toBe('true');
+  });
+
+  it('水线把三条边界切开：线上两条「别人看得到」、线下一条「只有你自己知道」', async () => {
+    const container = await renderSettings();
+    const above = container.querySelector('[data-device="anonymous-above"]');
+    const below = container.querySelector('[data-device="anonymous-below"]');
+    const waterline = container.querySelector('[data-device="anonymous-waterline"]');
+
+    expect(above, '水线之上缺一块').not.toBeNull();
+    expect(below, '水线之下缺一块').not.toBeNull();
+    expect(waterline, '缺水线本身').not.toBeNull();
+
+    // 三条边界的**分布**：2 上 1 下 —— 这正是这一页的装置
+    expect(above?.querySelectorAll('li')).toHaveLength(2);
+    expect(below?.querySelectorAll('li')).toHaveLength(1);
+
+    // 水线必须在两者**之间**（DOM 顺序 + 视觉顺序同一口径）
+    const follows = (a: Element, b: Element): boolean =>
+      (a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0;
+    expect(follows(above as Element, waterline as Element), '水线不在线上内容之后').toBe(true);
+    expect(follows(waterline as Element, below as Element), '水线不在线下内容之前').toBe(true);
+  });
+
+  it('线两侧各写清自己是什么（水线不是一根无字的分隔线）', async () => {
+    await renderSettings();
+    expect(screen.getByText('水面之上 · 别人看得到的')).toBeInTheDocument();
+    expect(screen.getByText('水面之下 · 只有你自己知道的')).toBeInTheDocument();
+  });
+
+  it('三条边界的原文都在（不许为了排版删掉哪一条）', async () => {
+    await renderSettings();
+    expect(screen.getByText(/每支瓶子一个独立代号/)).toBeInTheDocument();
+    expect(screen.getByText(/别人拿不到你的账号/)).toBeInTheDocument();
+    expect(screen.getByText(/账号只用于认领你自己的漂流瓶与漂流日志/)).toBeInTheDocument();
+  });
+});
+
+/**
+ * 设置页 · **逐值复核**（`docs/impl-plan-record-v1.md` §5.5：精确值一律以同名 `.html` 为准）。
+ * 设计稿 = `docs/ui-review/design-explore/p-settings-record.html`。
+ * 样式值（字号 / 字距 / 透明度 / 宽度）用**源码级断言**钉住（jsdom 无渲染，看 class 串）；
+ * 文案用 DOM 断言。整改前这些断言会红（Red → Green 的证据在交付汇报里）。
+ */
+describe('设置页 · 逐值对齐 p-settings-record.html', () => {
+  const source = (): string =>
+    readFileSync(join(process.cwd(), 'src', 'pages', 'settings-page.tsx'), 'utf8').replace(
+      /\s+/g,
+      ' ',
+    );
+
+  it('页头：h1 桌面 58px；导语 14.5px/1.85 且宽 500px；封面元信息 11px/.24em 且是 paper/.5', () => {
+    const src = source();
+    expect(src, 'h1 桌面档应是设计稿的 58px（不是 56px）').toContain('md:text-[3.625rem]');
+    expect(src).not.toContain('md:text-[3.5rem]');
+    expect(src, '导语 14.5px/1.85').toContain('text-[0.90625rem] leading-[1.85]');
+    expect(src, '导语宽 500px').toContain('max-w-[500px]');
+    expect(src, '.cat 是 rgba(243,249,250,.5) = paper/50，不是 muted/70').toContain(
+      'text-[0.6875rem] tracking-[0.24em] text-paper/50',
+    );
+  });
+
+  it('h2 = 17px/700/1.3 + h2.block 的 1px 下边框与 11px 内距（设计稿不是 19px/600）', () => {
+    const src = source();
+    expect(src, '17px/700/1.3').toContain('text-[1.0625rem] font-bold leading-[1.3]');
+    expect(src, 'h2.block 的下边框').toContain('border-b border-line/13 pb-[11px]');
+    expect(src, '旧 19px/600 应清掉').not.toContain('text-[1.1875rem] font-semibold');
+    expect(src, '行分隔从 h2 边框走，ol 不再顶一条 border-t').not.toContain(
+      'border-t border-line/13 pt-4',
+    );
+  });
+
+  it('三条边界：桌面正文 15.5px；序号 14px（水上 water-mid/.5、水下 paper/.36）', () => {
+    const src = source();
+    expect(src, '桌面正文 15.5px').toContain('md:text-[0.96875rem]');
+    expect(src, '序号 14px + 水上色').toContain('text-[0.875rem] text-water-mid/50');
+    expect(src, '水下序号更深一档').toContain('text-[0.875rem] text-paper/[0.36]');
+  });
+
+  it('水线两侧图例：上行 water-mid/.62、短线 10px；下行 muted/.7（设计稿 .cap.up/.cap.dn）', () => {
+    const src = source();
+    expect(src, '.cap.up 色 = rgba(203,238,246,.62)').toContain('text-water-mid/[0.62]');
+    expect(src, '.cap.up::before = water-mid/.5、宽 10px').toContain(
+      'h-px w-[10px] bg-water-mid/50',
+    );
+    expect(src, '.cap.dn::before = paper/.28、宽 10px').toContain('h-px w-[10px] bg-paper/[0.28]');
+    expect(src, '.cap.dn 色 = muted/.7').toContain('text-muted/70');
+  });
+
+  it('当前身份 = .who：19px/700 + coral 记号（2×19px、右距 11px）+ 设计稿的「已登录态」行', async () => {
+    const src = source();
+    expect(src, '.who 19px/700 paper').toContain('text-[1.1875rem] font-bold text-paper');
+    expect(src, 'coral 记号 2×19px').toContain('h-[19px] w-0.5 bg-coral');
+    expect(src, '记号右距 11px').toContain('mr-[11px]');
+
+    renderWithProviders(<SettingsPage />, {
+      route: '/settings',
+      handlers: handlers(() => ({ body: METADATA })),
+    });
+    await screen.findByRole('heading', { name: '匿名的边界' });
+    expect(screen.getByText('已登录态')).toBeInTheDocument();
+    expect(screen.getByText('已登录：代号（邮箱）')).toBeInTheDocument();
+    expect(screen.getByText('已登录态')).toHaveClass('text-paper/[0.42]');
+  });
+
+  it('契约版本是两段：标签 11px/.24em paper/.5 + 值 18px/.04em（不是合成一行）', async () => {
+    const src = source();
+    expect(src, '值 18px/.04em').toContain('text-[1.125rem] tracking-[0.04em]');
+
+    renderWithProviders(<SettingsPage />, {
+      route: '/settings',
+      handlers: handlers(() => ({ body: METADATA })),
+    });
+    const label = await screen.findByText('契约版本');
+    expect(label.textContent).not.toContain(CONTRACT_VERSION);
+    expect(screen.getByText(CONTRACT_VERSION)).toBeInTheDocument();
+  });
+
+  it('伴奏说明 13.5px/1.8；环境说明与登出注 12.5px/1.75（设计稿 .body/.env/.note）', () => {
+    const src = source();
+    expect(src, '伴奏说明 13.5px/1.8').toContain('text-[0.84375rem] leading-[1.8]');
+    const envAndNote = src.match(/text-\[0\.78125rem\] leading-\[1\.75\]/g) ?? [];
+    expect(envAndNote.length, '环境说明 + 登出注各一处').toBeGreaterThanOrEqual(2);
+  });
+
+  it('折页纸面：干半 water-bed/90（58.8% 高）、湿半 water-bed/45 + 水膜 —— 湿的那半才透出沟槽', () => {
+    const src = source();
+    expect(src, '干半（设计稿 .leaf-dry ≈ .9 不透）').toContain('h-[58.8%] bg-water-bed/90');
+    expect(src, '湿半（设计稿 .leaf-wet ≈ .32–.56 半透）').toContain('h-[41.2%] bg-water-bed/45');
+    expect(src, '湿纸水膜 .film = glass/.07→0').toContain('from-glass/[0.07]');
+    expect(src, '单层 25% 的旧纸面应清掉').not.toContain('bg-water-bed/25');
+  });
+
+  it('瓶上的代号签 12.5px/.18em 暖色；小注 11px/.16em paper/.5（设计稿两档字距）', () => {
+    const src = source();
+    expect(src, '代号/账号签的暖色底与描边').toContain('border border-warm/[0.55] bg-warm/[0.18]');
+    const chips = src.match(/text-\[0\.78125rem\] tracking-\[0\.18em\] text-warm\/95/g) ?? [];
+    expect(chips.length, '「代号」与「账号」各一枚').toBeGreaterThanOrEqual(2);
+    const tinies = src.match(/text-\[0\.6875rem\] tracking-\[0\.16em\] text-paper\/50/g) ?? [];
+    expect(tinies.length, '「你的声音」与「倒影 · 账号与邮箱」').toBeGreaterThanOrEqual(2);
+  });
+
+  it('关键块有 data-anchor（机器判据：settings-attribution 进 375 首屏）', () => {
+    expect(source()).toContain('data-anchor="settings-attribution"');
   });
 });

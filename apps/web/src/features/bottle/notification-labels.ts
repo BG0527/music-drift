@@ -60,9 +60,17 @@ export function describeNotification(notification: NotificationLike): Notificati
           ? `${titled(songTitle) || '你参与的这支作品'}已经补齐所有段位并进入公海，可以回听完整接力链。`
           : `${titled(songTitle) || '你参与的这支作品'}还在公海等待接力。`,
         tone: complete ? 'success' : 'info',
-        href: bottleId === null ? null : complete ? `/sea/${bottleId}` : `/bottles/${bottleId}`,
+        // 公海详情页已删（deploy-plan §17 用户裁决）：完成品的落点也进瓶子详情（沟槽时间轴在此）
+        href: bottleId === null ? null : `/bottles/${bottleId}`,
       };
     }
+    case 'BOTTLE_RETURNED':
+      return {
+        label: '收到回传 · 等你操作',
+        detail: `${titled(songTitle) || '你的漂流瓶'}完整回到了你手里 —— 你只能把它送进公海。`,
+        tone: 'warning',
+        href: bottleId === null ? null : `/bottles/${bottleId}`,
+      };
     default:
       return {
         label: '有一条新的动态',

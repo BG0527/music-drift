@@ -122,6 +122,18 @@ describe('SegmentPlayer：结构与可访问性', () => {
 
     expect(screen.getByText(/已听 2\.0 秒/)).toBeInTheDocument();
   });
+
+  it('状态文字与播放按钮同一个行容器（一屏门禁：状态行不再单独占一整行）', () => {
+    setup();
+
+    const state = document.querySelector('[data-testid="playback-state"]');
+    const toggle = screen.getByRole('button', { name: '播放' });
+    expect(state, '状态文字节点必须在（aria-live 通道不许删）').not.toBeNull();
+    expect(
+      state!.parentElement,
+      '状态文字必须与播放按钮同一行容器（压掉单独一行的高度）',
+    ).toBe(toggle.parentElement);
+  });
 });
 
 describe('SegmentPlayer：点踩门槛', () => {

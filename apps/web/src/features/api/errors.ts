@@ -78,8 +78,8 @@ const RULE_FALLBACK_MESSAGES: Record<string, string> = {
   AUDIO_SEGMENT_PRESET_MISSING: '这一段的固定时长还没登记，现在没法录；换一首歌，或者稍后再来。',
   EMAIL_TAKEN: '这个邮箱已经注册过了，直接登录试试？',
   HANDLE_TAKEN: '这个名字已经有人用了，换一个吧。',
-  INVALID_CREDENTIALS: '账号或口令不正确。',
-  WEAK_PASSWORD: '口令太弱了：至少 8 位，且要同时包含字母和数字。',
+  INVALID_CREDENTIALS: '账号或密码不正确。',
+  WEAK_PASSWORD: '密码太弱了：至少 8 位，且要同时包含字母和数字。',
 };
 
 const LOGIN_EXIT: ApiErrorExit = { key: 'login', label: '去登录' };

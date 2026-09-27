@@ -14,7 +14,6 @@ import { LoginPage } from './login-page';
 import { NotFoundPage } from './not-found-page';
 import { ProfilePage } from './profile-page';
 import { RiverPage } from './river-page';
-import { SeaDetailPage } from './sea-detail-page';
 import { SeaPage } from './sea-page';
 import { SettingsPage } from './settings-page';
 import { SongPickerPage } from './song-picker-page';
@@ -41,8 +40,6 @@ export function RouteView() {
         return <DriftLogPage id={match.params['id'] ?? ''} />;
       case 'sea':
         return <SeaPage />;
-      case 'seaDetail':
-        return <SeaDetailPage id={match.params['id'] ?? ''} />;
       case 'profile':
         return <ProfilePage />;
       case 'settings':

@@ -30,7 +30,7 @@ export function CollectionsPanel({ open, onClose }: CollectionsPanelProps) {
   return (
     <Modal open={open} title="我的收藏" onClose={onClose}>
       <div className="flex flex-col gap-3">
-        <p className="text-[0.9375rem] leading-[1.6] text-slate-current">
+        <p className="text-[0.9375rem] leading-[1.6] text-muted">
           收藏只对已完成并进入公海的作品开放：听到想再听的，把它收起来。
         </p>
 
@@ -40,7 +40,7 @@ export function CollectionsPanel({ open, onClose }: CollectionsPanelProps) {
           emptyWhen={(items) => items.length === 0}
           empty={
             <div className="flex flex-col gap-2">
-              <p className="text-[0.9375rem] leading-[1.6] text-slate-current">
+              <p className="text-[0.9375rem] leading-[1.6] text-muted">
                 还没有收藏。去公海大厅听一支完整作品，再把它收起来。
               </p>
               <Link to="/sea" className={TEXT_LINK_STRONG}>
@@ -57,7 +57,7 @@ export function CollectionsPanel({ open, onClose }: CollectionsPanelProps) {
                 ))}
               </ul>
               {items.length > visible.length ? (
-                <p className="text-[0.8125rem] text-slate-current">
+                <p className="text-[0.8125rem] text-muted">
                   收藏共 {items.length} 支，这里先显示最近 {visible.length} 支。
                 </p>
               ) : null}
@@ -73,19 +73,20 @@ function CollectedRow({ bottleId }: { bottleId: string }) {
   const sea = useSeaBottle(bottleId);
 
   return (
-    <li className="flex flex-wrap items-center gap-x-[12px] gap-y-[4px] rounded-base border border-mist bg-foam px-4 py-[8px]">
+    <li className="flex flex-wrap items-center gap-x-[12px] gap-y-[4px] rounded-base border border-line/15 bg-ink px-4 py-[8px]">
       {sea.isPending ? (
         <Skeleton height="1.25rem" width="10rem" />
       ) : sea.data === undefined ? (
         // 404 = 这支作品已经不在公海了（被撤下 / 链接失效）。如实说，不显示一个假曲名。
-        <span className="text-[0.9375rem] text-slate-current">这支作品已经不在公海了</span>
+        <span className="text-[0.9375rem] text-muted">这支作品已经不在公海了</span>
       ) : (
         <>
-          <span className="text-[1rem] font-semibold text-abyss">{sea.data.songTitle}</span>
-          <span className="text-[0.875rem] text-slate-current">{progressLabel(sea.data)}</span>
+          <span className="text-[1rem] font-semibold text-paper">{sea.data.songTitle}</span>
+          <span className="text-[0.875rem] text-muted">{progressLabel(sea.data)}</span>
         </>
       )}
-      <Link to={`/sea/${bottleId}`} className={`ml-auto ${TEXT_LINK}`}>
+      {/* 公海详情页已删（deploy-plan §17 用户裁决）：收藏的落点 = 瓶子详情（沟槽时间轴在此） */}
+      <Link to={`/bottles/${bottleId}`} className={`ml-auto ${TEXT_LINK}`}>
         <span className="whitespace-nowrap">听这支作品</span>
       </Link>
     </li>

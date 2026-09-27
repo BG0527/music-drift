@@ -39,8 +39,8 @@ const STATUS_LABEL: Record<PrivateMessage['status'], string> = {
 };
 
 const STATUS_STYLE: Record<PrivateMessage['status'], string> = {
-  PENDING: 'bg-tide-pool text-slate-current',
-  DELIVERED: 'bg-info-tint text-peacock',
+  PENDING: 'bg-water-void text-muted',
+  DELIVERED: 'bg-info-tint text-info',
   UNDELIVERED: 'bg-warning-tint text-warning',
 };
 
@@ -93,18 +93,18 @@ export function PrivateMessages({ open, bottleId, canWrite, onClose }: PrivateMe
   return (
     <Modal open={open} title="私密留言" onClose={onClose}>
       <div className="flex flex-col gap-4">
-        <p className="text-[0.9375rem] leading-[1.6] text-slate-current">
+        <p className="text-[0.9375rem] leading-[1.6] text-muted">
           留言只有收件人看得到：你指定之前某一棒的作者，内容会跟着这支瓶子漂到他手里；中间接过棒的人看不到它。
         </p>
 
         {canWrite ? (
           <AsyncBoundary
             query={bottle}
-            skeleton={<div aria-busy="true" className="h-[96px] rounded-base bg-tide-pool" />}
+            skeleton={<div aria-busy="true" className="h-[96px] rounded-base bg-water-void" />}
           >
             {() =>
               candidates.length === 0 ? (
-                <p className="rounded-base border border-mist bg-foam px-4 py-[10px] text-[0.9375rem] leading-[1.6] text-slate-current">
+                <p className="rounded-base border border-line/15 bg-ink px-4 py-[10px] text-[0.9375rem] leading-[1.6] text-muted">
                   没有可选的收件人：留言只能发给「之前各段」的作者，而你接的是第 1 段 —— 你前面还没有人唱过。
                 </p>
               ) : (
@@ -116,14 +116,14 @@ export function PrivateMessages({ open, bottleId, canWrite, onClose }: PrivateMe
                   }}
                 >
                   <label className="flex flex-col gap-[6px]">
-                    <span className="text-[0.875rem] text-slate-current">送给哪一段的作者</span>
+                    <span className="text-[0.875rem] text-muted">送给哪一段的作者</span>
                     <select
                       aria-label="送给哪一段的作者"
                       value={targetIndex === '' ? String(effectiveTarget ?? '') : targetIndex}
                       onChange={(event) => {
                         setTargetIndex(event.target.value);
                       }}
-                      className="h-[44px] w-full rounded-base border border-mist bg-wave-white px-4 text-[0.9375rem] text-abyss"
+                      className="h-[44px] w-full rounded-base border border-line/15 bg-water-void px-4 text-[0.9375rem] text-paper"
                     >
                       {candidates.map((candidate) => (
                         <option key={candidate.index} value={String(candidate.index)}>
@@ -134,7 +134,7 @@ export function PrivateMessages({ open, bottleId, canWrite, onClose }: PrivateMe
                   </label>
 
                   <label className="flex flex-col gap-[6px]">
-                    <span className="text-[0.875rem] text-slate-current">写一句给这一段的作者</span>
+                    <span className="text-[0.875rem] text-muted">写一句给这一段的作者</span>
                     <textarea
                       aria-label="写一句给这一段的作者"
                       value={draft}
@@ -143,7 +143,7 @@ export function PrivateMessages({ open, bottleId, canWrite, onClose }: PrivateMe
                       onChange={(event) => {
                         setDraft(event.target.value);
                       }}
-                      className="w-full resize-none rounded-base border border-mist bg-wave-white px-4 py-[10px] text-[0.9375rem] text-abyss"
+                      className="w-full resize-none rounded-base border border-line/15 bg-water-void px-4 py-[10px] text-[0.9375rem] text-paper"
                     />
                   </label>
 
@@ -157,7 +157,7 @@ export function PrivateMessages({ open, bottleId, canWrite, onClose }: PrivateMe
                     >
                       送出留言
                     </Button>
-                    <span className="text-[0.8125rem] text-slate-current">
+                    <span className="text-[0.8125rem] text-muted">
                       瓶子还在漂流时都能写；它漂到收件人手里那一刻才算送达。
                     </span>
                   </div>
@@ -175,10 +175,10 @@ export function PrivateMessages({ open, bottleId, canWrite, onClose }: PrivateMe
 
         <AsyncBoundary
           query={messages}
-          skeleton={<div aria-busy="true" className="h-[64px] rounded-base bg-tide-pool" />}
+          skeleton={<div aria-busy="true" className="h-[64px] rounded-base bg-water-void" />}
           emptyWhen={(items) => items.length === 0}
           empty={
-            <p className="rounded-base border border-mist bg-foam px-4 py-[10px] text-[0.9375rem] text-slate-current">
+            <p className="rounded-base border border-line/15 bg-ink px-4 py-[10px] text-[0.9375rem] text-muted">
               {canWrite
                 ? '还没有留言。你写的会在这支瓶子漂到收件人手里之后显示给他。'
                 : '看不到任何留言：只有收件人和发送者能读到这些内容。'}
@@ -190,14 +190,14 @@ export function PrivateMessages({ open, bottleId, canWrite, onClose }: PrivateMe
               {items.map((item) => (
                 <li
                   key={item.id}
-                  className="flex flex-col gap-[6px] rounded-base border border-mist bg-foam px-4 py-[10px]"
+                  className="flex flex-col gap-[6px] rounded-base border border-line/15 bg-ink px-4 py-[10px]"
                 >
-                  <p className="text-[0.9375rem] leading-[1.6] text-abyss">{item.content}</p>
+                  <p className="text-[0.9375rem] leading-[1.6] text-paper">{item.content}</p>
                   <p className="flex flex-wrap items-center gap-x-[12px] text-[0.8125rem]">
-                    <span className="text-slate-current">
+                    <span className="text-muted">
                       给第 {String(item.targetSegmentIndex)} 段的作者
                     </span>
-                    <span className={cn('rounded-pill px-3 py-1', STATUS_STYLE[item.status])}>
+                    <span className={cn('rounded-base px-3 py-1', STATUS_STYLE[item.status])}>
                       {STATUS_LABEL[item.status]}
                     </span>
                   </p>

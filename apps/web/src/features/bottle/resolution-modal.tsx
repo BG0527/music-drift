@@ -6,6 +6,10 @@
  *    末段录满之后不能"继续投河"，这些判断都在内核里，前端不许自己猜；
  * 2. **未选去向时"确认投递"禁用**（不让用户点一下才知道）；
  * 3. 提交失败（409 / 422）**留在模态里就地解释**，不关掉模态、不丢用户的选择。
+ *
+ * record-v1 形态：**一行一个去向**（图标盘 + 名称 + "会发生什么"），选中态用 coral 边框 +
+ * coral 淡底 + 实心 coral 盘 —— 颜色之外还有 `aria-pressed` 与「已选择」文字，
+ * 不靠颜色单独表达状态。圆角一律 2px（`rounded-base`）。
  */
 import { useState } from 'react';
 import type { Resolution } from '@music-drift/shared';
@@ -75,7 +79,7 @@ export function ResolutionModal({
         </>
       }
     >
-      <p className="text-[0.9375rem] leading-[1.6] text-slate-current">
+      <p className="text-[0.9375rem] leading-[1.6] text-muted">
         {stage === 'FIRST_CAST'
           ? '第 1 段已经录好了。投河之后就交出去了：只有下一位捞到的人能听到它，你可以在漂流日志里看它漂到哪了。'
           : '接力乐章已就绪，你的声音将驶向何方？'}
@@ -85,49 +89,56 @@ export function ResolutionModal({
       {error === undefined ? null : <ConflictNotice error={error} bottleId={bottleId} />}
 
       {options.length === 0 ? (
-        <p role="status" className="text-[0.875rem] leading-[1.6] text-slate-current">
+        <p role="status" className="text-[0.875rem] leading-[1.6] text-muted">
           现在还不能选择去向：先录一段，或者等当前这一步完成。
         </p>
       ) : (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <ul className="flex flex-col gap-2">
           {options.map((resolution) => {
             const copy = resolutionCopy(resolution);
             const isSelected = selected === resolution;
             return (
-              <button
-                key={resolution}
-                type="button"
-                aria-pressed={isSelected}
-                onClick={() => {
-                  setSelected(resolution);
-                }}
-                className={cn(
-                  'flex min-h-11 flex-col items-start gap-3 rounded-base border p-4 text-left',
-                  'focus-visible:ring-2 focus-visible:ring-peacock focus-visible:ring-offset-2 focus-visible:ring-offset-foam',
-                  isSelected
-                    ? 'border-peacock bg-info-tint'
-                    : 'border-driftline bg-wave-white hover:bg-info-tint',
-                )}
-              >
-                <span
+              <li key={resolution}>
+                <button
+                  type="button"
+                  aria-pressed={isSelected}
+                  onClick={() => {
+                    setSelected(resolution);
+                  }}
                   className={cn(
-                    'flex h-11 w-11 items-center justify-center rounded-full',
-                    isSelected ? 'bg-peacock text-wave-white' : 'bg-tide-pool text-peacock',
+                    'flex w-full min-h-11 flex-col gap-[6px] rounded-base border px-4 py-[12px] text-left',
+                    'transition-colors duration-200 ease-out',
+                    isSelected
+                      ? 'border-coral bg-coral/10'
+                      : 'border-line/15 bg-ink hover:border-line/30',
                   )}
                 >
-                  <Icon name={CARD_ICON[resolution]} size={20} />
-                </span>
-                <span className="text-[1rem] font-semibold text-abyss">{copy.title}</span>
-                <span className="text-[0.875rem] leading-[1.6] text-slate-current">
-                  {copy.detail}
-                </span>
-                <span className="text-[0.8125rem] font-medium text-peacock">
-                  {isSelected ? '已选择' : '选择这一项'}
-                </span>
-              </button>
+                  <span className="flex items-center gap-[12px]">
+                    <span
+                      className={cn(
+                        'flex h-[32px] w-[32px] shrink-0 items-center justify-center rounded-full border',
+                        isSelected ? 'border-coral bg-coral text-ink' : 'border-line/25 text-coral',
+                      )}
+                    >
+                      <Icon name={CARD_ICON[resolution]} size={18} />
+                    </span>
+                    <span className="text-[1rem] font-semibold text-paper">{copy.title}</span>
+                    <span
+                      className={cn(
+                        'ml-auto shrink-0 text-[0.8125rem] font-medium',
+                        // 12% coral 淡底**不算填充** ⇒ 其上的文字用 coral 的提亮档 danger（DESIGN.md §Colors）
+                        isSelected ? 'text-danger' : 'text-coral',
+                      )}
+                    >
+                      {isSelected ? '已选择' : '选择这一项'}
+                    </span>
+                  </span>
+                  <span className="text-[0.875rem] leading-[1.6] text-muted">{copy.detail}</span>
+                </button>
+              </li>
             );
           })}
-        </div>
+        </ul>
       )}
     </Modal>
   );

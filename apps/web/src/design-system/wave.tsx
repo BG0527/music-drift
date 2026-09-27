@@ -1,3 +1,4 @@
+import { useId } from 'react';
 import { cn } from './utils';
 
 /**
@@ -15,7 +16,7 @@ export function WaveDivider({ className }: DecorProps) {
       aria-hidden="true"
       viewBox="0 0 1200 24"
       preserveAspectRatio="none"
-      className={cn('block h-6 w-full text-mist', className)}
+      className={cn('block h-6 w-full text-line', className)}
     >
       <path
         d="M0 14 C 100 2, 200 26, 300 14 S 500 2, 600 14 S 800 26, 900 14 S 1100 2, 1200 14"
@@ -34,18 +35,18 @@ export function WaveDivider({ className }: DecorProps) {
   );
 }
 
-/** 河道导引线：纵向接力路径的骨架（已完成段用 peacock，未完成段用 mist）。 */
+/** 河道导引线：纵向接力路径的骨架（已完成段用 coral，未完成段用 line）。 */
 export function RiverLine({ progress = 0, className }: DecorProps & { progress?: number }) {
   const clamped = Math.min(1, Math.max(0, progress));
   return (
     <svg aria-hidden="true" viewBox="0 0 8 120" className={cn('block h-full w-2', className)}>
-      <line x1="4" y1="0" x2="4" y2="120" stroke="var(--color-mist)" strokeWidth="2" />
+      <line x1="4" y1="0" x2="4" y2="120" stroke="var(--color-line)" strokeWidth="2" />
       <line
         x1="4"
         y1="0"
         x2="4"
         y2={120 * clamped}
-        stroke="var(--color-peacock)"
+        stroke="var(--color-coral)"
         strokeWidth="2"
         strokeLinecap="round"
       />
@@ -54,39 +55,70 @@ export function RiverLine({ progress = 0, className }: DecorProps & { progress?:
 }
 
 /**
- * 漂流瓶标记：唯一可被"追踪"的具象元素（瓶身 + 瓶塞 + 涟漪）。
+ * 漂流瓶记号（record-v1 的 `bottleMark`）——唯一可被"追踪"的具象元素。
  *
- * `tone` 是**真实需要**而不是预留：瓶子同时出现在浅底（`peacock`，5.13:1 on foam）
- * 与深水（`sea-glass`，7.00:1 on deep-current）两种底上。
- * 深底上用 `peacock` 只有 2.05:1 —— 那会让用户点名的母题变成一块看不出的污渍（实测发生过）。
+ * **它承担信息**（DESIGN.md §Elevation & Depth：装置必须编码某件事实）：
+ * `filled` = **已录段数**（0–4）。水位按 `filled / 4` 映射 ⇒ 干瓶一眼就是"还没有人唱"，
+ * 半瓶是"缺第 3 段"，满瓶是"四段齐了"。段位不进文字、也不靠颜色区分，只靠水位。
+ *
+ * `tone` 沿用两个旧名（过渡期 API 稳定，值已 re-point）：`peacock` → coral、`sea-glass` → glass。
+ * 深底上用 coral 是 4.76:1、用 glass 是 11.08:1 —— 都 ≥3:1（非文本图形下限），
+ * 所以瓶身轮廓在两个 tone 下都不会糊成一块污渍（旧契约曾在这里踩过 2.05:1）。
  */
 export function BottleMark({
   className,
   size = 48,
   tone = 'peacock',
-}: DecorProps & { size?: number; tone?: 'peacock' | 'sea-glass' }) {
+  filled = 4,
+}: DecorProps & { size?: number; tone?: 'peacock' | 'sea-glass'; filled?: number }) {
+  const level = Math.min(4, Math.max(0, Math.round(filled)));
+  const clipId = `bottle-${useId().replace(/[^a-zA-Z0-9-]/g, '')}`;
+  const waterHeight = (level / 4) * 18;
   return (
     <svg
       aria-hidden="true"
+      data-filled={level}
       width={size}
       height={size}
       viewBox="0 0 48 48"
-      className={cn(
-        'pointer-events-none',
-        tone === 'sea-glass' ? 'text-sea-glass' : 'text-peacock',
-        className,
-      )}
+      className={cn('pointer-events-none', tone === 'sea-glass' ? 'text-glass' : 'text-coral', className)}
     >
-      <ellipse cx="24" cy="41" rx="13" ry="3.2" fill="var(--color-lagoon)" opacity="0.28" />
+      <defs>
+        <clipPath id={clipId}>
+          <path d="M18 14h12c0 2 5 5 5 11v14c0 3-2.4 5-5 5H18c-2.6 0-5-2-5-5V25c0-6 5-9 5-11Z" />
+        </clipPath>
+      </defs>
+      {/* 落点的涟漪（事件涟漪的最小形态：标记"曾经落在水面上"） */}
+      <ellipse cx="24" cy="42" rx="13" ry="3" fill="var(--color-water-mid)" opacity="0.28" />
+      <g clipPath={`url(#${clipId})`}>
+        {/* 水位 = 已录段数（0 段 = 干瓶） */}
+        <rect
+          data-water=""
+          x="12"
+          y={44 - waterHeight}
+          width="24"
+          height={waterHeight}
+          fill="var(--color-glass)"
+          opacity="0.5"
+        />
+        {/* 瓶里卷着的那道声波（纸条） */}
+        <path
+          d="M13 33 C 17 30, 19 36, 23 33 S 29 30, 33 33 S 39 36, 43 33"
+          fill="none"
+          stroke="var(--color-water-light)"
+          strokeWidth="1.2"
+          opacity="0.7"
+        />
+      </g>
       <path
-        d="M18 8h12v6c0 2 5 5 5 11v14c0 3-2.4 5-5 5h-12c-2.6 0-5-2-5-5V25c0-6 5-9 5-11V8Z"
+        d="M18 8h12v6c0 2 5 5 5 11v14c0 3-2.4 5-5 5H18c-2.6 0-5-2-5-5V25c0-6 5-9 5-11V8Z"
         fill="none"
         stroke="currentColor"
         strokeWidth="2"
         strokeLinejoin="round"
       />
-      <rect x="21" y="3" width="6" height="5" rx="1.5" fill="var(--color-coral)" />
-      <path d="M17 30h14" stroke="var(--color-wave-white)" strokeWidth="2" strokeLinecap="round" />
+      {/* 木塞：coral = 被记下的那一下（与印章/当前项同色族） */}
+      <rect x="21" y="3" width="6" height="5" rx="1" fill="var(--color-coral)" />
     </svg>
   );
 }
@@ -97,7 +129,7 @@ export function RippleRing({ className }: DecorProps) {
     <span
       aria-hidden="true"
       className={cn(
-        'ripple-ring pointer-events-none absolute inset-0 rounded-full border border-lagoon/40',
+        'ripple-ring pointer-events-none absolute inset-0 rounded-full border border-water-mid/40',
         className,
       )}
     />
@@ -257,6 +289,132 @@ export function DriftingBottle({ className, size = 34 }: DecorProps & { size?: n
       <span className="passage-drift block">
         <BottleMark size={size} tone="sea-glass" />
       </span>
+    </span>
+  );
+}
+
+/* ── record-v1 装置层（S2）───────────────────────────────────────────────────────
+   语言契约：`DESIGN.md §Elevation & Depth · 母题装置库`（platter / glint / groove /
+   waterline / ripple / bottleMark —— bottleMark 见上面的 `BottleMark`）。
+   五个新构件与上面九件**同一纪律**：`aria-hidden` + `pointer-events-none` + 绝对定位
+   （零布局高度 ⇒ 不可能破坏"一屏装下"），颜色取 `var(--color-*)`、强度取 `var(--motif-*)`。
+   宿主仍需 `relative` + `isolate`（否则 z-underlay 会落到宿主背景之下而看不见）。 */
+
+/**
+ * 盘面（platter）：**世界的底** —— 同心沟槽 + 径向内层（`repeating-radial-gradient`）。
+ * 「唱片落在水里」的那张唱片是背景层，不是主角：它只提供"这是一张盘"的质感与深度。
+ */
+export function Platter({ className }: DecorProps) {
+  return (
+    <span
+      aria-hidden="true"
+      className={cn('platter pointer-events-none absolute inset-0 z-underlay', className)}
+    />
+  );
+}
+
+/**
+ * 掠光（glint）：世界的"上方"、瓶子来的方向（101° 斜向、混合模式 screen）。
+ * 它同时是**光从哪来**的说明 —— 盘面的高光、水面的反光都与它同向。
+ */
+export function Glint({ className }: DecorProps) {
+  return (
+    <span
+      aria-hidden="true"
+      className={cn('glint pointer-events-none absolute inset-0 z-underlay', className)}
+    />
+  );
+}
+
+/**
+ * 沟槽 = 河道（groove）：**被点亮的沟槽就是已录段位**。
+ * `progress ∈ [0,1]` 直接映射到点亮长度（越界输入被夹住，不许撑破容器）；
+ * `tone` 区分两岸：`cool`（捞取一侧，glass）/ `warm`（投下一侧，warm）。
+ * 宿主给它高度与位置（例如 `inset-x-0 top-[220px] h-[9px]`）。
+ */
+export function Groove({
+  progress = 0,
+  tone = 'cool',
+  className,
+}: DecorProps & { progress?: number; tone?: 'cool' | 'warm' }) {
+  const clamped = Math.min(1, Math.max(0, progress));
+  return (
+    <span
+      aria-hidden="true"
+      className={cn(
+        'pointer-events-none absolute inset-x-0 z-underlay h-[9px]',
+        className,
+      )}
+    >
+      <span className="groove-bed absolute inset-0" />
+      <span
+        className={cn(
+          'groove-lit absolute inset-y-px left-0',
+          tone === 'warm' && 'groove-lit-warm',
+        )}
+        style={{ width: `${clamped * 100}%` }}
+      />
+    </span>
+  );
+}
+
+/**
+ * 水线（waterline）：**分界**。岸/水、线上（别人看得到）/线下（只有你知道）、
+ * 浮上来（待处理）/沉下去（历史裁决）—— 全站所有"切开"都用它，因此全页只允许一条。
+ */
+export function Waterline({ className }: DecorProps) {
+  return (
+    <span
+      aria-hidden="true"
+      className={cn('waterline pointer-events-none absolute inset-x-0 z-underlay', className)}
+    />
+  );
+}
+
+/**
+ * 涟漪（ripple）：**刚刚发生过的事**（落下 / 捞起 / 入海）。同心扁椭圆，断弧编码缺口
+ * （`gaps` = 断口数，0 = 闭合环）。它是常驻的场景涟漪时**不承载信息**（`aria-hidden`）；
+ * 作为事件涟漪时由使用方只播一次、并同时给出文案（动效不得是唯一反馈）。
+ */
+export function Ripple({ className, gaps = 1 }: DecorProps & { gaps?: number }) {
+  const breaks = Math.max(0, Math.round(gaps));
+  return (
+    <span
+      aria-hidden="true"
+      className={cn('ripple pointer-events-none absolute z-underlay', className)}
+    >
+      <svg viewBox="0 0 120 40" preserveAspectRatio="none" className="block h-full w-full">
+        <ellipse
+          cx="60"
+          cy="20"
+          rx="56"
+          ry="17"
+          fill="none"
+          stroke="var(--color-water-mid)"
+          strokeWidth="1"
+        />
+        <ellipse
+          cx="60"
+          cy="20"
+          rx="38"
+          ry="11"
+          fill="none"
+          stroke="var(--color-water-mid)"
+          strokeWidth="1"
+          opacity="0.7"
+        />
+        {/* 内圈：断弧 = 缺口（0 = 闭合，说明四段都有人唱过） */}
+        <ellipse
+          cx="60"
+          cy="20"
+          rx="20"
+          ry="6"
+          fill="none"
+          stroke="var(--color-glass)"
+          strokeWidth="1.4"
+          strokeDasharray={breaks === 0 ? undefined : `${String(26 - breaks * 2)} ${String(4 + breaks * 2)}`}
+        />
+      </svg>
     </span>
   );
 }

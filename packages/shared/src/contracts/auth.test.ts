@@ -31,6 +31,16 @@ describe('账号错误码词表', () => {
     ]);
   });
 
+  /**
+   * 用户裁决（2026-09-27 grill ④）：用户可见文案统一叫「密码」——
+   * 页面 label 已按设计稿改成「密码」，错误文案若还叫「口令」，同一块表单会两种叫法。
+   */
+  it('用户可见文案统一「密码」，不再出现「口令」', () => {
+    expect(AUTH_ERROR_MESSAGES.INVALID_CREDENTIALS).toBe('账号或密码不正确。');
+    expect(AUTH_ERROR_MESSAGES.WEAK_PASSWORD).toBe('密码太弱了：至少 8 位，且要同时包含字母和数字。');
+    expect(JSON.stringify(AUTH_ERROR_MESSAGES), '文案表里不得再有「口令」').not.toContain('口令');
+  });
+
   it('每个码都有中文文案与 HTTP 状态（不允许漏项）', () => {
     for (const code of AUTH_ERROR_CODES) {
       expect(AUTH_ERROR_MESSAGES[code], `${code} 缺文案`).toMatch(/[。？]$/);

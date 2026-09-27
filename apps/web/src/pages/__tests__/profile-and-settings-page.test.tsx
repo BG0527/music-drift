@@ -99,6 +99,33 @@ describe('个人中心', () => {
     expect(screen.queryByText(/本机记录/)).not.toBeInTheDocument();
     expect(screen.queryByText(/这台设备参与过的瓶子/)).not.toBeInTheDocument();
   });
+
+  /**
+   * 构图（p-profile-record.html 实测：列表窗在 `top:250` 的上排、消息在 `top:596` 的下排）：
+   * **窗口在上、消息在下**。移动端单列沿用同一 DOM 顺序 —— 若通知排在列表窗之前，
+   * 375 下 `me-bottles` 锚点会被通知区顶出首屏（one-screen 手机口径必红）。
+   */
+  it('构图：列表窗（我参与过的漂流瓶）排在「通知」之前——窗口在上、消息在下', async () => {
+    const { container } = renderWithProviders(<ProfilePage />, {
+      route: '/me',
+      handlers: [
+        ...authedHandlers(),
+        { path: /\/api\/notifications/, respond: () => ({ body: { items: [], nextCursor: null } }) },
+        { path: /\/api\/me\/bottles/, respond: () => ({ body: { items: [], nextCursor: null } }) },
+      ],
+    });
+
+    expect(await screen.findByText('我参与过的漂流瓶')).toBeInTheDocument();
+    const bottles = container.querySelector('[data-anchor="me-bottles"]');
+    const notifications = container.querySelector('#notifications-heading');
+    expect(bottles, '缺列表窗锚点 me-bottles').not.toBeNull();
+    expect(notifications, '缺通知区标题').not.toBeNull();
+    const follows =
+      bottles !== null && notifications !== null
+        ? bottles.compareDocumentPosition(notifications) & Node.DOCUMENT_POSITION_FOLLOWING
+        : 0;
+    expect(follows, '通知排在列表窗之前 ⇒ 375 下 me-bottles 锚点被顶出首屏').toBeTruthy();
+  });
 });
 
 describe('设置页（Figma 无此帧，captain 裁决必须补最简版）', () => {
@@ -147,5 +174,36 @@ describe('我的：收藏与徽章入口', () => {
     expect(await screen.findByRole('heading', { name: '我的收藏' })).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: '我的徽章' }));
     expect(await screen.findByRole('heading', { name: '我的徽章' })).toBeInTheDocument();
+  });
+});
+
+/**
+ * 装置断言（docs/impl-plan-record-v1.md §5.1 `/me` 行）：**内袋身份卡**。
+ * 内袋 = 从柜里抽出来的唱片内套：中心孔是纸被挖掉的一块，透出来的标签盘**还没印字** ——
+ * 这张唱片上不存在「你的代号」（用户裁决），所以卡上只放账号信息（handle / 邮箱 / 角色）。
+ */
+describe('我的：内袋身份卡（record-v1 装置）', () => {
+  it('身份卡在 data-anchor=me-identity 上：账号三件套在卡内，且卡上没有「匿名代号」这一行', async () => {
+    const { container } = renderWithProviders(<ProfilePage />, {
+      route: '/me',
+      handlers: [
+        ...authedHandlers(),
+        { path: /\/api\/notifications/, respond: () => ({ body: { items: [], nextCursor: null } }) },
+        { path: /\/api\/me\/bottles/, respond: () => ({ body: { items: [], nextCursor: null } }) },
+      ],
+    });
+
+    // 会话从 /api/auth/me 异步到达：先等到 handle 出现，再断言卡内容（否则读到的是加载态）
+    expect(await screen.findByText('午夜歌手')).toBeInTheDocument();
+    const sleeve = container.querySelector('[data-anchor="me-identity"]');
+    expect(sleeve, '内袋身份卡（data-anchor=me-identity）必须在').not.toBeNull();
+    expect(sleeve?.textContent).toContain('内袋');
+    expect(sleeve?.textContent).toContain('午夜歌手');
+    expect(sleeve?.textContent).toContain('a@example.com');
+    expect(sleeve?.textContent).toContain('普通用户');
+    // 用户裁决：不显示匿名代号 —— 卡上没有这一行；整页也没有**恰为**「匿名代号」的行
+    //（副标题里解释"别人看到的是匿名代号"是合法文案，所以用整串匹配而不是正则子串）
+    expect(sleeve?.textContent).not.toContain('匿名代号');
+    expect(screen.queryByText('匿名代号')).not.toBeInTheDocument();
   });
 });

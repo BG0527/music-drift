@@ -167,6 +167,21 @@ motif:
   currentLineAlpha: 0.42   # 河道主流线的强度。主流线的形状是**声波包络**（音乐母题），位置在水里（河道母题）
   lightShaftAlpha: 0.05    # 水下光柱强度。极淡是**故意的**：它只说"这里更深"，不照亮正文、不与内容争亮度
   surfaceLineAlpha: 0.7    # 水线（岸与水体的分界）强度。全页唯一一条横线，故可以比别的装饰更实
+  # ── record-v1 装置（S2；母题装置库见 §Elevation & Depth）──────────────────
+  # 纪律：**所有**强度/周期只在这里定义，theme.css 暴露为 --motif-*，
+  # 样式层（water.css）与组件层只许引用变量 —— 不许内联 alpha / px（守卫：__tests__/water-motif.test.tsx）。
+  platterAlpha: 0.055      # 盘面（platter）同心沟槽的强度：rgba(line,.055)，周期见 textureLineGap
+  glintAlpha: 0.065        # 掠光（glint）峰值强度：rgba(water-deep,.065)（契约正文的范围 .028~.065 取上界）
+  hairlineMix: 13%         # 1px 细线 / 沟槽底：rgba(line,.13)，用于 border-hairline 与 .groove-bed
+  grooveLitAlpha: 0.9      # 被点亮的沟槽（groove = 河道）强度。它**承担信息**（= 已录段位），故近乎全亮
+  rippleRingAlpha: 0.32    # 涟漪（ripple）环强度。同心扁椭圆，断弧可编码缺口（事件涟漪只播一次）
+  ringAlpha: 0.42          # 圆盘外环第 1 圈的强度（承重的边界装置，合成后对 ink 必须 ≥3:1）
+  ringFalloff: 0.5         # 每往外一圈的强度衰减 ⇒ .42 / .21 / .105
+  ringInset: 13px          # 外环第 1 圈相对盘身的偏移（圆的语法 §Shapes：外环最多 3 圈）
+  ringStep: 16px           # 每圈递增偏移 ⇒ 13 / 29 / 45（与语言契约 §1.5 逐条一致）
+  discCoreAlpha: 0.78      # 盘身（径向内层 water-bed → water-void）的强度。盘身**不填彩色**
+  discEdgeCoolAlpha: 0.7   # 盘缘冷光：rgba(water-mid,.7)（"捞取"一侧）
+  discEdgeWarmAlpha: 0.66  # 盘缘暖光：rgba(warm,.66)（"投下"一侧）
 zIndex:
   underlay: -1   # 装饰层：在宿主背景**之上**、内容**之下**（宿主必须 isolate，否则会被背景盖住）
   base: 0

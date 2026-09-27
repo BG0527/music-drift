@@ -469,3 +469,143 @@ describe('漂流瓶接唱页', () => {
     );
   });
 });
+
+/**
+ * 用户第 3 轮裁决（deploy-plan §17）：公海详情页删除，它顶部的「沟槽时间轴 + 唱针」
+ * 复刻进本页。语义分工：瓶身剖面回答"哪些段录了、缺哪段"；
+ * 沟槽时间轴回答"现在放到哪儿、这一段多长"（唱针 = 播放头，跟随真实播放进度）。
+ */
+describe('瓶子详情：播放沟槽 + 唱针', () => {
+  it('页面上部有播放沟槽（data-anchor）：段位全在、缺口段显式可见、时长来自服务端', async () => {
+    renderWithProviders(<BottlePage id={BOTTLE_ID} />, {
+      route: `/bottles/${BOTTLE_ID}`,
+      handlers: [
+        {
+          path: `/api/bottles/${BOTTLE_ID}`,
+          respond: () => ({ body: bottleDetail({ isHolder: false, holderId: USER_B }) }),
+        },
+      ],
+    });
+
+    expect(await screen.findByText(/现在不在你手上/)).toBeInTheDocument();
+    const anchor = document.querySelector('[data-anchor="groove-timeline"]');
+    expect(anchor, '瓶子详情上部缺少播放沟槽').not.toBeNull();
+
+    const slots = anchor!.querySelector('[data-testid="groove-slots"]');
+    expect(slots?.querySelectorAll('li')).toHaveLength(4);
+    // 缺口 [2,3,4] 在时间轴上是显式的一格（不是少一格）
+    expect(slots?.querySelectorAll('li[data-state="gap"]')).toHaveLength(3);
+
+    const marks = anchor!.querySelector('[data-testid="groove-marks"]');
+    expect(marks?.textContent).toContain('第 1 段');
+    expect(marks?.textContent).toContain('00:20');
+    expect(marks?.querySelectorAll('li[data-state="gap"]')).toHaveLength(3);
+    expect(marks?.textContent).toContain('静音');
+  });
+
+  it('唱针跟随真实播放进度：timeupdate 推进到 10s/20s ⇒ 唱针从 0% 落到 12.5%', async () => {
+    const listeners: Record<string, (() => void)[]> = {};
+    const element = {
+      src: '',
+      currentTime: 0,
+      paused: true,
+      play: () => undefined,
+      pause: () => undefined,
+      addEventListener: (type: string, handler: () => void) => {
+        listeners[type] = [...(listeners[type] ?? []), handler];
+      },
+      removeEventListener: (type: string, handler: () => void) => {
+        listeners[type] = (listeners[type] ?? []).filter((item) => item !== handler);
+      },
+    };
+
+    renderWithProviders(
+      <BottlePage
+        id={BOTTLE_ID}
+        seams={{
+          segmentElementFactory: ((src: string) => {
+            element.src = src;
+            return element;
+          }) as never,
+        }}
+      />,
+      {
+        route: `/bottles/${BOTTLE_ID}`,
+        handlers: [
+          {
+            path: `/api/bottles/${BOTTLE_ID}`,
+            respond: () => ({ body: bottleDetail({ isHolder: false, holderId: USER_B }) }),
+          },
+        ],
+      },
+    );
+
+    // 播放器挂载即上报（选中段 = 第 1 段，段内 0%）⇒ 唱针停在槽 1 起点
+    const playhead = await screen.findByTestId('groove-playhead');
+    expect(playhead.style.left).toBe('0%');
+
+    // 驱动真实播放进度（服务端段长 20s；10s ⇒ 段内 50% ⇒ 槽 1 内一半 = 全轴 12.5%）
+    element.currentTime = 10;
+    for (const handler of listeners['timeupdate'] ?? []) handler();
+
+    await waitFor(() => {
+      expect(screen.getByTestId('groove-playhead').style.left).toBe('12.5%');
+    });
+  });
+
+  it('一屏门禁（<1024）：时间轴用 flex order 给播放/录制区让位，lg: 恢复「时间轴在上」的桌面构图', async () => {
+    renderWithProviders(<BottlePage id={BOTTLE_ID} />, {
+      route: `/bottles/${BOTTLE_ID}`,
+      handlers: [
+        {
+          path: `/api/bottles/${BOTTLE_ID}`,
+          respond: () => ({ body: bottleDetail({ isHolder: false, holderId: USER_B }) }),
+        },
+      ],
+    });
+
+    expect(await screen.findByText(/现在不在你手上/)).toBeInTheDocument();
+    const groove = document.querySelector('[data-anchor="groove-timeline"]');
+    const play = document.querySelector('[data-anchor="bottle-play"]');
+    expect(groove, '沟槽时间轴必须还在（装置不许删/藏）').not.toBeNull();
+    expect(play, '播放区锚点必须在').not.toBeNull();
+
+    // 桌面构图靠 DOM 顺序：时间轴仍排在播放区之前（lg 及以上渲染成设计稿的「时间轴在上」）
+    expect(
+      Boolean(groove!.compareDocumentPosition(play!) & Node.DOCUMENT_POSITION_FOLLOWING),
+      'DOM 顺序：时间轴必须仍在播放区之前',
+    ).toBe(true);
+
+    // <1024 靠 flex order 把时间轴推到首屏之后（375 一屏门禁），lg: 归位
+    const grooveClass = groove!.getAttribute('class') ?? '';
+    expect(grooveClass, '时间轴要有窄屏 order-1').toContain('order-1');
+    expect(grooveClass, '时间轴要 lg 归位').toContain('lg:order-none');
+
+    // 页脚跟着时间轴一起下移（否则页脚会插到时间轴前面）
+    const footer = screen.getByText('看这只瓶子的漂流日志').parentElement;
+    const footerClass = footer?.getAttribute('class') ?? '';
+    expect(footerClass, '页脚要有窄屏 order-2').toContain('order-2');
+    expect(footerClass, '页脚要 lg 归位').toContain('lg:order-none');
+  });
+
+  /**
+   * 用户裁决（2026-09-27 grill ②）：h1 恢复与其他页一致的 56px 上限 ——
+   * 一屏余量靠压别的间距补，不拿标题字号换（h1 带 52–62，impl-plan §6#3；
+   * 与 drift-log 同款 clamp 必须一致）。
+   */
+  it('h1 上限恢复 3.5rem（56px）：一屏余量不拿标题字号换', async () => {
+    renderWithProviders(<BottlePage id={BOTTLE_ID} />, {
+      route: `/bottles/${BOTTLE_ID}`,
+      handlers: [
+        {
+          path: `/api/bottles/${BOTTLE_ID}`,
+          respond: () => ({ body: bottleDetail({ isHolder: false, holderId: USER_B }) }),
+        },
+      ],
+    });
+
+    const h1 = await screen.findByRole('heading', { level: 1 });
+    expect(h1.className, 'h1 clamp 上限必须是 3.5rem').toContain('3.5rem');
+    expect(h1.className, '不得再是压余量用的 2.75rem').not.toContain('2.75rem');
+  });
+});

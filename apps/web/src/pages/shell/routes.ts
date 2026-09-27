@@ -15,7 +15,6 @@ export type RouteName =
   | 'bottle'
   | 'bottleLog'
   | 'sea'
-  | 'seaDetail'
   | 'profile'
   | 'settings'
   | 'admin'
@@ -43,7 +42,7 @@ const PATTERNS: readonly RoutePattern[] = [
   { name: 'bottleLog', segments: ['bottles', ':id', 'log'] },
   { name: 'bottle', segments: ['bottles', ':id'] },
   { name: 'sea', segments: ['sea'] },
-  { name: 'seaDetail', segments: ['sea', ':id'] },
+  // 公海详情路由已删除（用户第 3 轮裁决：与瓶子详情冲突，公海点听直接跳 /bottles/:id）
   { name: 'profile', segments: ['me'] },
   { name: 'settings', segments: ['settings'] },
   // 审核台（仅管理员；权限由服务端判定，前端只负责别把入口露给普通用户）
@@ -119,7 +118,7 @@ export const NAV_ITEMS: readonly AppNavItem[] = [
   { key: 'settings', label: '设置', href: '/settings' },
 ];
 
-/** 侧栏高亮归属：漂流瓶页与日志属于「河道」，公海详情属于「公海」。 */
+/** 侧栏高亮归属：漂流瓶页与日志属于「河道」。 */
 export function activeNavKey(name: RouteName): AppNavItem['key'] | null {
   switch (name) {
     case 'home':
@@ -129,7 +128,6 @@ export function activeNavKey(name: RouteName): AppNavItem['key'] | null {
     case 'new':
       return 'river';
     case 'sea':
-    case 'seaDetail':
       return 'sea';
     case 'profile':
       return 'mine';

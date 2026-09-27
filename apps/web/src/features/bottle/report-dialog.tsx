@@ -71,7 +71,7 @@ export function ReportDialog({ open, targetType, targetId, onClose }: ReportDial
         </>
       }
     >
-      <p className="text-[0.9375rem] leading-[1.6] text-slate-current">
+      <p className="text-[0.9375rem] leading-[1.6] text-muted">
         举报会进入人工审核队列，由管理员判断，不是自动删除。
         请写清问题，理由越具体越好（例如"这段和曲目无关"）。
       </p>

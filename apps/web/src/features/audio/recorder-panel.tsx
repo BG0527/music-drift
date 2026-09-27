@@ -122,6 +122,19 @@ export function RecorderPanel({
   /** 计时文案的分母：有本段固定时长就用它（"20.6"），否则退回 30 秒上限。 */
   const targetLabel = preset === null ? '30' : formatSeconds(preset);
 
+  /**
+   * 已录进度（0..1）：分母**只认本段固定时长**；拿不到就返回 null —— 宁可没有进度条，
+   * 也不拿一个假分母画一条假进度（这一段的时长本来就是服务端权威值）。
+   * 录完（`recorded`）用实际录到的时长，所以"差太多"时进度条诚实地停在那一格。
+   */
+  const progressRatio =
+    preset === null
+      ? null
+      : Math.min(
+          1,
+          (status === 'recorded' ? (recording?.durationMs ?? elapsedMs) : elapsedMs) / preset,
+        );
+
   const statusText = ((): string => {
     switch (status) {
       case 'unsupported':
@@ -175,31 +188,29 @@ export function RecorderPanel({
     <section
       aria-labelledby={headingId}
       className={cn(
-        'flex flex-col gap-4 rounded-base bg-deep-current p-6 text-wave-white',
+        // record-v1（DESIGN.md §Components）：录制 / 波形区 = `water-void` 底 + 1px 细线（不用阴影造层次）
+        'flex flex-col gap-4 rounded-base border border-line/20 bg-water-void p-6 text-paper',
         className,
       )}
     >
       <header className="flex flex-col gap-1">
-        <h2 id={headingId} className="text-[1.25rem] font-semibold">
+        <h2 id={headingId} className="text-[1.25rem] font-semibold text-paper">
           第 {segmentIndex} 段 · 共 {totalSegments} 段
         </h2>
         {/* 本段固定时长（用户第 4 条）：优先说"这段有多长"，而不是给一个浮动区间 */}
         {preset === null ? (
-          <p className="text-[0.875rem] leading-[1.6] text-on-dark-muted">
+          <p className="text-[0.875rem] leading-[1.6] text-muted">
             这一段的固定时长还没登记，所以现在不能录 —— 换一首歌，或者稍后再来。
           </p>
         ) : (
-          <p
-            data-testid="preset-duration"
-            className="text-[0.875rem] leading-[1.6] text-on-dark-muted"
-          >
+          <p data-testid="preset-duration" className="text-[0.875rem] leading-[1.6] text-muted">
             本段 {formatSeconds(preset)} 秒（与这段伴奏等长，允许 ±{formatSeconds(tolerance)} 秒）。
             录满会自动停止，投出去之后由陌生人接下一段。
           </p>
         )}
       </header>
 
-      <p aria-live="polite" className="text-[0.9375rem] font-semibold">
+      <p aria-live="polite" className="text-[0.9375rem] font-semibold text-paper">
         {statusText}
       </p>
 
@@ -207,21 +218,44 @@ export function RecorderPanel({
       <div
         data-testid="waveform"
         aria-hidden="true"
-        className="flex h-16 items-end gap-1 rounded-md bg-trench px-3 py-2"
+        className="flex h-16 items-end gap-1 rounded-md border border-line/10 bg-water-bed px-3 py-2"
       >
         {levels.map((level, index) => (
           <span
             key={`bar-${String(index)}`}
-            className="w-1 flex-1 rounded-pill bg-lagoon"
+            className="w-1 flex-1 rounded-sm bg-glass"
             style={{ height: `${Math.max(4, Math.round(level * 100))}%` }}
           />
         ))}
       </div>
 
+      {/*
+        已录进度（record-v1 的沟槽语法：底槽 `rgba(line,.1)`、已录段 `water-deep`）。
+        它**不是**第二个进度来源：百分比与秒数仍由上面那行状态文字给出（`aria-live`），
+        这里只是把同一份进度画进水里 —— 只动 transform（DESIGN.md：禁止动画 width/height）。
+        拿不到本段固定时长时不给进度条（`--:--` 的分母是假的，画出来就是骗人）。
+      */}
+      {progressRatio === null ? null : (
+        <div
+          data-testid="record-progress"
+          role="progressbar"
+          aria-label="本段录制进度"
+          aria-valuemin={0}
+          aria-valuemax={100}
+          aria-valuenow={Math.round(progressRatio * 100)}
+          className="h-2 w-full overflow-hidden rounded-sm bg-line/10"
+        >
+          <div
+            className="h-2 origin-left rounded-sm bg-water-deep transition-transform duration-200 ease-out"
+            style={{ transform: `scaleX(${progressRatio})` }}
+          />
+        </div>
+      )}
+
       {!support.ok && support.guidance !== null ? (
         <div
           role="alert"
-          className="flex items-start gap-2 rounded-base border border-danger-border bg-danger-tint px-4 py-3 text-[0.875rem] leading-[1.6] text-coral-deep"
+          className="flex items-start gap-2 rounded-base border border-danger-border bg-danger-tint px-4 py-3 text-[0.875rem] leading-[1.6] text-danger"
         >
           <Icon name="MicOff" size={18} />
           <span>{support.guidance}</span>
@@ -231,7 +265,7 @@ export function RecorderPanel({
       {error !== null ? (
         <div
           role="alert"
-          className="flex items-start gap-2 rounded-base border border-danger-border bg-danger-tint px-4 py-3 text-[0.875rem] leading-[1.6] text-coral-deep"
+          className="flex items-start gap-2 rounded-base border border-danger-border bg-danger-tint px-4 py-3 text-[0.875rem] leading-[1.6] text-danger"
         >
           <Icon name="AlertCircle" size={18} />
           <span>
@@ -257,7 +291,7 @@ export function RecorderPanel({
         <p
           data-testid="remaining"
           aria-live="polite"
-          className="text-[0.875rem] leading-[1.6] text-on-dark-muted"
+          className="text-[0.875rem] leading-[1.6] text-muted"
         >
           {remainingMs === 0
             ? '已录满，正在收尾…'
@@ -286,7 +320,7 @@ export function RecorderPanel({
           <p
             data-testid="clip-ok"
             role="status"
-            className="flex items-center gap-2 text-[0.875rem] leading-[1.6] text-on-dark-muted"
+            className="flex items-center gap-2 text-[0.875rem] leading-[1.6] text-muted"
           >
             <Icon name="AudioWaveform" size={16} />
             <span>{clip.message}</span>
@@ -295,7 +329,7 @@ export function RecorderPanel({
           <p
             data-testid="clip-unavailable"
             role="status"
-            className="flex items-center gap-2 text-[0.875rem] leading-[1.6] text-on-dark-muted"
+            className="flex items-center gap-2 text-[0.875rem] leading-[1.6] text-muted"
           >
             <Icon name="Info" size={16} />
             <span>{clip.message}</span>
@@ -380,7 +414,7 @@ export function RecorderPanel({
         <p
           data-testid="preview-state"
           aria-live="polite"
-          className="enter-fade text-[0.875rem] leading-[1.6] text-on-dark-muted"
+          className="enter-fade text-[0.875rem] leading-[1.6] text-muted"
         >
           {previewUi.state}
         </p>
@@ -395,7 +429,7 @@ export function RecorderPanel({
               ? 'border-success-border bg-success-tint text-success'
               : uploadTone === 'warning'
                 ? 'border-warning-border bg-warning-tint text-warning'
-                : 'border-info-border bg-info-tint text-peacock',
+                : 'border-info-border bg-info-tint text-info',
           )}
         >
           <Icon name={uploadTone === 'warning' ? 'AlertTriangle' : 'UploadCloud'} size={18} />

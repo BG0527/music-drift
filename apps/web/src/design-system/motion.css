@@ -115,13 +115,14 @@
     opacity: 1;
   }
 
-  /* 骨架屏 shimmer（禁 spinner）；时长取自契约 token，不再内联 1.4s */
+  /* 骨架屏 shimmer（禁 spinner）；时长取自契约 token，不再内联 1.4s。
+     record-v1：底 `water-void` + **glass 22%** 的掠光（DESIGN.md §Components 的 skeleton 行）。 */
   .skeleton-shimmer {
     background-image: linear-gradient(
       90deg,
-      color-mix(in srgb, var(--color-lagoon) 0%, transparent) 0%,
-      color-mix(in srgb, var(--color-lagoon) 22%, transparent) 45%,
-      color-mix(in srgb, var(--color-lagoon) 0%, transparent) 100%
+      color-mix(in srgb, var(--color-glass) 0%, transparent) 0%,
+      color-mix(in srgb, var(--color-glass) 22%, transparent) 45%,
+      color-mix(in srgb, var(--color-glass) 0%, transparent) 100%
     );
     background-size: 220% 100%;
     animation: ocean-shimmer var(--shimmer-duration) linear infinite;

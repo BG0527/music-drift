@@ -27,7 +27,6 @@ const TITLES: Record<RouteName, string> = {
   bottle: '漂流瓶',
   bottleLog: '漂流日志',
   sea: '公海大厅',
-  seaDetail: '公海作品',
   profile: '我的',
   settings: '设置',
   admin: '审核台',

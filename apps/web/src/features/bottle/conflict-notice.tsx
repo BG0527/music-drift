@@ -48,16 +48,16 @@ function exitHref(
 }
 
 const TONE_CLASS: Record<ApiErrorView['kind'], string> = {
-  CONFLICT: 'border-danger-border bg-danger-tint text-coral-deep',
+  CONFLICT: 'border-danger-border bg-danger-tint text-danger',
   EMPTY_RIVER: 'border-warning-border bg-warning-tint text-warning',
-  AUTH_REQUIRED: 'border-info-border bg-info-tint text-peacock',
-  FORBIDDEN: 'border-danger-border bg-danger-tint text-coral-deep',
+  AUTH_REQUIRED: 'border-info-border bg-info-tint text-info',
+  FORBIDDEN: 'border-danger-border bg-danger-tint text-danger',
   NOT_FOUND: 'border-warning-border bg-warning-tint text-warning',
   INVALID_REQUEST: 'border-warning-border bg-warning-tint text-warning',
   RULE_VIOLATION: 'border-warning-border bg-warning-tint text-warning',
   SERVER: 'border-warning-border bg-warning-tint text-warning',
   NETWORK: 'border-warning-border bg-warning-tint text-warning',
-  CONTRACT: 'border-danger-border bg-danger-tint text-coral-deep',
+  CONTRACT: 'border-danger-border bg-danger-tint text-danger',
   UNKNOWN: 'border-warning-border bg-warning-tint text-warning',
 };
 

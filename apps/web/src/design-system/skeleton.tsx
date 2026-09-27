@@ -21,7 +21,7 @@ export function Skeleton({
   return (
     <span
       aria-hidden="true"
-      className={cn('block overflow-hidden rounded-md bg-tide-pool', className)}
+      className={cn('block overflow-hidden rounded-md bg-water-void', className)}
       style={{ width, height, ...style }}
       {...rest}
     >

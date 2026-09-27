@@ -33,6 +33,20 @@ describe('组件展示页（开发用）', () => {
     const main = screen.getByTestId('showcase');
     expect(main.className).toMatch(/max-w-\[var\(--container-max-width\)\]/);
   });
+
+  it('展示页已是 record-v1 的活文档：六个装置都有展位，且旧版文案已清', () => {
+    const { container } = render(<Showcase />);
+    for (const device of ['platter', 'glint', 'groove', 'waterline', 'ripple', 'bottleMark']) {
+      expect(
+        container.querySelector(`[data-motif="${device}"]`),
+        `展示页没有 ${device} 装置`,
+      ).not.toBeNull();
+    }
+    expect(container.innerHTML, '旧版文案 Ocean Drift 还在').not.toContain('Ocean Drift');
+    // 展示页必须把「圆盘 + 外环」和「coral 填充 + ink 字」的主 CTA 都露出来
+    expect(container.querySelector('[data-demo="disc-button"]')).not.toBeNull();
+    expect(container.querySelector('[data-demo="disc-rings-3"]')).not.toBeNull();
+  });
 });
 
 describe('横向溢出守卫（375px 可用性底线）', () => {

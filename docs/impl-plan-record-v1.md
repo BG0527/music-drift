@@ -189,3 +189,61 @@ node apps/web/tools/one-screen-check.mjs --viewport=375x812  --shot=docs/ui-revi
 - ✅ **一个冲突自动消解**：`water-motif.test.tsx` 原来要求河道页必须有 `<DriftingBottle`，与用户"默认态无瓶"的裁决冲突；**S2 已把它改成禁止**并留了原文→新文与理由 ⇒ 实现者一字节没碰 design-system。
 - ✅ **`apps/web/dist` 被 build 覆写**：已核 `git ls-files apps/web/dist` = 0、`.gitignore` 含 `dist/` ⇒ **无害**（构建产物不入库）。
 - ⚠️ 并发期全量测试会红，且**红在别人正在改的文件上**（本例 4 条：login/404 的 design-discipline、record-v1 的 shadow-card、report-queue 的印章色）—— 这是并行的必然现象，**不是回归**；判定以"该片自己的守卫"+"收工后 captain 串行全量"为准。
+
+## 8. 全量落地批次执行记录（2026-09-27，S4/S5/S6/S7 收尾 + 复核 + 联调）
+
+> 用户裁决（本批开题 grill 九问）：① 公海详情**删除**、时间轴移植瓶子详情（沿 §17）；② 登录/注册**对齐 `{account,password}`**（去邮箱）；③ **全量**=剩余页+已做 8 页复核+联调；④ 375/1440 **双档硬门**；⑤ 端到端核心闭环联调；⑥ f0 捞/投分镜落地；⑦ 一屏硬门优先于密度（改构图不砍装置）；⑧ **一次交付**（覆盖 §6 分片停等）；⑨ 后端缺陷直接修。
+
+### 8.1 交付构成（10 个并行子任务 + 整合者集成）
+| 任务 | 内容 | 状态 |
+| --- | --- | --- |
+| A3 | 公海大厅 record-v1（静海水线+六瓶+涟漪 4 断弧；「听」跳 `/bottles/:id`） | ✅ 13/13 |
+| B | 我的 record-v1（内袋身份卡+沉积柱+`awaitingMyAction` 回传提示三态） | ✅ 16/16 |
+| C2 | **删公海详情**（路由/页面/测试归零）+ 沟槽时间轴+唱针移植瓶子详情（groove-timeline/playback 新建） | ✅ 128/128 |
+| D | 登录/注册对齐 `{account,password}`（无邮箱框；请求体断言改写 9 处红→绿） | ✅ 14/14 |
+| E | f0 捞/投三段分镜（enter→ripple→exit 状态机、播完再跳转 §103.3、reduced-motion 全静止） | ✅ 17/17 |
+| R1 | 设置/404/审核台逐值复核（22 组值修正；审核台新增真实页脚计数） | ✅ 152/152 |
+| R2c | 漂流日志逐值复核（9 组修正，刻痕语法表逐值照稿） | ✅ 5/5 |
+| R3+S-min | 选歌逐值清单（70 条落盘 `apps/web/docs/review-songpicker.md`）+ 三处硬伤修复（沟槽半径梯 88.3/75/58.1/32.4、检索牌挂片「找 歌」、页脚线按 DESIGN 无条文删除） | ✅ 39/39 |
+| P1 | `/me` 一屏压缩：两区分栏（列表窗 260px 内滚+内袋卡 470px / 通知+内袋口） | ✅ 双档 OK、101/101 |
+| P2 | `/bottles/:id` 一屏压缩：<1024 以 `order` 把时间轴排到操作区后（lg 归位、装置不删）、gap/页头收紧 | ✅ 双档 OK、70/70 |
+
+### 8.2 整合者修的 9 条守卫红（全部显式记录）
+| # | 守卫 | 原断言 → 新处置 | 依据 |
+| --- | --- | --- | --- |
+| 1 | water-motif「公海作品页深底页头光带」 | **删除该 it** | sea-detail 页已按用户 §17 删除 |
+| 2 | water-motif PAGES 含 `sea-detail-page.tsx` | **从名单移除** | 同上 |
+| 3 | water-motif「作品详情深底页头 drift」（含 `darkSurfaceDrifts` 函数） | **删除 it + 未使用函数**（留注释） | 同上；防 TS6133 |
+| 4-6 | water-motif 公海大厅 3 条（母题/整页水位线/空态瓶）+「≥3 页 drift」 | **sea-page.tsx 补回** `WaterSheen tone=light + WaterTexture drift + BottleMark×2 + TideLine`（不改守卫） | 母题是用户点名资产；页级静海线也更贴设计稿 |
+| 7-8 | design-discipline 2 条（nowrap / min-h-11） | **sea-page 链接改走 `TEXT_LINK`**（常量更名 `SEA_TEXT_LINK`） | 不改守卫 |
+| 9 | 死链 2 处 + 回传文案缺失 | `collections-panel` 与 `notification-labels` 的 `/sea/:id` → `/bottles/:id`（断言先红后绿）；**新增 `BOTTLE_RETURNED` case**（label「收到回传 · 等你操作」/warning/详情链接瓶子详情） | §17 删除后落点唯一化 |
+| 附 | one-screen-check 路由表 | 移除 `/sea/:id` 行（`seed.seaId` 保留供 `/sea` 列表） | 同上 |
+
+### 8.3 机器门禁（收工串行复跑，全部以本批最终字节为准）
+- `pnpm -r test` **EXIT=0**：shared 250 / api 180 / **web 796 passed | 1 skipped**；
+- `pnpm -r typecheck` **EXIT=0**；`pnpm lint` **EXIT=0**（0 error，10 条 no-console warning 全在站外 files）；
+- `node apps/web/tools/one-screen-check.mjs --viewport=1440x900` → **✅ 全部页面达标（12 路由）exit 0**；
+- 同 `--viewport=375x812` → **✅ 全部页面达标 exit 0**；
+- `node apps/web/tools/golden-path-live-check.mjs`（hermetic）→ **✅ 28 步全过 exit 0**（真库+真 HTTP+真音频字节：注册→发起→录段→Range→投河→捞→接唱×3→回传→入海→公海→日志→代号→放回→409→斩浪门槛）。
+
+### 8.4 有意差异与遗留（逐条可追溯）
+1. **涟漪时长**：§103.3「约 1.2s」 vs f0 图例 2.4s 矛盾 ⇒ **用户裁决（2026-09-27）：先按 f0 2.4s 交付看效果**（点击到跳转 3.1s 总时长，现状即此）；两文档矛盾记为待修；收拢幅度 15% 缺契约 token 记账。
+2. **bottle 页 h1**：**用户裁决→已修**：恢复 `3.5rem`(56px)（h1 带 52–62、与 drift-log 一致），一屏余量改由外层 `gap-3→gap-2` 补回；`bottle-page.test` 新增断言钉住（红→绿），双档门禁复跑全绿。
+3. **印章语义色缺 token**（`seal-ink/seal-due/danger-light`，§6.1 已建议）：审核台现就近映射 danger/warm；**用户裁决：记账，下轮 S1b/frontend-ds 收编**（本轮不动 DESIGN.md，避让并行工作流）。
+4. **口令 vs 密码**：**用户裁决→已统一**：`AUTH_ERROR_MESSAGES`（INVALID_CREDENTIALS/WEAK_PASSWORD）、web `errors.ts` 兜底、`docs/api.md` 码表两行全部改「密码」；shared 新增反潮断言（文案表不得含「口令」，红→绿）。`passwordPolicy.ts` 等**代码注释**里的「口令」属内部用语，不面向用户，保留。
+5. `DESIGN.md` h2 阶梯 19px vs 设置稿 17px：按「HTML 为准」实现 17px，契约阶梯待 frontend-ds 记账（同 §6#3 方式）。
+6. `/me` 桌面通知 ≥2 条时下排可能再顶破 900（hermetic 种子只 1 条）→ 若真数据复现，加 `lg:max-h + overflow` 一行。
+7. `/bottles` 桌面余量仅 12px；「还有 N 段看不到」提示渲染时约 +50px 会再红 → 联调留意。
+8. 移动端 bottle 整页变高（时间轴/页脚 order 下移，1993px）——手机口径不测总高，取舍在案。
+9. 被斩 vs 未唱在沉积柱不可分（契约 `missingSegmentIndexes` 合并两者）→ 契约加字段才可还原，记 architecture 待办。
+10. 河道页 `river-motion.css` 收拢涟漪复用 ocean-ripple 反向 15% 幅度；退场 easing/瓶子行程距离均复用现有 token（缺专属 token 清单见 E 汇报）。
+11. **浏览器级点击流未覆盖**（录音/上传按钮的真浏览器交互）：jsdom 测试 + 黄金路径 API 真链路 + one-screen 真浏览器渲染三层合起来作证据；纯浏览器 click-through e2e 不在本仓工具链内。
+
+### 8.5 §5.3 并排看图复核结论（captain，2026-09-27；`docs/ui-review/impl-1440/*.png` vs 设计稿 PNG）
+| 页 | 装置判定 | 说明 |
+| --- | --- | --- |
+| 公海大厅 | ✅ 存活 | 水线/到岸瓶/涟漪 4 断弧/两 Tab/游标分页俱在；**有意差异**：设计稿的整页连续静海线在响应式栅格里落成「顶部水带 WaterSheen + 每卡一段水线」（A3 自评已记录，连续线在可滚动多行栅格下无法成立于画布外） |
+| 我的 | ✅ 存活 | 四块构图与稿对齐（列表窗+内袋卡 / 通知+内袋口）；沉积柱 4 层位、中心孔空白标签盘在图上可读 |
+| 瓶子详情 | ✅ 存活 | 顶部沟槽时间轴+唱针（移植成功，即用户点名的"进度条"）+ 横躺瓶剖面并存、语义分工清晰；一屏内 |
+| 选一首歌 | ✅ 存活 | 五口浅盆+水位、检索牌挂片「找 歌」、沟槽半径梯逐档值在图上成立 |
+| 河道/设置/审核台/日志/登录/404 | ✅ | 分别由 S3/S3b 既往验收、R1/R2c 逐值复核（红→绿）与本轮双档门禁背书 |

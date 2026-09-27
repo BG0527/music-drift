@@ -31,7 +31,9 @@ function iconFor(item: NavItem): IconName {
 /**
  * 桌面侧栏：四入口 IA（河道 / 公海 / 我的 / 设置）。
  * 来源：用户终裁「桌面为主要场景」+ Figma 帧 IA（`docs/figma/CONFLICTS.md` 采纳清单 #1）。
- * active 用 peacock 指示 + 字重 500（DESIGN.md §Components 导航条）。
+ *
+ * record-v1（DESIGN.md §Components 导航条）：**ink 底 + 顶部/侧向 1px 细线**（不用阴影造层次）；
+ * 当前项用 **coral 1px 竖线 + 字重 500** 指示（颜色不是唯一信号）。
  *
  * ⚠️ **几何一律写显式 px，不用 Tailwind 的数字 utility**：
  * `theme.css` 曾把 `--spacing` 覆盖成 0.5rem，于是 `w-64` 等于 **512px**（不是 256px），
@@ -47,15 +49,16 @@ export function SidebarNav({ items, current, footer, className }: NavProps) {
     <nav
       aria-label="主导航"
       className={cn(
-        'hidden w-[260px] shrink-0 flex-col gap-[48px] border-r border-mist bg-foam/70 px-[24px] py-[40px] md:flex',
+        'hidden w-[260px] shrink-0 flex-col gap-[48px] border-r border-hairline bg-ink px-[24px] py-[40px] md:flex',
         className,
       )}
     >
       <div className="flex items-center gap-[12px]">
-        <span className="flex h-[36px] w-[36px] items-center justify-center rounded-full bg-peacock text-wave-white">
+        {/* 品牌记号 = 一枚 coral 标签盘（盘身填 coral ⇒ 其上文字用 ink，4.76:1） */}
+        <span className="flex h-[36px] w-[36px] items-center justify-center rounded-full bg-coral text-ink">
           <Icon name="AudioWaveform" size={18} />
         </span>
-        <span className="text-[1.25rem] font-bold">音乐漂流瓶</span>
+        <span className="text-[1.25rem] font-bold text-paper">音乐漂流瓶</span>
       </div>
       <ul className="flex w-[212px] flex-col gap-[12px]">
         {items.map((item) => {
@@ -68,18 +71,18 @@ export function SidebarNav({ items, current, footer, className }: NavProps) {
                 className={cn(
                   // 212×44（Figma）：宽度由外层 ul 固定，这里只定高与内边距
                   'flex h-[44px] w-[212px] items-center gap-[16px] overflow-hidden rounded-base px-[16px] text-[1rem]',
-                  'focus-visible:ring-2 focus-visible:ring-peacock focus-visible:ring-offset-2 focus-visible:ring-offset-foam',
+                  'focus-visible:ring-2 focus-visible:ring-coral focus-visible:ring-offset-2 focus-visible:ring-offset-ink',
                   // 颜色过渡（motion-web §1 feedback）：原来 hover 是瞬变，与按钮的 200ms 手感不一致
                   'transition-colors duration-200 ease-out',
                   active
-                    ? 'bg-wave-white font-semibold text-peacock'
-                    : 'text-slate-current font-normal hover:bg-wave-white/70',
+                    ? 'bg-water-void font-medium text-coral'
+                    : 'font-normal text-muted hover:bg-water-void hover:text-paper',
                 )}
               >
                 <Icon name={iconFor(item)} size={20} />
                 <span>{item.label}</span>
                 {active ? (
-                  <span aria-hidden="true" className="ml-auto h-4 w-1 rounded-pill bg-peacock" />
+                  <span aria-hidden="true" className="ml-auto h-4 w-px bg-coral" />
                 ) : null}
               </a>
             </li>
@@ -94,14 +97,14 @@ export function SidebarNav({ items, current, footer, className }: NavProps) {
 
 /**
  * 移动底栏：375px 下替代侧栏的四项导航（`docs/figma/CONFLICTS.md` C-14 裁决）。
- * 触控目标 ≥44px；预留 iOS 安全区。
+ * 触控目标 ≥44px；预留 iOS 安全区；ink 底 + 顶部 1px 细线（与侧栏同一套层次语言）。
  */
 export function BottomNav({ items, current, className }: NavProps) {
   return (
     <nav
       aria-label="底部导航"
       className={cn(
-        'fixed inset-x-0 bottom-0 z-sticky flex items-stretch justify-around border-t border-mist bg-foam',
+        'fixed inset-x-0 bottom-0 z-sticky flex items-stretch justify-around border-t border-hairline bg-ink',
         'pb-[env(safe-area-inset-bottom)] md:hidden',
         className,
       )}
@@ -117,10 +120,10 @@ export function BottomNav({ items, current, className }: NavProps) {
               'flex min-h-11 flex-1 flex-col items-center justify-center gap-1 px-2 py-2 text-[0.75rem]',
               // feedback（motion-web §1「按下缩放」）：移动端没有 hover，`:active` 是唯一即时回应。
               // 只动颜色与背景（DESIGN.md §Interaction States：颜色变化允许，不动布局属性）。
-              'transition-colors duration-200 ease-out hover:bg-wave-white/70 active:bg-tide-pool',
+              'transition-colors duration-200 ease-out hover:bg-water-void active:bg-water-void',
               // 焦点环：与侧栏同款（两处导航的键盘手感必须一致）
-              'focus-visible:ring-2 focus-visible:ring-peacock focus-visible:ring-offset-2 focus-visible:ring-offset-foam',
-              active ? 'font-medium text-peacock' : 'text-slate-current',
+              'focus-visible:ring-2 focus-visible:ring-coral focus-visible:ring-offset-2 focus-visible:ring-offset-ink',
+              active ? 'font-medium text-coral' : 'text-muted',
             )}
           >
             <Icon name={iconFor(item)} size={20} />

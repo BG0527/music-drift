@@ -38,14 +38,18 @@ type PutBackResponse = ReturnType<typeof PutBackResponseSchema.parse>;
 /** 收藏契约里没导出同名 type，按同一规矩从 schema 推导（ADR-004：zod 是唯一真相）。 */
 type Collection = ReturnType<typeof CollectionSchema.parse>;
 
+/**
+ * 注册请求体与 `RegisterRequestSchema` 正名对齐：`{ account, password }` ——
+ * 不发 `handle` 别名、不发 `email`（后端 refine 见 `account` 即通过；邮箱已 deprecated）。
+ */
 export interface RegisterInput {
-  handle: string;
-  email: string;
+  account: string;
   password: string;
 }
 
+/** 登录请求体与 `LoginRequestSchema` 对齐：`{ account, password }`（按账号 = handle 查用户）。 */
 export interface LoginInput {
-  email: string;
+  account: string;
   password: string;
 }
 

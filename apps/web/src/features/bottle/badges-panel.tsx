@@ -37,7 +37,7 @@ export function BadgesPanel({ open, onClose }: BadgesPanelProps) {
   return (
     <Modal open={open} title="我的徽章" onClose={onClose}>
       <div className="flex flex-col gap-3">
-        <p className="text-[0.9375rem] leading-[1.6] text-slate-current">
+        <p className="text-[0.9375rem] leading-[1.6] text-muted">
           徽章是派生的（不落库）：服务端按你参与过的事件当场算出来，作品被撤下就跟着消失。
         </p>
 
@@ -46,7 +46,7 @@ export function BadgesPanel({ open, onClose }: BadgesPanelProps) {
           skeleton={<Skeleton height="3rem" width="100%" />}
           emptyWhen={(items) => items.length === 0}
           empty={
-            <p className="rounded-base border border-mist bg-foam px-4 py-[10px] text-[0.9375rem] leading-[1.6] text-slate-current">
+            <p className="rounded-base border border-line/15 bg-ink px-4 py-[10px] text-[0.9375rem] leading-[1.6] text-muted">
               还没有徽章。接唱一支作品并让它入海，或者把一支完整作品回传到发起者手里，就会出现。
             </p>
           }
@@ -56,15 +56,15 @@ export function BadgesPanel({ open, onClose }: BadgesPanelProps) {
               {items.map((badge) => (
                 <li
                   key={`${badge.kind}:${badge.bottleId}`}
-                  className="flex flex-wrap items-center gap-x-[12px] gap-y-[4px] rounded-base border border-mist bg-foam px-4 py-[10px]"
+                  className="flex flex-wrap items-center gap-x-[12px] gap-y-[4px] rounded-base border border-line/15 bg-ink px-4 py-[10px]"
                 >
                   <span className="flex items-center gap-2">
                     <Icon name="CheckCircle2" size={18} />
-                    <span className="text-[1rem] font-semibold text-abyss">
+                    <span className="text-[1rem] font-semibold text-paper">
                       {BADGE_LABEL[badge.kind].name}
                     </span>
                   </span>
-                  <span className="text-[0.875rem] leading-[1.6] text-slate-current">
+                  <span className="text-[0.875rem] leading-[1.6] text-muted">
                     {BADGE_LABEL[badge.kind].how}
                   </span>
                   <Link to={`/bottles/${badge.bottleId}/log`} className={`ml-auto ${TEXT_LINK}`}>

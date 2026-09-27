@@ -149,11 +149,84 @@ describe('接力时间轴：每行显示该段的赞/踩计数', () => {
         segments={[{ ...SEGMENTS[0]!, likeCount: 3, dislikeCount: 2 }]}
         totalSegments={4}
         missingSegmentIndexes={[2, 3]}
-      />,
+      />
     );
 
     const gap = screen.getAllByRole('listitem')[1]!;
     expect(within(gap).queryByText(/赞/)).not.toBeInTheDocument();
     expect(within(gap).queryByText(/踩/)).not.toBeInTheDocument();
+  });
+});
+
+/**
+ * record-v1 的 `/bottles/:id` 装置：**横躺的玻璃瓶剖面**。
+ *
+ * 四个位置各自承担信息，缺一条这一片就不算通过（实施计划 §5.1）：
+ * - 瓶内的**水**只到"最高已录段位"（水位＝已录段数）；
+ * - **干格**＝缺口（歌里固定的段位，成品里留成静音，不会被顶替）；
+ * - 漂着的**瓶塞**＝有人持有（状态由页面给，组件不自己猜）。
+ *
+ * 水与干格是**每个段位格自己的**（有水＝这一段有人唱过），所以"水位只到第 N 段"
+ * 是这些格子的整体读数，而不是另算一个数 —— 缺口在中间时也不会被水淹没。
+ */
+describe('接力时间轴：瓶身剖面（横躺的瓶）', () => {
+  /** 第 1 段与第 3 段有人唱过，缺第 2、4 段。 */
+  const FILLED_1_3 = [
+    SEGMENTS[0]!,
+    {
+      ...SEGMENTS[0]!,
+      id: '11111111-0000-4000-8000-000000000003',
+      index: 3,
+      ownerCode: '雾中松',
+      durationMs: 22_000,
+    },
+  ];
+
+  it('瓶内水位＝已录段数：有水的是已录段位，干格是缺口', () => {
+    render(
+      <RelayTimeline segments={FILLED_1_3} totalSegments={4} missingSegmentIndexes={[2, 4]} />,
+    );
+
+    const body = screen.getByTestId('bottle-body');
+    const cells = within(body).getAllByRole('listitem');
+    // 逐格：干＝缺口，水＝已录（缺口在中间时不会被水淹没）
+    expect(cells.map((cell) => cell.getAttribute('data-filled'))).toEqual([
+      'true',
+      'false',
+      'true',
+      'false',
+    ]);
+    // 整体读数：水只到最高已录段位（第 3 段）
+    expect(within(body).getByTestId('bottle-water-level')).toHaveTextContent('水只到第 3 段');
+  });
+
+  it('瓶子里还没有人唱过时，一格水都没有（不假装有水）', () => {
+    render(<RelayTimeline segments={[]} totalSegments={4} missingSegmentIndexes={[1, 2, 3, 4]} />);
+
+    const body = screen.getByTestId('bottle-body');
+    expect(body.querySelectorAll('[data-filled="true"]')).toHaveLength(0);
+    expect(within(body).getByTestId('bottle-water-level')).toHaveTextContent('还没有人唱过');
+  });
+
+  it('瓶塞＝有人持有：持有状态由页面传入，不在手上时没有瓶塞', () => {
+    const { rerender } = render(
+      <RelayTimeline
+        segments={FILLED_1_3}
+        totalSegments={4}
+        missingSegmentIndexes={[2, 4]}
+        status="HELD"
+      />,
+    );
+    expect(screen.getByTestId('bottle-cork')).toHaveTextContent('有人持有');
+
+    rerender(
+      <RelayTimeline
+        segments={FILLED_1_3}
+        totalSegments={4}
+        missingSegmentIndexes={[2, 4]}
+        status="IN_RIVER"
+      />,
+    );
+    expect(screen.queryByTestId('bottle-cork')).not.toBeInTheDocument();
   });
 });

@@ -22,7 +22,7 @@ import {
   type UploadPhase,
   type UploadTransport,
 } from '../audio';
-import { Button, Card, Icon, cn } from '../../design-system';
+import { Button, Icon, cn } from '../../design-system';
 import type { RecorderUploadView } from '../audio';
 
 export interface RecordStepProps {
@@ -160,7 +160,7 @@ export function RecordStep({
       */}
       <AsyncBoundary
         query={songs}
-        skeleton={<div aria-busy="true" className="h-[140px] rounded-base bg-tide-pool" />}
+        skeleton={<div aria-busy="true" className="h-[140px] rounded-base bg-water-void" />}
       >
         {(items) => {
           /**
@@ -192,10 +192,7 @@ export function RecordStep({
       </AsyncBoundary>
 
       {failure === null ? null : (
-        <Card
-          elevation="raised"
-          className="flex flex-col gap-3 border-warning-border bg-warning-tint text-warning"
-        >
+        <div className="flex flex-col gap-3 rounded-base border border-warning-border bg-warning-tint px-4 py-4 text-warning">
           <p role="status" className="flex items-start gap-2 text-[0.875rem] leading-[1.6]">
             <Icon name="AlertTriangle" size={16} />
             <span>{failure.message}</span>
@@ -213,13 +210,13 @@ export function RecordStep({
               </Button>
             ) : null}
             {localUrl === null ? null : (
-              <span className="flex flex-col gap-2 text-[0.875rem] text-slate-current">
-                <span className="font-medium text-abyss">本地回放确认（还没传上去的那一段）</span>
+              <span className="flex flex-col gap-2 text-[0.875rem] text-muted">
+                <span className="font-medium text-paper">本地回放确认（还没传上去的那一段）</span>
                 <audio controls src={localUrl} aria-label="本地回放确认" className="max-w-full" />
               </span>
             )}
           </div>
-        </Card>
+        </div>
       )}
     </div>
   );

@@ -14,7 +14,7 @@
  * **禁用必有可见文字原因**（DESIGN.md），原因不写在 `title` 里。
  */
 import { useEffect, useRef } from 'react';
-import { Button, Icon, cn, motion, prefersReducedMotion } from '../../design-system';
+import { Icon, cn, motion, prefersReducedMotion } from '../../design-system';
 
 export type MyVote = 'LIKE' | 'DISLIKE' | null;
 
@@ -126,22 +126,29 @@ function VoteButton({
 
   return (
     <span className="flex flex-col gap-[2px]">
-      <Button
-        variant="ghost"
+      {/*
+        record-v1：赞/踩是**一行里的小动作**，用 1px 细线 + 2px 圆角（不用药丸大圆角），
+        hover 只动 transform（scale 契约值），按下 translateY(-1px)，44px 触控底线。
+        选中态不止靠颜色：`aria-pressed` + 边框/字重同时变化。
+      */}
+      <button
+        type="button"
         aria-label={ariaLabel}
         aria-pressed={pressed}
         disabled={disabled}
-        loading={busy}
+        aria-busy={busy ? true : undefined}
         {...(title === undefined ? {} : { title })}
-        // 小尺寸：显式 px（不写 w-* / h-* 数字档，避免尺度耦合到 --spacing）
         className={cn(
-          'h-[32px] min-h-[32px] gap-[6px] rounded-pill px-[12px] text-[0.8125rem]',
-          'transition-transform duration-200 ease-out hover:scale-[1.03] active:translate-y-[-1px]',
-          pressed ? 'border-peacock bg-info-tint text-peacock' : '',
+          'inline-flex min-h-11 items-center gap-[6px] rounded-base border px-[12px] text-[0.8125rem]',
+          'transition-transform duration-200 ease-out hover:scale-[var(--motion-hover-scale)] active:translate-y-[-1px]',
+          'disabled:cursor-not-allowed',
+          pressed
+            ? 'border-coral bg-coral/10 font-medium text-danger'
+            : 'border-line/25 text-muted hover:text-paper',
         )}
-        icon={<Icon name={icon} size={16} />}
         onClick={onClick}
       >
+        <Icon name={icon} size={16} />
         <span className="whitespace-nowrap">{label}</span>
         <span
           ref={countRef}
@@ -150,10 +157,17 @@ function VoteButton({
         >
           {count}
         </span>
-      </Button>
+        {busy ? (
+          <span
+            data-testid="shimmer"
+            aria-hidden="true"
+            className="skeleton-shimmer h-2 w-[20px] rounded-base bg-line/20"
+          />
+        ) : null}
+      </button>
       {disabled && disabledReason !== undefined ? (
         // 禁用必须有**可见**的文字原因（DESIGN.md：禁用不能是唯一的不可用提示）
-        <span role="status" className="text-[0.75rem] text-slate-current">
+        <span role="status" className="text-[0.75rem] text-muted">
           {disabledReason}
         </span>
       ) : null}

@@ -25,29 +25,96 @@ const NAV_ITEMS = [
 /** 触控目标 ≥44px：DESIGN.md §Layout/§Accessibility 的移动端硬底线。 */
 const TOUCH = /min-h-11|min-h-\[44px\]/;
 
-describe('Button（主按钮 / 幽灵按钮）', () => {
-  it('主按钮用 peacock 底 + wave-white 文字，且触控高度 ≥44px', () => {
+describe('Button（主 CTA 盘 / 幽灵按钮 / 圆盘）', () => {
+  it('主 CTA 用 coral 实心填充 + ink 文字（双向 4.76:1），且触控高度 ≥44px', () => {
     render(<Button variant="primary">投瓶</Button>);
     const btn = screen.getByRole('button', { name: '投瓶' });
-    expect(btn.className).toMatch(/bg-peacock/);
-    expect(btn.className).toMatch(/text-wave-white/);
+    expect(btn.className).toMatch(/bg-coral/);
+    // record-v1：coral 填充上的文字**一律用 ink**（纸白字只有 3.83:1，不合格）
+    expect(btn.className).toMatch(/text-ink/);
+    expect(btn.className).not.toMatch(/text-paper|text-wave-white/);
     expect(btn.className).toMatch(TOUCH);
   });
 
-  it('幽灵按钮用描边 + peacock 文字，不使用实心底', () => {
+  it('幽灵按钮用 1px 细线 + coral 文字，不使用实心底', () => {
     render(<Button variant="ghost">放回海中</Button>);
     const btn = screen.getByRole('button', { name: '放回海中' });
     expect(btn.className).toMatch(/border/);
-    expect(btn.className).toMatch(/text-peacock/);
-    expect(btn.className).not.toMatch(/bg-peacock/);
+    expect(btn.className).toMatch(/text-coral/);
+    expect(btn.className).not.toMatch(/bg-coral/);
   });
 
-  it('focus ring 是 2px peacock + offset 2px（键盘可达）', () => {
+  it('盘身不填彩色：只有主 CTA 填 coral，其余盘面是深水底', () => {
+    const ghost = render(<Button variant="ghost">放回</Button>).getByRole('button');
+    expect(ghost.className).not.toMatch(/bg-(?:coral|warm|glass|peacock)/);
+  });
+
+  it('圆盘：rounded-full + 2~3 圈外环 + 深色盘身 + 冷/暖只在边缘微光', () => {
+    const { container } = render(
+      <Button shape="disc" variant="ghost">
+        捞
+      </Button>,
+    );
+    const disc = screen.getByRole('button', { name: '捞' });
+    expect(disc.className).toMatch(/rounded-full/);
+    // 盘身：深水径向内层（不是色板之外的填充，也不填彩色）
+    expect(container.querySelector('.disc-core')).not.toBeNull();
+    expect(disc.className).not.toMatch(/bg-(?:coral|warm|glass)/);
+    // 外环 2~3 圈（默认 2 圈）——4 圈及以上会让盘身淹没在环里
+    const rings = container.querySelectorAll('.disc-ring');
+    expect(rings.length).toBeGreaterThanOrEqual(2);
+    expect(rings.length).toBeLessThanOrEqual(3);
+    for (const ring of rings) expect(ring.getAttribute('aria-hidden')).toBe('true');
+    // 默认冷边
+    expect(container.querySelector('.disc-edge-cool')).not.toBeNull();
+  });
+
+  it('圆盘上的文字用 paper（盘身 ≈ water-bed，coral 压上去只有 3.44:1，不够 4.5）', () => {
+    render(
+      <Button shape="disc" variant="ghost">
+        捞
+      </Button>,
+    );
+    const disc = screen.getByRole('button', { name: '捞' });
+    expect(disc.className).toMatch(/text-paper/);
+    expect(disc.className, 'coral 文字在深水盘身上不达标').not.toMatch(/text-coral/);
+  });
+
+  it('主 CTA 圆盘 = coral 标签盘：填充 coral、文字 ink，且不叠深水盘身', () => {
+    const { container } = render(<Button shape="disc">投</Button>);
+    const disc = screen.getByRole('button', { name: '投' });
+    expect(disc.className).toMatch(/bg-coral/);
+    expect(disc.className).toMatch(/text-ink/);
+    expect(container.querySelector('.disc-core')).toBeNull();
+  });
+
+  it('圆盘的暖边可切换（投下 = 暖，捞取 = 冷），且冷暖不同时出现', () => {
+    const { container } = render(
+      <Button shape="disc" tone="warm">
+        投
+      </Button>,
+    );
+    expect(container.querySelector('.disc-edge-warm')).not.toBeNull();
+    expect(container.querySelector('.disc-edge-cool')).toBeNull();
+  });
+
+  it('外环可以收到 3 圈（上限），但请求更多圈时不得超出上限', () => {
+    const { container } = render(
+      <Button shape="disc" rings={3}>
+        投
+      </Button>,
+    );
+    expect(container.querySelectorAll('.disc-ring')).toHaveLength(3);
+    expect(container.querySelector('.disc-ring-3')).not.toBeNull();
+  });
+
+  it('focus ring 是 2px coral + offset 2px，且在 ink 底上（4.76:1 ≥3:1）', () => {
     render(<Button>继续</Button>);
     const btn = screen.getByRole('button', { name: '继续' });
     expect(btn.className).toMatch(/focus-visible:ring-2/);
-    expect(btn.className).toMatch(/focus-visible:ring-peacock/);
+    expect(btn.className).toMatch(/focus-visible:ring-coral/);
     expect(btn.className).toMatch(/focus-visible:ring-offset-2/);
+    expect(btn.className).toMatch(/focus-visible:ring-offset-ink/);
   });
 
   it('hover 只做 scale(1.03)（动效纪律：不改布局属性）', () => {
@@ -60,12 +127,12 @@ describe('Button（主按钮 / 幽灵按钮）', () => {
     expect(className).not.toMatch(/transition-\[[^\]]*box-shadow/);
   });
 
-  it('disabled 时不可点、且不是靠透明度敷衍（用 tide-pool 底）', () => {
+  it('disabled 时不可点、且不是靠透明度敷衍（用 water-void 底 + muted 文字）', () => {
     render(<Button disabled>不可用</Button>);
     const btn = screen.getByRole('button', { name: '不可用' });
     expect(btn).toBeDisabled();
-    expect(btn.className).toMatch(/bg-tide-pool/);
-    expect(btn.className).toMatch(/text-slate-current/);
+    expect(btn.className).toMatch(/bg-water-void/);
+    expect(btn.className).toMatch(/text-muted/);
   });
 
   it('loading 态保持文字与宽度、右侧用 shimmer 条而不是 spinner', () => {
@@ -94,29 +161,68 @@ describe('Input（label 在上 + 错误态）', () => {
     expect(screen.getByText('代号需 3–20 个字符')).toHaveAttribute('id', describedBy);
   });
 
-  it('focus ring 为 2px peacock + offset 2px（DESIGN.md §Components 原文要求）', () => {
+  it('focus ring 为 2px coral + offset 2px（DESIGN.md §Components 原文要求）', () => {
     render(<Input label="接力代号" />);
     expect(screen.getByLabelText('接力代号').className).toMatch(/focus-visible:ring-2/);
-    expect(screen.getByLabelText('接力代号').className).toMatch(/focus-visible:ring-peacock/);
+    expect(screen.getByLabelText('接力代号').className).toMatch(/focus-visible:ring-coral/);
   });
 
   it('输入区高度 ≥44px（移动端可用性底线）', () => {
     render(<Input label="接力代号" />);
     expect(screen.getByLabelText('接力代号').className).toMatch(TOUCH);
   });
+
+  it('深底输入框：water-void 底 + muted 描边 + paper 文字 + 2px 圆角', () => {
+    render(<Input label="接力代号" />);
+    const input = screen.getByLabelText('接力代号');
+    expect(input.className).toMatch(/bg-water-void/);
+    expect(input.className).toMatch(/border-muted/);
+    expect(input.className).toMatch(/text-paper/);
+    expect(input.className).toMatch(/rounded-md/);
+  });
+
+  it('字段级错误用 danger 文字 + coral 描边（错误文字 6.67:1）', () => {
+    render(<Input label="接力代号" error="代号需 3–20 个字符" />);
+    const input = screen.getByLabelText('接力代号');
+    expect(input.className).toMatch(/border-coral/);
+    expect(screen.getByText('代号需 3–20 个字符').className).toMatch(/text-danger/);
+  });
 });
 
 describe('Card', () => {
-  it('用 foam 底 + mist 描边 + 12px 基准圆角', () => {
+  it('L1 卡片：ink 底 + 1px 细线 + 2px 圆角，且**不用阴影造层次**', () => {
     render(
       <Card>
         <p>漂流瓶</p>
       </Card>,
     );
     const card = screen.getByText('漂流瓶').closest('section') as HTMLElement;
-    expect(card.className).toMatch(/bg-foam/);
-    expect(card.className).toMatch(/border-mist/);
+    expect(card.className).toMatch(/bg-ink/);
+    expect(card.className).toMatch(/border-hairline/);
     expect(card.className).toMatch(/rounded-base/);
+    expect(card.className, 'record-v1 用亮度差与细线造层次，卡片不用阴影').not.toMatch(/shadow-/);
+  });
+
+  it('L2 浮动条：water-void 底 + 阴影（阴影只给浮层）', () => {
+    render(
+      <Card elevation="floating">
+        <p>播放条</p>
+      </Card>,
+    );
+    const card = screen.getByText('播放条').closest('section') as HTMLElement;
+    expect(card.className).toMatch(/bg-water-void/);
+    expect(card.className).toMatch(/shadow-floating/);
+  });
+
+  it('L4 深水沉浸区：water-body 底（不是"深色模式"，只有沉浸式区块用）', () => {
+    render(
+      <Card elevation="deep">
+        <p>沉浸区</p>
+      </Card>,
+    );
+    const card = screen.getByText('沉浸区').closest('section') as HTMLElement;
+    expect(card.className).toMatch(/bg-water-body/);
+    expect(card.className).toMatch(/text-paper/);
   });
 });
 
@@ -144,7 +250,7 @@ describe('导航（桌面侧栏 / 移动底栏）', () => {
     for (const link of links) {
       expect(link.className, `${link.textContent} 触控目标不足`).toMatch(TOUCH);
     }
-    expect(nav.className).toMatch(/bg-foam/);
+    expect(nav.className).toMatch(/bg-ink/);
     expect(screen.getByRole('link', { name: '公海' })).toHaveAttribute('aria-current', 'page');
   });
 
@@ -154,6 +260,25 @@ describe('导航（桌面侧栏 / 移动底栏）', () => {
     expect(nav.className).toMatch(/fixed/);
     expect(nav.className).toMatch(/z-sticky/);
     expect(nav.className).toMatch(/safe-area-inset-bottom|pb-\[env/);
+  });
+
+  it('导航条是 ink 底 + 1px 细线（不是浅底卡片）', () => {
+    const { container } = render(<SidebarNav items={NAV_ITEMS} current="river" />);
+    const nav = container.querySelector('nav') as HTMLElement;
+    expect(nav.className).toMatch(/bg-ink/);
+    expect(nav.className).toMatch(/border-hairline/);
+  });
+
+  it('当前项用 coral 指示：1px 竖线 + 字重 500（不只靠颜色）', () => {
+    const { container } = render(<SidebarNav items={NAV_ITEMS} current="river" />);
+    const active = screen.getByRole('link', { name: '河道' });
+    expect(active.className).toMatch(/text-coral/);
+    expect(active.className).toMatch(/font-medium/);
+    // 竖线是独立的一根 1px 条（w-px + bg-coral），对读屏隐藏
+    const bar = container.querySelector('a[aria-current="page"] span[aria-hidden="true"]');
+    expect(bar, '缺 1px 竖线指示').not.toBeNull();
+    expect(bar?.className).toMatch(/w-px/);
+    expect(bar?.className).toMatch(/bg-coral/);
   });
 });
 
@@ -175,6 +300,11 @@ describe('Skeleton（shimmer，非 spinner）', () => {
     );
     expect(document.querySelector('[aria-busy="true"]')).not.toBeNull();
   });
+
+  it('骨架底用 water-void（与目标组件同色系，加载完不跳色）', () => {
+    render(<Skeleton data-testid="sk" />);
+    expect(screen.getByTestId('sk').className).toMatch(/bg-water-void/);
+  });
 });
 
 describe('EmptyState', () => {
@@ -191,6 +321,12 @@ describe('EmptyState', () => {
     expect(screen.getByText('等一会儿再来捞')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: '去录制' })).toBeInTheDocument();
     expect(document.querySelector('svg[aria-hidden="true"]')).not.toBeNull();
+  });
+
+  it('空态是中性色、无填充底（不与错误态混淆）', () => {
+    const { container } = render(<EmptyState icon="Waves" title="这一带还没有瓶子" />);
+    const root = container.firstElementChild as HTMLElement;
+    expect(root.className).not.toMatch(/bg-(?:coral|danger|warning|foam|water-light)/);
   });
 });
 
@@ -221,11 +357,26 @@ describe('Toast', () => {
     expect(toast.className).toMatch(/z-toast/);
   });
 
-  it('语义色 tone 用 tint 底 + border，不使用未定义颜色', () => {
+  it('语义色 tone 用 tint 底 + border + 语义文字色，不使用未定义颜色', () => {
     render(<Toast tone="danger" message="录制失败" />);
     const toast = screen.getByRole('status');
     expect(toast.className).toMatch(/bg-danger-tint/);
     expect(toast.className).toMatch(/border-danger-border/);
+    expect(toast.className).toMatch(/text-danger/);
+  });
+
+  it('四种 tone 都用各自的语义文字色（success/info 不许退化成同一个）', () => {
+    const { container } = render(
+      <>
+        <Toast tone="success" message="接力成功" />
+        <Toast tone="warning" message="接近上限" />
+        <Toast tone="info" message="有人取走了你的瓶子" />
+      </>,
+    );
+    const [success, warning, info] = [...container.querySelectorAll('[role="status"]')];
+    expect(success?.className).toMatch(/text-success/);
+    expect(warning?.className).toMatch(/text-warning/);
+    expect(info?.className).toMatch(/text-info/);
   });
 });
 
@@ -261,6 +412,18 @@ describe('Modal（去向三选一）', () => {
       </Modal>,
     );
     expect(screen.queryByRole('dialog')).toBeNull();
+  });
+
+  it('浮层才允许用阴影（遮罩 water-void + 面板 ink 细线）', () => {
+    render(
+      <Modal open title="选择声音去向" onClose={() => {}}>
+        <p>内容</p>
+      </Modal>,
+    );
+    expect(document.querySelector('.z-overlay')?.className).toMatch(/bg-water-void/);
+    const dialog = screen.getByRole('dialog');
+    expect(dialog.className).toMatch(/bg-ink/);
+    expect(dialog.className).toMatch(/shadow-floating/);
   });
 });
 
@@ -298,5 +461,22 @@ describe('Tabs（公海三入口）', () => {
   it('tab 触控高度 ≥44px', () => {
     render(<Tabs items={[{ key: 'a', label: '指定接唱' }]} />);
     expect(screen.getByRole('tab').className).toMatch(TOUCH);
+  });
+
+  it('当前项用 coral 指示 + 1px 下划线（不是实心药丸；圆角纪律 ≤4px）', () => {
+    render(
+      <Tabs
+        items={[
+          { key: 'a', label: '完整作品' },
+          { key: 'b', label: '等待接力' },
+        ]}
+      />,
+    );
+    const [first, second] = screen.getAllByRole('tab');
+    expect(first?.className).toMatch(/text-coral/);
+    expect(first?.className).toMatch(/border-b/);
+    expect(first?.className).toMatch(/border-coral/);
+    expect(first?.className, 'record-v1 不用胶囊药丸表示选中').not.toMatch(/rounded-pill/);
+    expect(second?.className).toMatch(/text-muted/);
   });
 });

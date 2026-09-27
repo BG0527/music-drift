@@ -30,11 +30,11 @@ describe('路由表', () => {
     expect(log.params['id']).toBe('8f1d6c2e-0f1a-4a1e-9f2b-111111111111');
   });
 
-  it('公海详情 /sea/:id 与公海大厅 /sea 不互相吞掉', () => {
+  it('公海详情路由已删除（用户裁决：与瓶子详情冲突）：/sea/:id 落到 notFound，/sea 仍是大厅', () => {
     expect(matchRoute('/sea').name).toBe('sea');
-    const detail = matchRoute('/sea/8f1d6c2e-0f1a-4a1e-9f2b-222222222222');
-    expect(detail.name).toBe('seaDetail');
-    expect(detail.params['id']).toBe('8f1d6c2e-0f1a-4a1e-9f2b-222222222222');
+    const removed = matchRoute('/sea/8f1d6c2e-0f1a-4a1e-9f2b-222222222222');
+    expect(removed.name).toBe('notFound');
+    expect(removed.params['id']).toBeUndefined();
   });
 
   it('忽略查询串与尾斜杠，未知路径落到 notFound（不白屏）', () => {
@@ -51,7 +51,6 @@ describe('路由表', () => {
       ['bottle', { id }],
       ['bottleLog', { id }],
       ['sea', {}],
-      ['seaDetail', { id }],
       ['settings', {}],
     ] as const) {
       const path = buildPath(name, params as Record<string, string>);
@@ -59,12 +58,11 @@ describe('路由表', () => {
     }
   });
 
-  it('侧栏高亮：漂流瓶相关页归属「河道」，公海详情归属「公海」', () => {
+  it('侧栏高亮：漂流瓶相关页归属「河道」，公海大厅归属「公海」', () => {
     expect(activeNavKey('river')).toBe('river');
     expect(activeNavKey('bottle')).toBe('river');
     expect(activeNavKey('bottleLog')).toBe('river');
     expect(activeNavKey('sea')).toBe('sea');
-    expect(activeNavKey('seaDetail')).toBe('sea');
     expect(activeNavKey('profile')).toBe('mine');
     expect(activeNavKey('settings')).toBe('settings');
     expect(activeNavKey('login')).toBeNull();

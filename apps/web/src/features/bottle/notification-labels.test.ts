@@ -31,7 +31,7 @@ describe('通知 → 中文文案', () => {
       payload: { bottleId: 'b1', songTitle: '深海鲸落', isComplete: true },
     });
     expect(done.label).toContain('已完成');
-    expect(done.href).toBe('/sea/b1');
+    expect(done.href).toBe('/bottles/b1');
     expect(done.tone).toBe('success');
 
     const incomplete = describeNotification({
@@ -40,6 +40,15 @@ describe('通知 → 中文文案', () => {
       payload: { bottleId: 'b1', songTitle: '深海鲸落', isComplete: false },
     });
     expect(incomplete.label).not.toContain('已完成');
+  });
+
+  it('回传通知（BOTTLE_RETURNED）：直说「等你操作」并送进瓶子详情（公海详情已删，§17）', () => {
+    const view = describeNotification({ ...base, type: 'BOTTLE_RETURNED' });
+    expect(view.label).toContain('等你操作');
+    expect(view.detail).toContain('深海鲸落');
+    expect(view.detail).toContain('回');
+    expect(view.href).toBe('/bottles/b1');
+    expect(view.tone).toBe('warning');
   });
 
   it('曲名缺失时不显示书名号空壳（payload 是弱类型，必须容错）', () => {
