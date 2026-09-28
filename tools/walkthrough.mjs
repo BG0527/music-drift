@@ -32,7 +32,7 @@
  *   与**有界 `waitForFunction`**，不用固定 sleep 猜时机；
  * - 音频端点支持 Range ⇒ 响应是 **206**（只认 200 会把"试听成功"误判成失败，实测踩过）。
  *
- * 前置：API 在 8787（`pnpm --filter @music-drift/api dev`）与 Postgres 5433 已就绪；
+ * 前置：API 在 8788（`pnpm --filter @music-drift/api dev`）与 Postgres 5433 已就绪；
  * 站点服务器本脚本**自己起**（没起时）并复用（已在跑时），**不会**再起第二个 API。
  *
  * 用法：node tools/walkthrough.mjs [--port=5188]
@@ -58,7 +58,7 @@ const args = new Map(
 );
 const PORT = Number(args.get('port') ?? 5188);
 const BASE = `http://127.0.0.1:${String(PORT)}`;
-const API_PORT = Number(args.get('api-port') ?? 8787);
+const API_PORT = Number(args.get('api-port') ?? 8788);
 const STAMP = new Date()
   .toISOString()
   .replace(/[-:TZ.]/g, '')
@@ -302,7 +302,7 @@ async function main() {
       await walker.page.waitForFunction(() => document.documentElement.dataset.pageReady === 'bottle');
     }
     const walkerDetail = await api(walkerClient, 'GET', `/api/bottles/${walkerBottle.bottleId}`);
-    const walkerOwn = walkerDetail.segments.find((segment) => segment.ownerId === walkerId) ?? null;
+    const walkerOwn = walkerDetail.segments.find((segment) => segment.isMine) ?? null;
     check(
       `接唱成功（${walkerRecord.ok ? '真 MediaRecorder' : '合成容器降级'}）：录满预设自动停 + 自动上传 + 服务端记到我的这一段`,
       walkerOwn !== null && walkerDetail.segments.length === 1,
@@ -406,8 +406,6 @@ async function main() {
     const relay = await openSession(browser, 'relay');
     await signInThroughUi(relay.page, RELAY, { register: true });
     const relayClient = await clientFromContext(relay.context);
-    const relayMe = await api(relayClient, 'GET', '/api/auth/me');
-    const relayId = relayMe?.user?.id ?? '';
     await relay.page.goto(`${BASE}/river.html`);
     await relay.page.waitForFunction(() => document.documentElement.dataset.pageReady === 'river');
     check(
@@ -460,7 +458,7 @@ async function main() {
       await relay.page.waitForFunction(() => document.documentElement.dataset.pageReady === 'bottle');
     }
     const relayAfterRecord = await api(relayClient, 'GET', `/api/bottles/${drawnId}`);
-    const relayOwn = relayAfterRecord.segments.find((segment) => segment.ownerId === relayId) ?? null;
+    const relayOwn = relayAfterRecord.segments.find((segment) => segment.isMine) ?? null;
     check(
       `接唱（${relayRecord.ok ? '真 MediaRecorder' : '合成容器降级'}）：服务端把我的这一段记进了作品`,
       relayOwn !== null && relayOwn.index === relayGapIndex,
@@ -488,7 +486,7 @@ async function main() {
       check('试听（我自己刚录的那一段）：真的在出声（第二段真 MediaRecorder 产物同样可解码）', false, '我没有段');
     }
 
-    const firstOther = relayAfterRecord.segments.find((segment) => segment.ownerId !== relayId) ?? null;
+    const firstOther = relayAfterRecord.segments.find((segment) => !segment.isMine) ?? null;
     await relay.page.locator('.cap .listen').nth((firstOther?.index ?? 1) - 1).click({ timeout: 20000 });
     await voteButtons(relay.page).nth(0).click({ timeout: 20000 });
     const relayVote = await waitForLikeCount(relayClient, drawnId, firstOther?.index ?? 1);
@@ -525,13 +523,13 @@ async function main() {
     await relay.page.locator('form.w1b-panel button[type="button"]').click();
 
     /**
-     * 「处置生效」的判据＝**状态签名**（status / 持有者 / 当前投掷者 / 回传是否走完）里的任意一项变化。
+     * 「处置生效」的判据＝**状态签名**（status / 当前观看者是否持有 / 回传是否走完）里的任意一项变化。
      *
      * 为什么不用单一字段：
      *   - `status` 单独用会把**成功的回传**判成失败（回传＝沿父链交回，status 仍是 `HELD`，只是换持有者）；
      *   - `revision` 单独用也不行：**实测服务器在处置时不改 revision**（`revision 2 → 2`，而 status 已
      *     `HELD → IN_RIVER`）—— 我第一版就是拿它当判据，被这一步当场戳破。
-     * 签名变化则对三条水路都成立（投河 → status；入海 → status/seaZone；回传 → holderId）。
+     * 签名变化则对三条水路都成立（投河/入海 → status；回传 → isHolder）。
      */
     const beforeResolution = resolutionSignature(relayAfterRecord);
     const enabledRow = await relay.page.evaluate(() => {
@@ -809,13 +807,12 @@ async function waitForStatus(client, bottleId, expected) {
 
 /**
  * 「处置生效」的签名：这四项里任意一项变化都说明服务端真的动了这支瓶子
- *（投河/入海改 `status`，回传换 `holderId`），而**不依赖**某一项单独变化。
+ *（投河/入海改 `status`，回传改变当前观看者的 `isHolder`），而**不依赖**稳定用户 UUID。
  */
 function resolutionSignature(detail) {
   return [
     detail.status,
-    detail.holderId ?? '-',
-    detail.currentCasterId ?? '-',
+    String(detail.isHolder),
     String(detail.returnCompleted),
   ].join('|');
 }

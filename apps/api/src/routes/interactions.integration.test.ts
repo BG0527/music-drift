@@ -440,7 +440,7 @@ describe('私密留言（CONTEXT §5）：目标由发送者按**段号**指定�
     }
   });
 
-  it('回传到**目标**手上即 DELIVERED（本例目标是发起者 ⇒ 他此时可见）；无需等到入海', async () => {
+  it('回传到目标手上即 DELIVERED；入海后接口隐藏内容但落库状态保持送达', async () => {
     // 回传是**逐跳**的（CONTEXT §4.3）：末段作者 → 上一段作者 → … → 发起者；
     // 谁持有谁选去向，所以这条链要一跳一跳走完（不能在别人手上替它入海）。
     await resolve(lastSingerCookie, bottleId, 'RETURN');
@@ -455,9 +455,8 @@ describe('私密留言（CONTEXT §5）：目标由发送者按**段号**指定�
       headers: { cookie: initiatorCookie },
     });
     expect(response.statusCode).toBe(200);
-    const items = response.json() as { id: string; status: string }[];
-    expect(items.map((item) => item.id)).toContain(messageId);
-    expect(items.find((item) => item.id === messageId)?.status).toBe('DELIVERED');
+    // 公海不展示私密留言；这不回滚已经完成的送达，也不删除数据。
+    expect(response.json()).toEqual([]);
 
     // 落库事实：留言是点对点写给**发起者**的，且投影状态已跟随事件转为 DELIVERED
     const rows = await db.query<{ status: string; to_user_id: string; count: string }>(
@@ -482,8 +481,8 @@ describe('私密留言（CONTEXT §5）：目标由发送者按**段号**指定�
   });
 });
 
-describe('私密留言：中途入海 → 未送达（CONTEXT §5.2）', () => {
-  it('留言后把瓶子投进公海 → 发送者看到 UNDELIVERED，发起者始终看不到', async () => {
+describe('私密留言：未完成作品中途入海时隐藏但保留（CONTEXT §5.2）', () => {
+  it('留言后把未完成瓶子投进公海 → 双方接口为空，数据仍为 PENDING', async () => {
     const initiator = await register('ui');
     const bottleId = (await seedSeaBottle(initiator.cookie)).bottleId;
     const singerCookie = (await register('us')).cookie;
@@ -497,7 +496,7 @@ describe('私密留言：中途入海 → 未送达（CONTEXT §5.2）', () => {
     });
     expect(created.statusCode).toBe(201);
 
-    // §5.2：瓶子中途被投入公海 → 留言不公开，C 收到「未送达」
+    // §5.2：瓶子中途被投入公海 → 留言不公开，但未完成作品仍可离海继续接力。
     await resolve(singerCookie, bottleId, 'SEA');
 
     const sender = await app.inject({
@@ -505,8 +504,7 @@ describe('私密留言：中途入海 → 未送达（CONTEXT §5.2）', () => {
       url: '/api/bottles/' + bottleId + '/messages',
       headers: { cookie: singerCookie },
     });
-    const delivered = sender.json() as { status: string }[];
-    expect(delivered.map((item) => item.status)).toEqual(['UNDELIVERED']);
+    expect(sender.json()).toEqual([]);
 
     const owner = await app.inject({
       method: 'GET',
@@ -519,11 +517,9 @@ describe('私密留言：中途入海 → 未送达（CONTEXT §5.2）', () => {
       `select status from messages where bottle_id = $1`,
       [bottleId],
     );
-    expect(rows[0]?.status).toBe('UNDELIVERED');
-    // ✅ §5.2 的「留言者会收到通知：你的留言未送达」**已实现**（t42）：
-    // 写入点在 `store/notifications.ts` 的"内核前后状态比对"里 —— 留言 PENDING → UNDELIVERED 就
-    // 给**发送者**写一条 `MESSAGE_UNDELIVERED`；三条失败路径（目标段被斩 / DAMAGED / 完整入海未送达）
-    // 各有集成用例，见 `routes/messageTargeting.integration.test.ts` 的「§5.2 三种失败都通知留言者」。
+    expect(rows[0]?.status).toBe('PENDING');
+    // 真正失败终局（目标段被斩 / DAMAGED / 完整入海仍未送达）由
+    // messageTargeting.integration.test.ts 覆盖并通知发送者。
     //（此处原先的 ⚠️ 过期警示写于 t9：当时全仓确实没有写入口；t12 补齐写入后它就成了误导，t42 更新。）
   });
 });

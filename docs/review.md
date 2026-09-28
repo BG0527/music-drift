@@ -63,3 +63,58 @@ pnpm --filter @music-drift/api test:integration -- \
 git diff --check
 exit 0（仅 CRLF 转 LF 提示，无 whitespace error）
 ```
+
+## 2026-09-29 验收返修（用户裁决覆盖旧音频揭晓规则）
+
+本节覆盖上文“锁定段 / 暂未解锁”的旧结论。用户最终裁决：任何观看者均可试听瓶中当前全部已录段；“解锁”只指私密留言送达后，且只向该留言的发送者与接收者揭晓双方账号名。
+
+### 返修范围
+
+- 删除 `LOCKED`、`hiddenLaterSegmentCount` 与“暂未解锁”音频语义；所有观看者可逐段试听并一键按段号连续播放。
+- 公共详情不返回 `ownerId / holderId / currentCasterId`；只返回瓶级匿名代号及当前观看者相对字段 `isMine / isHolder`。
+- 公共日志展示全部核心事件，操作者只显示稳定的瓶级匿名代号；私密留言、投票和内部事件采用白名单隔离。
+- 私密留言只能投递给发送者有效段之前的有效段；送达前匿名，送达后仅通信双方互见账号名；公海接口与页面隐藏留言但保留数据。
+- 删除独立“放回海中”入口；持有者点击左上“回河道”时先完成服务端 put-back，成功后导航。
+- Modal 使用 body portal、焦点闭环和背景 `inert`；录音上传成功后等待旧 portal 240ms 真实卸载，再打开去向窗口。
+
+### TDD 与缺陷闭环摘要
+
+| 行为 | Red | Green |
+| --- | --- | --- |
+| 所有人试听 | mix 仍要求 `hiddenLaterSegmentCount` 并抛错 | 只区分 `RECORDED / UNRECORDED`，逐段与顺序播放器通过 |
+| 公共 DTO 匿名 | 原始详情仍含稳定用户 UUID | 删除真实 ID，API 集成断言键名不存在 |
+| 漂流日志 | 未唱就回河道的两名操作者都退化为“匿名歌手” | 所有可见核心事件 actor 获得稳定且可区分瓶级代号 |
+| 顺序播放 | 测试删除 `play()` 仍可通过；reject 后假播报 | 真实断言每段 `play()`，失败停止并可重试，下一段 resolve 前显示“准备中” |
+| 私密留言目标 | 第 1 段可伪造请求投给后序段 | 服务端强制 `target.index < sender.index` 且发送者段有效 |
+| 公海留言 | 公海仍可读，未完成入海被提前判未送达 | 公海 API 返回空且页面无入口；未完成作品保留 `PENDING`，离海恢复 |
+| Modal 图层 | portal 前仍受祖先层叠上下文影响 | portal 挂到 body，z-index 复用 DESIGN token |
+| Modal 切换 | 录音退场 240ms 内可出现双 portal | `onExited` + 双门禁阶段机保证任意时刻 portal ≤ 1 |
+| 回河道时序 | 即时响应测试无法证明成功前不导航 | deferred 响应证明成功前留页，500 失败留页并显示错误 |
+
+### 独立评审
+
+交叉评审累计发现并修复：1 Critical（公共详情泄露稳定 UUID）、13 Major（音频/日志权限、留言边界、公海隐藏、Modal 可达性与竞态、river draw 匿名码、黄金路径旧契约等）及 4 Minor。每轮修复均由未实现该切片的执行者复审；最终结论：**0 Critical、0 Major、0 Minor**。
+
+### 最终证据
+
+```text
+pnpm -r test
+shared: 22 files / 263 passed
+api:    19 files / 181 passed
+web:    81 files / 1070 passed / 1 skipped
+
+pnpm -r typecheck
+shared / api / web: tsc --noEmit passed
+
+pnpm --filter @music-drift/api test:integration
+24 files / 213 passed
+
+node apps/web/tools/golden-path-live-check.mjs
+28/28 步通过；4 个账号、一次性真库、真 HTTP、真音频字节；临时数据库已删除
+
+四档一屏门禁
+1024×720 / 1280×800 / 1440×900 / 1920×1080 均为“全部页面达标”
+
+git diff --check
+exit 0（仅 CRLF 转 LF 提示，无 whitespace error）
+```

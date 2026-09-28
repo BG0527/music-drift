@@ -11,16 +11,16 @@
 
 ```
 浏览器 ──► http://localhost:5173 ─┬─ 静态：site/*.html + /app/*.js + /node_modules/**(本地字体)
-                                  └─ 同源反代：/api/* 与 /healthz ──► http://127.0.0.1:8787（apps/api）
+                                  └─ 同源反代：/api/* 与 /healthz ──► http://127.0.0.1:8788（apps/api）
                                                                        └─► Postgres localhost:5433
 ```
 
-**必须经 5173 访问**，不要直接开 `:8787`，也不要用 `file://`：
+**必须经 5173 访问**，不要直接开 `:8788`，也不要用 `file://`：
 
 - 会话 cookie 是 `HttpOnly + SameSite=Lax`、后端**没有任何 CORS**（本轮不改后端）⇒ 只有同源（5173）才带得上 cookie；
 - 页面里 4 行本地字体 `@import url('/node_modules/.pnpm/...')` 只有经这个服务器（它把 `/node_modules/*` 映射到仓库根）才解析得到，`file://` 下字体会静默回退。
 
-端口：站点 `5173`（可 `--port=`）、API `8787`（可 `--api-port=`）、Postgres `5433`（docker-compose）。
+端口：站点 `5173`（可 `--port=`）、API `8788`（可 `--api-port=`；原端口回环被本机外部工具占用，用户裁决迁移）、Postgres `5433`（docker-compose）。
 
 ## 2. 一键起全栈（确切命令序列）
 
@@ -52,7 +52,7 @@ pnpm --filter @music-drift/api db:migrate
 
 pnpm --filter @music-drift/api db:seed
 # 期望：$ tsx ... src/db/seed.ts
-#       seed ok: 3 songs / 12 segments
+#       seed ok: 3 songs / 12 segments / admin=admin
 ```
 
 > 重复跑 `db:seed` 是幂等的（同一份演示数据）；要推倒重来：`docker compose down -v` 再走 2.1 → 2.3。
@@ -62,7 +62,7 @@ pnpm --filter @music-drift/api db:seed
 ```powershell
 pnpm --filter @music-drift/api dev
 # 期望：$ tsx watch --env-file-if-exists=../../.env src/server.ts
-#       {"level":30,...,"msg":"Server listening at http://127.0.0.1:8787"}
+#       {"level":30,...,"msg":"Server listening at http://127.0.0.1:8788"}
 # 若出现 "[api] 未配置 DATABASE_URL：/api/auth/* ... 未挂载" ⇒ 回到 2.2
 ```
 
@@ -74,7 +74,7 @@ node tools/site-server.mjs --port=5173
 #   站点在 http://localhost:5173
 #     静态根目录：D:\Develop\projects\music\site
 #     本地字体：/node_modules/* → D:\Develop\projects\music
-#     同源反代：/api/* 与 /healthz → http://127.0.0.1:8787
+#     同源反代：/api/* 与 /healthz → http://127.0.0.1:8788
 ```
 
 浏览器打开 `http://localhost:5173/`（会 302 到 `/river.html`）。右下角有**默认收起**的「站点导航」按钮，展开可跳 11 页。
@@ -210,7 +210,7 @@ curl.exe -s -i -c .tmp-w0-cookies.txt -X POST http://127.0.0.1:5173/api/auth/log
 | 首页空白十几秒 | 后端冷启动（免费容器休眠） | 前端应显示"正在唤醒服务"（`showWaking()`）；本地一般不会有 |
 | `seed-demo` 报「账号 demo 已存在但登录失败」 | 该账号的口令被改过（或不是本脚本建的） | 按报错里给的 SQL 删掉它再跑；或换 handle/email |
 | `seed-demo` 报「曲库里没有已切分的曲目」 | 没跑 `db:seed`（或占位曲被清） | 跑 2.3 的 `pnpm --filter @music-drift/api db:seed` |
-| `seed-demo` 报连不上 / `fetch failed` | API 没起（它默认打 `http://127.0.0.1:8787`） | 起 2.4；或 `--base=http://127.0.0.1:5173`（经站点同源反代） |
+| `seed-demo` 报连不上 / `fetch failed` | API 没起（它默认打 `http://127.0.0.1:8788`） | 起 2.4；或 `--base=http://127.0.0.1:5173`（经站点同源反代） |
 | `walkthrough` 报「找不到 playwright（npx 缓存里没有）」 | 本机从没跑过 playwright | 跑一次 `npx playwright --version` 让它落到 `_npx` 缓存（**不要**装成项目依赖） |
 | `walkthrough` 报「站点服务器没起来」/ 端口占用 | 5188 被别的进程占着 | 换端口 `--port=5189`（它会自己起服务器；已在跑则复用） |
 | `walkthrough` 打出 `WARN 录音降级为（旧）合成容器` | 该环境给不出假麦克风/`MediaRecorder` | W8 起这条"降级"上传的是**内置真音频 fixture**（不再有哑音频）；文案里的"合成容器"是 W7 待改的旧措辞 |
@@ -299,7 +299,7 @@ node tools/probe-fit.mjs                                                    # �
 | 5 | 点收藏那行的「听《…》」→ `/bottle.html` | 曲名、A1–A4 段链、`收藏` 是「已收藏」态；底部可试听 |
 | 6 | 站点导航 →「公海」（`/sea.html`） | 已完成区有作品（卡片有曲名、"已录 4 / 4 段"、「听这支作品」） |
 | 7 | 站点导航 →「河道」（`/river.html`）→ 点中间的「撒网」 | 若河道里有瓶子：跳到 `/bottle.html?id=…` 且"瓶塞 · 有人持有"；若空河道：给出服务端文案的空态（不是红字错误） |
-| 8 | 任意瓶子页：点瓶身上的「听」、点赞/点踩、`私密留言`、`继续投河`/`回传`/`入海`、`放回海中`、`看这只瓶子的漂流日志` | 每个动作都有即时反馈（状态条/就地文案），不出现"点了没反应" |
+| 8 | 任意瓶子页：点瓶身上的「听」、点赞/点踩、`私密留言`、`继续投河`/`回传`/`入海`、左上角`回河道`、`看这只瓶子的漂流日志` | 每个动作都有即时反馈（状态条/就地文案），不出现"点了没反应" |
 | 9 | 站点导航 →「设置」「审核台」「404」 | 设置页显示真账号与版本；审核台按角色显示（demo 是普通用户，处理按钮应禁用/不可用）；404 页正常 |
 | 10 | 想自己完整跑一遍（不用手点） | `node tools/walkthrough.mjs` → 结尾 `结论：0 项不达标` |
 

@@ -16,15 +16,14 @@
  * 三条不变量（ADR-015，页面不许自己推断）：段号 = `missingSegmentIndexes[0]`；
  * 完成度看缺口；备选去向由服务端给（发起者没有「回传」）。
  */
-import { useMemo, useState } from 'react';
+import { useRef, useState } from 'react';
 import type { BottleDetail, RecordSegmentResponse, Resolution } from '@music-drift/shared';
-import { karaokeLyricsForTrack, planAccompaniedMix } from '@music-drift/shared/audio';
 import {
   useChooseResolution,
   useInvalidateBottle,
   usePutBack,
 } from '../features/api/mutations';
-import { useBottle, segmentAudioUrl, useLibraryMetadata } from '../features/api/queries';
+import { useBottle, segmentAudioUrl } from '../features/api/queries';
 import { ApiError } from '../features/api/client';
 import { ConflictNotice } from '../features/bottle/conflict-notice';
 import { RecordStep } from '../features/bottle/record-step';
@@ -45,7 +44,7 @@ import { useSession } from '../features/session/session-context';
 import { GroovePlaybackProvider, GrooveTimeline } from '../features/audio/groove-timeline';
 import {
   type AudioElementLike,
-  MixExportPanel,
+  SequentialSegmentPlayer,
   type RecorderEnvironment,
   type UploadTransport,
 } from '../features/audio';
@@ -127,9 +126,13 @@ function BottleView({ bottle, seams }: { bottle: BottleDetail; seams?: BottlePag
   /** 正在试听的那一段（界面上同时只有一个播放器）。默认 = 补位上下文指的段（ADR-015 §16.5），否则最后一段。 */
   const [selectedSegmentId, setSelectedSegmentId] = useState<string | null>(null);
   /** 录制面板（录完才能选去向）：收进弹窗，页面本体只留稿上的 CTA。 */
-  const [recorderOpen, setRecorderOpen] = useState(false);
-  /** 完整试听独占一个 Modal，避免把新增播放器撑进一屏画布，也不与录音/去向浮层叠加。 */
-  const [fullPreviewOpen, setFullPreviewOpen] = useState(false);
+  const [recorderPhase, setRecorderPhase] = useState<
+    'closed' | 'open' | 'exiting-to-destination'
+  >('closed');
+  const [recorderSegmentIndex, setRecorderSegmentIndex] = useState<number | null>(null);
+  const [recorderUploading, setRecorderUploading] = useState(false);
+  const recorderPortalExitedRef = useRef(false);
+  const destinationReadyRef = useRef(false);
   /** 私密留言（§5）：声明式内容 + 表单 → 弹窗。 */
   const [messagesOpen, setMessagesOpen] = useState(false);
   /** 投票失败（409 冲突 / 网络层）→ 交给 ConflictNotice 给出口，不静默。 */
@@ -144,45 +147,7 @@ function BottleView({ bottle, seams }: { bottle: BottleDetail; seams?: BottlePag
     type: 'BOTTLE' | 'SEGMENT';
     id: string;
   } | null>(null);
-  const me = session.user?.id ?? null;
-  const library = useLibraryMetadata();
-
   const liveSegments = bottle.segments.filter((segment) => segment.deletedAt === null);
-  const libraryTrack = library.data?.tracks.find((track) => track.songId === bottle.songId) ?? null;
-  const fullMixPlan = useMemo(
-    () =>
-      libraryTrack === null
-        ? null
-        : planAccompaniedMix({
-            segments: liveSegments.flatMap((segment) => {
-              const durationMs =
-                libraryTrack.segments.find((preset) => preset.index === segment.index)?.durationMs ??
-                segment.durationMs;
-              return durationMs === null
-                ? []
-                : [
-                    {
-                      index: segment.index,
-                      durationMs,
-                      audioUrl: segmentAudioUrl(segment.id),
-                      ownerCode: segment.ownerCode,
-                    },
-                  ];
-            }),
-            totalSegments: bottle.totalSegments,
-            missingSegmentIndexes: bottle.missingSegmentIndexes,
-            hiddenLaterSegmentCount: bottle.hiddenLaterSegmentCount,
-            nominalDurationByIndex: Object.fromEntries(
-              libraryTrack.segments.map((segment) => [segment.index, segment.durationMs]),
-            ),
-            accompanimentUrl: libraryTrack.accompanimentRef,
-          }),
-    [bottle.hiddenLaterSegmentCount, bottle.missingSegmentIndexes, bottle.totalSegments, libraryTrack, liveSegments],
-  );
-  const fullLyrics = useMemo(
-    () => (libraryTrack === null ? [] : karaokeLyricsForTrack(libraryTrack).flatMap((part) => part.lines)),
-    [libraryTrack],
-  );
   /** 默认选段：补位上下文指的那一段，其次最后一段；用户点「听」后由 state 覆盖（派生默认，不用 effect）。 */
   const preferredSegmentId =
     bottle.replacementContext?.listenSegmentId ?? liveSegments[liveSegments.length - 1]?.id ?? null;
@@ -199,17 +164,15 @@ function BottleView({ bottle, seams }: { bottle: BottleDetail; seams?: BottlePag
   const isMyDraft = bottle.status === 'DRAFT' && bottle.availableResolutions.length > 0;
   const canActOnBottle = bottle.isHolder || isMyDraft;
   /** 同一人在同一支瓶子里只能录一次（内核 CANNOT_RECORD_TWICE_IN_BOTTLE）。 */
-  const mySegmentRecorded =
-    me !== null && bottle.segments.some((segment) => segment.ownerId === me);
+  const mySegmentRecorded = bottle.segments.some((segment) => segment.isMine);
   const canRecord =
     canActOnBottle && !mySegmentRecorded && nextIndex !== undefined && !bottle.isComplete;
   const canChooseResolution = bottle.availableResolutions.length > 0;
   /** 稿上 destCol 的三条水路 = 三选一入口；录完（或已录满）才摆出来 —— 与旧"选择去向"按钮同一门。 */
   const showDestinationRows = canChooseResolution && !canRecord;
   /**
-   * 放回（参考 page-bottle.js `renderPutBack`）：**判据只认服务端事实**
-   * `isHolder && HELD` —— 内核 `canPutBack` 同样只要求"持有 + 未处置"（唱没唱过不拦，
-   * 见 packages/shared domain/bottle.ts）。未登录/非持有者仍不渲染（不摆假按钮）。
+   * 左上「回河道」是唯一放回入口：持有且未处置时先走服务端 put-back，
+   * 非持有者不能改变瓶子状态，只返回河道。
    */
   const canPutBack = bottle.isHolder && bottle.status === 'HELD';
   const destinationRows = bottle.availableResolutions.map((choice) => ({
@@ -217,17 +180,39 @@ function BottleView({ bottle, seams }: { bottle: BottleDetail; seams?: BottlePag
     copy: resolutionCopy(choice),
   }));
 
+  const openDestinationWhenRecorderIsGone = (): void => {
+    if (!recorderPortalExitedRef.current || !destinationReadyRef.current) return;
+    recorderPortalExitedRef.current = false;
+    destinationReadyRef.current = false;
+    setRecorderPhase('closed');
+    setRecorderSegmentIndex(null);
+    setModalOpen(true);
+  };
+
   return (
     <>
       {/* ── 顶栏（稿 .crumb）：回河道 + 状态 pill ─────────────────────────── */}
       <nav aria-label="面包屑" className="bp-crumb flex flex-wrap items-center gap-[16px]">
-        <Link
-          to="/river"
+        <button
+          type="button"
+          disabled={putBack.isPending}
+          onClick={() => {
+            if (!canPutBack) {
+              navigate('/river');
+              return;
+            }
+            void putBack
+              .mutateAsync()
+              .then(() => {
+                navigate('/river');
+              })
+              .catch(() => undefined);
+          }}
           className="inline-flex min-h-11 items-center gap-[7px] whitespace-nowrap text-[0.875rem] text-glass underline underline-offset-[4px]"
         >
           <Icon name="ArrowLeft" size={16} />
           回河道
-        </Link>
+        </button>
         <span className="rounded-base border border-coral/55 px-[10px] pt-[3px] pb-[4px] text-[0.8125rem] tracking-[0.08em] text-coral">
           {BOTTLE_STATUS_LABEL[bottle.status]}
         </span>
@@ -275,7 +260,7 @@ function BottleView({ bottle, seams }: { bottle: BottleDetail; seams?: BottlePag
 
       {/* 层外提示（触发才出现，非稿块）：成功播报 + 投后下一步键（G2）/ 没听满提醒 / 投票冲突 */}
       {announcement === null ? null : (
-        <div className="bp-status-item flex flex-col">
+        <div role="status" className="bp-status-item flex flex-col">
           <Toast tone="success" message={announcement} />
           {/* G2：三选一成功后留在正文的语义下一步（播报保留，键不只活在 aria-live 里） */}
           {resolutionNext === null ? null : (
@@ -363,7 +348,8 @@ function BottleView({ bottle, seams }: { bottle: BottleDetail; seams?: BottlePag
               type="button"
               className="cta whitespace-nowrap"
               onClick={() => {
-                setRecorderOpen(true);
+                setRecorderSegmentIndex(nextIndex);
+                setRecorderPhase('open');
               }}
             >
               <Icon name="Mic" size={16} />
@@ -372,16 +358,6 @@ function BottleView({ bottle, seams }: { bottle: BottleDetail; seams?: BottlePag
           )
         }
       />
-
-      {bottle.hiddenLaterSegmentCount === 0 ? null : (
-        <p
-          role="status"
-          className="bp-status-item order-3 lg:order-none rounded-base border border-info-border bg-info-tint px-[12px] py-[8px] text-[0.875rem] leading-[1.5] text-info"
-        >
-          还有 {bottle.hiddenLaterSegmentCount}{' '}
-          段现在看不到（CONTEXT §9.1：漂流中只能听到自己这一棒之前的部分），入海后全部解锁。
-        </p>
-      )}
 
       {/*
         稿两列：.listenCol（614） | .destCol（644），间距 30。
@@ -410,22 +386,14 @@ function BottleView({ bottle, seams }: { bottle: BottleDetail; seams?: BottlePag
             </span>
           </h2>
 
-          <section className="bf-full-preview mt-[4px] flex flex-wrap items-center gap-x-[12px] gap-y-[4px]">
-            <h3 className="sr-only">试听完整作品</h3>
-            <p className="text-[0.8125rem] leading-[1.4] text-muted">
-              伴奏 + 四段人声；歌词随播放进度滚动。
-            </p>
-            <button
-              type="button"
-              disabled={fullMixPlan === null}
-              className="inline-flex min-h-11 items-center gap-[7px] whitespace-nowrap rounded-base border border-glass/40 px-[12px] text-[0.875rem] text-glass transition-[transform,opacity] duration-[var(--motion-hover-duration)] ease-[var(--motion-entry-easing)] hover:scale-[var(--motion-hover-scale)] disabled:cursor-not-allowed disabled:opacity-60 motion-reduce:transition-none motion-reduce:hover:scale-100"
-              onClick={() => {
-                setFullPreviewOpen(true);
-              }}
-            >
-              <Icon name="AudioWaveform" size={16} />
-              生成并试听完整作品
-            </button>
+          <section className="bf-full-preview mt-[4px] flex flex-col gap-[4px]">
+            <h3 className="sr-only">听全部已有录音</h3>
+            <SequentialSegmentPlayer
+              segments={liveSegments.map((segment) => ({
+                index: segment.index,
+                src: segmentAudioUrl(segment.id),
+              }))}
+            />
           </section>
 
           {selectedSegment === null ? (
@@ -472,7 +440,7 @@ function BottleView({ bottle, seams }: { bottle: BottleDetail; seams?: BottlePag
               }}
               src={segmentAudioUrl(selectedSegment.id)}
               bottleId={bottle.id}
-              isOwnSegment={me !== null && selectedSegment.ownerId === me}
+              isOwnSegment={selectedSegment.isMine}
               myVote={myVotes[selectedSegment.id] ?? null}
               onVoted={(segmentId, value) => {
                 setMyVotes((previous) => ({ ...previous, [segmentId]: value }));
@@ -498,39 +466,6 @@ function BottleView({ bottle, seams }: { bottle: BottleDetail; seams?: BottlePag
             )}
           </p>
 
-          {/* 放回（稿 .putBack）：参考这一行**常驻** —— 能放回给按钮，不能放回给禁用按钮+原因
-              （未登录仍不出现：不摆会 401 的假按钮，见 bottle-page.test 首条） */}
-          {canPutBack || session.status !== 'guest' ? (
-            <div
-              className="putBack mt-[8px] flex flex-wrap items-center gap-[14px]"
-              data-can-put-back={canPutBack ? 'true' : 'false'}
-            >
-              <button
-                type="button"
-                disabled={!canPutBack || putBack.isPending}
-                className="ghost inline-flex min-h-11 items-center gap-[8px] rounded-base border border-paper/20 px-[15px] text-[0.875rem] text-paper transition-colors duration-200 ease-out hover:border-coral disabled:cursor-not-allowed disabled:opacity-60"
-                onClick={() => {
-                  void putBack
-                    .mutateAsync()
-                    .then((response) => {
-                      setAnnouncement(
-                        `已放回河道，接下来 ${String(response.cooldownDraws)} 次打捞里不会再碰到它。`,
-                      );
-                      navigate('/river');
-                    })
-                    .catch(() => undefined);
-                }}
-              >
-                <Icon name="RotateCcw" size={16} />
-                放回海中，继续漂流
-              </button>
-              <span className="text-[0.8125rem] text-muted">
-                {canPutBack
-                  ? '还没想好要不要唱？放回去不会记录任何东西。'
-                  : '你此刻不是这支瓶子的持有者，放回不成立。'}
-              </span>
-            </div>
-          ) : null}
         </section>
 
         <section className="destCol enter-rise stagger-3 flex flex-col">
@@ -613,16 +548,18 @@ function BottleView({ bottle, seams }: { bottle: BottleDetail; seams?: BottlePag
         </Link>
         <span>捞取 / 录音 / 投河 / 回传 / 入海 全部记在服务端。</span>
         <span className="flex flex-wrap items-center gap-[26px] md:ml-auto">
-          <button
-            type="button"
-            className="inline-flex min-h-11 items-center gap-[7px] whitespace-nowrap text-muted underline underline-offset-[4px] transition-colors duration-200 ease-out hover:text-paper"
-            onClick={() => {
-              setMessagesOpen(true);
-            }}
-          >
-            <Icon name="ScrollText" size={16} />
-            私密留言
-          </button>
+          {bottle.status === 'SEA' ? null : (
+            <button
+              type="button"
+              className="inline-flex min-h-11 items-center gap-[7px] whitespace-nowrap text-muted underline underline-offset-[4px] transition-colors duration-200 ease-out hover:text-paper"
+              onClick={() => {
+                setMessagesOpen(true);
+              }}
+            >
+              <Icon name="ScrollText" size={16} />
+              私密留言
+            </button>
+          )}
           <button
             type="button"
             className="inline-flex min-h-11 items-center gap-[7px] whitespace-nowrap text-muted underline underline-offset-[4px] transition-colors duration-200 ease-out hover:text-paper"
@@ -637,34 +574,48 @@ function BottleView({ bottle, seams }: { bottle: BottleDetail; seams?: BottlePag
       </div>
 
       {/* 对话层（稿是静态帧，这里保留行为）：录制 / 三选一确认 / 私密留言 / 举报 */}
-      {canRecord && nextIndex !== undefined ? (
+      {recorderSegmentIndex === null ? null : (
         <Modal
-          open={recorderOpen}
-          title={`录第 ${String(nextIndex)} 段`}
+          open={recorderPhase === 'open'}
+          title={`录第 ${String(recorderSegmentIndex)} 段`}
+          dismissible={!recorderUploading}
           onClose={() => {
-            setRecorderOpen(false);
+            setRecorderPhase('closed');
+          }}
+          onExited={() => {
+            if (recorderPhase === 'exiting-to-destination') {
+              recorderPortalExitedRef.current = true;
+              openDestinationWhenRecorderIsGone();
+              return;
+            }
+            setRecorderSegmentIndex(null);
           }}
         >
           <RecordStep
             bottleId={bottle.id}
             songId={bottle.songId}
-            segmentIndex={nextIndex}
+            segmentIndex={recorderSegmentIndex}
             totalSegments={bottle.totalSegments}
             recorderEnvironment={seams?.recorderEnvironment}
             uploadTransport={seams?.uploadTransport}
+            onUploadingChange={setRecorderUploading}
             onCancel={() => {
-              setRecorderOpen(false);
+              setRecorderPhase('closed');
             }}
             onUploaded={async (response: RecordSegmentResponse) => {
               setAnnouncement(`已录下第 ${String(response.index)} 段，等待你选择去向。`);
-              setRecorderOpen(false);
+              setRecorderUploading(false);
+              recorderPortalExitedRef.current = false;
+              destinationReadyRef.current = false;
+              setRecorderPhase('exiting-to-destination');
               // 先让服务端重新算一遍缺口与可选去向，再打开三选一（不拿旧数据猜）
               await invalidateBottle(bottle.id);
-              setModalOpen(true);
+              destinationReadyRef.current = true;
+              openDestinationWhenRecorderIsGone();
             }}
           />
         </Modal>
-      ) : null}
+      )}
 
       <ResolutionModal
         open={modalOpen}
@@ -697,25 +648,8 @@ function BottleView({ bottle, seams }: { bottle: BottleDetail; seams?: BottlePag
         }}
       />
 
-      <Modal
-        open={fullPreviewOpen && fullMixPlan !== null}
-        title="试听完整作品"
-        className="max-h-[calc(100dvh-3rem)] overflow-y-auto"
-        onClose={() => {
-          setFullPreviewOpen(false);
-        }}
-      >
-        {fullMixPlan === null ? null : (
-          <MixExportPanel
-            plan={fullMixPlan}
-            title="伴奏与接唱合成"
-            lyrics={fullLyrics}
-          />
-        )}
-      </Modal>
-
       <PrivateMessages
-        open={messagesOpen}
+        open={messagesOpen && bottle.status !== 'SEA'}
         bottleId={bottle.id}
         // 内核 canAttachPrivateMessage：只有接唱者能写；入海/损坏/回传链断裂后送不到 —— 按可见事实给入口。
         canWrite={

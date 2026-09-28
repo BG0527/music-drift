@@ -1,18 +1,6 @@
 /**
- * §9.1 / §9.2 的**可见性契约**（t12）。
- *
- * `CONTEXT.md` §9.1 原话是产品的核心承诺：漂流中「**看不到后面是谁、唱成什么样**」；
- * §9.2 则要求「入海后解锁完整接力链」。两者是一对，必须同时被测试钉住 ——
- * 只做一半（该藏的不藏 / 该给的没给）都是缺陷。
- *
- * 这个文件存在的直接原因：`GET /api/bottles/:id` 此前返回**全部有效段**，
- * 于是一个正在漂流中的人点开就能看见"后面是谁唱的、唱成什么样" ——
- * 产品违背自己的设计，而且评审点一下就能看见。
- *
- * 判据（三条路径都要覆盖，漏一条等于没裁）：
- * 1. `/api/bottles/:id` 的 `segments`；
- * 2. `/api/bottles/:id/events` 的漂流日志（事件里带 `actorId`，**更容易泄露"后面是谁"**）；
- * 3. `hiddenLaterSegmentCount` 让界面能解释"不是丢了，是看不到"。
+ * W18 的读取契约：所有观看者都能读取当前全部有效段及其音频；公共日志对所有观看者一致，
+ * 只返回瓶级匿名 `actorCode`，并完全排除私密留言事件。
  */
 import { BottleDetailSchema } from '@music-drift/shared';
 import { createSystemClock } from '@music-drift/shared/domain';
@@ -22,6 +10,7 @@ import { buildApp } from '../app.js';
 import { createDb, type Db } from '../db/client.js';
 import { runSeed } from '../db/seed.js';
 import { insertSong } from '../db/test-helpers.js';
+import { appendEvent } from '../db/events.js';
 
 const DATABASE_URL = process.env['DATABASE_URL'] ?? '';
 const PASSWORD = 'Drift-Bottle-2026';
@@ -71,6 +60,10 @@ async function record(cookie: string, bottleId: string, note?: string): Promise<
 }
 
 async function drawUntil(cookie: string, bottleId: string): Promise<string | null> {
+  return (await drawDetailUntil(cookie, bottleId))?.id ?? null;
+}
+
+async function drawDetailUntil(cookie: string, bottleId: string) {
   for (let attempt = 0; attempt < 40; attempt += 1) {
     const response = await app.inject({
       method: 'POST',
@@ -78,8 +71,8 @@ async function drawUntil(cookie: string, bottleId: string): Promise<string | nul
       headers: { cookie },
     });
     if (response.statusCode !== 200) return null;
-    const bottle = (response.json() as { bottle: { id: string } }).bottle;
-    if (bottle.id === bottleId) return bottleId;
+    const bottle = BottleDetailSchema.parse((response.json() as { bottle: unknown }).bottle);
+    if (bottle.id === bottleId) return bottle;
     await app.inject({
       method: 'POST',
       url: '/api/bottles/' + bottle.id + '/put-back',
@@ -106,7 +99,12 @@ async function eventsOf(cookie: string | null, bottleId: string) {
     ...(cookie === null ? {} : { headers: { cookie } }),
   });
   expect(response.statusCode).toBe(200);
-  return response.json() as { seq: number; type: string; actorId: string }[];
+  return response.json() as Array<{
+    seq: number;
+    type: string;
+    actorCode: string;
+    actorId?: string;
+  }>;
 }
 
 beforeAll(async () => {
@@ -121,12 +119,13 @@ afterAll(async () => {
   if (db !== undefined) await db.close();
 });
 
-describe('§9.1 漂流中：看不到后面是谁、唱成什么样', () => {
+describe('W18：所有观看者可读取全部有效段与公共日志', () => {
   let initiator: { cookie: string; userId: string };
   let singerOne: { cookie: string; userId: string };
   let holder: { cookie: string; userId: string };
   let stranger: { cookie: string; userId: string };
   let bottleId = '';
+  let holderDrawDetail: ReturnType<typeof BottleDetailSchema.parse>;
   const segmentIds: string[] = [];
 
   beforeAll(async () => {
@@ -155,6 +154,13 @@ describe('§9.1 漂流中：看不到后面是谁、唱成什么样', () => {
     // 第二个人捞到并接唱第 2 段后**继续投河**（瓶子仍在漂流中）
     expect(await drawUntil(singerOne.cookie, bottleId)).toBe(bottleId);
     segmentIds.push(await record(singerOne.cookie, bottleId, '第二棒的附言'));
+    const privateMessage = await app.inject({
+      method: 'POST',
+      url: `/api/bottles/${bottleId}/messages`,
+      headers: { cookie: singerOne.cookie },
+      payload: { targetSegmentIndex: 1, content: '只给第一棒看的私密留言' },
+    });
+    expect(privateMessage.statusCode).toBe(201);
     await app.inject({
       method: 'POST',
       url: '/api/bottles/' + bottleId + '/resolution',
@@ -163,60 +169,150 @@ describe('§9.1 漂流中：看不到后面是谁、唱成什么样', () => {
     });
 
     // 第三个人捞到它、成为持有者（此时瓶子 HELD，仍在漂流）
-    expect(await drawUntil(holder.cookie, bottleId)).toBe(bottleId);
+    const drawn = await drawDetailUntil(holder.cookie, bottleId);
+    expect(drawn?.id).toBe(bottleId);
+    holderDrawDetail = drawn!;
   });
 
-  it('发起者：只看到自己那一棒（第 1 段），看不到第 2 段是谁唱的', async () => {
-    const detail = await detailOf(initiator.cookie, bottleId);
+  it('发起者可以看到当前全部已录段', async () => {
+    const response = await app.inject({
+      method: 'GET',
+      url: `/api/bottles/${bottleId}`,
+      headers: { cookie: initiator.cookie },
+    });
+    expect(response.statusCode).toBe(200);
+    const raw = response.json() as Record<string, unknown>;
+    expect(raw).not.toHaveProperty('holderId');
+    expect(raw).not.toHaveProperty('currentCasterId');
+    expect(raw['segments']).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ index: 1, isMine: true }),
+        expect.objectContaining({ index: 2, isMine: false }),
+      ]),
+    );
+    for (const segment of raw['segments'] as Array<Record<string, unknown>>) {
+      expect(segment).not.toHaveProperty('ownerId');
+    }
+    const detail = BottleDetailSchema.parse(raw);
     expect(detail.status).toBe('HELD');
-    expect(detail.segments.map((segment) => segment.index)).toEqual([1]);
+    expect(detail.segments.map((segment) => segment.index)).toEqual([1, 2]);
     expect(detail.segments.map((segment) => segment.ownerCode)).not.toContain(undefined);
-    // 缺口字段照旧反映真实结构（进度信息不算泄露"后面是谁"）
-    expect(detail.hiddenLaterSegmentCount).toBe(1);
   });
 
   it('持有者（还没唱）：看得到已有的段（他要接着唱），但**没有后续**可藏', async () => {
     const detail = await detailOf(holder.cookie, bottleId);
     expect(detail.isHolder).toBe(true);
     expect(detail.segments.map((segment) => segment.index)).toEqual([1, 2]);
-    expect(detail.hiddenLaterSegmentCount).toBe(0);
   });
 
-  it('陌生人：一段都看不到，但能看到"还有 N 段是你看不到的"（不是内容）', async () => {
+  it('河道捞取响应给已有参与者稳定且可区分的瓶级匿名码，并且不泄露 UUID', async () => {
+    const regularDetail = await detailOf(holder.cookie, bottleId);
+    const drawCodes = holderDrawDetail.segments.map((segment) => segment.ownerCode);
+
+    expect(drawCodes).toEqual(regularDetail.segments.map((segment) => segment.ownerCode));
+    expect(new Set(drawCodes).size).toBe(2);
+    const raw = JSON.stringify(holderDrawDetail);
+    expect(raw).not.toMatch(/ownerId|holderId|currentCasterId/);
+    expect(raw).not.toMatch(new RegExp([initiator.userId, singerOne.userId].join('|')));
+  });
+
+  it('已登录陌生人也可以看到当前全部已录段', async () => {
     const detail = await detailOf(stranger.cookie, bottleId);
-    expect(detail.segments).toEqual([]);
-    expect(detail.hiddenLaterSegmentCount).toBe(2);
-    // 计数类字段仍然可用（进度/缺口），它们不泄露"是谁/唱的什么"
+    expect(detail.segments.map((segment) => segment.index)).toEqual([1, 2]);
     expect(detail.recordedCount).toBe(2);
   });
 
-  it('未登录同样看不到内容（可见性在服务端，不靠前端隐藏）', async () => {
+  it('未登录观看者也能看到并逐段读取当前全部已录音频', async () => {
     const detail = await detailOf(null, bottleId);
-    expect(detail.segments).toEqual([]);
-    expect(detail.hiddenLaterSegmentCount).toBe(2);
+    expect(detail.segments.map((segment) => segment.index)).toEqual([1, 2]);
+
+    const statuses = await Promise.all(
+      segmentIds.map(async (segmentId) =>
+        (
+          await app.inject({
+            method: 'GET',
+            url: `/api/segments/${segmentId}/audio`,
+          })
+        ).statusCode,
+      ),
+    );
+    expect(statuses).toEqual([200, 200]);
   });
 
-  it('即使知道隐藏后续段 UUID，发起者也不能绕过详情投影直接取音频', async () => {
+  it('发起者可直接读取瓶中当前其他人的已录音频', async () => {
     const response = await app.inject({
       method: 'GET',
       url: `/api/segments/${segmentIds[1] ?? ''}/audio`,
       headers: { cookie: initiator.cookie },
     });
 
-    expect(response.statusCode).toBe(404);
+    expect(response.statusCode).toBe(200);
   });
 
-  it('漂流日志同样按同一判据裁剪：发起者只看到自己那一棒的日志', async () => {
-    const events = await eventsOf(initiator.cookie, bottleId);
-    expect(events.length).toBeGreaterThan(0);
-    // 日志里每条事件的 actor 都只能是发起者自己（否则就泄露了"后面是谁"）
-    expect(events.every((event) => event.actorId === initiator.userId)).toBe(true);
-
+  it('公共日志向所有观看者展示相同核心事件，只给瓶级匿名代号且完全排除私密留言事件', async () => {
+    const hiddenActor = await register('vz');
+    await appendEvent(db, {
+      bottleId,
+      type: 'MESSAGE_FUTURE_INTERNAL',
+      actorId: hiddenActor.userId,
+      payload: { secret: '不得进入公共日志' },
+      occurredAt: new Date(CLOCK.now()),
+    });
+    const initiatorEvents = await eventsOf(initiator.cookie, bottleId);
     const holderEvents = await eventsOf(holder.cookie, bottleId);
-    expect(holderEvents.length).toBeGreaterThan(events.length);
+    const anonymousEvents = await eventsOf(null, bottleId);
 
-    const strangerEvents = await eventsOf(stranger.cookie, bottleId);
-    expect(strangerEvents).toEqual([]);
+    expect(initiatorEvents.length).toBeGreaterThan(0);
+    expect(holderEvents).toEqual(initiatorEvents);
+    expect(anonymousEvents).toEqual(initiatorEvents);
+    expect(anonymousEvents.every((event) => event.actorId === undefined)).toBe(true);
+    expect(anonymousEvents.every((event) => event.actorCode.length > 0)).toBe(true);
+    expect(anonymousEvents.every((event) => !event.type.startsWith('MESSAGE_'))).toBe(true);
+    const hiddenCodes = await db.query<{ code: string }>(
+      `select code from anon_codes where bottle_id = $1 and user_id = $2`,
+      [bottleId, hiddenActor.userId],
+    );
+    expect(hiddenCodes).toEqual([]);
+  });
+
+  it('未接唱就放回的操作者也有稳定且互不相同的瓶级匿名码', async () => {
+    const owner = await register('vc');
+    const firstPasser = await register('vp');
+    const secondPasser = await register('vq');
+    const songId = await insertSong(db, 4);
+    const created = await app.inject({
+      method: 'POST',
+      url: '/api/bottles',
+      payload: { songId },
+      headers: { cookie: owner.cookie },
+    });
+    const targetBottleId = (created.json() as { id: string }).id;
+    await record(owner.cookie, targetBottleId);
+    await app.inject({
+      method: 'POST',
+      url: `/api/bottles/${targetBottleId}/resolution`,
+      payload: { resolution: 'RIVER' },
+      headers: { cookie: owner.cookie },
+    });
+
+    for (const passer of [firstPasser, secondPasser]) {
+      expect(await drawUntil(passer.cookie, targetBottleId)).toBe(targetBottleId);
+      const putBack = await app.inject({
+        method: 'POST',
+        url: `/api/bottles/${targetBottleId}/put-back`,
+        headers: { cookie: passer.cookie },
+      });
+      expect(putBack.statusCode).toBe(200);
+    }
+
+    const events = await eventsOf(null, targetBottleId);
+    const transitCodes = events
+      .filter((event) => event.type === 'BOTTLE_DRAWN' || event.type === 'BOTTLE_PUT_BACK')
+      .map((event) => event.actorCode);
+    expect(transitCodes).toHaveLength(4);
+    expect(transitCodes[0]).toBe(transitCodes[1]);
+    expect(transitCodes[2]).toBe(transitCodes[3]);
+    expect(transitCodes[0]).not.toBe(transitCodes[2]);
   });
 
   it('入海后（§9.2）解锁完整接力链：所有参与者与陌生人都能看到全部段与完整日志', async () => {
@@ -249,7 +345,6 @@ describe('§9.1 漂流中：看不到后面是谁、唱成什么样', () => {
     expect(afterSea.status).toBe('SEA');
     expect(afterSea.isComplete).toBe(true);
     expect(afterSea.segments.map((segment) => segment.index)).toEqual([1, 2, 3, 4]);
-    expect(afterSea.hiddenLaterSegmentCount).toBe(0);
 
     const strangerView = await detailOf(stranger.cookie, bottleId);
     expect(strangerView.segments.map((segment) => segment.index)).toEqual([1, 2, 3, 4]);
@@ -268,6 +363,6 @@ describe('§9.1 漂流中：看不到后面是谁、唱成什么样', () => {
 
     const log = await eventsOf(stranger.cookie, bottleId);
     expect(log.length).toBeGreaterThan(5);
-    expect(new Set(log.map((event) => event.actorId)).size).toBeGreaterThan(1);
+    expect(new Set(log.map((event) => event.actorCode)).size).toBeGreaterThan(1);
   });
 });

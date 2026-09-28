@@ -131,12 +131,14 @@ describe('个人中心', () => {
 });
 
 /**
- * flow-audit G7（P2）：「我的」非空态没有横向出口 —— 去河道/公海的链只在空态里。
- * 修法：页头（header 尾）加**常显**两条语义出口，任何数据状态下都渲染；
- * record-v1 文字链语态（TEXT_LINK_STRONG，min-h-11 热区 ≥44px）。
+ * t17 深度复刻（用户打回后按参考对齐）：页头**不再有第二条导航**（`site/me.html` 只有
+ * cat/h1/sub 三件），横向出口由两处承担 ——
+ * ① 空态：窗内两个出口（参考 `showEmpty(target=windowBox)` 的位置）；
+ * ② 非空态：每张卡片自己的「去看这个瓶子 / 漂流日志」；河道/公海两枚常显入口在**顶栏**
+ *    （`top-nav`「入口常显（无收起态）」，app-shell 测试钉住）—— 同样是"任何状态下都在"。
  */
-describe('我的：页头常显横向出口（flow-audit G7）', () => {
-  it('非空态（有瓶子）也有「← 去河道捞一个」→ /river 与「公海听完成的作品」→ /sea', async () => {
+describe('我的：横向出口（参考结构：页头无第二导航，出口常显）', () => {
+  it('非空态（有瓶子）：每张卡片带「去看这个瓶子 / 漂流日志」出口（页头不再挂导航）', async () => {
     const { container } = renderWithProviders(<ProfilePage />, {
       route: '/me',
       handlers: [
@@ -163,24 +165,20 @@ describe('我的：页头常显横向出口（flow-audit G7）', () => {
       ],
     });
 
-    // 非空态前提：列表有真行 —— 此时空态出口不在场，出口只能来自页头
     expect(await screen.findByText('深海鲸落')).toBeInTheDocument();
-
-    const river = screen.getByRole('link', { name: '← 去河道捞一个' });
-    expect(river).toHaveAttribute('href', '/river');
-    expect(river.className, '热区 ≥44px').toContain('min-h-11');
-    const sea = screen.getByRole('link', { name: '公海听完成的作品' });
-    expect(sea).toHaveAttribute('href', '/sea');
-    expect(sea.className, '热区 ≥44px').toContain('min-h-11');
-
-    // 出口在页头区（header 内）—— main 块序（waterlight→header→bleed→crate→bottom）不被破坏
-    const header = container.querySelector('header');
-    expect(header, '页头必须存在').not.toBeNull();
-    expect(header?.contains(river), '河道出口须在页头内').toBe(true);
-    expect(header?.contains(sea), '公海出口须在页头内').toBe(true);
+    expect(screen.getByRole('link', { name: '去看这个瓶子' })).toHaveAttribute(
+      'href',
+      `/bottles/${BOTTLE_ID}`,
+    );
+    expect(screen.getByRole('link', { name: '漂流日志' })).toHaveAttribute(
+      'href',
+      `/bottles/${BOTTLE_ID}/log`,
+    );
+    // 参考页头没有第二条导航
+    expect(container.querySelector('header nav')).toBeNull();
   });
 
-  it('空态也渲染同样两条页头出口（与空态窗内出口不同位、不重复）', async () => {
+  it('空态：出口落在窗内（去河道捞一个 / 自己发起一支），页头仍无导航', async () => {
     const { container } = renderWithProviders(<ProfilePage />, {
       route: '/me',
       handlers: [
@@ -193,12 +191,12 @@ describe('我的：页头常显横向出口（flow-audit G7）', () => {
       ],
     });
 
-    const river = await screen.findByRole('link', { name: '← 去河道捞一个' });
-    expect(river).toHaveAttribute('href', '/river');
-    const sea = await screen.findByRole('link', { name: '公海听完成的作品' });
-    expect(sea).toHaveAttribute('href', '/sea');
-    const header = container.querySelector('header');
-    expect(header?.contains(river) && header?.contains(sea)).toBe(true);
+    const text = await screen.findByText(/你还没有参与过任何漂流瓶/);
+    const win = text.closest('.window');
+    expect(win, '空态出口必须在窗内（参考 showEmpty target=windowBox）').not.toBeNull();
+    expect(screen.getByRole('link', { name: '去河道捞一个' })).toHaveAttribute('href', '/river');
+    expect(screen.getByRole('link', { name: '自己发起一支' })).toHaveAttribute('href', '/new');
+    expect(container.querySelector('header nav')).toBeNull();
   });
 });
 
@@ -248,7 +246,15 @@ describe('我的：收藏与徽章入口', () => {
     fireEvent.click(await screen.findByRole('button', { name: '我的收藏' }));
     const collections = await screen.findByRole('dialog');
     expect(within(collections).getByRole('heading', { name: '我的收藏' })).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: '我的徽章' }));
+
+    // Modal 会把背景设为 inert；真实用户必须先关闭当前弹窗，不能穿透遮罩点击下一个入口。
+    fireEvent.click(within(collections).getByRole('button', { name: '关闭' }));
+    await waitFor(() => {
+      expect(collections).not.toBeInTheDocument();
+    });
+
+    // Portal 卸载与背景 inert 清理分属提交/effect 两步；等待入口重新变为可访问再操作。
+    fireEvent.click(await screen.findByRole('button', { name: '我的徽章' }));
     const badges = await screen.findByRole('dialog');
     expect(within(badges).getByRole('heading', { name: '我的徽章' })).toBeInTheDocument();
   });
@@ -277,7 +283,9 @@ describe('我的：内袋身份卡（record-v1 装置）', () => {
     expect(sleeve?.textContent).toContain('内袋');
     expect(sleeve?.textContent).toContain('午夜歌手');
     expect(sleeve?.textContent).toContain('a@example.com');
-    expect(sleeve?.textContent).toContain('普通用户');
+    // 参考 page-me.js：角色徽「管理员账号」只在真是管理员时出现，普通用户不打（稿里那枚是演示数据）
+    expect(sleeve?.textContent).not.toContain('普通用户');
+    expect(sleeve?.querySelector('.who .stamp')).toBeNull();
     // 用户裁决：不显示匿名代号 —— 卡上没有这一行；整页也没有**恰为**「匿名代号」的行
     //（副标题里解释"别人看到的是匿名代号"是合法文案，所以用整串匹配而不是正则子串）
     expect(sleeve?.textContent).not.toContain('匿名代号');
@@ -384,7 +392,8 @@ describe('我的：p-profile-record.html 逐块照稿（返工）', () => {
     expect(label?.querySelector(':scope > i.hub')).not.toBeNull();
     expect(sleeve?.querySelector('.who .handle')?.textContent).toBe('午夜歌手');
     expect(sleeve?.querySelector('.who .mail')?.textContent).toBe('a@example.com');
-    expect(sleeve?.querySelector('.who .stamp')?.textContent).toBe('普通用户');
+    // 参考 page-me.js：stamp 只在 ADMIN 出现（普通用户为 null，稿里那枚是演示数据）
+    expect(sleeve?.querySelector('.who .stamp')).toBeNull();
     // 用户裁决：匿名代号行不出现 —— 稿的 .codeslot 不移植
     expect(sleeve?.querySelector('.codeslot')).toBeNull();
   });
@@ -541,13 +550,14 @@ describe('我的：one-screen 门禁修复点（源码钉住）', () => {
     ).toMatch(/\.p-record\s*\{\s*overflow-x:\s*clip\s*\}/);
   });
 
-  it('整页高：列表窗高与柜上段间距收紧为 clamp 流体值（1031 → ≤900）', () => {
-    const code = pageSource();
-    expect(code, '列表窗高必须流体收紧（稿 260 定高）').toMatch(
-      /\.p-record \.window\s*\{\s*height:\s*clamp\(/,
+  it('整页高：空隙走 --gap-* 三档直线（参考 W5-B），消息列定高内滚（真实库存量不撑破页面）', () => {
+    const css = readFileSync(join(process.cwd(), 'src', 'pages', 'profile-page.css'), 'utf8');
+    expect(css, '缺 --gap-page 三档空隙').toMatch(/--gap-page:\s*clamp\(28px/);
+    expect(css, '柜上间距必须走 --gap-crate（720↔900 直线，900 钉回定稿）').toMatch(
+      /\.p-record \.crate\s*\{[^}]*margin-top:\s*var\(--gap-crate\)/,
     );
-    expect(code, '柜上段间距必须流体收紧（稿 59px）').toMatch(
-      /\.p-record \.crate\s*\{\s*margin-top:\s*clamp\(/,
+    expect(css, '消息列必须有高度上限（2987px 根因）').toMatch(
+      /\.p-record \.msgs ul\s*\{[^}]*max-height:\s*clamp\(/,
     );
   });
 });

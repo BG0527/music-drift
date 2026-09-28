@@ -43,6 +43,8 @@ export interface RecordStepProps {
   onUploaded: (response: RecordSegmentResponse) => void;
   /** 放弃未上传的本地录音并关闭录音窗口。 */
   onCancel?: () => void;
+  /** 告知外层上传是否正在进行，以便锁住承载录音流程的弹窗。 */
+  onUploadingChange?: (uploading: boolean) => void;
   /** 附言（CONTEXT §12.2，可选）。 */
   note?: string;
   /** 录音环境覆盖（测试注入；生产自动探测浏览器能力）。 */
@@ -60,6 +62,7 @@ export function RecordStep({
   totalSegments,
   onUploaded,
   onCancel,
+  onUploadingChange,
   note,
   recorderEnvironment,
   uploadTransport,
@@ -79,6 +82,10 @@ export function RecordStep({
   const [localUrl, setLocalUrl] = useState<string | null>(null);
   const uploading = phase === 'uploading' || phase === 'retrying';
   const startedRef = useRef(false);
+
+  useEffect(() => {
+    onUploadingChange?.(uploading);
+  }, [onUploadingChange, uploading]);
 
   /**
    * 本地回放用的 objectURL。

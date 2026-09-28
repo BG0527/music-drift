@@ -16,7 +16,6 @@ import { useState } from 'react';
 import type { PrivateMessage } from '@music-drift/shared';
 import { useAttachMessage } from '../api/mutations';
 import { useBottle, useBottleMessages } from '../api/queries';
-import { useSession } from '../session/session-context';
 import { AsyncBoundary } from '../../pages/shell/async-boundary';
 import { ConflictNotice } from './conflict-notice';
 import { Button, Icon, Modal, cn } from '../../design-system';
@@ -57,15 +56,12 @@ interface TargetOption {
 export function PrivateMessages({ open, bottleId, canWrite, onClose }: PrivateMessagesProps) {
   const messages = useBottleMessages(bottleId, open);
   const bottle = useBottle(open ? bottleId : undefined);
-  const session = useSession();
   const attach = useAttachMessage(bottleId);
   const [draft, setDraft] = useState('');
   const [targetIndex, setTargetIndex] = useState('');
 
-  const me = session.user?.id ?? null;
   const liveSegments = (bottle.data?.segments ?? []).filter((segment) => segment.deletedAt === null);
-  const mySegment =
-    me === null ? undefined : liveSegments.find((segment) => segment.ownerId === me);
+  const mySegment = liveSegments.find((segment) => segment.isMine);
   /**
    * 候选 = **我自己那一段之前**的有效段（用户第 4 条："指定之前段的某一个人"）。
    * 用服务端给的 `index` / `ownerCode`；本组件不做任何可见性判断。
@@ -195,7 +191,7 @@ export function PrivateMessages({ open, bottleId, canWrite, onClose }: PrivateMe
                   <p className="text-[0.9375rem] leading-[1.6] text-paper">{item.content}</p>
                   <p className="flex flex-wrap items-center gap-x-[12px] text-[0.8125rem]">
                     <span className="text-muted">
-                      给第 {String(item.targetSegmentIndex)} 段的作者
+                      {item.sender.displayName} → {item.recipient.displayName}
                     </span>
                     <span className={cn('rounded-base px-3 py-1', STATUS_STYLE[item.status])}>
                       {STATUS_LABEL[item.status]}

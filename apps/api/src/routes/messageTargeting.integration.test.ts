@@ -34,7 +34,7 @@ function webmPayload(size = 2048): Buffer {
 let db: Db;
 let app: FastifyInstance;
 
-async function register(prefix: string): Promise<{ cookie: string; userId: string }> {
+async function register(prefix: string): Promise<{ cookie: string; userId: string; handle: string }> {
   const handle = uniqueHandle(prefix);
   const response = await app.inject({
     method: 'POST',
@@ -44,7 +44,7 @@ async function register(prefix: string): Promise<{ cookie: string; userId: strin
   expect(response.statusCode).toBe(201);
   const cookie = response.cookies.find((entry) => entry.name === 'mdb_session');
   const user = (response.json() as { user: { id: string } }).user;
-  return { cookie: cookie === undefined ? '' : cookie.name + '=' + cookie.value, userId: user.id };
+  return { cookie: cookie === undefined ? '' : cookie.name + '=' + cookie.value, userId: user.id, handle };
 }
 
 async function sing(cookie: string, bottleId: string): Promise<string> {
@@ -103,6 +103,8 @@ async function messagesOf(cookie: string, bottleId: string) {
     content: string;
     status: string;
     targetSegmentIndex: number;
+    sender: { segmentIndex: number; displayName: string; revealed: boolean };
+    recipient: { segmentIndex: number; displayName: string; revealed: boolean };
   }[];
 }
 
@@ -121,7 +123,7 @@ async function notificationsOf(cookie: string): Promise<{ type: string; payload:
  * A 发起 + 第 1 段 → 入海（未完成区）→ B/C/D 依次「指定接唱」拿到瓶子并各录一段。
  * 返回四位的 cookie（按 A/B/C/D 顺序）。
  */
-async function fourHopChain(): Promise<{ bottleId: string; cookies: string[] }> {
+async function fourHopChain(): Promise<{ bottleId: string; cookies: string[]; handles: string[] }> {
   const initiator = await register('mt');
   const songId = await insertSong(db, 4);
   const created = await app.inject({
@@ -136,6 +138,7 @@ async function fourHopChain(): Promise<{ bottleId: string; cookies: string[] }> 
   await resolve(initiator.cookie, bottleId, 'SEA');
 
   const cookies = [initiator.cookie];
+  const handles = [initiator.handle];
   for (let hop = 0; hop < 3; hop += 1) {
     const singer = await register('mt');
     await take(singer.cookie, bottleId);
@@ -144,8 +147,9 @@ async function fourHopChain(): Promise<{ bottleId: string; cookies: string[] }> 
       await resolve(singer.cookie, bottleId, 'SEA');
     }
     cookies.push(singer.cookie);
+    handles.push(singer.handle);
   }
-  return { bottleId, cookies };
+  return { bottleId, cookies, handles };
 }
 
 beforeAll(async () => {
@@ -184,7 +188,7 @@ describe('契约：目标必须是**段号**（服务端解析成作者），不
     }
   });
 
-  it('不存在的段号 / 自己的段 → 422 MESSAGE_TARGET_NOT_AVAILABLE（不能靠伪造段号给别人发）', async () => {
+  it('不存在的段号 / 自己的段 / 后序段 → 422 MESSAGE_TARGET_NOT_AVAILABLE', async () => {
     const { bottleId, cookies } = await fourHopChain();
     const sender = cookies[3] as string;
 
@@ -193,10 +197,42 @@ describe('契约：目标必须是**段号**（服务端解析成作者），不
       expect(response.statusCode, `target=${String(target)}`).toBe(422);
       expect(response.body).toContain('MESSAGE_TARGET_NOT_AVAILABLE');
     }
+
+    const forward = await sendMessage(cookies[0] as string, bottleId, '不能写给后面的人', 2);
+    expect(forward.statusCode).toBe(422);
+    expect(forward.body).toContain('MESSAGE_TARGET_NOT_AVAILABLE');
   });
 });
 
 describe('可见性：只有**目标**能看到；发起者与其他段作者一律看不到', () => {
+  it('创建与送达前：发送者看到双方瓶内匿名代号，响应不泄露账号字段', async () => {
+    const { bottleId, cookies } = await fourHopChain();
+    const sender = cookies[3] as string;
+    const codes = await db.query<{ segment_index: number; code: string }>(
+      `select bs."index" as segment_index, ac.code
+       from bottle_segments bs
+       join anon_codes ac on ac.bottle_id = bs.bottle_id and ac.user_id = bs.owner_id
+       where bs.bottle_id = $1 and bs."index" in (2, 4)`,
+      [bottleId],
+    );
+    const codeByIndex = new Map(codes.map((row) => [row.segment_index, row.code]));
+
+    const created = await sendMessage(sender, bottleId, '先保持匿名', 2);
+    expect(created.statusCode).toBe(201);
+    expect(created.json()).toMatchObject({
+      sender: { segmentIndex: 4, displayName: codeByIndex.get(4), revealed: false },
+      recipient: { segmentIndex: 2, displayName: codeByIndex.get(2), revealed: false },
+    });
+
+    const pending = await messagesOf(sender, bottleId);
+    expect(pending).toHaveLength(1);
+    expect(pending[0]).toMatchObject({
+      sender: { segmentIndex: 4, displayName: codeByIndex.get(4), revealed: false },
+      recipient: { segmentIndex: 2, displayName: codeByIndex.get(2), revealed: false },
+    });
+    expect(JSON.stringify({ created: created.json(), pending })).not.toMatch(/userId|email/i);
+  });
+
   it('送达前：目标看不到（内容还没送到）；发送者看得到自己写的；发起者此时也看不到', async () => {
     const { bottleId, cookies } = await fourHopChain();
     const [initiator, middle, other, sender] = cookies as [string, string, string, string];
@@ -229,6 +265,71 @@ describe('可见性：只有**目标**能看到；发起者与其他段作者一
     // 发起者/第 3 段作者即使后来拿到瓶子也看不到（内容只属于目标）
     await resolve(middle, bottleId, 'RETURN'); // 回到发起者
     expect(await messagesOf(initiator, bottleId)).toEqual([]);
+  });
+
+  it('送达后：发送者与收件人都看到双方账号名，响应仍不泄露内部身份字段', async () => {
+    const { bottleId, cookies, handles } = await fourHopChain();
+    const [, recipient, relay, sender] = cookies as [string, string, string, string];
+    const [, recipientHandle, , senderHandle] = handles as [string, string, string, string];
+    await sendMessage(sender, bottleId, '送达才认识', 2);
+
+    await resolve(sender, bottleId, 'RETURN');
+    await resolve(relay, bottleId, 'RETURN');
+
+    const expectedParties = {
+      sender: { segmentIndex: 4, displayName: senderHandle, revealed: true },
+      recipient: { segmentIndex: 2, displayName: recipientHandle, revealed: true },
+    };
+    const senderView = await messagesOf(sender, bottleId);
+    const recipientView = await messagesOf(recipient, bottleId);
+    expect(senderView[0]).toMatchObject(expectedParties);
+    expect(recipientView[0]).toMatchObject(expectedParties);
+    expect(JSON.stringify({ senderView, recipientView })).not.toMatch(/userId|email/i);
+  });
+});
+
+describe('公海中的私密留言暂时隐藏，但数据保留', () => {
+  it('未完成瓶入海时返回空数组，离海后恢复原留言', async () => {
+    const initiator = await register('ms');
+    const songId = await insertSong(db, 4);
+    const createdBottle = await app.inject({
+      method: 'POST',
+      url: '/api/bottles',
+      payload: { songId },
+      headers: { cookie: initiator.cookie },
+    });
+    expect(createdBottle.statusCode).toBe(201);
+    const bottleId = (createdBottle.json() as { id: string }).id;
+
+    await sing(initiator.cookie, bottleId);
+    await resolve(initiator.cookie, bottleId, 'SEA');
+
+    const second = await register('ms');
+    await take(second.cookie, bottleId);
+    await sing(second.cookie, bottleId);
+    await resolve(second.cookie, bottleId, 'SEA');
+
+    const sender = await register('ms');
+    await take(sender.cookie, bottleId);
+    await sing(sender.cookie, bottleId);
+    const createdMessage = await sendMessage(sender.cookie, bottleId, '离海后还在', 2);
+    expect(createdMessage.statusCode).toBe(201);
+    const messageId = (createdMessage.json() as { id: string }).id;
+
+    await resolve(sender.cookie, bottleId, 'SEA');
+    expect(await messagesOf(sender.cookie, bottleId)).toEqual([]);
+
+    const stored = await db.query<{ status: string }>(
+      `select status from messages where id = $1`,
+      [messageId],
+    );
+    expect(stored).toEqual([{ status: 'PENDING' }]);
+
+    const nextSinger = await register('ms');
+    await take(nextSinger.cookie, bottleId);
+    expect(await messagesOf(sender.cookie, bottleId)).toMatchObject([
+      { id: messageId, content: '离海后还在', status: 'PENDING' },
+    ]);
   });
 });
 

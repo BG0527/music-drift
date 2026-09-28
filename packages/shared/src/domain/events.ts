@@ -9,7 +9,7 @@ import { SYSTEM_ACTOR_ID } from './constants';
 // ⚠️ 只引入三个**纯函数**（无 IO、无状态）：它们就是"留言何时送达/何时失败"的唯一实现。
 // messages.ts 只从 events.ts 引 `type`（编译期擦除），因此运行期不存在循环依赖。
 import { messagesDeliveredTo, messagesUndelivered, messagesUndeliveredFor } from './messages';
-import { findSegment } from './queries';
+import { findSegment, isComplete } from './queries';
 import type { BottleState, Segment, VoteValue } from './types';
 
 export type SeaReason = 'RESOLUTION' | 'RIVER_IDLE_TIMEOUT' | 'RETURN_DECISION_TIMEOUT';
@@ -206,9 +206,12 @@ export function reduceBottle(state: BottleState, event: DomainEvent): BottleStat
         holder: null,
         returnCompleted: state.returnCompleted || event.returnCompleted,
         returnChainBroken: state.returnChainBroken || event.chainBroken,
-        // 失败③：入海即终结 —— 此刻仍是 PENDING 的留言**就是没送到目标**（用户明确补充的那条）。
-        // 已送达的（目标先前已拿到过瓶子）不受影响。
-        messages: messagesUndelivered(state.messages),
+        // 父链断裂本身就是失败终局；除此之外，只有作品完整入海才终结留言。
+        // 普通未完成作品仍可被指定接唱捞走，留言保持 PENDING，离海后继续流转。
+        messages:
+          event.chainBroken || isComplete(state)
+            ? messagesUndelivered(state.messages)
+            : state.messages,
         updatedAt: event.at,
       };
 

@@ -1,6 +1,6 @@
 import { screen, within } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
-import { BOTTLE_ID, USER_A, bottleDetail, bottleEvent } from '../../test/fixtures';
+import { BOTTLE_ID, bottleDetail, bottleEvent } from '../../test/fixtures';
 import { renderWithProviders } from '../../test/harness';
 import { DriftLogPage } from '../drift-log-page';
 
@@ -297,22 +297,22 @@ describe('漂流日志页', () => {
 });
 
 const EVENTS = [
-  bottleEvent({ seq: 1, type: 'BOTTLE_CREATED', actorId: USER_A }),
-  bottleEvent({ seq: 2, type: 'SEGMENT_RECORDED', actorId: USER_A }),
+  bottleEvent({ seq: 1, type: 'BOTTLE_CREATED', actorCode: '午夜歌手#042' }),
+  bottleEvent({ seq: 2, type: 'SEGMENT_RECORDED', actorCode: '午夜歌手#042' }),
   // 下面两条是**该被过滤掉**的：系统行为（斩浪）与互动流水（点跩）
-  bottleEvent({ seq: 3, type: 'SEGMENT_CUT', actorId: 'SYSTEM' }),
-  bottleEvent({ seq: 4, type: 'VOTE_CAST', actorId: USER_A }),
-  bottleEvent({ seq: 5, type: 'BOTTLE_CAST_TO_RIVER', actorId: USER_A }),
+  bottleEvent({ seq: 3, type: 'SEGMENT_CUT', actorCode: '系统' }),
+  bottleEvent({ seq: 4, type: 'VOTE_CAST', actorCode: '午夜歌手#042' }),
+  bottleEvent({ seq: 5, type: 'BOTTLE_CAST_TO_RIVER', actorCode: '午夜歌手#042' }),
 ];
 
 /** 逐值复核用：稿语法表的**全部七种切口**（发起 接唱 投河 捞取 回传 完成 入海）。 */
 const ALL_OPS_EVENTS = [
-  bottleEvent({ seq: 1, type: 'BOTTLE_CREATED', actorId: USER_A }),
-  bottleEvent({ seq: 2, type: 'SEGMENT_RECORDED', actorId: USER_A }),
-  bottleEvent({ seq: 3, type: 'BOTTLE_CAST_TO_RIVER', actorId: USER_A }),
-  bottleEvent({ seq: 4, type: 'BOTTLE_DRAWN', actorId: USER_A }),
-  bottleEvent({ seq: 5, type: 'BOTTLE_RETURNED', actorId: USER_A }),
+  bottleEvent({ seq: 1, type: 'BOTTLE_CREATED', actorCode: '午夜歌手#042' }),
+  bottleEvent({ seq: 2, type: 'SEGMENT_RECORDED', actorCode: '午夜歌手#042' }),
+  bottleEvent({ seq: 3, type: 'BOTTLE_CAST_TO_RIVER', actorCode: '午夜歌手#042' }),
+  bottleEvent({ seq: 4, type: 'BOTTLE_DRAWN', actorCode: '午夜歌手#042' }),
+  bottleEvent({ seq: 5, type: 'BOTTLE_RETURNED', actorCode: '午夜歌手#042' }),
   // isComplete=true ⇒ 最后一次接唱（seq 6）显示成「完成」
-  bottleEvent({ seq: 6, type: 'SEGMENT_RECORDED', actorId: USER_A }),
-  bottleEvent({ seq: 7, type: 'BOTTLE_WENT_TO_SEA', actorId: USER_A }),
+  bottleEvent({ seq: 6, type: 'SEGMENT_RECORDED', actorCode: '午夜歌手#042' }),
+  bottleEvent({ seq: 7, type: 'BOTTLE_WENT_TO_SEA', actorCode: '午夜歌手#042' }),
 ];

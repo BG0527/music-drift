@@ -36,23 +36,27 @@ import {
 const SAMPLE_RATE = 8_000; // 小采样率让"帧 ↔ 毫秒"手算得清楚（1 帧 = 0.125ms）
 
 describe('mixPcm：完整试听保留伴奏', () => {
-  it('未录与暂未解锁时间槽都只保留伴奏，可见人声才叠加', () => {
+  it('未录时间槽只保留伴奏，全部已有录音都会叠加', () => {
     const mixPlan = planAccompaniedMix({
-      segments: [{ index: 1, durationMs: 1_000, audioUrl: '/api/segments/a/audio' }],
+      segments: [
+        { index: 1, durationMs: 1_000, audioUrl: '/api/segments/a/audio' },
+        { index: 3, durationMs: 1_000, audioUrl: '/api/segments/c/audio' },
+      ],
       totalSegments: 3,
       missingSegmentIndexes: [2],
-      hiddenLaterSegmentCount: 1,
       nominalDurationByIndex: { 1: 1_000, 2: 1_000, 3: 1_000 },
       accompanimentUrl: '/library/accompaniment.mp3',
       sampleRate: SAMPLE_RATE,
     });
     const accompaniment = [Float32Array.from({ length: 24_000 }, () => 0.2)];
 
-    const mixed = mixPcm(mixPlan, [clip(1, 8_000, 0.3)], { accompaniment });
+    const mixed = mixPcm(mixPlan, [clip(1, 8_000, 0.3), clip(3, 8_000, 0.4)], {
+      accompaniment,
+    });
 
     expect(mixed.channels[0]?.[0]).toBeCloseTo(0.5);
     expect(mixed.channels[0]?.[8_000]).toBeCloseTo(0.2);
-    expect(mixed.channels[0]?.[16_000]).toBeCloseTo(0.2);
+    expect(mixed.channels[0]?.[16_000]).toBeCloseTo(0.6);
   });
 });
 

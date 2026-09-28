@@ -35,12 +35,6 @@ import { createActorResolver, type ActorResolver } from '../http/session.js';
 import type { Db } from '../db/client.js';
 import type { BottleStore } from '../store/bottles.js';
 import { createRequestContext } from '../store/context.js';
-import {
-  isEventVisible,
-  isSegmentVisible,
-  lastOwnEventIndex,
-  segmentVisibility,
-} from '../store/visibility.js';
 import { toBottleDetail, toBottleSummary } from '../store/dto.js';
 
 export interface BottleRoutesOptions {
@@ -51,6 +45,15 @@ export interface BottleRoutesOptions {
 
 const BottleIdParamsSchema = z.object({ id: UuidSchema });
 const CreateBottleRequestSchema = z.object({ songId: UuidSchema });
+const PUBLIC_BOTTLE_EVENT_TYPES = new Set([
+  'BOTTLE_CREATED',
+  'SEGMENT_RECORDED',
+  'BOTTLE_CAST_TO_RIVER',
+  'BOTTLE_DRAWN',
+  'BOTTLE_PUT_BACK',
+  'BOTTLE_RETURNED',
+  'BOTTLE_WENT_TO_SEA',
+]);
 /**
  * 「我的漂流瓶」列表参数：与其它列表端点同口径（默认 20、上限 100）。
  * **不做游标**：Demo 规模下个人参与量远小于一页，`nextCursor` 恒为 null（与 `/api/sea`、`/api/notifications` 一致）。
@@ -113,13 +116,7 @@ export function registerBottleRoutes(app: FastifyInstance, options: BottleRoutes
       return null;
     }
     const allSegments = await store.listBottleSegments(bottleId);
-    /**
-     * §9.1：漂流中只把"我这一棒之前（含我自己）"的段交给观看者；
-     * 入海后（§9.2）全部解锁。判据集中在 `store/visibility.ts`（详情与日志共用一份，避免漂移）。
-     */
-    const visibility = segmentVisibility({ state, viewerId });
-    const segments = allSegments.filter((segment) => isSegmentVisible(visibility, segment.index));
-    const hiddenLaterSegmentCount = allSegments.length - segments.length;
+    const segments = allSegments;
     const codes = await codesFor(bottleId, [
       state.initiatorId,
       ...state.segments.map((segment) => segment.ownerId),
@@ -135,7 +132,6 @@ export function registerBottleRoutes(app: FastifyInstance, options: BottleRoutes
       songTitle: songs[0]?.title ?? '',
       voteCounts: await likeDislikeCounts(segments.map((segment) => segment.id)),
       viewerId,
-      hiddenLaterSegmentCount,
     });
   }
 
@@ -240,7 +236,7 @@ export function registerBottleRoutes(app: FastifyInstance, options: BottleRoutes
     return detail === null ? sendProblem(reply, transportProblem('NOT_FOUND')) : reply.send(detail);
   });
 
-  /** 漂流日志：只给时间线（类型/时间/操作者），内容可见性由前端按 seq 裁剪（CONTEXT §9.1）。 */
+  /** 公共漂流日志：完整核心时间线；私密留言事件永不进入此响应。 */
   app.get('/api/bottles/:id/events', async (request, reply) => {
     const params = BottleIdParamsSchema.safeParse(request.params);
     if (!params.success) {
@@ -250,25 +246,20 @@ export function registerBottleRoutes(app: FastifyInstance, options: BottleRoutes
     if (events.length === 0) {
       return sendProblem(reply, transportProblem('NOT_FOUND'));
     }
-    const actor = await actors.resolve(request);
     const state = await store.loadState(params.data.id);
-    /**
-     * §9.1：日志与详情**同一判据**（事件里带 actorId，后面那一棒的录音事件会暴露"后面是谁"）。
-     * 入海后（§9.2）不裁 —— 完整接力链就是公海作品的卖点。
-     */
-    const visibility =
-      state === null
-        ? ({ mode: 'ALL', drifting: false } as const)
-        : segmentVisibility({ state, viewerId: actor?.user.id ?? null });
-    const ownEventIndex = lastOwnEventIndex(events, actor?.user.id ?? null);
-    const visible = events.filter((_event, position) =>
-      isEventVisible({ visibility, position, lastOwnEventIndex: ownEventIndex }),
+    if (state === null) {
+      return sendProblem(reply, transportProblem('NOT_FOUND'));
+    }
+    const visible = events.filter((event) => PUBLIC_BOTTLE_EVENT_TYPES.has(event.type));
+    const codes = await codesFor(
+      params.data.id,
+      visible.filter((event) => event.actorId !== 'SYSTEM').map((event) => event.actorId),
     );
     return reply.send(
       visible.map((event, position) => ({
         seq: position + 1,
         type: event.type,
-        actorId: event.actorId,
+        actorCode: event.actorId === 'SYSTEM' ? '系统' : (codes.get(event.actorId) ?? '匿名歌手'),
         occurredAt: new Date(event.at).toISOString(),
         occurredAtMs: event.at,
       })),

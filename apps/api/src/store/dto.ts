@@ -51,11 +51,12 @@ export function toBottleSummary(
 export function toSegments(
   rows: readonly BottleSegmentRow[],
   codes: ReadonlyMap<string, string>,
+  viewerId: string | null,
 ): Segment[] {
   return rows.map((row) => ({
     id: row.id,
     index: row.index,
-    ownerId: row.ownerId,
+    isMine: viewerId !== null && row.ownerId === viewerId,
     note: row.note,
     ownerCode: codes.get(row.ownerId) ?? '匿名歌手',
     likeCount: 0,
@@ -67,8 +68,6 @@ export function toSegments(
 }
 
 export interface DetailInput {
-  /** §9.1：因"漂流中不可见后续"被裁掉的段数（0 = 未裁）。 */
-  hiddenLaterSegmentCount?: number | undefined;
   row: BottleRow;
   state: BottleState;
   segments: readonly BottleSegmentRow[];
@@ -80,7 +79,7 @@ export interface DetailInput {
 
 export function toBottleDetail(input: DetailInput): BottleDetail {
   const { row, state, viewerId } = input;
-  const segments = toSegments(input.segments, input.codes).map((segment) => ({
+  const segments = toSegments(input.segments, input.codes, viewerId).map((segment) => ({
     ...segment,
     likeCount: input.voteCounts.get(segment.id)?.likeCount ?? 0,
     dislikeCount: input.voteCounts.get(segment.id)?.dislikeCount ?? 0,
@@ -88,8 +87,6 @@ export function toBottleDetail(input: DetailInput): BottleDetail {
   return {
     ...toBottleSummary(row, state, input.songTitle),
     initiatorCode: input.codes.get(state.initiatorId) ?? '匿名歌手',
-    holderId: currentHolderId(state),
-    currentCasterId: state.currentCasterId,
     returnCompleted: state.returnCompleted,
     returnChainBroken: state.returnChainBroken,
     segments,
@@ -98,7 +95,6 @@ export function toBottleDetail(input: DetailInput): BottleDetail {
         ? []
         : availableResolutions(state, { userId: viewerId }).map((resolution) => resolution),
     isHolder: viewerId !== null && currentHolderId(state) === viewerId,
-    hiddenLaterSegmentCount: input.hiddenLaterSegmentCount ?? 0,
     replacementContext: replacementContext(state),
     riverCastAt: iso(state.riverCastAt === null ? null : new Date(state.riverCastAt)),
     seaAt: iso(state.seaAt === null ? null : new Date(state.seaAt)),

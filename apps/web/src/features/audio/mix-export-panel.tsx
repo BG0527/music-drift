@@ -117,12 +117,6 @@ export function MixExportPanel({
         </p>
       )}
 
-      {!accompanied || (plan.lockedSegmentIndexes?.length ?? 0) === 0 ? null : (
-        <p role="status" className="text-[0.875rem] leading-[1.6] text-muted">
-          第 {plan.lockedSegmentIndexes?.join('、')} 段暂未解锁；当前只播放这些时间槽的伴奏。
-        </p>
-      )}
-
       {view.warnings.length > 0 ? (
         <p
           role="status"

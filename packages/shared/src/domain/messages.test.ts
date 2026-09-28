@@ -66,6 +66,19 @@ describe('§5 规则变更：留言目标由发送者按**段号**指定，服�
     expect(segmentByIndex(state, 2).ownerId).toBe(toB.messages[0]?.toUserId);
   });
 
+  it('只能给自己的有效段之前的作者留言：第 1 段不能写给第 2 段', () => {
+    const { ctx, state } = chain();
+
+    expectRejected(attach(state, ctx, 'u:A', 2), ['MESSAGE_TARGET_NOT_AVAILABLE']);
+  });
+
+  it('发送者自己的段已被斩后不能再留言', () => {
+    const { ctx, state } = chain();
+    const cut = cutSegment(state, ctx, 3);
+
+    expectRejected(attach(cut, ctx, 'u:C', 1), ['MESSAGE_TARGET_NOT_AVAILABLE']);
+  });
+
   it('目标必须是**有效段**且不能是自己：不存在的段号 / 自己的段 / 已斩段 → MESSAGE_TARGET_NOT_AVAILABLE', () => {
     const { ctx, state } = chain();
 
@@ -117,16 +130,15 @@ describe('§5.1 可见性：只有目标能看到内容（发起者也不例外�
     expect(visibleMessagesFor(settled, 'u:B').map((message) => message.content)).toEqual(['只给你看。']);
   });
 
-  it('未送达时：目标看不到（内容没送到），发送者能看到"未送达"', () => {
+  it('未完成作品入海时留言保持 PENDING，目标仍看不到', () => {
     const { ctx, state } = chain();
     const withNote = attach(state, ctx, 'u:C', 2).state; // 目标 = B
 
-    // C 直接把瓶子送进公海（**没有**交给 B）→ 留言永远到不了目标
-    const broken = resolve(withNote, ctx, 'u:C', 'SEA');
+    // C 直接把未完成瓶送进公海（**没有**交给 B）；它之后仍可被指定接唱捞走，不能提前判失败。
+    const atSea = resolve(withNote, ctx, 'u:C', 'SEA');
 
-    expect(broken.messages.map((message) => message.status)).toEqual(['UNDELIVERED']);
-    expect(visibleMessagesFor(broken, 'u:B')).toEqual([]);
-    expect(visibleMessagesFor(broken, 'u:C').map((message) => message.status)).toEqual(['UNDELIVERED']);
+    expect(atSea.messages.map((message) => message.status)).toEqual(['PENDING']);
+    expect(visibleMessagesFor(atSea, 'u:B')).toEqual([]);
   });
 });
 

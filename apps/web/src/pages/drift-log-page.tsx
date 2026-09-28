@@ -169,7 +169,7 @@ export function DriftLogPage({ id }: { id: string }) {
   const spillDy = wet === null ? 0 : wet.end.y - DRAFT_WET_END.y;
 
   return (
-    <main className="relative z-[2] px-[max(1.5rem,5.278vw)] pt-[max(2.5rem,4.444vw)] pb-0 text-paper">
+    <main className="relative z-[2] px-[max(1.5rem,5.278vw)] pt-[max(2.5rem,4.444vw)] pb-0 text-paper md:h-[100dvh] md:overflow-hidden">
       {/* 背景三层（稿 .clip：世界是这台机器，正文浮在它上面） */}
       <div aria-hidden="true" className="pointer-events-none absolute inset-0 -z-10 overflow-hidden">
         <div className="platter absolute inset-0" style={{ background: PLATTER_BG }} />
@@ -188,7 +188,7 @@ export function DriftLogPage({ id }: { id: string }) {
       </div>
 
       {/* ── 页头（稿 header：crumb / cat / h1 / sub 逐字逐值）────────────────── */}
-      <header className="relative">
+      <header className="enter-rise relative">
         <Link
           to={`/bottles/${id}`}
           className="inline-flex min-h-11 items-center gap-[7px] rounded-[2px] border border-[rgba(243,249,250,0.16)] px-[12px] text-[12.5px] text-muted"

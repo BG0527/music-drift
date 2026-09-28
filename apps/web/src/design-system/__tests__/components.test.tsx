@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { act, render, screen, fireEvent, within } from '@testing-library/react';
 import {
   BottomNav,
   Button,
@@ -37,8 +37,8 @@ describe('Button（主 CTA 盘 / 幽灵按钮 / 圆盘）', () => {
   });
 
   it('幽灵按钮用 1px 细线 + coral 文字，不使用实心底', () => {
-    render(<Button variant="ghost">放回海中</Button>);
-    const btn = screen.getByRole('button', { name: '放回海中' });
+    render(<Button variant="ghost">回河道</Button>);
+    const btn = screen.getByRole('button', { name: '回河道' });
     expect(btn.className).toMatch(/border/);
     expect(btn.className).toMatch(/text-coral/);
     expect(btn.className).not.toMatch(/bg-coral/);
@@ -381,6 +381,105 @@ describe('Toast', () => {
 });
 
 describe('Modal（去向三选一）', () => {
+  it('通过 portal 挂到 document.body 直属层，遮罩可点击关闭', () => {
+    const onClose = vi.fn();
+    const { container } = render(
+      <div data-testid="page-stacking-context">
+        <Modal open title="录第 3 段" onClose={onClose}>
+          <button type="button">开始录制</button>
+        </Modal>
+      </div>,
+    );
+
+    const dialog = screen.getByRole('dialog', { name: '录第 3 段' });
+    const modalRoot = dialog.parentElement;
+    expect(container.contains(dialog), '弹窗不得留在页面层叠上下文里').toBe(false);
+    expect(modalRoot?.parentElement).toBe(document.body);
+
+    const backdrop = modalRoot?.querySelector('[data-modal-backdrop]');
+    expect(backdrop).not.toBeNull();
+    fireEvent.click(backdrop!);
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it('720px 矮屏下面板有视口高度上限，长内容在面板内滚动', () => {
+    render(<Modal open title="长内容" onClose={() => {}}><div>内容</div></Modal>);
+    const dialog = screen.getByRole('dialog', { name: '长内容' });
+    expect(dialog.className).toContain('max-h-[calc(100dvh-3rem)]');
+    expect(dialog.className).toContain('overflow-y-auto');
+  });
+
+  it('打开时使背景 inert/aria-hidden，Tab 和 Shift+Tab 都不会逃出面板', () => {
+    const { container } = render(
+      <div>
+        <button type="button">背景按钮</button>
+        <Modal open title="焦点闭环" onClose={() => {}}>
+          <button type="button">第一项</button>
+          <button type="button">最后一项</button>
+        </Modal>
+      </div>,
+    );
+    const pageRoot = container;
+    expect(pageRoot).toHaveAttribute('inert');
+    expect(pageRoot).toHaveAttribute('aria-hidden', 'true');
+
+    const dialog = screen.getByRole('dialog', { name: '焦点闭环' });
+    const buttons = within(dialog).getAllByRole('button');
+    const first = buttons[0]!;
+    const last = buttons.at(-1)!;
+    last.focus();
+    fireEvent.keyDown(document, { key: 'Tab' });
+    expect(first).toHaveFocus();
+    first.focus();
+    fireEvent.keyDown(document, { key: 'Tab', shiftKey: true });
+    expect(last).toHaveFocus();
+  });
+
+  it('audio controls 是焦点闭环中的原生可聚焦项', () => {
+    render(
+      <Modal open title="录音失败复核" onClose={() => {}}>
+        <button type="button">重试上传</button>
+        <audio controls aria-label="本地录音" />
+      </Modal>,
+    );
+
+    const audio = screen.getByLabelText('本地录音');
+    // jsdom 不把 controls 媒体算作原生 tabbable；先借临时 tabindex 建立真实焦点，再移除，
+    // 让断言验证 Modal 自己的原生媒体 selector，而不是被通用 [tabindex] 假通过。
+    audio.setAttribute('tabindex', '0');
+    audio.focus();
+    audio.removeAttribute('tabindex');
+    fireEvent.keyDown(document, { key: 'Tab' });
+    expect(screen.getByRole('button', { name: '关闭' })).toHaveFocus();
+  });
+
+  it('Tab 可进入音频，并在 video/contenteditable 间正反向循环', () => {
+    render(
+      <Modal open title="媒体焦点顺序" onClose={() => {}}>
+        <button type="button">重试上传</button>
+        <audio controls tabIndex={0} aria-label="本地录音" />
+        <video controls tabIndex={0} aria-label="本地视频" />
+        <div contentEditable tabIndex={0} aria-label="可编辑说明" />
+      </Modal>,
+    );
+
+    const retry = screen.getByRole('button', { name: '重试上传' });
+    const audio = screen.getByLabelText('本地录音');
+    const video = screen.getByLabelText('本地视频');
+    const editable = screen.getByLabelText('可编辑说明');
+    retry.focus();
+    fireEvent.keyDown(document, { key: 'Tab' });
+    expect(audio).toHaveFocus();
+    fireEvent.keyDown(document, { key: 'Tab' });
+    expect(video).toHaveFocus();
+    fireEvent.keyDown(document, { key: 'Tab' });
+    expect(editable).toHaveFocus();
+    fireEvent.keyDown(document, { key: 'Tab', shiftKey: true });
+    expect(video).toHaveFocus();
+    fireEvent.keyDown(document, { key: 'Tab', shiftKey: true });
+    expect(audio).toHaveFocus();
+  });
+
   it('是 dialog + aria-modal，并带标题关联', () => {
     render(
       <Modal open title="选择声音去向" onClose={() => {}}>
@@ -405,6 +504,22 @@ describe('Modal（去向三选一）', () => {
     expect(screen.getByRole('dialog').className).toMatch(/z-modal/);
   });
 
+  it('不可关闭态会锁住 Esc、遮罩与关闭按钮', () => {
+    const onClose = vi.fn();
+    render(
+      <Modal open title="正在上传" onClose={onClose} dismissible={false}>
+        <p>正在保存录音</p>
+      </Modal>,
+    );
+
+    fireEvent.keyDown(document, { key: 'Escape' });
+    fireEvent.click(document.querySelector('[data-modal-backdrop]')!);
+    const close = screen.getByRole('button', { name: '关闭' });
+    expect(close).toBeDisabled();
+    fireEvent.click(close);
+    expect(onClose).not.toHaveBeenCalled();
+  });
+
   it('关闭时不渲染（不留下不可见但可聚焦的节点）', () => {
     render(
       <Modal open={false} title="选择声音去向" onClose={() => {}}>
@@ -412,6 +527,48 @@ describe('Modal（去向三选一）', () => {
       </Modal>,
     );
     expect(screen.queryByRole('dialog')).toBeNull();
+  });
+
+  it('关闭后保留 240ms 退场画面，再卸载并立即恢复背景与焦点', async () => {
+    vi.useFakeTimers();
+    try {
+      const onExited = vi.fn();
+      const opener = document.createElement('button');
+      document.body.append(opener);
+      opener.focus();
+      const { container, rerender } = render(
+        <Modal open title="带退场的弹窗" onClose={() => {}} onExited={onExited}>
+          <button type="button">弹窗动作</button>
+        </Modal>,
+      );
+
+      rerender(
+        <Modal open={false} title="带退场的弹窗" onClose={() => {}} onExited={onExited}>
+          <button type="button">弹窗动作</button>
+        </Modal>,
+      );
+
+      expect(document.querySelector('[data-modal-root]')).toHaveClass('exit-fade');
+      expect(container).toHaveAttribute('inert');
+      expect(opener).not.toHaveFocus();
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(239);
+      });
+      expect(document.querySelector('[data-modal-root]')).not.toBeNull();
+      expect(onExited).not.toHaveBeenCalled();
+      expect(container).toHaveAttribute('inert');
+      expect(opener).not.toHaveFocus();
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(1);
+      });
+      expect(document.querySelector('[data-modal-root]')).toBeNull();
+      expect(onExited).toHaveBeenCalledTimes(1);
+      expect(container).not.toHaveAttribute('inert');
+      expect(opener).toHaveFocus();
+      opener.remove();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('浮层才允许用阴影（遮罩 water-void + 面板 ink 细线）', () => {

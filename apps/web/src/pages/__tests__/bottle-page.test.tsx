@@ -1,13 +1,12 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { fireEvent, screen, waitFor, within } from '@testing-library/react';
-import { describe, expect, it } from 'vitest';
+import { act, fireEvent, screen, waitFor, within } from '@testing-library/react';
+import { describe, expect, it, vi } from 'vitest';
 import {
   BOTTLE_ID,
   SEGMENT_1,
   SEGMENT_2,
   SONG_ID,
-  USER_A,
   USER_B,
   bottleDetail,
 } from '../../test/fixtures';
@@ -39,11 +38,95 @@ const SESSION_B = {
  * `missingSegmentIndexes[0]` 决定"这一棒录第几段"，`availableResolutions` 决定可选去向。
  */
 describe('漂流瓶接唱页', () => {
+  it('左上「回河道」是唯一放回入口：持有者先 put-back 成功再导航', async () => {
+    renderWithProviders(<BottlePage id={BOTTLE_ID} />, {
+      route: `/bottles/${BOTTLE_ID}`,
+      handlers: [
+        { path: '/api/auth/me', respond: () => ({ body: SESSION_B }) },
+        { path: `/api/bottles/${BOTTLE_ID}`, respond: () => ({ body: bottleDetail() }) },
+      ],
+    });
+
+    const harnessFetch = globalThis.fetch;
+    let putBackRequested = false;
+    let finishPutBack: (() => void) | undefined;
+    globalThis.fetch = ((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
+      if ((init?.method ?? 'GET').toUpperCase() === 'POST' && url === `/api/bottles/${BOTTLE_ID}/put-back`) {
+        putBackRequested = true;
+        return new Promise<Response>((resolve) => {
+          finishPutBack = () => {
+            resolve(
+              new Response(
+                JSON.stringify({
+                  bottle: bottleDetail({ status: 'IN_RIVER', isHolder: false }),
+                  cooldownDraws: 10,
+                }),
+                { status: 200, headers: { 'Content-Type': 'application/json' } },
+              ),
+            );
+          };
+        });
+      }
+      return harnessFetch(input, init);
+    }) as typeof fetch;
+
+    fireEvent.click(await screen.findByRole('button', { name: '回河道' }));
+
+    await waitFor(() => expect(putBackRequested).toBe(true));
+    expect(window.location.pathname).toBe(`/bottles/${BOTTLE_ID}`);
+    finishPutBack?.();
+    await waitFor(() => expect(window.location.pathname).toBe('/river'));
+    globalThis.fetch = harnessFetch;
+    expect(screen.queryByRole('button', { name: /放回海中/ })).not.toBeInTheDocument();
+  });
+
+  it('持有者放回失败时留在详情页，并显示可恢复错误', async () => {
+    renderWithProviders(<BottlePage id={BOTTLE_ID} />, {
+      route: `/bottles/${BOTTLE_ID}`,
+      handlers: [
+        { path: '/api/auth/me', respond: () => ({ body: SESSION_B }) },
+        { path: `/api/bottles/${BOTTLE_ID}`, respond: () => ({ body: bottleDetail() }) },
+        {
+          method: 'POST',
+          path: `/api/bottles/${BOTTLE_ID}/put-back`,
+          respond: () => ({
+            status: 500,
+            body: { error: { message: '暂时无法放回，请稍后重试。', violations: [] } },
+          }),
+        },
+      ],
+    });
+
+    fireEvent.click(await screen.findByRole('button', { name: '回河道' }));
+
+    expect(await screen.findByText('暂时无法放回，请稍后重试。')).toBeInTheDocument();
+    expect(window.location.pathname).toBe(`/bottles/${BOTTLE_ID}`);
+  });
+
+  it('非持有者点左上「回河道」只导航，不请求 put-back', async () => {
+    const view = renderWithProviders(<BottlePage id={BOTTLE_ID} />, {
+      route: `/bottles/${BOTTLE_ID}`,
+      handlers: [
+        { path: '/api/auth/me', respond: () => ({ body: SESSION_B }) },
+        {
+          path: `/api/bottles/${BOTTLE_ID}`,
+          respond: () => ({ body: bottleDetail({ isHolder: false }) }),
+        },
+      ],
+    });
+
+    fireEvent.click(await screen.findByRole('button', { name: '回河道' }));
+
+    expect(window.location.pathname).toBe('/river');
+    expect(view.fetchMock.calls.some((call) => call.url.endsWith('/put-back'))).toBe(false);
+  });
+
   it('完整作品在详情页提供整首试听入口，并明确包含伴奏、四段人声与同步歌词', async () => {
     const segments = [1, 2, 3, 4].map((index) => ({
       id: `${String(index).repeat(8)}-${String(index).repeat(4)}-4${String(index).repeat(3)}-8${String(index).repeat(3)}-${String(index).repeat(12)}`,
       index,
-      ownerId: index % 2 === 0 ? USER_B : USER_A,
+      isMine: false,
       note: null,
       ownerCode: `接唱者#00${String(index)}`,
       likeCount: 0,
@@ -67,7 +150,6 @@ describe('漂流瓶接唱页', () => {
               seaZone: 'COMPLETED',
               isComplete: true,
               isHolder: false,
-              holderId: null,
               missingSegmentIndexes: [],
               availableResolutions: [],
               segments,
@@ -77,12 +159,34 @@ describe('漂流瓶接唱页', () => {
       ],
     });
 
-    const heading = await screen.findByRole('heading', { name: '试听完整作品' });
+    const heading = await screen.findByRole('heading', { name: '听全部已有录音' });
     const region = heading.closest('section');
     expect(region).not.toBeNull();
-    expect(within(region!).getByText(/伴奏.*四段人声/)).toBeInTheDocument();
-    expect(within(region!).getByText(/歌词随播放进度/)).toBeInTheDocument();
-    expect(within(region!).getByRole('button', { name: '生成并试听完整作品' })).toBeEnabled();
+    expect(within(region!).getByText(/按段号顺序/)).toBeInTheDocument();
+    expect(within(region!).getByRole('button', { name: '听全部' })).toBeEnabled();
+    expect(within(region!).queryByText(/生成|导出|下载/)).toBeNull();
+  });
+
+  it('公海详情完全不显示私密留言入口', async () => {
+    renderWithProviders(<BottlePage id={BOTTLE_ID} />, {
+      route: `/bottles/${BOTTLE_ID}`,
+      handlers: [
+        {
+          path: `/api/bottles/${BOTTLE_ID}`,
+          respond: () => ({
+            body: bottleDetail({
+              status: 'SEA',
+              seaZone: 'INCOMPLETE',
+              isHolder: false,
+              availableResolutions: [],
+            }),
+          }),
+        },
+      ],
+    });
+
+    await screen.findByRole('heading', { level: 1 });
+    expect(screen.queryByRole('button', { name: '私密留言' })).not.toBeInTheDocument();
   });
 
   it('未登录时不摆出「录制 / 放回」按钮（先请登录，不制造会 401 的假按钮）', async () => {
@@ -93,7 +197,7 @@ describe('漂流瓶接唱页', () => {
           path: `/api/bottles/${BOTTLE_ID}`,
           respond: () => ({
             // 未登录观看者拿到的就是这样的 DTO（`toBottleDetail`: viewerId null ⇒ isHolder false、去向为空）
-            body: bottleDetail({ isHolder: false, holderId: USER_A, availableResolutions: [] }),
+            body: bottleDetail({ isHolder: false, availableResolutions: [] }),
           }),
         },
       ],
@@ -163,6 +267,102 @@ describe('漂流瓶接唱页', () => {
     expect(screen.getByText(/已录下第 2 段/)).toBeInTheDocument();
   });
 
+  it('上传未完成时录音窗口不能被 Esc、遮罩或关闭按钮中断，成功后才进入去向', async () => {
+    const recorder = fakeRecorderEnvironment();
+    let uploaded = false;
+    let finishUpload: (() => void) | undefined;
+    const transport = () =>
+      new Promise<{
+        status: number;
+        body: {
+          segmentId: typeof SEGMENT_2;
+          index: number;
+          nextRecordIndex: number;
+          bottle: ReturnType<typeof bottleDetail>;
+        };
+      }>((resolve) => {
+        finishUpload = () => {
+          uploaded = true;
+          resolve({
+            status: 201,
+            body: {
+              segmentId: SEGMENT_2,
+              index: 2,
+              nextRecordIndex: 3,
+              bottle: bottleDetail({ recordedCount: 2, missingSegmentIndexes: [3, 4] }),
+            },
+          });
+        };
+      });
+
+    renderWithProviders(
+      <BottlePage
+        id={BOTTLE_ID}
+        seams={{ recorderEnvironment: recorder.environment, uploadTransport: transport }}
+      />,
+      {
+        route: `/bottles/${BOTTLE_ID}`,
+        handlers: [
+          songsHandler,
+          { path: '/api/auth/me', respond: () => ({ body: SESSION_B }) },
+          {
+            path: `/api/bottles/${BOTTLE_ID}`,
+            respond: () => ({
+              body: uploaded
+                ? bottleDetail({ recordedCount: 2, missingSegmentIndexes: [3, 4] })
+                : bottleDetail(),
+            }),
+          },
+        ],
+      },
+    );
+
+    const recordEntry = await screen.findByRole('button', { name: '录第 2 段' });
+    fireEvent.click(recordEntry);
+    fireEvent.click(await screen.findByRole('button', { name: /开始录制/ }));
+    const stop = await screen.findByRole('button', { name: /停止录制/ });
+    recorder.clock.value += 20_000;
+    fireEvent.click(stop);
+    fireEvent.click(await screen.findByRole('button', { name: /用这一段/ }));
+
+    const recordingDialog = screen.getByRole('dialog', { name: '录第 2 段' });
+    expect(await within(recordingDialog).findByText(/上传中/)).toBeInTheDocument();
+    const close = within(recordingDialog).getByRole('button', { name: '关闭' });
+    await waitFor(() => expect(close).toBeDisabled());
+    fireEvent.keyDown(document, { key: 'Escape' });
+    fireEvent.click(document.querySelector('[data-modal-backdrop]')!);
+    fireEvent.click(close);
+    expect(screen.getByRole('dialog', { name: '录第 2 段' })).toBeInTheDocument();
+    expect(screen.queryByRole('dialog', { name: '选择声音去向' })).not.toBeInTheDocument();
+
+    vi.useFakeTimers();
+    try {
+      await act(async () => {
+        finishUpload?.();
+        await Promise.resolve();
+        await Promise.resolve();
+      });
+
+      expect(document.querySelectorAll('[data-modal-root]')).toHaveLength(1);
+      expect(screen.queryByRole('dialog', { name: '选择声音去向' })).not.toBeInTheDocument();
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(239);
+      });
+      fireEvent.click(recordEntry);
+      expect(document.querySelectorAll('[data-modal-root]')).toHaveLength(1);
+      expect(screen.queryByRole('dialog', { name: '选择声音去向' })).not.toBeInTheDocument();
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(1);
+        await Promise.resolve();
+      });
+      expect(document.querySelectorAll('[data-modal-root]')).toHaveLength(1);
+      expect(screen.getByRole('dialog', { name: '选择声音去向' })).toBeInTheDocument();
+      expect(screen.queryByRole('dialog', { name: '录第 2 段' })).not.toBeInTheDocument();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('本地复核时取消会关闭录音窗口，且不会提前打开去向窗口', async () => {
     const recorder = fakeRecorderEnvironment();
     renderWithProviders(
@@ -209,19 +409,45 @@ describe('漂流瓶接唱页', () => {
     ).toBeInTheDocument();
   });
 
-  it('§9.1：漂流中被裁掉后续时，明确说明"还有 N 段看不到"（不是假装瓶子丢了段）', async () => {
+  it('持有且已有 2 段：录第 3 段、听全部、去向与日志同时可达，不再渲染独立放回行', async () => {
     renderWithProviders(<BottlePage id={BOTTLE_ID} />, {
       route: `/bottles/${BOTTLE_ID}`,
       handlers: [
+        songsHandler,
+        libraryHandler,
+        { path: '/api/auth/me', respond: () => ({ body: SESSION_B }) },
         {
           path: `/api/bottles/${BOTTLE_ID}`,
           respond: () => ({
-            body: bottleDetail({ hiddenLaterSegmentCount: 2, isHolder: false, holderId: USER_B }),
+            body: bottleDetail({
+              recordedCount: 2,
+              missingSegmentIndexes: [3, 4],
+              segments: [
+                ...bottleDetail().segments,
+                {
+                  id: SEGMENT_2,
+                  index: 2,
+                  isMine: false,
+                  note: null,
+                  ownerCode: '河岸听众#017',
+                  likeCount: 0,
+                  dislikeCount: 0,
+                  deletedAt: null,
+                  audioMime: 'audio/webm',
+                  durationMs: 22_000,
+                },
+              ],
+            }),
           }),
         },
       ],
     });
-    expect(await screen.findByText(/还有 2 段现在看不到/)).toBeInTheDocument();
+
+    expect(await screen.findByRole('button', { name: '录第 3 段' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '听全部' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: '选择去向' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /看这只瓶子的漂流日志/ })).toBeInTheDocument();
+    expect(document.querySelector('.putBack')).toBeNull();
   });
 
   it('点踩不含 listenedRatio：覆盖率走 /listen 上报，票体只有 value（服务端判定门槛）', async () => {
@@ -257,7 +483,7 @@ describe('漂流瓶接唱页', () => {
           { path: '/api/auth/me', respond: () => ({ body: SESSION_B }) },
           {
             path: `/api/bottles/${BOTTLE_ID}`,
-            respond: () => ({ body: bottleDetail({ isHolder: false, holderId: USER_B }) }),
+            respond: () => ({ body: bottleDetail({ isHolder: false }) }),
           },
           {
             method: 'POST',
@@ -338,7 +564,6 @@ describe('漂流瓶接唱页', () => {
             body: bottleDetail({
               status: 'DRAFT',
               isHolder: false,
-              holderId: null,
               segments: [],
               recordedCount: 0,
               missingSegmentIndexes: [1, 2, 3, 4],
@@ -364,13 +589,12 @@ describe('漂流瓶接唱页', () => {
             body: bottleDetail({
               status: 'DRAFT',
               isHolder: false,
-              holderId: null,
-              // 第 1 段就是我录的（ownerId = 当前会话用户）⇒ 内核不许再录，只能选去向
+              // 第 1 段就是我录的（服务端 isMine=true）⇒ 内核不许再录，只能选去向
               segments: [
                 {
                   id: SEGMENT_1,
                   index: 1,
-                  ownerId: USER_B,
+                  isMine: true,
                   note: '我录的第一棒',
                   ownerCode: '接棒的人#001',
                   likeCount: 0,
@@ -406,7 +630,6 @@ describe('漂流瓶接唱页', () => {
             body: bottleDetail({
               status: 'HELD',
               isHolder: false,
-              holderId: USER_A,
               availableResolutions: [],
             }),
           }),
@@ -426,7 +649,7 @@ describe('漂流瓶接唱页', () => {
       handlers: [
         {
           path: `/api/bottles/${BOTTLE_ID}`,
-          respond: () => ({ body: bottleDetail({ isHolder: false, holderId: USER_B }) }),
+          respond: () => ({ body: bottleDetail({ isHolder: false }) }),
         },
       ],
     });
@@ -528,6 +751,9 @@ describe('漂流瓶接唱页', () => {
 
     // G2/P0（flow-audit）：成功不能只活在 aria-live 播报里 —— 播报容器内必须留下语义下一步键
     expect(await screen.findByText('已入海：这件作品现在所有人都能听到。')).toBeInTheDocument();
+    await waitFor(() => {
+      expect(document.querySelector('[data-modal-root]')).toBeNull();
+    });
     const seaNext = screen.getByRole('link', { name: /去公海听这一版/ });
     expect(seaNext).toHaveAttribute('href', '/sea');
     expect(seaNext.className, '热区 ≥44px').toContain('min-h-11');
@@ -571,6 +797,9 @@ describe('漂流瓶接唱页', () => {
     });
 
     expect(await screen.findByText('已投河：等下一位陌生人捞到它。')).toBeInTheDocument();
+    await waitFor(() => {
+      expect(document.querySelector('[data-modal-root]')).toBeNull();
+    });
     expect(screen.getByRole('link', { name: /回河道继续/ })).toHaveAttribute('href', '/river');
     expect(screen.queryByRole('link', { name: /去公海听这一版/ })).not.toBeInTheDocument();
   });
@@ -635,7 +864,7 @@ describe('瓶子详情：播放沟槽 + 唱针', () => {
       handlers: [
         {
           path: `/api/bottles/${BOTTLE_ID}`,
-          respond: () => ({ body: bottleDetail({ isHolder: false, holderId: USER_B }) }),
+          respond: () => ({ body: bottleDetail({ isHolder: false }) }),
         },
       ],
     });
@@ -687,7 +916,7 @@ describe('瓶子详情：播放沟槽 + 唱针', () => {
         handlers: [
           {
             path: `/api/bottles/${BOTTLE_ID}`,
-            respond: () => ({ body: bottleDetail({ isHolder: false, holderId: USER_B }) }),
+            respond: () => ({ body: bottleDetail({ isHolder: false }) }),
           },
         ],
       },
@@ -712,7 +941,7 @@ describe('瓶子详情：播放沟槽 + 唱针', () => {
       handlers: [
         {
           path: `/api/bottles/${BOTTLE_ID}`,
-          respond: () => ({ body: bottleDetail({ isHolder: false, holderId: USER_B }) }),
+          respond: () => ({ body: bottleDetail({ isHolder: false }) }),
         },
       ],
     });
@@ -746,7 +975,7 @@ describe('瓶子详情：播放沟槽 + 唱针', () => {
       handlers: [
         {
           path: `/api/bottles/${BOTTLE_ID}`,
-          respond: () => ({ body: bottleDetail({ isHolder: false, holderId: USER_B }) }),
+          respond: () => ({ body: bottleDetail({ isHolder: false }) }),
         },
       ],
     });
@@ -760,7 +989,7 @@ describe('瓶子详情：播放沟槽 + 唱针', () => {
 /**
  * 逐块照抄 `docs/ui-review/design-explore/p-bottle-record.html`（用户重写令）：
  * 块顺序 / 装置 / 文案逐字 / 值逐值，不省块不发明不重组；唯一翻译 = 固定 px → 流体。
- * 两个保留例外：① 沟槽时间轴+唱针放在稿上部对应位；② 录制/去向/放回/留言/赞踩行为全保留。
+ * 两个保留例外：① 沟槽时间轴+唱针放在稿上部对应位；② 录制/去向/留言/赞踩行为全保留。
  */
 describe('逐块照抄 p-bottle-record.html', () => {
   const defaultHandlers = [
@@ -790,7 +1019,7 @@ describe('逐块照抄 p-bottle-record.html', () => {
     await screen.findByRole('heading', { level: 1 });
 
     // 顶栏与标题区（稿 .crumb/.h1/.work/.metaRow/.note/.maker）
-    expect(screen.getByRole('link', { name: '回河道' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '回河道' })).toBeInTheDocument();
     expect(screen.getByText('有人持有')).toBeInTheDocument();
     expect(screen.getByText('深海鲸落')).toBeInTheDocument();
     expect(screen.getByText('已录 1 / 4 段')).toBeInTheDocument();
@@ -815,8 +1044,7 @@ describe('逐块照抄 p-bottle-record.html', () => {
 
     // 试听与投票（稿 .listenCol）
     expect(screen.getByText('还没有听满这一段，继续听一会儿再点踩吧。')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /放回海中，继续漂流/ })).toBeInTheDocument();
-    expect(screen.getByText('还没想好要不要唱？放回去不会记录任何东西。')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /放回海中，继续漂流/ })).not.toBeInTheDocument();
 
     // 选择去向（稿 .destCol）
     expect(
@@ -867,7 +1095,7 @@ describe('逐块照抄 p-bottle-record.html', () => {
     expect(heroLab).not.toBeNull();
 
     const seq: [string, Element][] = [
-      ['回河道', screen.getByRole('link', { name: '回河道' })],
+      ['回河道', screen.getByRole('button', { name: '回河道' })],
       ['状态 pill', screen.getByText('有人持有')],
       ['h1', screen.getByRole('heading', { level: 1 })],
       ['.work 曲名', screen.getByText('深海鲸落')],
@@ -880,7 +1108,6 @@ describe('逐块照抄 p-bottle-record.html', () => {
       ['.gapBox 录制入口', screen.getByText('第 2 段由你开第一句')],
       ['.listenCol 标题', screen.getByRole('heading', { name: /试听与投票/ })],
       ['.votesNote', screen.getByText('还没有听满这一段，继续听一会儿再点踩吧。')],
-      ['.putBack', screen.getByRole('button', { name: /放回海中/ })],
       ['.destCol 标题', screen.getByRole('heading', { name: '选择去向' })],
       ['.bottom 漂流日志', screen.getByRole('link', { name: /看这只瓶子的漂流日志/ })],
       ['.bottom 举报', screen.getByRole('button', { name: /举报（进人工队列，不是自动删除）/ })],
@@ -975,7 +1202,7 @@ describe('门禁锚点与窄屏 order 让位', () => {
         {
           path: `/api/bottles/${BOTTLE_ID}`,
           respond: () =>
-            ({ body: bottleDetail({ isHolder: false, holderId: USER_B, availableResolutions: [] }) }),
+            ({ body: bottleDetail({ isHolder: false, availableResolutions: [] }) }),
         },
       ],
     });

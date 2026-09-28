@@ -2,7 +2,7 @@ import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { bottleDetail, song, USER_A } from '../../test/fixtures';
+import { bottleDetail, song } from '../../test/fixtures';
 import { renderWithProviders } from '../../test/harness';
 import { SongPickerPage } from '../song-picker-page';
 
@@ -37,7 +37,6 @@ describe('选歌页', () => {
             body: bottleDetail({
               status: 'DRAFT',
               isHolder: true,
-              holderId: USER_A,
               segments: [],
               recordedCount: 0,
               missingSegmentIndexes: [1, 2, 3, 4],

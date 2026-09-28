@@ -400,7 +400,7 @@ export const notifications = pgTable(
 );
 
 /**
- * 河道状态（每个用户一行）：放回海中后的「接下来 N 次打捞不再给同一用户」（CONTEXT §15，N=10）。
+ * 河道状态（每个用户一行）：回河道后的「接下来 N 次打捞不再给同一用户」（CONTEXT §15，N=10）。
  * 规则在内核（`RiverState` 纯函数），这里只存它的状态 —— 单用户单行，避免为 Demo 引入计数服务。
  */
 export const riverState = pgTable('river_state', {

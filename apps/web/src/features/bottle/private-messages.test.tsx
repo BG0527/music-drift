@@ -12,15 +12,15 @@ import { fireEvent, screen, waitFor } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import { PrivateMessages } from './private-messages';
 import { renderWithProviders } from '../../test/harness';
-import { USER_A, USER_B, bottleDetail } from '../../test/fixtures';
+import { USER_B, bottleDetail } from '../../test/fixtures';
 
 const BOTTLE_ID = '11111111-1111-4111-8111-111111111111';
 const ME = USER_B;
 
-const segment = (index: number, ownerId: string, ownerCode: string) => ({
+const segment = (index: number, isMine: boolean, ownerCode: string) => ({
   id: `11111111-0000-4000-8000-00000000000${String(index)}`,
   index,
-  ownerId,
+  isMine,
   note: null,
   ownerCode,
   likeCount: 0,
@@ -31,7 +31,7 @@ const segment = (index: number, ownerId: string, ownerCode: string) => ({
 });
 
 /** 我（USER_B）= 第 2 段的作者；之前各段 = 第 1 段（USER_A「午夜歌手#042」）。 */
-const SEGMENTS = [segment(1, USER_A, '午夜歌手#042'), segment(2, ME, '接棒的人#002')];
+const SEGMENTS = [segment(1, false, '午夜歌手#042'), segment(2, true, '接棒的人#002')];
 
 function message(overrides: Partial<Record<string, unknown>> = {}) {
   return {
@@ -40,6 +40,8 @@ function message(overrides: Partial<Record<string, unknown>> = {}) {
     content: '你写的这首歌我听过很多次。',
     status: 'PENDING',
     targetSegmentIndex: 1,
+    sender: { segmentIndex: 2, displayName: '接棒的人#002', revealed: false },
+    recipient: { segmentIndex: 1, displayName: '午夜歌手#042', revealed: false },
     createdAt: '2026-09-23T02:00:00.000Z',
     ...overrides,
   };
@@ -109,7 +111,7 @@ describe('私密留言：目标选择（从之前各段的作者里选一位）'
   });
 
   it('没有「之前段」（我是第 1 段的作者）⇒ 不渲染表单，并说明为什么', async () => {
-    setup({ segments: [segment(1, ME, '我#001')] });
+    setup({ segments: [segment(1, true, '我#001')] });
 
     expect(await screen.findByText(/没有可选的收件人/)).toBeInTheDocument();
     expect(screen.queryByLabelText('送给哪一段的作者')).not.toBeInTheDocument();
@@ -126,6 +128,26 @@ describe('私密留言：目标选择（从之前各段的作者里选一位）'
 });
 
 describe('私密留言：状态口径（送达目标）', () => {
+  it('待送达时直接显示服务端给出的双方瓶内匿名代号', async () => {
+    setup({ items: [message()] });
+
+    expect(await screen.findByText('接棒的人#002 → 午夜歌手#042')).toBeInTheDocument();
+  });
+
+  it('送达后直接显示服务端给出的双方账号名', async () => {
+    setup({
+      items: [
+        message({
+          status: 'DELIVERED',
+          sender: { segmentIndex: 2, displayName: '接棒的人', revealed: true },
+          recipient: { segmentIndex: 1, displayName: '潮声', revealed: true },
+        }),
+      ],
+    });
+
+    expect(await screen.findByText('接棒的人 → 潮声')).toBeInTheDocument();
+  });
+
   it('PENDING = 等它漂到目标手里；DELIVERED = 已送达目标（不写"发起者"）', async () => {
     setup({
       items: [

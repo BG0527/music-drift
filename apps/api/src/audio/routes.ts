@@ -6,13 +6,11 @@
  * - `Accept-Ranges: bytes` → 浏览器敢做 seek；Safari 探测 moov 时会先发 `bytes=-N` 后缀请求；
  * - `Cache-Control: private, no-store` → 别人的声音不进任何共享缓存（匿名社区，Figma/DESIGN.md 的隐私口径）。
  *
- * 权限：生产装配注入 `canRead`，并与详情投影共用段可见性判据；UUID 不再被当成权限。
- * 漂流中的隐藏后续段即使地址泄露也返回 404，入海后则对访客开放。
+ * 读取：生产装配注入 `canRead`，确认段仍有效且所属瓶存在；所有观看者（含未登录访客）均可读取。
  */
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import type { Clock } from '@music-drift/shared/domain';
 import { UuidSchema } from '@music-drift/shared/contracts';
-import { createActorResolver } from '../http/session.js';
 import type { Db } from '../db/client.js';
 import type { BottleStore } from '../store/bottles.js';
 import { isSegmentVisible, segmentVisibility } from '../store/visibility.js';
@@ -25,14 +23,13 @@ export interface SegmentAudioRoutesOptions {
   canRead?: (request: FastifyRequest, segmentId: string) => Promise<boolean>;
 }
 
-/** 与详情投影共用 `segmentVisibility`，防止 UUID 直链绕过“后续未解锁”。 */
+/** 与详情投影共用当前“全部有效段可读”口径。 */
 export function createSegmentAudioAuthorizer(input: {
   db: Db;
   store: BottleStore;
   clock: Clock;
 }): NonNullable<SegmentAudioRoutesOptions['canRead']> {
-  const actors = createActorResolver(input.db, input.clock);
-  return async (request, segmentId) => {
+  return async (_request, segmentId) => {
     const rows = await input.db.query<{ bottle_id: string; index: number }>(
       `select bottle_id, "index" from bottle_segments
        where id = $1 and deleted_at is null`,
@@ -42,9 +39,8 @@ export function createSegmentAudioAuthorizer(input: {
     if (segment === undefined) return false;
     const state = await input.store.loadState(segment.bottle_id);
     if (state === null) return false;
-    const actor = await actors.resolve(request);
     return isSegmentVisible(
-      segmentVisibility({ state, viewerId: actor?.user.id ?? null }),
+      segmentVisibility({ state, viewerId: null }),
       segment.index,
     );
   };

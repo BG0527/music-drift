@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { screen, within } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
-import { BOTTLE_ID, USER_A, USER_B, bottleDetail } from '../../test/fixtures';
+import { BOTTLE_ID, USER_B, bottleDetail } from '../../test/fixtures';
 import { renderWithProviders } from '../../test/harness';
 import { BottlePage } from '../bottle-page';
 
@@ -39,7 +39,6 @@ function handlersOneOfFour() {
       respond: () => ({
         body: bottleDetail({
           isHolder: false,
-          holderId: USER_A,
           availableResolutions: ['RIVER', 'SEA'],
           missingSegmentIndexes: [2, 3, 4],
         }),
@@ -104,7 +103,7 @@ describe('瓶身详情：仪器层（试听与投票 / 选择去向 / 底栏）'
     expect(document.querySelector('.transport .timecode'), '缺时长 .timecode').not.toBeNull();
     expect(document.querySelector('.listenCol .votes'), '缺投票行 .votes').not.toBeNull();
     expect(document.querySelector('.listenCol .votesNote'), '缺门槛说明 .votesNote').not.toBeNull();
-    expect(document.querySelector('.listenCol .putBack'), '缺放回行 .putBack').not.toBeNull();
+    expect(document.querySelector('.listenCol .putBack'), '放回只能从左上「回河道」进入').toBeNull();
   });
 
   it('选择去向 = 参考的 .destCol + .destRow 行块（服务端给几条画几条）', async () => {

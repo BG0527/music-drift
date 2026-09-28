@@ -25,12 +25,17 @@
  *
  * // 试听某一段（src 指向 Range 端点），<80% 时点踩按钮自动禁用并说明原因
  * <SegmentPlayer src={`/api/segments/${segment.id}/audio`} segmentIndex={segment.index}
- *                durationMs={segment.durationMs} isOwnSegment={segment.ownerId === me}
+ *                durationMs={segment.durationMs} isOwnSegment={segment.isMine}
  *                onCastDislike={(index) => castVote(segment.id, 'DISLIKE', player.ratio)} />
  * ```
  */
 export { RecorderPanel, type RecorderPanelProps, type RecorderUploadView } from './recorder-panel';
 export { SegmentPlayer, type SegmentPlayerProps } from './segment-player';
+export {
+  SequentialSegmentPlayer,
+  type SequentialSegment,
+  type SequentialSegmentPlayerProps,
+} from './sequential-segment-player';
 export { DislikeButton, type DislikeButtonProps } from './dislike-button';
 export {
   SegmentTimeline,

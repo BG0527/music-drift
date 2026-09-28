@@ -81,6 +81,15 @@ export const AttachPrivateMessageRequestSchema = z.object({
   targetSegmentIndex: z.number().int().min(1),
 });
 
+export const PrivateMessageIdentitySchema = z.object({
+  /** 该用户在当前瓶中的段号（1-based）。 */
+  segmentIndex: z.number().int().min(1),
+  /** 服务端按留言状态与查看者投影：瓶内匿名代号，或送达后的账号名。 */
+  displayName: z.string().min(1),
+  /** `true` 表示 displayName 已揭晓为账号名；前端不得自行推断。 */
+  revealed: z.boolean(),
+});
+
 export const PrivateMessageSchema = z.object({
   id: UuidSchema,
   bottleId: UuidSchema,
@@ -89,6 +98,8 @@ export const PrivateMessageSchema = z.object({
   status: MessageStatusSchema,
   /** 我选的目标段号（发送者用它渲染"给第 N 段的作者"；目标用它认出这是给自己的）。 */
   targetSegmentIndex: z.number().int().min(1),
+  sender: PrivateMessageIdentitySchema,
+  recipient: PrivateMessageIdentitySchema,
   createdAt: IsoDateTimeSchema,
 });
 

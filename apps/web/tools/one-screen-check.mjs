@@ -230,7 +230,7 @@ async function stopHermetic() {
  * 一次运行造三支瓶子（都在**一次性库**里，跑完连库一起删）：
  * - `sea`：录满 4 段 → 入海 ⇒ 用来量 `/sea/:id`；
  * - `river`：录 1 段 → 投河 ⇒ 量非持有者视角的 `/bottles/:id` 与 `/bottles/:id/log`；
- * - `held`：录 1 段、留在手上 ⇒ 唯一能看到「录第 N 段」入口的状态，用来量录制入口锚点。
+ * - `heldTwoSegments`：已录 2 段、第三位持有者待录第 3 段 ⇒ 同时量录制/试听/去向。
  * 录段上传 2KB 假音频 + `x-audio-duration-ms: 20000`（服务端校验 15–30 秒）。
  */
 async function register(name) {
@@ -269,10 +269,10 @@ async function seedData() {
   const songs = await (await fetch(`${API}/api/songs`)).json();
   const song = songs.find((item) => item.segments.length === item.totalSegments) ?? songs[0];
 
-  async function createBottle() {
+  async function createBottle(as = cookie) {
     const created = await fetch(`${API}/api/bottles`, {
       method: 'POST',
-      headers: { 'content-type': 'application/json', cookie },
+      headers: { 'content-type': 'application/json', cookie: as },
       body: JSON.stringify({ songId: song.id }),
     });
     return (await created.json()).id;
@@ -329,14 +329,21 @@ async function seedData() {
   await record(riverId, '布局检查用的第一棒');
   await resolve(riverId, 'RIVER');
 
-  // ③ 留在手上（持有者视角，唯一能看到「录第 N 段」）
-  const heldId = await createBottle();
-  await record(heldId, '布局检查·留在手上的一段');
+  // ③ 已录 2 段，主测试账号作为第三位持有者（待录第 3 段）
+  const heldCreator = await register(`heldcreator${stamp}`);
+  const heldSecond = await register(`heldsecond${stamp}`);
+  const heldTwoSegmentsId = await createBottle(heldCreator.cookie);
+  await record(heldTwoSegmentsId, '布局检查·持有态第一段', heldCreator.cookie);
+  await resolve(heldTwoSegmentsId, 'RIVER', heldCreator.cookie);
+  await drawUntil(heldSecond.cookie, heldTwoSegmentsId);
+  await record(heldTwoSegmentsId, '布局检查·持有态第二段', heldSecond.cookie);
+  await resolve(heldTwoSegmentsId, 'RIVER', heldSecond.cookie);
+  await drawUntil(cookie, heldTwoSegmentsId);
 
   // ④ **刚发起、什么都没录**（用户 2026-09-23 报的 P0：这一步曾显示"不在你手上"，录不了第 1 段）
   const freshId = await createBottle();
 
-  return { cookie, seaId, riverId, heldId, freshId };
+  return { cookie, seaId, riverId, heldTwoSegmentsId, freshId };
 }
 
 // ---------------------------------------------------------------- 判据
@@ -359,7 +366,11 @@ function routesFor(seed) {
     { path: '/me', anchors: ['me-bottles'], needsAuth: true },
     { path: '/settings', anchors: ['settings-attribution'], needsAuth: true },
     { path: `/bottles/${seed.riverId}`, anchors: ['bottle-play', 'bottle-action'], needsAuth: true },
-    { path: `/bottles/${seed.heldId}`, anchors: ['bottle-play', 'bottle-action'], needsAuth: true },
+    {
+      path: `/bottles/${seed.heldTwoSegmentsId}`,
+      anchors: ['bottle-record', 'bottle-play', 'bottle-action'],
+      needsAuth: true,
+    },
     // 刚发起的草稿：必须能看到「录第 1 段」（P0 回归守卫）
     { path: `/bottles/${seed.freshId}`, anchors: ['bottle-record'], needsAuth: true },
     { path: `/bottles/${seed.riverId}/log`, anchors: [], needsAuth: true },

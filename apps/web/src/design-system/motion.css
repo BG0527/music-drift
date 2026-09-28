@@ -42,6 +42,15 @@
   }
 }
 
+@keyframes ocean-exit-fade {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
 @keyframes ocean-shimmer {
   from {
     background-position: -140% 0;
@@ -62,6 +71,21 @@
   }
 }
 
+/* 选中确认（t6）：一次性「起-落」—— 0 → 契约 hoverScale → 0，落回基态 ⇒ 静止态无残留。
+   目的：feedback（心情标签）/ guidance（段位选中、公海分区）；只动 transform，
+   幅度取 `--hover-scale`、时长取 `--entry-duration`、缓动取 ` --entry-easing`（skill §2）。 */
+@keyframes bottle-pick {
+  0% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(var(--hover-scale));
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
 @layer components {
   /* 入场：fade + translateY(16px → 0) / 480ms ease-out */
   .enter-rise {
@@ -70,6 +94,10 @@
 
   .enter-fade {
     animation: ocean-fade var(--page-duration) var(--entry-easing) both;
+  }
+
+  .exit-fade {
+    animation: ocean-exit-fade var(--exit-duration) var(--entry-easing) both;
   }
 
   /* 列表交错：每项 +100ms */
@@ -133,6 +161,16 @@
   .ripple-ring {
     animation: ocean-ripple var(--ripple-duration) var(--entry-easing) infinite;
   }
+
+  /* t6 选中确认：挂类即播一次（选中态切换时由属性变化触发，不靠改 key 重播）。
+     静止态 = 基态（keyframes 首尾都是 scale(1)）⇒ 退场/换选不会留下残留缩放。 */
+  .mood-pick {
+    animation: bottle-pick var(--entry-duration) var(--entry-easing) both;
+  }
+
+  .segment-pick {
+    animation: bottle-pick var(--entry-duration) var(--entry-easing) both;
+  }
 }
 
 /* ── 无障碍降级：reduced-motion 时关掉动画与过渡，只留 150ms opacity 淡入 ── */
@@ -150,6 +188,19 @@
     animation: none;
     opacity: 1;
     transform: none;
+  }
+
+  /* 减少动效时退场立即不可见；React 仍按 token 延后卸载，避免状态切换抖动。 */
+  .exit-fade {
+    animation: none;
+    opacity: 0;
+    transform: none;
+  }
+
+  /* t6 选中确认：逐项冻结（全局 `*` 之外的双保险，skill §7） */
+  .mood-pick,
+  .segment-pick {
+    animation: none;
   }
 
   .motion-fade-in {

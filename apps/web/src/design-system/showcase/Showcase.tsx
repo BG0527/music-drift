@@ -240,7 +240,7 @@ export function Showcase() {
             <div className="flex flex-col gap-6">
               <div className="flex flex-wrap items-center gap-3">
                 <Button>投瓶入海</Button>
-                <Button variant="ghost">放回海中，继续漂流</Button>
+                <Button variant="ghost">回河道</Button>
                 <Button loading>接力提交中</Button>
                 <Button disabled>不可用</Button>
                 <Button icon={<Icon name="Waves" size={18} />}>捞取漂流瓶</Button>

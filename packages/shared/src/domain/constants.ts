@@ -22,7 +22,7 @@ export interface DomainPolicy {
   totalSegments: number;
   /** 斩浪踩数阈值，默认 10（CONTEXT §7.2）。 */
   dislikeThreshold: number;
-  /** 放回海中后的打捞冷却次数，N = 10（CONTEXT §15）。 */
+  /** 回河道后的打捞冷却次数，N = 10（CONTEXT §15）。 */
   putBackCooldownDraws: number;
   /** 投河后无人接唱的超时，72h（CONTEXT §11.3）。 */
   riverIdleTimeoutMs: number;

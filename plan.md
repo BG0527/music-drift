@@ -112,14 +112,20 @@ t1 ─┬─ t4 ── t5 ── t6 ───┼───────┼─ t10 
    - 在 `apps/web/src/features/audio/recorder-panel.test.tsx` / `use-recorder.test.ts` 逐条覆盖试听、重录释放 URL、取消、确认上传、上传失败保留 Blob、上传成功才打开去向。
    - 最小修改 `recorder-panel.tsx`、`use-recorder.ts`、`record-step.tsx`；两个 Modal 永不共存。
    - 验证：`pnpm --filter @music-drift/web test -- recorder-panel use-recorder record-step`。
-4. **完整试听权限与混音**
-   - 先在 `packages/shared/src/audio/mix.test.ts`、API 集成测试中覆盖完成公海访客四段可听、未完成只含服务端可见段、缺口伴奏保留、后续隐藏段不可取。
-   - 最小修改 `packages/shared/src/audio/mix.ts`、`apps/api/src/routes/bottles.ts` / `apps/api/src/audio/routes.ts`、前端 `mix-render.ts` 与详情播放器。
+4. **逐段试听与一键听全部（取消错误的音频解锁规则）**
+   - 先在 `packages/shared/src/audio/mix.test.ts`、API 集成测试中覆盖：持有者、非持有者、未登录访客均可读取瓶中当前全部已录段；尚未录制段只标记 `UNRECORDED`；不存在 `LOCKED`、`hiddenLaterSegmentCount` 或“暂未解锁”。
+   - 同一 API 垂直切片覆盖漂流日志：不同观看者读取相同的全部核心事件，操作者只返回瓶级匿名代号；响应中不包含私密留言事件或可推断留言存在的字段。
+   - 再为详情页写失败测试：每段可单独试听；点击“听全部”立即按段号连续播放当前全部已录段，不要求先生成、导出或下载。
+   - 最小修改 `packages/shared/src/audio/mix.ts`、`packages/shared/src/contracts/bottles.ts`、`apps/api/src/routes/bottles.ts` / `apps/api/src/audio/routes.ts`、前端顺序播放器与详情页；移除错误的观看者音频裁剪代码和 UI 文案。
    - 验证：`pnpm --filter @music-drift/shared test -- mix.test.ts`、`pnpm --filter @music-drift/api test -- visibility audio`、`pnpm --filter @music-drift/web test -- mix-render bottle-page`。
 5. **详情页复刻和一屏门禁**
    - 以 `site/bottle.html` 为结构基准，先更新 `apps/web/src/pages/__tests__/bottle-page-reference.test.tsx`、`one-screen-fit.test.ts` 见 Red，再改 `bottle-page.tsx` / `bottle-page.css`。
    - 用真实 API、真实音频路径在 `1024×720`、`1280×800`、`1440×900`、`1920×1080` 检查根高度、横向溢出、关键控件相交；窄/矮屏只要求可滚、16px 正文、44px 操作目标。
-6. **W18 评审与验收**
+6. **私密留言的定向投递与送达后双向解匿名**
+   - 保留现有“从自己之前的有效段中选择目标 + 编辑正文”的弹窗和服务端段号校验；先写 API 集成 Red，证明留言送达前发送者只看到双方匿名代号，目标与中间人看不到留言。
+   - 再写送达后的 Red：瓶子回传到目标手中时，目标收到通知；此后且仅此后，发送者与目标读取该条留言时能看到双方账号名，中间人仍不能读取消息或身份；任何响应均不含用户 ID 或邮箱。
+   - 最小扩展 `PrivateMessageSchema`、`apps/api/src/routes/interactions.ts` 的服务端投影与 `private-messages.tsx` 展示；身份解匿名不改变音频、接唱链或公共漂流日志权限。
+7. **W18 评审与验收**
    - 独立执行者完成实现后，由另一独立执行者做规格符合性与代码质量评审，结果写入 `docs/review.md`；Critical 必须回到对应 TDD 循环修复。
    - 全量命令：`pnpm -r test`、`pnpm -r typecheck`，再跑真实 Postgres/API/浏览器走查；把命令与原始输出摘要写入 `docs/review.md`。
    - 在本地 `main` 仅提交 W18 一次，然后停下等待用户验收，未验收不得开始 W19。

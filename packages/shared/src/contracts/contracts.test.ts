@@ -6,6 +6,7 @@ import { describe, expect, it } from 'vitest';
 import { CONTRACT_VERSION, ErrorResponseSchema, RuleCodeSchema, UuidSchema } from './common';
 import {
   BottleDetailSchema,
+  BottleEventSchema,
   BottleSummarySchema,
   RecordSegmentRequestSchema,
   SeaBottleListSchema,
@@ -129,18 +130,15 @@ describe('契约：ADR-015 三条硬语义', () => {
     );
   });
 
-  it('详情契约包含补位上下文与可选去向（前端不需要自己算），且 currentCasterId 允许 SYSTEM', () => {
+  it('详情契约包含补位上下文、viewer-relative 字段与可选去向', () => {
     const detail = BottleDetailSchema.safeParse({
       ...summaryPayload(),
       initiatorCode: '匿名歌手#042',
-      holderId: null,
-      currentCasterId: 'SYSTEM',
       returnCompleted: false,
       returnChainBroken: false,
       segments: [],
       availableResolutions: ['RIVER', 'SEA'],
       isHolder: false,
-      hiddenLaterSegmentCount: 0,
       replacementContext: {
         gapIndex: 2,
         listenSegmentIndex: 1,
@@ -152,6 +150,19 @@ describe('契约：ADR-015 三条硬语义', () => {
       damagedAt: null,
     });
     expect(detail.success).toBe(true);
+  });
+});
+
+describe('契约：公共漂流日志只暴露瓶级匿名代号', () => {
+  it('接受 actorCode，拒绝只有真实 actorId 的旧载荷', () => {
+    const base = {
+      seq: 1,
+      type: 'SEGMENT_RECORDED',
+      occurredAt: '2026-09-23T00:00:00.000Z',
+      occurredAtMs: 1_758_585_600_000,
+    };
+    expect(BottleEventSchema.safeParse({ ...base, actorCode: '匿名歌手#042' }).success).toBe(true);
+    expect(BottleEventSchema.safeParse({ ...base, actorId: UUID }).success).toBe(false);
   });
 });
 

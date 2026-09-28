@@ -181,7 +181,7 @@ export function resolve(
   return expectOk(chooseResolution(state, { userId, resolution }, ctx));
 }
 
-/** 放回海中。 */
+/** 回河道：不接唱，释放持有并让瓶子继续在河道漂流。 */
 export function putBackBy(state: BottleState, ctx: DomainContext, userId: string): BottleState {
   return expectOk(putBack(state, { userId }, ctx));
 }

@@ -220,7 +220,9 @@ describe('⑥ 阶段2 每页动效类存在（方案 §1.1 / §1.2 / §1.3 / §1
 
   it('404：页面内容入场 enter-fade（§1.10-1，DS 类非内联数值）', () => {
     expect(notFoundPage).toMatch(
-      /<div className="enter-fade relative isolate flex flex-col gap-6 overflow-hidden">/,
+      // t5 一屏收敛后根类追加 `md:h-[100dvh] md:overflow-hidden`（one-screen-fit 契约）；
+      // enter-fade 契约类与其余构成本条断言的原意，一个都没动。
+      /<div className="enter-fade relative isolate flex flex-col gap-6 overflow-hidden md:h-\[100dvh\] md:overflow-hidden">/,
     );
   });
 

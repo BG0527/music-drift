@@ -201,24 +201,17 @@
    「new segment id + 同一 index + 同一份音频字节」重新登记，旧行保持软删做审计
    （代价：恢复后的段 id 变了，旧 id 的播放链接与票数不继承）。
 
-**§9.1 / §9.2 可见性（t12 落地）**
+**详情、段音频与公共日志可见性（W18 当前口径）**
 
-`CONTEXT.md` §9.1 是产品的核心承诺：**漂流中看不到后面是谁、唱成什么样**；§9.2：**入海后解锁完整接力链**。
-两者是一对，判据集中在 `apps/api/src/store/visibility.ts`（详情与日志共用一份，避免两条路径漂移）：
-
-| 观看者 \ 状态   | 漂流中（DRAFT / IN_RIVER / HELD）                  | 已入海（SEA） |
-| --------------- | -------------------------------------------------- | ------------- |
-| 持有者          | 全部有效段（他就是单支路的尾巴，后面本来没有内容） | 全部          |
-| 唱过的人        | 到**自己的最高段号**为止（含自己；被斩过也算）     | 全部          |
-| 陌生人 / 未登录 | **一段都看不到**（`segments: []`）                 | 全部          |
-
-- 三条读取路径**同时**受同一判据约束：`GET /api/bottles/:id` 的 `segments`、`GET /api/bottles/:id/events`
-  的漂流日志（事件里带 `actorId`，**更容易泄露「后面是谁」**，因此按「我的最后一次动作」为界裁剪），
-  以及任何返回段的投影查询；
-- `BottleDetailSchema` 新增 **`hiddenLaterSegmentCount`**：被裁掉的段数，供界面解释「不是丢了，是你看不到」
-  （`0` = 未裁：持有者 / 已入海）；
-- 进度类字段（`recordedCount` / `missingSegmentIndexes` / `isComplete`）**不裁**：它们描述结构与进度，
-  不泄露「是谁 / 唱的什么」。
+- `GET /api/bottles/:id` 对所有观看者（持有者、参与者、陌生账号、未登录访客）返回瓶中当前全部有效段；
+  不再按漂流状态或观看者裁剪。
+- 公共详情不下发稳定真实身份：段只提供瓶级匿名 `ownerCode` 与 viewer-relative `isMine`；瓶级只提供
+  viewer-relative `isHolder`。响应中不存在 `segments[].ownerId`、`holderId`、`currentCasterId`。
+- `GET /api/segments/:segmentId/audio` 与详情保持一致：任何观看者都能读取当前有效段，删除或不存在的段仍返回 `404`。
+- `GET /api/bottles/:id/events` 对所有观看者返回相同的公共核心事件白名单。每个非系统操作者（包括捞起后
+  直接放回、从未接唱的人）都分配瓶级匿名 `actorCode`：同一瓶同一人稳定、不同人不同码；不返回真实
+  `actorId`。白名单之外的事件一律不返回，因此当前和未来的 `MESSAGE_*` 私密事件都不会进入公共日志。
+- `recordedCount` / `missingSegmentIndexes` / `isComplete` 继续描述当前真实结构与进度。
 
 **通知：写入路径（t12 落地，`CONTEXT.md` §5.2 / §9.2）**
 
@@ -394,7 +387,7 @@ pnpm --filter @music-drift/api test:integration
 | `0.2.0-s1` | **t20 已听覆盖率服务端化**：新增 `POST /api/segments/:id/listen`（`SubmitListenProgressRequestSchema` / `ListenProgressResponseSchema`）与表 `listen_progress`（只增不减、跨会话保留）；点踩门槛改读持久化覆盖率（阈值取内核策略），不足返回 `422 LISTEN_THRESHOLD_NOT_REACHED`；`CastVoteRequest.listenedRatio` 废弃为可选且被忽略，`CastVoteResponse` 新增服务端 `listenedRatio`；集成测试对真响应做 `Schema.parse`。既有字段零破坏（新增字段 + 可选化） |
 | `0.2.0-s1` | **t19 追补（captain 裁决）**：live-check 增加**第 27 步** `GET /api/me/bottles` 端到端检查（覆盖 `role` / `mySegmentIndexes`，含"斩浪后仍算参与过、段号变空"）；外部模式改为**不可能被误当验收证据**（开头醒目横幅 + 非确定性步骤单列「未复现（数据不受控）」不计 pass + 本文 §2.9 写死「验收证据只认 hermetic 模式」）；全文步数口径同步为 **27 步**                                                                                                                                                                                                                                                                                                                                                                                                  |
 | `0.2.0-s1` | **t19 可复现性修复**：新增 **`GET /api/me/bottles`**（`MyBottleSchema` / `MyBottleListSchema`，漂流日志 P0，替换 t11 的 localStorage 书签；契约只**新增**类型，既有字段形状零改动）；`apps/api` 的 `start` / `dev` 补上 `--env-file-if-exists=../../.env`（此前照 README 复制 .env 后起服务会走「未配置 DATABASE_URL」降级、`/api/songs` 404）；`golden-path-live-check.mjs` 改为**自建可抛弃库 + 自起 API**（hermetic），旧的"对着 dev 服务跑"只能靠 `API_BASE` 显式开启                                                                                                                                                                                                                                                                              |
-| `0.2.0-s1` | **t12 §9.1/§9.2 可见性**：`BottleDetailSchema` 新增 `hiddenLaterSegmentCount`；详情与漂流日志按「漂流中不可见后续」裁剪（持有者 / 唱过的人 / 陌生人三态），入海后全部解锁。**未改既有字段形状**，契约版本不变。                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| `0.2.0-s1` | **W18 详情 / 音频 / 公共日志可见性**：所有观看者均可读取当前全部有效段及段音频；公共日志返回全部核心事件，只暴露瓶级匿名 `actorCode`，排除私密留言事件；详情删除后续段裁剪字段。                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
 | `0.2.0-s1` | **t12 审核台裁决流转**：`POST /api/admin/reports/:id/decision` 由 `501` 换成真实流转（`NONE` / `REMOVE_SEGMENT` / `RESTORE_SEGMENT` / `REMOVE_BOTTLE` / `BAN_USER`）；`GET /api/admin/reports` 增加 `?status=`；新增 `API_RULE_CODES`：`REPORT_ALREADY_REVIEWED`、`REVIEW_ACTION_NOT_APPLICABLE`；新增契约 `ReportSchema` / `ReviewDecisionRequestSchema` / `ReportActionSchema` / `ReportStatusSchema`；DB：`users.banned_at`（迁移 0002）+ `reports.action` 允许 `RESTORE_SEGMENT`（迁移 0003）。**未改任何既有字段形状**，契约版本不变。                                                                                                                                                                                                            |
 | `0.2.0-s1` | **t12 通知写入路径**：新增「通知：写入路径」小节（三类 `type` + 收件人口径 + 两条不发通知的边界）；`BOTTLE_DAMAGED`（回传链断）也会把 PENDING 留言终结为 `UNDELIVERED` 并通知发送者（t9 的投影只覆盖了 `BOTTLE_WENT_TO_SEA`）。**未改任何 zod 字段形状**，契约版本不变。                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
 | `0.2.0-s1` | **t9 业务 API 落地**：§2.5 补齐 `POST /api/sea/:id/targeted-segment` 并改正 `/api/sea` 查询字段（`zone`/`limit`）与详情形状（`BottleSummarySchema`，非公海 → `404`）；§2.6 补齐 `notifications/:id/read`、`/api/me/badges`、`/api/me/collections`、`/api/admin/*`（决策端点显式 `501`）；新增 §2.8 错误码总表（规则码 → 409/422、传输码 → 400/401/403/404/501）+ §2.9 复现命令；§2.4 的录制端点由 `multipart` 改为**原始二进制**（ADR-018）。**未改任何 zod 字段形状**（`durationMs` 必填系 t7 已登记项；契约版本常量在代码里已是 `0.2.0-s1`，与本文件头部对齐）。**修复**：`toBottleSummary` 的 `songTitle` 曾写死空串，`GET /api/sea*` 返回违反契约（`min(1)`）的响应 —— 现由调用方必传曲名，并在集成测试里用 `BottleSummarySchema.parse` 校验真响应 |
@@ -441,15 +434,20 @@ pnpm --filter @music-drift/api test:integration
 
 ### 契约
 - `AttachPrivateMessageRequest = { content, targetSegmentIndex }` —— **`targetSegmentIndex` 是 1-based 段号**（与 `Segment.index` 同语义），**服务端解析成该段作者**；**客户端不传 `userId`**（不信任前端送来的身份）；
-- `PrivateMessage` 增 `targetSegmentIndex`；
-- 错误码：**`422 MESSAGE_TARGET_NOT_AVAILABLE`**（目标段不存在 / 已被斩 / 写给自己）、**`400`**（缺字段或非正整数）。
+- `PrivateMessage` 含 `targetSegmentIndex`，并由服务端投影双方展示身份：
+  `sender/recipient = { segmentIndex, displayName, revealed }`；响应**不返回** `userId`、`email`；
+- 错误码：**`422 MESSAGE_TARGET_NOT_AVAILABLE`**（目标段不存在 / 已被斩 / 不是发送者的前序段 / 发送者自己的段已被斩）、**`400`**（缺字段或非正整数）。
 
 ### 语义
 | 项 | 规则 |
 | --- | --- |
 | **可见性** | **只有目标能看到**（送达后）；发送者能看到自己写的；**发起者与其它段作者一律看不到** |
+| **发送资格与目标** | 发送者必须拥有当前有效段；目标只能是该段之前的有效段（`target.index < sender.index`）。发送者之后的段、自身段、已删除段均不可选 |
+| **身份展示** | `PENDING` / `UNDELIVERED`：双方 `displayName` 均为该瓶内匿名代号、`revealed=false`；`DELIVERED`：发送者和收件人读取时均看到双方账号名、`revealed=true`。身份只由服务端按状态与 viewer 投影，前端不得自行推断 |
+| **创建响应** | `POST …/messages` 的 `201` 仍保持双方匿名；送达前收件人完全读不到留言 |
 | **送达时刻** | **目标当轮拿到瓶子即送达**（`BOTTLE_DRAWN` / `BOTTLE_RETURNED`）—— **不必等到入海** |
 | **三种失败** | ① **目标段被斩**（`SEGMENT_CUT`）② **父链断裂 / `DAMAGED`** ③ **整首完成入海、却未回传到目标**（`BOTTLE_WENT_TO_SEA`）⇒ 一律 `UNDELIVERED` + **通知留言者** |
+| **公海隐藏** | `SEA` 状态下 `GET …/messages` 恒返回 `[]`，详情页不显示私密留言入口；留言数据不删除。未完成作品被指定接唱捞离公海后，原 `PENDING` 留言恢复可读并继续流转；只有完整作品入海才触发上面的失败③ |
 | **通知收件人** | `MESSAGE_DELIVERED` ⇒ **目标**；`MESSAGE_UNDELIVERED` ⇒ **留言者** |
 | **唯一实现** | 内核 `messagesDeliveredTo` / `messagesUndelivered` / `messagesUndeliveredFor` 三个纯函数**是"送达/失败"的唯一实现**；投影层按**内核重放**同步，不得另写一份 |
 
@@ -465,18 +463,17 @@ pnpm --filter @music-drift/api test:integration
 
 ### `GET /api/segments/:segmentId/audio`
 
-段音频直链与瓶子详情共用 `segmentVisibility`，不能用 UUID 绕过后续段隐藏：
+段音频直链与瓶子详情口径一致：
 
 | 状态 | 结果 |
 | --- | --- |
-| 漂流中、该段对当前观看者不可见 | `404 NOT_FOUND` |
-| 漂流中、该段按详情规则可见 | 保持既有 Range/字节响应 |
-| 已完成并入海 | 匿名观看者也可读取四段 |
+| 当前有效段 | 所有观看者（含未登录访客）均保持既有 Range/字节响应 |
+| 段不存在或已删除 | `404 NOT_FOUND` |
 
-### 完整伴奏试听语义
+### “听全部已有录音”语义
 
-- `RECORDED`：请求该段人声并叠加到固定曲库时间槽。
-- `UNRECORDED`：不请求人声；该时间槽继续播放伴奏。
-- `LOCKED`：服务端已隐藏的已录段；不请求人声，该时间槽继续播放伴奏，并明确显示“暂未解锁”。
-- 每段起止只取曲库固定 `startMs/durationMs`；人声即使超长也在本段槽位截断，不得压入下一段。
-- 只有真实缺口和锁定段都为空时 `isComplete=true`。
+- 客户端按 `Segment.index` 升序逐段播放当前已有录音；一段触发 `ended` 后立即播放下一段。
+- 每次切段都必须等待媒体元素 `play()` 成功后才播报“正在播放”；`play()` 被拒绝或音频元素报错时停止
+  队列并显示“第 N 段播放失败，请重试”，不能假报播放中或永久卡住。
+- 不生成服务端或客户端混音文件，不提供导出或下载。
+- 未录段不进入播放队列；`isComplete` 只由真实缺口是否为空决定。

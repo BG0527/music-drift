@@ -1,10 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { actorLabel, describeEvent, eventTimeline } from './drift-events';
-import { bottleDetail, bottleEvent, USER_A, USER_B } from '../../test/fixtures';
+import { describeEvent, eventTimeline } from './drift-events';
+import { bottleDetail, bottleEvent } from '../../test/fixtures';
 
 /**
- * 漂流日志：事件类型 → 中文说明，操作者 → 匿名代号。
- * **系统行为不是人**（`actorId` 是哨兵 `SYSTEM`，不是用户 id）—— 必须显示成"系统"，不能显示成一串 id。
+ * 漂流日志：事件类型 → 中文说明，操作者直接使用服务端的瓶级匿名代号。
  */
 describe('漂流日志文案', () => {
   it('每种领域事件都有中文说明（不把英文枚举漏给用户）', () => {
@@ -32,25 +31,19 @@ describe('漂流日志文案', () => {
     expect(describeEvent({ ...bottleEvent(), type: 'SOMETHING_NEW' })).toBe('有一条新的动态');
   });
 
-  it('系统行为显示为「系统」，用户显示为该瓶子里的匿名代号', () => {
-    const bottle = bottleDetail();
-    expect(actorLabel(USER_A, bottle)).toBe('午夜歌手#042');
-    expect(actorLabel('SYSTEM', bottle)).toBe('系统');
-    expect(actorLabel(USER_B, bottle)).toBe('匿名歌手');
-  });
-
-  it('时间线按 seq 升序整理，并带上中文时间', () => {
+  it('时间线直接使用服务端瓶级匿名代号，不需要真实用户 id 做二次映射', () => {
     const bottle = bottleDetail();
     const timeline = eventTimeline(
       [
-        bottleEvent({ seq: 2, type: 'BOTTLE_CAST_TO_RIVER', actorId: USER_A }),
-        bottleEvent({ seq: 1, type: 'BOTTLE_CREATED', actorId: USER_A }),
+        bottleEvent({ seq: 2, type: 'BOTTLE_CAST_TO_RIVER', actorCode: '河湾歌手#108' }),
+        bottleEvent({ seq: 1, type: 'BOTTLE_CREATED', actorCode: '午夜歌手#042' }),
       ],
       bottle,
     );
     expect(timeline.map((entry) => entry.seq)).toEqual([1, 2]);
     expect(timeline[0]!.label).toContain('发起');
     expect(timeline[0]!.actor).toBe('午夜歌手#042');
+    expect(timeline[1]!.actor).toBe('河湾歌手#108');
     expect(timeline[0]!.at.length).toBeGreaterThan(0);
   });
 });
@@ -58,15 +51,14 @@ describe('漂流日志文案', () => {
 /**
  * 日志精简（用户第十三轮 ③）：**只留核心操作**，不显示赞/踩记录与系统行为细节。
  *
- * 过滤位置 = **前端映射层**（`eventTimeline`）：接口返回的是事件流（服务端真相），
- * "给用户看什么"是**展示策略**，不该烧进契约。
+ * 服务端已排除私密留言，前端继续只展示核心操作。
  */
 describe('漂流日志：只留核心操作', () => {
-  const seq = (type: string, index: number, actorId = USER_A) => ({
+  const seq = (type: string, index: number, actorCode = '午夜歌手#042') => ({
     ...bottleEvent(),
     type,
     seq: index,
-    actorId,
+    actorCode,
   });
 
   it('点赞 / 点踩记录不出现（用户明说不要）', () => {

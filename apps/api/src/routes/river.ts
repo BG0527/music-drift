@@ -19,6 +19,8 @@ import type { BottleStore } from '../store/bottles.js';
 import { createRequestContext } from '../store/context.js';
 import type { RiverStateStore } from '../store/riverState.js';
 import { toBottleDetail } from '../store/dto.js';
+import { createAnonCodeService } from '../auth/anonCodeService.js';
+import { createAuthRepository } from '../auth/repository.js';
 
 export interface RiverRoutesOptions {
   db: Db;
@@ -32,6 +34,22 @@ export interface RiverRoutesOptions {
 
 export function registerRiverRoutes(app: FastifyInstance, options: RiverRoutesOptions): void {
   const actors = createActorResolver(options.db, options.clock);
+  const anonCodes = createAnonCodeService({ repo: createAuthRepository(options.db) });
+
+  async function codesFor(bottleId: string, userIds: readonly string[]): Promise<Map<string, string>> {
+    const rows = await options.db.query<{ user_id: string; code: string }>(
+      `select user_id, code from anon_codes where bottle_id = $1`,
+      [bottleId],
+    );
+    const codes = new Map(rows.map((row) => [row.user_id, row.code]));
+    for (const userId of new Set(userIds)) {
+      if (!codes.has(userId)) {
+        const assigned = await anonCodes.assign({ userId, bottleId });
+        codes.set(userId, assigned.code);
+      }
+    }
+    return codes;
+  }
 
   app.post('/api/river/draw', async (request, reply) => {
     const actor = await actors.resolve(request);
@@ -79,12 +97,16 @@ export function registerRiverRoutes(app: FastifyInstance, options: RiverRoutesOp
       `select title from songs where id = $1`,
       [row.songId],
     );
+    const codes = await codesFor(outcome.bottleId, [
+      state.initiatorId,
+      ...state.segments.map((segment) => segment.ownerId),
+    ]);
     return reply.send({
       bottle: toBottleDetail({
         row,
         state,
         segments,
-        codes: new Map(),
+        codes,
         songTitle: songs[0]?.title ?? '',
         voteCounts: new Map(),
         viewerId: actor.user.id,

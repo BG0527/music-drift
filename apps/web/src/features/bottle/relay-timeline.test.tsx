@@ -6,7 +6,6 @@ const SEGMENTS = [
   {
     id: '11111111-0000-4000-8000-000000000001',
     index: 1,
-    ownerId: 'user-a',
     note: '在深夜哼一段没有词的曲子，期待接唱',
     ownerCode: '午夜歌手#042',
     likeCount: 0,

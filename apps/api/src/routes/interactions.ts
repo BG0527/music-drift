@@ -59,6 +59,38 @@ export function registerInteractionRoutes(
    */
   const listen = createListenProgressStore(db, { threshold: DEFAULT_POLICY.dislikeListenRatioThreshold });
 
+  async function messageParties(
+    bottleId: string,
+    sender: { userId: string; segmentIndex: number },
+    recipient: { userId: string; segmentIndex: number },
+    revealed: boolean,
+  ) {
+    const rows = await db.query<{ user_id: string; code: string | null; handle: string }>(
+      `select u.id as user_id, ac.code, u.handle
+       from users u
+       left join anon_codes ac on ac.bottle_id = $1 and ac.user_id = u.id
+       where u.id = any($2::uuid[])`,
+      [bottleId, [sender.userId, recipient.userId]],
+    );
+    const identities = new Map(rows.map((row) => [row.user_id, row]));
+    const displayName = (userId: string): string => {
+      const identity = identities.get(userId);
+      return revealed ? (identity?.handle ?? '账号用户') : (identity?.code ?? '匿名歌手');
+    };
+    return {
+      sender: {
+        segmentIndex: sender.segmentIndex,
+        displayName: displayName(sender.userId),
+        revealed,
+      },
+      recipient: {
+        segmentIndex: recipient.segmentIndex,
+        displayName: displayName(recipient.userId),
+        revealed,
+      },
+    };
+  }
+
   /**
    * 上报已听覆盖率（t20）：**增量输入**，服务端只增不减地记账（跨会话保留）。
    *
@@ -218,12 +250,26 @@ export function registerInteractionRoutes(
     const attached = outcome.events.find((event) => event.type === 'MESSAGE_ATTACHED');
     const messageId =
       attached !== undefined && 'messageId' in attached ? String(attached.messageId) : '';
+    const senderSegment = state.segments.find((segment) => segment.ownerId === actor.user.id);
+    const recipientSegment = state.segments.find(
+      (segment) => segment.index === body.data.targetSegmentIndex && segment.deletedAt === null,
+    );
+    if (senderSegment === undefined || recipientSegment === undefined) {
+      return sendProblem(reply, transportProblem('INTERNAL'));
+    }
+    const parties = await messageParties(
+      params.data.id,
+      { userId: actor.user.id, segmentIndex: senderSegment.index },
+      { userId: recipientSegment.ownerId, segmentIndex: recipientSegment.index },
+      false,
+    );
     return reply.code(201).send({
       id: messageId,
       bottleId: params.data.id,
       content: body.data.content,
       status: 'PENDING',
       targetSegmentIndex: body.data.targetSegmentIndex,
+      ...parties,
       createdAt: new Date(clock.now()).toISOString(),
     });
   });
@@ -246,16 +292,32 @@ export function registerInteractionRoutes(
     if (state === null) {
       return sendProblem(reply, transportProblem('NOT_FOUND'));
     }
-    return reply.send(
-      visibleMessagesFor(state, actor.user.id).map((message) => ({
+    if (state.status === 'SEA') {
+      return reply.send([]);
+    }
+    const visible = visibleMessagesFor(state, actor.user.id);
+    const projected = await Promise.all(
+      visible.map(async (message) => ({
         id: message.id,
         bottleId: params.data.id,
         content: message.content,
         status: message.status,
         targetSegmentIndex: message.targetSegmentIndex,
+        ...(await messageParties(
+          params.data.id,
+          {
+            userId: message.fromUserId,
+            segmentIndex:
+              state.segments.find((segment) => segment.ownerId === message.fromUserId)?.index ?? 1,
+          },
+          { userId: message.toUserId, segmentIndex: message.targetSegmentIndex },
+          message.status === 'DELIVERED' &&
+            (actor.user.id === message.fromUserId || actor.user.id === message.toUserId),
+        )),
         createdAt: new Date(message.createdAt).toISOString(),
       })),
     );
+    return reply.send(projected);
   });
 
   /** 全链路举报入口（CONTEXT §8）：落库进人工审核队列；审核流转属 t12。 */

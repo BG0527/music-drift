@@ -28,7 +28,7 @@
  * `repairSyntheticAudioSql`）。
  *
  * 用法：
- *   node tools/seed-demo.mjs                 # 对 http://127.0.0.1:8787 施种（默认）
+ *   node tools/seed-demo.mjs                 # 对 http://127.0.0.1:8788 施种（默认）
  *   node tools/seed-demo.mjs --base=http://127.0.0.1:5173   # 也可以经站点服务器的同源反代
  *   node tools/seed-demo.mjs --print-repair-sql             # 只打印"把旧合成段换成真音频"的 SQL
  */
@@ -55,7 +55,7 @@ export const RELAYS = Object.freeze([
   Object.freeze({ handle: 'driftmate3', email: 'driftmate3@example.com', password: 'SeaDrift2026' }),
 ]);
 
-export const DEFAULT_BASE = process.env['MDB_API_BASE'] ?? 'http://127.0.0.1:8787';
+export const DEFAULT_BASE = process.env['MDB_API_BASE'] ?? 'http://127.0.0.1:8788';
 
 /** 段音频 fixture：真 WebM/Opus，由 `node tools/record-fixture.mjs` 录制（见 `tools/fixtures/README.md`）。 */
 export const SEGMENT_FIXTURE = DEFAULT_FIXTURE;
@@ -158,15 +158,13 @@ export function repairSyntheticAudioSql(containerPath = '/tmp/mdb-demo-segment.w
  * 只查 seed 数据，不碰别人的探针段（那句 SQL 的 handle 白名单同上）。
  */
 async function assertSeededAudioReal(client, items, log) {
-  const me = await call(client, 'GET', '/api/auth/me', {}, [200], '读会话');
-  const myId = me?.user?.id ?? null;
   const offenders = [];
   let checked = 0;
   for (const item of items) {
     if (!Array.isArray(item.mySegmentIndexes) || item.mySegmentIndexes.length === 0) continue;
     const detail = await detailOf(client, item.id);
     const segments = (detail?.segments ?? []).filter(
-      (segment) => segment.ownerId === myId && item.mySegmentIndexes.includes(segment.index),
+      (segment) => segment.isMine && item.mySegmentIndexes.includes(segment.index),
     );
     for (const segment of segments) {
       checked += 1;

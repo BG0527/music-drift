@@ -3,17 +3,11 @@
  *
  * 两条纪律：
  * 1. 事件类型是**机器码**，不许直接给用户看 —— 每一种都要有中文说明；
- * 2. **系统行为不是人**：斩浪 / 超时 / 断链的 `actorId` 是哨兵 `'SYSTEM'`（不是用户 id），
- *    必须显示「系统」，不能显示成一串 UUID。
+ * 2. 操作者只使用服务端返回的瓶级匿名代号 `actorCode`，客户端不接触真实用户 id。
  *
  * 客户端**不本地推算时间线**（`docs/api.md` §2.4）：只按服务端给的 `seq` 排序与展示。
  */
 import type { BottleDetail, BottleEvent } from '@music-drift/shared';
-
-export const SYSTEM_ACTOR = 'SYSTEM';
-
-/** 未知操作者的兜底（例如中途参与、但已不在当前段列表里的接唱者）。 */
-export const UNKNOWN_ACTOR_LABEL = '匿名歌手';
 
 export const EVENT_LABELS: Record<string, string> = {
   BOTTLE_CREATED: '发起：选定了这首歌',
@@ -42,8 +36,7 @@ export const EVENT_LABELS: Record<string, string> = {
  * 另外 `MESSAGE_ATTACHED` 也**不进日志**：CONTEXT §5.1 规定中间传递者**不知道留言存在**，
  * 日志里出现「有人留下了一条私密留言」本身就是泄露（留言有自己的可见性出口，见私密留言弹窗）。
  *
- * ⚠️ 过滤发生在**前端映射层**：接口给的是完整事件流（服务端真相），
- * "给用户看什么"是**展示策略**，不该烧进契约。
+ * 服务端已排除私密留言事件；前端白名单继续压缩为适合展示的核心操作。
  */
 export const CORE_EVENT_TYPES: readonly string[] = [
   'BOTTLE_CREATED',
@@ -61,20 +54,8 @@ export function describeEvent(event: Pick<BottleEvent, 'type'>): string {
 
 export interface ActorSource {
   initiatorCode: string;
-  segments: ReadonlyArray<{ ownerId: string; ownerCode: string }>;
   /** 作品是否已完整（服务端事实）：用来说明"完成"这一步。 */
   isComplete?: boolean;
-}
-
-/**
- * 操作者 → 展示名。
- * 匿名代号是**按瓶子**生成的（CONTEXT §12.1），所以这里只能从这支瓶子的信息里取。
- */
-export function actorLabel(actorId: string, bottle: ActorSource): string {
-  if (actorId === SYSTEM_ACTOR) return '系统';
-  const segment = bottle.segments.find((candidate) => candidate.ownerId === actorId);
-  if (segment !== undefined) return segment.ownerCode;
-  return UNKNOWN_ACTOR_LABEL;
 }
 
 export interface DriftLogEntry {
@@ -111,9 +92,9 @@ export function eventTimeline(
       event.seq === lastRecordSeq && lastRecordSeq !== null
         ? '完成：最后一段录好了，作品完整'
         : describeEvent(event),
-    actor: actorLabel(event.actorId, bottle),
+    actor: event.actorCode,
     at: formatOccurredAt(event.occurredAt),
-    isSystem: event.actorId === SYSTEM_ACTOR,
+    isSystem: event.actorCode === '系统',
   }));
 }
 
@@ -122,9 +103,5 @@ export function actorSourceOf(bottle: BottleDetail): ActorSource {
   return {
     initiatorCode: bottle.initiatorCode,
     isComplete: bottle.isComplete,
-    segments: bottle.segments.map((segment) => ({
-      ownerId: segment.ownerId,
-      ownerCode: segment.ownerCode,
-    })),
   };
 }

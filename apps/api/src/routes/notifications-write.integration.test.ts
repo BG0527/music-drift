@@ -254,7 +254,7 @@ describe('通知写入 ①：私密留言**送达** → 通知发起者（§5.2 
 });
 
 describe('通知写入 ②：私密留言**未送达** → 通知发送者（§5.2）', () => {
-  it('唱完留言后直接入海（回传链断）→ 发送者收到「你的留言未送达」，发起者收到的是入海通知而不是留言', async () => {
+  it('未完成作品入海只隐藏并保留留言，不提前发送「未送达」通知', async () => {
     const initiator = await register('ud');
     const singer = await register('us');
     const { bottleId } = await createBottle(initiator.cookie);
@@ -271,21 +271,17 @@ describe('通知写入 ②：私密留言**未送达** → 通知发送者（§5
     expect(created.statusCode).toBe(201);
     const messageId = (created.json() as { id: string }).id;
 
-    await resolve(singer.cookie, bottleId, 'SEA'); // 中途入海 → 未送达
+    await resolve(singer.cookie, bottleId, 'SEA'); // 未完成作品中途入海，之后仍可离海继续接力
 
     const rows = await db.query<{ status: string }>(`select status from messages where id = $1`, [
       messageId,
     ]);
-    expect(rows[0]?.status).toBe('UNDELIVERED');
+    expect(rows[0]?.status).toBe('PENDING');
 
     const senderNotifications = await notificationsOf(singer.cookie);
-    expect(typesFor(senderNotifications, bottleId)).toContain('MESSAGE_UNDELIVERED');
-    const undelivered = senderNotifications.find(
-      (row) => row.type === 'MESSAGE_UNDELIVERED' && row.payload['bottleId'] === bottleId,
-    );
-    expect(undelivered?.payload['messageId']).toBe(messageId);
+    expect(typesFor(senderNotifications, bottleId)).not.toContain('MESSAGE_UNDELIVERED');
 
-    // 发起者这边：留言没送达（他根本不该看到），作品也没完成（公海等待接力区）→ 无通知
+    // 发起者这边：留言尚未送达且公海不展示，作品也没完成 → 无留言通知。
     const initiatorTypes = typesFor(await notificationsOf(initiator.cookie), bottleId);
     expect(initiatorTypes).not.toContain('MESSAGE_DELIVERED');
     expect(initiatorTypes).not.toContain('BOTTLE_COMPLETED');

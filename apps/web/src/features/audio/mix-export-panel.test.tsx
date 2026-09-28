@@ -76,12 +76,14 @@ function environment(overrides: Partial<MixExportEnvironment> = {}): Partial<Mix
 }
 
 describe('MixExportPanel：摘要与缺口标注', () => {
-  it('伴奏完整试听用文字区分未录与暂未解锁，不把两者都说成静音缺口', () => {
+  it('伴奏完整试听只标出真实未录段，不再显示解锁状态', () => {
     const accompanied = planAccompaniedMix({
-      segments: [{ index: 1, durationMs: 1_000, audioUrl: '/api/segments/1/audio' }],
+      segments: [
+        { index: 1, durationMs: 1_000, audioUrl: '/api/segments/1/audio' },
+        { index: 3, durationMs: 1_000, audioUrl: '/api/segments/3/audio' },
+      ],
       totalSegments: 3,
       missingSegmentIndexes: [2],
-      hiddenLaterSegmentCount: 1,
       nominalDurationByIndex: { 1: 1_000, 2: 1_000, 3: 1_000 },
       accompanimentUrl: '/library/accompaniment.mp3',
       sampleRate: SAMPLE_RATE,
@@ -90,7 +92,7 @@ describe('MixExportPanel：摘要与缺口标注', () => {
     render(<MixExportPanel plan={accompanied} environment={environment()} />);
 
     expect(screen.getByText(/第 2 段未录/)).toBeInTheDocument();
-    expect(screen.getAllByText(/第 3 段暂未解锁/).length).toBeGreaterThan(0);
+    expect(screen.queryByText(/暂未解锁/)).not.toBeInTheDocument();
     expect(screen.getAllByText(/缺口仍保留伴奏/).length).toBeGreaterThan(0);
   });
 

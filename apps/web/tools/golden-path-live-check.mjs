@@ -14,12 +14,12 @@
  * 跑在别人的库上，河道里有别人的瓶子 ⟹ 结论受环境运气影响 ⟹ **不能写进验收口径**，
  * 它只会被当作调试工具，并且会把非确定性步骤单列成「未复现（数据不受控）」、不计入 pass。
  *
- * **为什么要这样**：旧版本直接用 8787 上的 dev 服务 → 库里漂着别人的瓶子 → 随机捞取会捞到别人的
+ * **为什么要这样**：旧版本直接用共享的 dev 服务 → 库里漂着别人的瓶子 → 随机捞取会捞到别人的
  * 瓶子 → 第 15 步断链、其后 11 项失败同源；通过与否取决于环境运气（同一份代码，captain 复现失败、
  * 本地复现成功）。**端到端检查必须自己掌控输入**，否则它的"通过"不构成证据。
  *
  * ## 外部模式（显式开启，非 hermetic）
- *   API_BASE=http://localhost:8787 node apps/web/tools/golden-path-live-check.mjs
+ *   API_BASE=http://localhost:8788 node apps/web/tools/golden-path-live-check.mjs
  * 对着一个已经起好的服务跑（调试用）。此时结果**取决于那个库里的数据**，不能当验收证据。
  *
  * 覆盖（27 步）：注册/登录 → 选歌 → 发起 → 录第 1 段 → 投河 → 第二人捞取 → 接唱 → 投河 → … → 末段 →
@@ -580,14 +580,12 @@ const runChecks = async () => {
     json: { resolution: 'RETURN' },
   });
   must(returned.status === 200, `回传应成功，实际 ${returned.status}`);
+  const returnedToC = await call(C.session, 'GET', `/api/bottles/${bottleId}`);
   must(
-    returned.body?.holderId === C.userId,
-    `回传后持有者应为父链上游（投给 D 的 C），实际 ${returned.body?.holderId}`,
+    returnedToC.status === 200 && returnedToC.body?.isHolder === true,
+    `回传后父链上游 C 的详情应为 isHolder=true，实际 status=${returnedToC.status} · isHolder=${String(returnedToC.body?.isHolder)}`,
   );
-  log(
-    'D 回传',
-    `holder=${returned.body.holderId === C.userId ? 'C（父链上游：投给 D 的人）' : returned.body.holderId}`,
-  );
+  log('D 回传', 'C（父链上游：投给 D 的人）isHolder=true');
 
   const toSea = await call(C.session, 'POST', `/api/bottles/${bottleId}/resolution`, {
     json: { resolution: 'SEA' },
@@ -636,7 +634,7 @@ const runChecks = async () => {
     ),
     '每条事件都要有 type 与 occurredAt',
   );
-  const systemEvents = events.body.filter((event) => event.actorId === 'SYSTEM');
+  const systemEvents = events.body.filter((event) => event.actorCode === '系统');
   log(
     '漂流日志',
     `${events.body.length} 条 · 事件类型 ${[...new Set(events.body.map((e) => e.type))].join(',')} · 系统行为 ${systemEvents.length} 条`,
@@ -647,7 +645,7 @@ const runChecks = async () => {
   must(codes.status === 200 && Array.isArray(codes.body), '匿名代号应可读');
   log('B 的匿名代号', codes.body.map((entry) => entry.code).join(', ') || '（空）');
 
-  // ── 放回海中（未接唱直接放回 + 冷却）──────────────────────────
+  // ── 回河道（未接唱直接放回 + 冷却）────────────────────────────
   const second2 = await call(C.session, 'POST', '/api/bottles', { json: { songId: song.id } });
   const bottle2 = second2.body.id;
   await recordSegment(C.session, bottle2, 20_000);
@@ -662,7 +660,7 @@ const runChecks = async () => {
     putBack.body?.cooldownDraws === 10,
     `放回后冷却次数应为 10，实际 ${putBack.body?.cooldownDraws}`,
   );
-  log('D 放回海中', `冷却 ${putBack.body.cooldownDraws} 次`);
+  log('D 回河道', `冷却 ${putBack.body.cooldownDraws} 次`);
 
   // ── 「没有可捞的瓶子」：409 + 稳定码（前端据此渲染空态，而不是红色报错）──
   //

@@ -543,7 +543,6 @@ describe('公海详情与指定接唱（CONTEXT §6.2）', () => {
   let initiatorCookie = '';
   let initiatorId = '';
   let takerCookie = '';
-  let takerId = '';
   let incompleteId = '';
   let completeId = '';
   let driftingId = '';
@@ -554,7 +553,6 @@ describe('公海详情与指定接唱（CONTEXT §6.2）', () => {
     initiatorId = initiator.userId;
     const taker = await register('dt');
     takerCookie = taker.cookie;
-    takerId = taker.userId;
 
     incompleteId = await seedIncompleteSeaBottle(initiatorCookie);
 
@@ -631,12 +629,10 @@ describe('公海详情与指定接唱（CONTEXT §6.2）', () => {
     });
     expect(detail.statusCode).toBe(200);
     const body = detail.json() as {
-      holderId: string | null;
       isHolder: boolean;
       availableResolutions: string[];
       missingSegmentIndexes: number[];
     };
-    expect(body.holderId).toBe(takerId);
     expect(body.isHolder).toBe(true);
     // 未完成的瓶子：可投河/回传/入海（缺口在，说明还能继续接）
     expect(body.availableResolutions).toEqual(['RIVER', 'RETURN', 'SEA']);

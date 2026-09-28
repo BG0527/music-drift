@@ -169,14 +169,14 @@ describe('回传交接后立刻选去向（重复压测，抓偶发）', () => {
           `第 ${String(round)} 轮 第 ${String(index + 2)} 棒选去向`,
         );
         if (last) {
-          // 交接点断言：回传后持有者必须是 C（父链上游）
-          const cMe = await app.inject({
+          // 交接点断言：用 C 的会话读取到 viewer-relative isHolder=true，不下发持有者 UUID。
+          const cView = await app.inject({
             method: 'GET',
-            url: '/api/auth/me',
+            url: '/api/bottles/' + bottleId,
             headers: { cookie: c },
           });
-          const cId = (cMe.json() as { user: { id: string } }).user.id;
-          expect((resolved.json() as { holderId: string }).holderId).toBe(cId);
+          expect(cView.statusCode).toBe(200);
+          expect((cView.json() as { isHolder: boolean }).isHolder).toBe(true);
           // 紧接着（无任何间隔）由新持有者选去向 —— 这就是 live-check 里偶发失败的那一步
           const toSea = await app.inject({
             method: 'POST',

@@ -118,23 +118,21 @@ describe('CONTEXT §4.3 / §5.2 / §10.1 — 回传中断', () => {
     );
   });
 
-  it('规则3（已按用户裁决反转）：谁都能写 —— 只要在该瓶唱过；不再要求"必须由接唱者写给发起者"', () => {
+  it('规则3：参与者只能写给自己的前序段；第 1 段不能写给第 2 段', () => {
     const harness = createHarness();
     const ctx = harness.ctx;
     let state = castToRiverBy(startBottle(ctx), ctx, 'u:A');
     state = castToRiverBy(drawAndSing(state, ctx, 'u:B'), ctx, 'u:B');
     state = drawAndSing(state, ctx, 'u:C');
 
-    // 旧断言：发起者写留言 → MESSAGE_SENDER_NOT_PARTICIPANT（"只能接唱者写给发起者"）。
-    // 新规则只按**段号**说话：发起者也可以写给"之前各段"里的别人 —— 这里他的目标只能是
-    // 第 2 段（B）或第 3 段（C）……而他自己是第 1 段，所以把 **第 2 段（B）** 作为目标应当**被接受**。
-    const ok = attachPrivateMessage(
-      state,
-      { userId: 'u:A', content: '给后面这位。', targetSegmentIndex: 2 },
-      ctx,
+    expectRejected(
+      attachPrivateMessage(
+        state,
+        { userId: 'u:A', content: '给后面这位。', targetSegmentIndex: 2 },
+        ctx,
+      ),
+      ['MESSAGE_TARGET_NOT_AVAILABLE'],
     );
-    expect(ok.ok).toBe(true);
-    expect(ok.state.messages[0]?.toUserId).toBe('u:B');
 
     // 真正的"不在场者"依旧不能写（他在该瓶没有任何段）
     expectRejected(

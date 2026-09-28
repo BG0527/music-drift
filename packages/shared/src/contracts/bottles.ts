@@ -18,7 +18,8 @@ export const SegmentSchema = z.object({
   id: UuidSchema,
   /** 歌里的固定段落位置；被斩的段不出现在有效段列表里，缺口由 `missingSegmentIndexes` 表达。 */
   index: z.number().int().min(1),
-  ownerId: UuidSchema,
+  /** 是否由当前登录观看者录制；匿名观看者恒为 false。真实 owner id 不进入公共详情。 */
+  isMine: z.boolean(),
   /** 每段附言（CONTEXT §12.2）。 */
   note: z.string().max(200).nullable(),
   /** 该段在本瓶子里显示的匿名代号（不跨瓶关联，CONTEXT §12.1）。 */
@@ -102,9 +103,6 @@ export const SeaBottleListSchema = PageSchema(BottleSummarySchema).extend({
 
 export const BottleDetailSchema = BottleSummarySchema.extend({
   initiatorCode: z.string().min(1),
-  holderId: UuidSchema.nullable(),
-  /** 最近一次投出者；斩浪后系统重新投河时为哨兵 `'SYSTEM'`（不是用户 id）。 */
-  currentCasterId: z.string().min(1).nullable(),
   returnCompleted: z.boolean(),
   returnChainBroken: z.boolean(),
   segments: z.array(SegmentSchema),
@@ -112,14 +110,6 @@ export const BottleDetailSchema = BottleSummarySchema.extend({
   availableResolutions: z.array(ResolutionSchema),
   /** 观看者是否持有该瓶子。 */
   isHolder: z.boolean(),
-  /**
-   * 因 §9.1（漂流中不可见后续）被裁掉的段数。
-   *
-   * 为什么要有这个字段：裁剪之后 `segments` 会比 `recordedCount` 短，
-   * 界面需要能解释"**不是丢了，是你看不到**"，否则用户会以为瓶子坏了。
-   * `0` = 没有裁剪（持有者 / 已入海）。
-   */
-  hiddenLaterSegmentCount: z.number().int().nonnegative(),
   /** 有缺口且该观看者可能补位时的上下文；无缺口或已损坏为 null。 */
   replacementContext: ReplacementContextSchema.nullable(),
   riverCastAt: IsoDateTimeSchema.nullable(),
@@ -195,7 +185,8 @@ export const BottleEventsQuerySchema = z.object({
 export const BottleEventSchema = z.object({
   seq: z.number().int().min(1),
   type: z.string().min(1),
-  actorId: z.string().min(1),
+  /** 仅返回这支瓶子内的匿名代号；公共日志永不暴露账号/用户 id。 */
+  actorCode: z.string().min(1),
   /** 系统行为的时间；客户端不要本地推算时间线。 */
   occurredAt: IsoDateTimeSchema,
   occurredAtMs: EpochMsSchema,

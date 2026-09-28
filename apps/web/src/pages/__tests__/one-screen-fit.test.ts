@@ -54,6 +54,12 @@ describe('W18 · 真浏览器一屏门禁同时检查可见控件相交', () => 
     expect(guard).toContain('document.createRange()');
     expect(guard).toMatch(/visualOverlaps\.length\s*===\s*0/);
   });
+
+  it('专门造出「持有 + 已录 2 段 + 待录第 3 段」的真实路由', () => {
+    const guard = readFileSync(join(process.cwd(), 'tools', 'one-screen-check.mjs'), 'utf8');
+    expect(guard).toContain('heldTwoSegmentsId');
+    expect(guard).toContain("anchors: ['bottle-record', 'bottle-play', 'bottle-action']");
+  });
 });
 
 describe('t5 · 公海页去掉 900 地板', () => {

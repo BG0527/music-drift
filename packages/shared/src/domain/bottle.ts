@@ -141,7 +141,7 @@ export function canPutBack(state: BottleState, cmd: { userId: string }): RuleVio
   return [];
 }
 
-/** 放回海中：不接唱，把瓶子放回河道（CONTEXT §3.2 / §15）。 */
+/** 回河道：不接唱，把当前持有的瓶子放回河道（CONTEXT §3.2 / §15）。 */
 export function putBack(
   state: BottleState,
   cmd: { userId: string },

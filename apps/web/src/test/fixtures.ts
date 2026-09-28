@@ -35,13 +35,10 @@ export interface BottleFixtureInput {
   missingSegmentIndexes?: number[];
   isComplete?: boolean;
   isHolder?: boolean;
-  holderId?: string | null;
   availableResolutions?: BottleDetail['availableResolutions'];
   segments?: BottleDetail['segments'];
   seaZone?: BottleSummary['seaZone'];
   initiatorCode?: string;
-  /** §9.1：因"漂流中不可见后续"被裁掉的段数。 */
-  hiddenLaterSegmentCount?: number;
 }
 
 /** 默认形态：A 发起、已录第 1 段、缺口 [2,3,4]、B 正持有（等待接唱）。 */
@@ -50,7 +47,7 @@ export function bottleDetail(overrides: BottleFixtureInput = {}): BottleDetail {
     {
       id: SEGMENT_1,
       index: 1,
-      ownerId: USER_A,
+      isMine: false,
       note: '在深夜哼一段没有词的曲子，期待接唱',
       ownerCode: '午夜歌手#042',
       likeCount: 0,
@@ -77,14 +74,11 @@ export function bottleDetail(overrides: BottleFixtureInput = {}): BottleDetail {
     createdAt: '2026-09-23T01:00:00.000Z',
     updatedAt: '2026-09-23T02:00:00.000Z',
     initiatorCode: overrides.initiatorCode ?? '午夜歌手#042',
-    holderId: overrides.holderId === undefined ? USER_B : overrides.holderId,
-    currentCasterId: USER_A,
     returnCompleted: false,
     returnChainBroken: false,
     segments,
     availableResolutions: overrides.availableResolutions ?? ['RIVER', 'RETURN'],
     isHolder: overrides.isHolder ?? true,
-    hiddenLaterSegmentCount: overrides.hiddenLaterSegmentCount ?? 0,
     replacementContext: null,
     riverCastAt: '2026-09-23T01:30:00.000Z',
     seaAt: null,
@@ -114,7 +108,7 @@ export function bottleEvent(overrides: Partial<BottleEvent> = {}): BottleEvent {
   return {
     seq: 1,
     type: 'BOTTLE_CREATED',
-    actorId: USER_A,
+    actorCode: '午夜歌手#042',
     occurredAt: '2026-09-23T01:00:00.000Z',
     occurredAtMs: 1_758_592_800_000,
     ...overrides,

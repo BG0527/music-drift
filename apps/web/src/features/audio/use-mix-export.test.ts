@@ -101,12 +101,11 @@ const FULL_RENDER = pcmRenderer([
 ]);
 
 describe('useMixExport：成功路径', () => {
-  it('观看者没有可见人声时仍可试听伴奏，锁定段不会被请求', async () => {
+  it('尚无录音时仍可试听伴奏，未录段不会被请求', async () => {
     const accompanied = planAccompaniedMix({
       segments: [],
       totalSegments: 2,
-      missingSegmentIndexes: [],
-      hiddenLaterSegmentCount: 2,
+      missingSegmentIndexes: [1, 2],
       nominalDurationByIndex: { 1: 1_000, 2: 1_000 },
       accompanimentUrl: '/library/accompaniment.mp3',
       sampleRate: SAMPLE_RATE,
@@ -140,7 +139,6 @@ describe('useMixExport：成功路径', () => {
       segments: [{ index: 1, durationMs: 1_000, audioUrl: '/api/segments/a/audio' }],
       totalSegments: 2,
       missingSegmentIndexes: [2],
-      hiddenLaterSegmentCount: 0,
       nominalDurationByIndex: { 1: 1_000, 2: 1_000 },
       accompanimentUrl: '/library/accompaniment.mp3',
       sampleRate: SAMPLE_RATE,

@@ -35,17 +35,22 @@ export function canAttachPrivateMessage(
   }
   // 发送者必须**在该瓶唱过**（留言是参与者之间的点对点；不再额外排除发起者：
   // 新规则只按"段号"说话，谁是发送者不影响目标合法性）。
-  const senderHasSegment = state.segments.some((segment) => segment.ownerId === cmd.userId);
-  if (!senderHasSegment) {
+  const sender = state.segments.find(
+    (segment) => segment.ownerId === cmd.userId && segment.deletedAt === null,
+  );
+  if (sender === undefined) {
+    if (state.segments.some((segment) => segment.ownerId === cmd.userId)) {
+      return [violation('MESSAGE_TARGET_NOT_AVAILABLE')];
+    }
     return [violation('MESSAGE_SENDER_NOT_PARTICIPANT')];
   }
   if (state.status === 'SEA' || state.status === 'DAMAGED' || state.returnChainBroken) {
     // 瓶子已终结或链已断，留言必然送不到 —— 直接拒绝，不留悬空 PENDING。
     return [violation('MESSAGE_BOTTLE_NOT_DRIFTING')];
   }
-  // 目标：必须是**已存在的有效段**（隐含 `index < nextRecordIndex`），且作者不是发送者自己。
+  // 目标必须是发送者之前的有效段；不能给自己或后来加入的人留言。
   const target = state.segments.find((segment) => segment.index === cmd.targetSegmentIndex);
-  if (target === undefined || target.deletedAt !== null || target.ownerId === cmd.userId) {
+  if (target === undefined || target.deletedAt !== null || target.index >= sender.index) {
     return [violation('MESSAGE_TARGET_NOT_AVAILABLE')];
   }
   return [];
@@ -112,7 +117,7 @@ export function messagesDeliveredTo(
   );
 }
 
-/** 失败终局：仍未送达的留言全部标记未送达（入海 / 损坏）。 */
+/** 失败终局：仍未送达的留言全部标记未送达（完整入海 / 损坏）。 */
 export function messagesUndelivered(messages: readonly PrivateMessage[]): PrivateMessage[] {
   return messages.map((message) =>
     message.status === 'PENDING' ? { ...message, status: 'UNDELIVERED' } : message,
