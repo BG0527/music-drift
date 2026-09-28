@@ -12,7 +12,7 @@ import { registerRiverRoutes } from './routes/river';
 import { registerSongRoutes } from './routes/songs';
 import type { ScryptParams } from './auth/password';
 import { createSegmentAudioRepository } from './audio/repository';
-import { registerSegmentAudioRoutes } from './audio/routes';
+import { createSegmentAudioAuthorizer, registerSegmentAudioRoutes } from './audio/routes';
 import type { Db } from './db/client';
 import { createBottleStore } from './store/bottles';
 import { createRiverStateStore } from './store/riverState';
@@ -46,6 +46,8 @@ export type BuildAppOptions = {
 
 export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
   const app = Fastify({ logger: options.logger ?? false });
+  const clock = options.clock ?? createSystemClock();
+  const store = options.db === undefined ? undefined : createBottleStore(options.db);
 
   /**
    * 录音上传走**原始二进制**（captain 裁决 ADR-018）：`Content-Type` 即音频 MIME，body 是字节流。
@@ -79,7 +81,7 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
   if (options.db !== undefined) {
     registerAuthRoutes(app, {
       db: options.db,
-      clock: options.clock ?? createSystemClock(),
+      clock,
       sessionTtlMs: options.sessionTtlMs,
       secureCookies: options.secureCookies,
       passwordParams: options.passwordParams,
@@ -90,13 +92,17 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
     options.segmentAudio ??
     (options.db === undefined ? undefined : createSegmentAudioRepository(options.db));
   if (segmentAudio !== undefined) {
-    registerSegmentAudioRoutes(app, { repository: segmentAudio });
+    registerSegmentAudioRoutes(app, {
+      repository: segmentAudio,
+      ...(options.db === undefined || store === undefined
+        ? {}
+        : { canRead: createSegmentAudioAuthorizer({ db: options.db, store, clock }) }),
+    });
   }
 
   if (options.db !== undefined) {
     // 业务路由族（t9）：装配只做增量追加，**不得**覆盖已有族（healthz / auth / segmentAudio）。
-    const clock = options.clock ?? createSystemClock();
-    const store = createBottleStore(options.db);
+    if (store === undefined) throw new Error('Bottle store is required when db is configured.');
     registerSongRoutes(app, { db: options.db, store, clock });
     registerBottleRoutes(app, { db: options.db, store, clock });
     registerSeaRoutes(app, { db: options.db, store, clock });

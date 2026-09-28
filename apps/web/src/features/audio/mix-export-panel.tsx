@@ -21,7 +21,10 @@ import {
   type AlignmentReport,
   type MixPlan,
 } from '@music-drift/shared/audio';
+import type { SongLyricLine } from '@music-drift/shared';
+import { useState } from 'react';
 import { Button, Icon, cn } from '../../design-system';
+import { KaraokeLyrics } from './karaoke-lyrics';
 import { useMixExport, type MixExportEnvironment, type MixExportPhase } from './use-mix-export';
 import { formatSeconds } from './format';
 
@@ -31,6 +34,8 @@ export interface MixExportPanelProps {
   environment?: Partial<MixExportEnvironment>;
   fileName?: string;
   title?: string;
+  /** 全曲绝对时间轴；由成品 audio.currentTime 驱动，不启动额外计时器。 */
+  lyrics?: readonly SongLyricLine[];
   className?: string;
 }
 
@@ -48,7 +53,8 @@ export function MixExportPanel({
   plan,
   environment,
   fileName,
-  title = '成品（阶段一 · 纯人声）',
+  title,
+  lyrics,
   className,
 }: MixExportPanelProps) {
   const view = useMixExport({
@@ -57,11 +63,19 @@ export function MixExportPanel({
     ...(fileName === undefined ? {} : { fileName }),
   });
   const missing = describeMissingSegments(plan.missingSegmentIndexes);
+  const accompanied = plan.hasAccompaniment && plan.accompanimentUrl != null;
+  const panelTitle = title ?? (accompanied ? '完整试听' : '成品（阶段一 · 纯人声）');
   const busy =
     view.phase === 'preparing' ||
     view.phase === 'decoding' ||
     view.phase === 'mixing' ||
     view.phase === 'encoding';
+  const [lyricClock, setLyricClock] = useState<{ objectUrl: string | null; currentTime: number }>({
+    objectUrl: null,
+    currentTime: 0,
+  });
+  const lyricCurrentTime =
+    lyricClock.objectUrl === view.objectUrl ? lyricClock.currentTime : 0;
 
   return (
     <div
@@ -73,12 +87,14 @@ export function MixExportPanel({
       )}
     >
       <header className="flex flex-wrap items-baseline justify-between gap-3">
-        <h3 className="text-[1.125rem] font-semibold text-paper">{title}</h3>
+        <h3 className="text-[1.125rem] font-semibold text-paper">{panelTitle}</h3>
         <p className="text-[0.875rem] text-muted">{mixSummaryLabel(plan)}</p>
       </header>
 
       <p className="text-[0.875rem] leading-[1.6] text-muted">
-        阶段一只拼接人声、不加伴奏（曲库到位后再按固定时间轴叠加）；成品为 WAV，可直接试听与下载。
+        {accompanied
+          ? '原伴奏贯穿四段，可见的人声按固定时间槽叠加；缺口仍保留伴奏。'
+          : '阶段一只拼接人声、不加伴奏（曲库到位后再按固定时间轴叠加）；成品为 WAV，可直接试听与下载。'}
       </p>
 
       {!view.canExport ? (
@@ -94,9 +110,16 @@ export function MixExportPanel({
         >
           <Icon name="AlertTriangle" size={16} />
           <span>
-            {missing} ·
-            这段时间在成品里留成静音，不会被别人的段顶替（段号是歌里的固定位置，永不压缩）。
+            {accompanied
+              ? `第 ${plan.missingSegmentIndexes.join('、')} 段未录 · 缺口仍保留伴奏。`
+              : `${missing ?? ''} · 这段时间在成品里留成静音，不会被别人的段顶替（段号是歌里的固定位置，永不压缩）。`}
           </span>
+        </p>
+      )}
+
+      {!accompanied || (plan.lockedSegmentIndexes?.length ?? 0) === 0 ? null : (
+        <p role="status" className="text-[0.875rem] leading-[1.6] text-muted">
+          第 {plan.lockedSegmentIndexes?.join('、')} 段暂未解锁；当前只播放这些时间槽的伴奏。
         </p>
       )}
 
@@ -131,12 +154,21 @@ export function MixExportPanel({
 
       {view.objectUrl === null ? null : (
         <div className="flex flex-col gap-3">
+          {lyrics === undefined || lyrics.length === 0 ? null : (
+            <KaraokeLyrics currentTime={lyricCurrentTime} lines={lyrics} />
+          )}
           <audio
             controls
             preload="metadata"
             src={view.objectUrl}
             aria-label="成品试听"
             className="w-full rounded-base"
+            onTimeUpdate={(event) => {
+              setLyricClock({
+                objectUrl: view.objectUrl,
+                currentTime: event.currentTarget.currentTime,
+              });
+            }}
           />
           <a
             href={view.objectUrl}
@@ -163,7 +195,13 @@ export function MixExportPanel({
           {view.objectUrl === null ? '导出成品' : '重新导出'}
         </Button>
         {view.objectUrl === null ? null : (
-          <Button variant="ghost" onClick={view.reset}>
+          <Button
+            variant="ghost"
+            onClick={() => {
+              setLyricClock({ objectUrl: null, currentTime: 0 });
+              view.reset();
+            }}
+          >
             清空成品
           </Button>
         )}

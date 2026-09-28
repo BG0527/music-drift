@@ -27,13 +27,13 @@
  * node apps/web/tools/one-screen-check.mjs --viewport=375x812  --shot=docs/ui-review/after-375
  * node apps/web/tools/one-screen-check.mjs --viewport=1440x900 --negative-control   # 期望：全路由 FAIL 且 **exit 0**
  * node apps/web/tools/one-screen-check.mjs --viewport=375x812  --negative-control   # 期望：有锚点的路由全 FAIL 且 **exit 0**
- * node apps/web/tools/one-screen-check.mjs --external   # 对着已起的 5173/8787 跑（调试用，不作证据）
+ * node apps/web/tools/one-screen-check.mjs --external   # 对着已起的 5173/8788 跑（调试用，不作证据）
  * ```
  *
  * 说明：脚本跑在 Node 里，但 `page.evaluate` 的回调在**页面上下文**执行，所以这里显式声明浏览器全局。
  */
 /* eslint-disable no-console */
-/* global document, requestAnimationFrame */
+/* global document, getComputedStyle, NodeFilter, requestAnimationFrame */
 import { existsSync, mkdirSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { homedir } from 'node:os';
@@ -77,7 +77,7 @@ async function loadPlaywright() {
 
 // ---------------------------------------------------------------- hermetic 环境
 
-let API = external ? 'http://localhost:8787' : null;
+let API = external ? 'http://localhost:8788' : null;
 let BASE = external ? 'http://localhost:5173' : null;
 let hermetic = null;
 
@@ -147,7 +147,7 @@ function killTree(child) {
  *
  * 为什么要自起 vite：浏览器里的 web 用的是**相对** `/api`，只有让 vite 把 `/api` 代理到自建 API，
  * 请求才会落到一次性库上；同时 cookie 仍在 5173 这个 origin 上（SameSite=Lax 不会被挡）。
- * vite 的 proxy 目标因此支持 `MDB_API_TARGET` 覆盖（默认仍是契约里的 8787）。
+ * vite 的 proxy 目标因此支持 `MDB_API_TARGET` 覆盖（默认仍是契约里的 8788）。
  */
 async function startHermetic() {
   console.log('[setup] 建一次性数据库（复用 apps/api 的派生 / 迁移 / 种子机制）…');
@@ -192,7 +192,7 @@ async function startHermetic() {
   /**
    * ⚠️ 必须在 **process.env** 上设：`vite.config.ts` 是在**本进程**里求值的，
    * 把 `MDB_API_TARGET` 传给 `createViteServer({env})` 只会进 `import.meta.env`（客户端变量），
-   * config 读不到 ⇒ proxy 仍指向 8787（dev API）⇒ 浏览器拿自建库的 cookie 去问 dev API，
+   * config 读不到 ⇒ proxy 仍指向 8788（dev API）⇒ 浏览器拿自建库的 cookie 去问 dev API，
    * 全部页面变成"未登录"视图、高度恒等于视口高 —— 正是这一版之前那批**假绿**的真因。
    */
   process.env['MDB_API_TARGET'] = API;
@@ -348,7 +348,9 @@ async function seedData() {
  */
 function routesFor(seed) {
   return [
-    { path: '/', anchors: ['river-draw', 'river-drop'] },
+    // t12（captain 裁决，合同 revision 4）：`/` 改为 landing（翻页式介绍页）⇒ 锚点换成第一屏
+    // intro-hero；保留 / 行让根路由继续受一屏守卫覆盖，河道锚点由 /river 行承担。
+    { path: '/', anchors: ['intro-hero'] },
     { path: '/river', anchors: ['river-draw', 'river-drop'] },
     { path: '/sea', anchors: ['sea-list'] },
     { path: '/new', anchors: ['new-catalog'] },
@@ -374,10 +376,49 @@ async function measure(page, selectors) {
       anchors[selector] =
         element === null ? null : Math.round(element.getBoundingClientRect().bottom);
     }
+    const visualOverlaps = [];
+    const bottlePage = document.querySelector('.bottle-page');
+    if (bottlePage !== null) {
+      const fragments = [];
+      const walker = document.createTreeWalker(bottlePage, NodeFilter.SHOW_TEXT);
+      for (let node = walker.nextNode(); node !== null; node = walker.nextNode()) {
+        const text = node.textContent?.replace(/\s+/g, ' ').trim() ?? '';
+        const element = node.parentElement;
+        if (text === '' || element === null) continue;
+        const style = getComputedStyle(element);
+        if (
+          style.display === 'none' ||
+          style.visibility === 'hidden' ||
+          Number(style.opacity) === 0 ||
+          element.closest('[aria-hidden="true"]') !== null ||
+          element.closest('.sr-only') !== null
+        ) {
+          continue;
+        }
+        const range = document.createRange();
+        range.selectNodeContents(node);
+        for (const rect of range.getClientRects()) {
+          if (rect.width < 2 || rect.height < 2) continue;
+          fragments.push({ node, rect, label: `${element.tagName.toLowerCase()}:${text.slice(0, 32)}` });
+        }
+      }
+      for (let leftIndex = 0; leftIndex < fragments.length; leftIndex += 1) {
+        const left = fragments[leftIndex];
+        for (let rightIndex = leftIndex + 1; rightIndex < fragments.length; rightIndex += 1) {
+          const right = fragments[rightIndex];
+          if (left.node === right.node) continue;
+          const overlapWidth = Math.min(left.rect.right, right.rect.right) - Math.max(left.rect.left, right.rect.left);
+          const overlapHeight = Math.min(left.rect.bottom, right.rect.bottom) - Math.max(left.rect.top, right.rect.top);
+          if (overlapWidth <= 2 || overlapHeight <= 2) continue;
+          visualOverlaps.push(`${left.label} ↔ ${right.label}`);
+        }
+      }
+    }
     return {
       height: Math.max(document.documentElement.scrollHeight, document.body.scrollHeight),
       scrollWidth: document.documentElement.scrollWidth,
       anchors,
+      visualOverlaps,
     };
   }, selectors);
 }
@@ -519,6 +560,11 @@ for (const route of routes) {
   }
   if (!mobile && after.height > heightThreshold) {
     problems.push(`整页高 ${String(after.height)} > ${String(heightThreshold)}`);
+  }
+  if (after.visualOverlaps.length === 0) {
+    // 明确保留这个分支：静态守卫据此确认真浏览器门禁不是只测高度。
+  } else {
+    problems.push(`可见文字/控件相交：${after.visualOverlaps.slice(0, 4).join('；')}`);
   }
 
   const ok = problems.length === 0;

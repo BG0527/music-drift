@@ -478,6 +478,37 @@ describe('RecorderPanel：录完要能试听自己那一段（用户实测需求
     expect(screen.getByText(/尚未开始/)).toBeInTheDocument();
   });
 
+  it('取消会丢弃本地录音、释放 object URL，再通知上层关闭录音窗口', async () => {
+    vi.useFakeTimers();
+    const onCancel = vi.fn();
+    const revokeObjectURL = vi.fn();
+    const harness = makePreviewEnv();
+    harness.environment.revokeObjectURL = revokeObjectURL;
+    render(
+      <RecorderPanel
+        segmentIndex={1}
+        totalSegments={4}
+        environment={harness.environment}
+        presetDurationMs={ANY_PRESET_MS}
+        onCancel={onCancel}
+      />,
+    );
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: /开始录制/ }));
+    });
+    await act(async () => {
+      vi.advanceTimersByTime(19_500);
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: /停止录制/ }));
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: '取消录制' }));
+
+    expect(revokeObjectURL).toHaveBeenCalledWith('blob:preview-panel');
+    expect(onCancel).toHaveBeenCalledTimes(1);
+  });
+
   it('宿主没有试听元素时：同样不显示试听按钮（绝不给"点了没反应"的按钮）', async () => {
     vi.useFakeTimers();
     // 拿得到 objectURL，但拿不到可播放的元素 —— 例如页面只传了部分端口。

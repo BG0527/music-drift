@@ -1,9 +1,12 @@
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import {
   BOTTLE_ID,
   SEGMENT_1,
   SEGMENT_2,
+  SONG_ID,
   USER_A,
   USER_B,
   bottleDetail,
@@ -17,6 +20,13 @@ import { BottlePage } from '../bottle-page';
  * 所以只要页面会渲染录制面板，就必须把 `/api/songs` 档上。
  */
 const songsHandler = { path: '/api/songs', respond: () => ({ body: [song()] }) };
+const libraryMetadata = JSON.parse(
+  readFileSync(join(process.cwd(), 'public', 'library', 'library.json'), 'utf8'),
+) as { tracks: Array<{ songId: string }> };
+const libraryHandler = {
+  path: '/library/library.json',
+  respond: () => ({ body: libraryMetadata }),
+};
 
 const SESSION_B = {
   user: { id: USER_B, handle: '接棒的人', email: 'b@example.com', role: 'USER' },
@@ -29,6 +39,52 @@ const SESSION_B = {
  * `missingSegmentIndexes[0]` 决定"这一棒录第几段"，`availableResolutions` 决定可选去向。
  */
 describe('漂流瓶接唱页', () => {
+  it('完整作品在详情页提供整首试听入口，并明确包含伴奏、四段人声与同步歌词', async () => {
+    const segments = [1, 2, 3, 4].map((index) => ({
+      id: `${String(index).repeat(8)}-${String(index).repeat(4)}-4${String(index).repeat(3)}-8${String(index).repeat(3)}-${String(index).repeat(12)}`,
+      index,
+      ownerId: index % 2 === 0 ? USER_B : USER_A,
+      note: null,
+      ownerCode: `接唱者#00${String(index)}`,
+      likeCount: 0,
+      dislikeCount: 0,
+      deletedAt: null,
+      audioMime: 'audio/webm',
+      durationMs: 20_000,
+    }));
+
+    const librarySongId = libraryMetadata.tracks[0]!.songId as typeof SONG_ID;
+    renderWithProviders(<BottlePage id={BOTTLE_ID} />, {
+      route: `/bottles/${BOTTLE_ID}`,
+      handlers: [
+        libraryHandler,
+        {
+          path: `/api/bottles/${BOTTLE_ID}`,
+          respond: () => ({
+            body: bottleDetail({
+              songId: librarySongId,
+              status: 'SEA',
+              seaZone: 'COMPLETED',
+              isComplete: true,
+              isHolder: false,
+              holderId: null,
+              missingSegmentIndexes: [],
+              availableResolutions: [],
+              segments,
+            }),
+          }),
+        },
+      ],
+    });
+
+    const heading = await screen.findByRole('heading', { name: '试听完整作品' });
+    const region = heading.closest('section');
+    expect(region).not.toBeNull();
+    expect(within(region!).getByText(/伴奏.*四段人声/)).toBeInTheDocument();
+    expect(within(region!).getByText(/歌词随播放进度/)).toBeInTheDocument();
+    expect(within(region!).getByRole('button', { name: '生成并试听完整作品' })).toBeEnabled();
+  });
+
   it('未登录时不摆出「录制 / 放回」按钮（先请登录，不制造会 401 的假按钮）', async () => {
     renderWithProviders(<BottlePage id={BOTTLE_ID} />, {
       route: `/bottles/${BOTTLE_ID}`,
@@ -105,6 +161,33 @@ describe('漂流瓶接唱页', () => {
 
     expect(await screen.findByRole('heading', { name: '选择声音去向' })).toBeInTheDocument();
     expect(screen.getByText(/已录下第 2 段/)).toBeInTheDocument();
+  });
+
+  it('本地复核时取消会关闭录音窗口，且不会提前打开去向窗口', async () => {
+    const recorder = fakeRecorderEnvironment();
+    renderWithProviders(
+      <BottlePage id={BOTTLE_ID} seams={{ recorderEnvironment: recorder.environment }} />,
+      {
+        route: `/bottles/${BOTTLE_ID}`,
+        handlers: [
+          songsHandler,
+          { path: '/api/auth/me', respond: () => ({ body: SESSION_B }) },
+          { path: `/api/bottles/${BOTTLE_ID}`, respond: () => ({ body: bottleDetail() }) },
+        ],
+      },
+    );
+
+    fireEvent.click(await screen.findByRole('button', { name: '录第 2 段' }));
+    fireEvent.click(await screen.findByRole('button', { name: /开始录制/ }));
+    recorder.clock.value += 20_000;
+    fireEvent.click(await screen.findByRole('button', { name: /停止录制/ }));
+    const cancel = await screen.findByRole('button', { name: '取消录制' });
+    fireEvent.click(cancel);
+
+    await waitFor(() => {
+      expect(screen.queryByRole('dialog', { name: '录第 2 段' })).not.toBeInTheDocument();
+    });
+    expect(screen.queryByRole('heading', { name: '选择声音去向' })).not.toBeInTheDocument();
   });
 
   it('持有者且有缺口：显示服务端给的段号，并把缺口显式标在时间轴上', async () => {
@@ -210,7 +293,8 @@ describe('漂流瓶接唱页', () => {
     );
 
     // 锚到播放器挂载（代号文本现在出现在发起者徽记与瓶身格两处，不能再当唯一锚点）
-    await screen.findByRole('button', { name: '播放' });
+    // t17：播放键是参考的唱片键，aria-label = 「播放第 N 段」
+    await screen.findByRole('button', { name: /^播放第 \d+ 段$/ });
     // 逐秒推进（每步 <1500ms，否则会被判成"拖动不计"）；段长 20s → 覆盖率 100%
     for (let second = 0; second <= 20; second += 1) {
       element.currentTime = second;
@@ -750,6 +834,22 @@ describe('逐块照抄 p-bottle-record.html', () => {
     // h2 副标题的稿式格式（全角空格分隔，逐字）
     const sub = screen.getByText(/在瓶身上点「听」换段/);
     expect(sub.textContent).toBe('第 1 段　午夜歌手#042　在瓶身上点「听」换段');
+  });
+
+  /**
+   * t17 深度复刻：段附言按参考挂 `.votesNote`（page-bottle.js `noteSuffix` 同位），
+   * **不塞进剖面卡** —— 参考 `.cap` 只有 代号 / 时长·赞踩 / 听 三行（h66）。
+   */
+  it('段附言挂在 votesNote 上（CONTEXT §12.2 原样），剖面卡不长第四行', async () => {
+    renderWithProviders(<BottlePage id={BOTTLE_ID} />, {
+      route: `/bottles/${BOTTLE_ID}`,
+      handlers: defaultHandlers,
+    });
+    await screen.findByRole('heading', { level: 1 });
+    const note = await screen.findByText(/本段附言/);
+    expect(note.textContent).toContain('在深夜哼一段没有词的曲子，期待接唱');
+    expect(note.closest('.votesNote'), '附言必须在 votesNote 里').not.toBeNull();
+    expect(document.querySelector('.cap .capNote'), '剖面卡不许长第四行').toBeNull();
   });
 
   it('块顺序照稿（不重组）：顶栏→标题区→沟槽(例外①)→瓶身装置→录制入口→试听→去向→底栏', async () => {

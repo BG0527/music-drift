@@ -132,6 +132,7 @@ export {
 
 export { formatClock, formatSeconds } from './format';
 export { downsampleLevels, normalizeLevels, peakLevel } from './waveform';
+export { KaraokeLyrics, type KaraokeLyricsProps } from './karaoke-lyrics';
 export {
   createBrowserRecorderEnvironment,
   normalizeRecorderMime,

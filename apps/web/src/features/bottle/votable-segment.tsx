@@ -99,7 +99,7 @@ export function VotableSegment({
   });
 
   return (
-    <div className={className ?? 'flex flex-col gap-[10px]'}>
+    <div className={className ?? 'flex flex-col'}>
       <SegmentPlayer
         src={src}
         segmentIndex={segment.index}
@@ -108,33 +108,38 @@ export function VotableSegment({
         isOwnSegment={isOwnSegment}
         // 收起播放器自带的踩：踩由下面这一对控件唯一承担（否则同一段出现两个踩）
         showDislike={false}
+        // t17 深度复刻：瓶身详情页用参考的 transport 构图（唱片键 + 水道 + 时长）
+        layout="transport"
         onProgress={listen.observe}
         {...(createElement === undefined ? {} : { createElement })}
       />
-      <VoteControls
-        segmentIndex={segment.index}
-        likeCount={segment.likeCount}
-        dislikeCount={segment.dislikeCount}
-        myVote={myVote}
-        listenShort={!listen.locallyUnlocked}
-        busy={like.isPending}
-        onLike={() => {
-          if (myVote === 'LIKE') return; // 内核会 LIKE_ALREADY_CAST：不做不可能成功的往返
-          like.mutate(
-            { segmentId: segment.id, value: 'LIKE' },
-            {
-              onSuccess: () => {
-                onVoted(segment.id, 'LIKE');
+      {/* 参考 .votes：赞/踩一对小按钮一行（t12 用户裁决的交互原样保留） */}
+      <div className="votes">
+        <VoteControls
+          segmentIndex={segment.index}
+          likeCount={segment.likeCount}
+          dislikeCount={segment.dislikeCount}
+          myVote={myVote}
+          listenShort={!listen.locallyUnlocked}
+          busy={like.isPending}
+          onLike={() => {
+            if (myVote === 'LIKE') return; // 内核会 LIKE_ALREADY_CAST：不做不可能成功的往返
+            like.mutate(
+              { segmentId: segment.id, value: 'LIKE' },
+              {
+                onSuccess: () => {
+                  onVoted(segment.id, 'LIKE');
+                },
+                onError: (error) => {
+                  onFailed?.(error);
+                },
               },
-              onError: (error) => {
-                onFailed?.(error);
-              },
-            },
-          );
-        }}
-        // 唯一的踩路径：先 flush 覆盖率再投 /votes（服务端按持久化覆盖率判 80%）
-        onDislike={listen.castDislike}
-      />
+            );
+          }}
+          // 唯一的踩路径：先 flush 覆盖率再投 /votes（服务端按持久化覆盖率判 80%）
+          onDislike={listen.castDislike}
+        />
+      </div>
     </div>
   );
 }

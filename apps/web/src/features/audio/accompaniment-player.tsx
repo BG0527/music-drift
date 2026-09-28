@@ -6,8 +6,14 @@
  * 卡片的底色用 `deep-current`（DESIGN.md：录制/波形区走深水暗底），与录制面板同一语义。
  */
 import { Button, Icon, cn } from '../../design-system';
-import { describeLibraryTrackMeta, type LibraryTrack } from '@music-drift/shared/audio';
+import { useMemo } from 'react';
+import {
+  describeLibraryTrackMeta,
+  karaokeLyricsForTrack,
+  type LibraryTrack,
+} from '@music-drift/shared/audio';
 import { formatClock } from './format';
+import { KaraokeLyrics } from './karaoke-lyrics';
 import { useAccompaniment, type AccompanimentEnvironment } from './use-accompaniment';
 
 export interface AccompanimentPlayerProps {
@@ -34,6 +40,10 @@ export function AccompanimentPlayer({
   });
 
   const gainLabel = `${view.gainDb >= 0 ? '+' : ''}${view.gainDb.toFixed(2)} dB`;
+  const lyricSegment = useMemo(
+    () => karaokeLyricsForTrack(track).find((item) => item.index === segmentIndex),
+    [segmentIndex, track],
+  );
 
   return (
     <div
@@ -83,6 +93,10 @@ export function AccompanimentPlayer({
               （曲目内 {formatClock(view.segment.startMs)}–{formatClock(view.segment.endMs)}）
             </span>
           </p>
+
+          {lyricSegment === undefined ? null : (
+            <KaraokeLyrics currentTime={view.positionMs / 1000} lines={lyricSegment.lines} />
+          )}
 
           <div
             role="progressbar"

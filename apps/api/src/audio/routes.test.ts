@@ -45,6 +45,28 @@ function buildTestApp(meta: SegmentAudioMeta | null = META): {
 }
 
 describe('GET /api/segments/:segmentId/audio', () => {
+  it('服务端判定当前观看者不可见时返回 404，且绝不读取音频字节', async () => {
+    const calls: Recorder = { sliceCalls: [] };
+    const repository: SegmentAudioRepository = {
+      stat: async () => META,
+      readSlice: async (segmentId, start, end) => {
+        calls.sliceCalls.push({ segmentId, start, end });
+        return AUDIO.slice(start, end + 1);
+      },
+    };
+    const app = Fastify({ logger: false });
+    registerSegmentAudioRoutes(app, {
+      repository,
+      canRead: async () => false,
+    });
+
+    const response = await app.inject({ method: 'GET', url: `/api/segments/${SEGMENT_ID}/audio` });
+
+    expect(response.statusCode).toBe(404);
+    expect(calls.sliceCalls).toEqual([]);
+    await app.close();
+  });
+
   it('整段请求：200 + 完整字节 + 试听所需响应头', async () => {
     const { app } = buildTestApp();
 

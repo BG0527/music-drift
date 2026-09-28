@@ -62,6 +62,13 @@ export interface SegmentPlayerProps {
   showDislike?: boolean;
   /** 测试/特殊环境注入音频元素工厂。 */
   createElement?: (src: string) => AudioElementLike;
+  /**
+   * 外观：
+   * - `card`（默认）= 浮动层播放条（标题 + 播放键 + 已听读数 + 进度）；
+   * - `transport` = **瓶身详情页的参考构图**（`site/bottle.html` `.transport`：
+   *   唱片播放键 `.play` + 400px 水道 `.bar` + 时长 `.timecode`），信息不减（进度条 + sr 文本照旧）。
+   */
+  layout?: 'card' | 'transport';
   className?: string;
 }
 
@@ -96,6 +103,7 @@ export function SegmentPlayer({
   showDislike = true,
   onProgress,
   createElement,
+  layout = 'card',
   className,
 }: SegmentPlayerProps) {
   const player = useSegmentPlayer({
@@ -140,6 +148,67 @@ export function SegmentPlayer({
       grooveReport({ segmentIndex: null, positionRatio: 0, playbackState: 'idle' });
     };
   }, [groovePositionRatio, grooveReport, player.playbackState, segmentIndex]);
+
+  /**
+   * `transport` 外观（t17 深度复刻：`site/bottle.html` `.transport` 逐块）——
+   * 唱片播放键 `.play`（52px 圆）+ 400px 水道 `.bar`（波形 + 已播水 + 珊瑚游标）+ `.timecode`。
+   * 信息一条不减：进度条仍是 `role="progressbar"`，状态与已听读数进 sr 文本（aria-live）。
+   * 进度条固定 400px 是参考的硬约定（唱针比例按"整条 400px"算，改宽度会让比例说谎）。
+   */
+  if (layout === 'transport') {
+    const fillPx = Math.round(groovePositionRatio * 400);
+    const playing = player.playbackState === 'playing';
+    return (
+      <div className={cn('transport', className)}>
+        <button
+          type="button"
+          className="play"
+          aria-label={`${PLAYBACK_UI[player.playbackState].label}第 ${String(segmentIndex)} 段`}
+          onClick={player.toggle}
+        >
+          <svg viewBox="0 0 34 34" fill="none" aria-hidden="true">
+            <circle cx="17" cy="17" r="16" stroke="var(--color-water-mid)" strokeOpacity=".45" />
+            <circle cx="17" cy="17" r="11.5" stroke="var(--color-water-mid)" strokeOpacity=".2" />
+            {playing ? (
+              <>
+                <rect x="13.4" y="11.6" width="3.2" height="10.8" rx="1" fill="var(--color-coral)" />
+                <rect x="17.8" y="11.6" width="3.2" height="10.8" rx="1" fill="var(--color-coral)" />
+              </>
+            ) : (
+              <path d="M14 11.8l9.4 5.2-9.4 5.2z" fill="var(--color-coral)" />
+            )}
+          </svg>
+        </button>
+
+        <div
+          className="bar"
+          role="progressbar"
+          aria-label={`第 ${String(segmentIndex)} 段播放进度 ${formatClock(player.positionMs)} / ${formatClock(typeof durationMs === 'number' ? durationMs : 0)}`}
+          aria-valuemin={0}
+          aria-valuemax={100}
+          aria-valuenow={percent}
+        >
+          <svg viewBox="0 0 400 20" fill="none" aria-hidden="true">
+            <path
+              d="M0 11 q14 -7 28 0 t28 0 t28 0 t28 0 t28 0 t28 0 t28 0 t28 0 t28 0 t28 0 t28 0 t28 0 t28 0 t28 0"
+              stroke="var(--color-water-mid)"
+              strokeOpacity=".18"
+            />
+          </svg>
+          <div className="fill" style={{ width: `${String(fillPx)}px` }} />
+          <div className="head" style={{ left: `${String(Math.max(0, fillPx - 2))}px` }} />
+        </div>
+
+        <span className="timecode">
+          {formatClock(player.positionMs)} / {formatClock(typeof durationMs === 'number' ? durationMs : 0)}
+        </span>
+
+        <span className="sr-only" aria-live="polite">
+          {PLAYBACK_UI[player.playbackState].state}；已听 {listenedSeconds} 秒 / 共 {totalSeconds} 秒（{percent}%）
+        </span>
+      </div>
+    );
+  }
 
   return (
     <div

@@ -12,6 +12,7 @@
  */
 import { describe, expect, it, vi } from 'vitest';
 import {
+  planAccompaniedMix,
   planMonoSequentialMix,
   summarizeAlignment,
   type MixPlan,
@@ -33,6 +34,27 @@ import {
 } from './mix-render';
 
 const SAMPLE_RATE = 8_000; // 小采样率让"帧 ↔ 毫秒"手算得清楚（1 帧 = 0.125ms）
+
+describe('mixPcm：完整试听保留伴奏', () => {
+  it('未录与暂未解锁时间槽都只保留伴奏，可见人声才叠加', () => {
+    const mixPlan = planAccompaniedMix({
+      segments: [{ index: 1, durationMs: 1_000, audioUrl: '/api/segments/a/audio' }],
+      totalSegments: 3,
+      missingSegmentIndexes: [2],
+      hiddenLaterSegmentCount: 1,
+      nominalDurationByIndex: { 1: 1_000, 2: 1_000, 3: 1_000 },
+      accompanimentUrl: '/library/accompaniment.mp3',
+      sampleRate: SAMPLE_RATE,
+    });
+    const accompaniment = [Float32Array.from({ length: 24_000 }, () => 0.2)];
+
+    const mixed = mixPcm(mixPlan, [clip(1, 8_000, 0.3)], { accompaniment });
+
+    expect(mixed.channels[0]?.[0]).toBeCloseTo(0.5);
+    expect(mixed.channels[0]?.[8_000]).toBeCloseTo(0.2);
+    expect(mixed.channels[0]?.[16_000]).toBeCloseTo(0.2);
+  });
+});
 
 function plan(segments: MixSourceSegment[], totalSegments = 4): MixPlan {
   return planMonoSequentialMix({ segments, totalSegments, sampleRate: SAMPLE_RATE });
@@ -312,15 +334,15 @@ describe('encodeWavPcm16 / wavBlob：可播放 + 可下载的成品', () => {
 
 describe('renderOfflineMix：浏览器端 OfflineAudioContext 调度（D-05 路径）', () => {
   function fakeContext() {
-    const starts: number[] = [];
+    const starts: Array<[number, number, number | undefined]> = [];
     const buffers: unknown[] = [];
-    const context: OfflineAudioContextLike & { starts: number[] } = {
+    const context = {
       starts,
       createBufferSource: () => ({
         buffer: null as AudioBufferLike | null,
         connect: vi.fn(),
-        start: (when?: number) => {
-          starts.push(when ?? 0);
+        start: (when = 0, offset = 0, duration?: number) => {
+          starts.push([when, offset, duration]);
         },
       }),
       destination: { id: 'destination' },
@@ -332,6 +354,8 @@ describe('renderOfflineMix：浏览器端 OfflineAudioContext 调度（D-05 路�
           duration: 2,
           getChannelData: () => Float32Array.from({ length: 16_000 }, () => 0),
         }) satisfies AudioBufferLike,
+    } satisfies OfflineAudioContextLike & {
+      starts: Array<[number, number, number | undefined]>;
     };
     return { context, starts, buffers };
   }
@@ -363,7 +387,11 @@ describe('renderOfflineMix：浏览器端 OfflineAudioContext 调度（D-05 路�
     });
 
     // 0ms / 1000+500(缺口)=1500ms / 2000ms
-    expect(starts).toEqual([0, 1.5, 2]);
+    expect(starts).toEqual([
+      [0, 0, 1],
+      [1.5, 0, 0.5],
+      [2, 0, 0.25],
+    ]);
     expect(rendered.length).toBe(16_000);
   });
 
@@ -380,7 +408,7 @@ describe('renderOfflineMix：浏览器端 OfflineAudioContext 调度（D-05 路�
       createContext: () => context,
     });
 
-    expect(starts).toEqual([0]);
+    expect(starts).toEqual([[0, 0, 1]]);
   });
 
   it('按计划的声道数与总帧数创建上下文（长度来自 plan，不靠猜）', async () => {

@@ -57,6 +57,7 @@ export interface MixExportEnvironment {
   render: (input: {
     plan: MixPlan;
     buffers: ReadonlyMap<number, AudioBufferLike>;
+    accompaniment: AudioBufferLike | null;
   }) => Promise<MixRenderResult>;
   createObjectURL: (blob: Blob) => string;
   revokeObjectURL: (url: string) => void;
@@ -151,12 +152,14 @@ function defaultDecode(bytes: ArrayBuffer): Promise<AudioBufferLike> {
 async function defaultRender(input: {
   plan: MixPlan;
   buffers: ReadonlyMap<number, AudioBufferLike>;
+  accompaniment: AudioBufferLike | null;
 }): Promise<MixRenderResult> {
   const Ctor = resolveOfflineContextCtor();
   if (Ctor !== null) {
     const rendered = await renderOfflineMix({
       plan: input.plan,
       buffers: input.buffers,
+      accompaniment: input.accompaniment,
       createContext: (channels, frames, sampleRate) => new Ctor(channels, frames, sampleRate),
     });
     return {
@@ -174,7 +177,16 @@ async function defaultRender(input: {
       Float32Array.from(buffer.getChannelData(channel)),
     ),
   }));
-  const mixed = mixPcm(input.plan, clips);
+  const mixed = mixPcm(input.plan, clips, {
+    ...(input.accompaniment === null
+      ? {}
+      : {
+          accompaniment: Array.from(
+            { length: input.accompaniment.numberOfChannels },
+            (_value, channel) => Float32Array.from(input.accompaniment?.getChannelData(channel) ?? []),
+          ),
+        }),
+  });
   return {
     channels: mixed.channels,
     sampleRate: mixed.sampleRate,
@@ -217,7 +229,7 @@ export function useMixExport(options: UseMixExportOptions): UseMixExportResult {
   useEffect(() => () => releaseUrl(), [releaseUrl]);
 
   const voiceClipCount = plan.clips.filter((clip) => clip.kind === 'voice').length;
-  const canExport = voiceClipCount > 0;
+  const canExport = voiceClipCount > 0 || plan.accompanimentUrl != null;
 
   const start = useCallback(async (): Promise<void> => {
     if (!canExport || runningRef.current) return;
@@ -247,6 +259,23 @@ export function useMixExport(options: UseMixExportOptions): UseMixExportResult {
     report('preparing', { done: 0, total });
 
     try {
+      let accompaniment: AudioBufferLike | null = null;
+      if (plan.accompanimentUrl !== undefined && plan.accompanimentUrl !== null) {
+        let bytes: ArrayBuffer;
+        try {
+          bytes = await fetchBytes(plan.accompanimentUrl);
+        } catch (thrown) {
+          throw new Error(
+            `取伴奏音频失败：${thrown instanceof Error ? thrown.message : '未知错误'}`,
+            { cause: thrown },
+          );
+        }
+        try {
+          accompaniment = await decode(bytes);
+        } catch {
+          throw new Error('伴奏音频解码失败（文件可能损坏或格式不受支持）。');
+        }
+      }
       const buffers = new Map<number, AudioBufferLike>();
       let done = 0;
       for (const clip of plan.clips) {
@@ -274,7 +303,7 @@ export function useMixExport(options: UseMixExportOptions): UseMixExportResult {
       }
 
       report('mixing', { done: total, total });
-      const rendered = await render({ plan, buffers });
+      const rendered = await render({ plan, buffers, accompaniment });
 
       report('encoding', { done: total, total });
       const wav = encodeWavPcm16({ sampleRate: rendered.sampleRate, channels: rendered.channels });
@@ -289,7 +318,8 @@ export function useMixExport(options: UseMixExportOptions): UseMixExportResult {
       const measurements = measureClipOnsets({ pcm, plan });
       const gaps = findNonSilentGaps({ pcm, plan });
 
-      setAlignment(summarizeAlignment(measurements));
+      // 混入伴奏后无法从最终波形区分“伴奏起拍”和“人声起拍”，禁止据此伪报人声对齐达标。
+      setAlignment(plan.hasAccompaniment ? null : summarizeAlignment(measurements));
       setMissingAudioIndexes(rendered.missingAudioIndexes);
       setNonSilentGaps(gaps);
 

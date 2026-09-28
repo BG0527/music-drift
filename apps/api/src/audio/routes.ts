@@ -6,17 +6,48 @@
  * - `Accept-Ranges: bytes` → 浏览器敢做 seek；Safari 探测 moov 时会先发 `bytes=-N` 后缀请求；
  * - `Cache-Control: private, no-store` → 别人的声音不进任何共享缓存（匿名社区，Figma/DESIGN.md 的隐私口径）。
  *
- * 权限：**本 Demo 该端点匿名可读**，因为 segment id 是 UUIDv4（不可枚举），
- * 且「随机捞到就能听」正是产品语义（CONTEXT §3.2）。账号级/持有者级收紧归 t9/t12，
- * 届时在 `registerSegmentAudioRoutes` 前加 preHandler 即可（本函数不改变这一扩展点）。
+ * 权限：生产装配注入 `canRead`，并与详情投影共用段可见性判据；UUID 不再被当成权限。
+ * 漂流中的隐藏后续段即使地址泄露也返回 404，入海后则对访客开放。
  */
-import type { FastifyInstance, FastifyReply } from 'fastify';
+import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
+import type { Clock } from '@music-drift/shared/domain';
 import { UuidSchema } from '@music-drift/shared/contracts';
+import { createActorResolver } from '../http/session.js';
+import type { Db } from '../db/client.js';
+import type { BottleStore } from '../store/bottles.js';
+import { isSegmentVisible, segmentVisibility } from '../store/visibility.js';
 import { parseRangeHeader } from './range.js';
 import type { SegmentAudioRepository } from './repository.js';
 
 export interface SegmentAudioRoutesOptions {
   repository: SegmentAudioRepository;
+  /** 详情投影之外的第二道权限边界；false 统一伪装为 404，避免泄露段是否存在。 */
+  canRead?: (request: FastifyRequest, segmentId: string) => Promise<boolean>;
+}
+
+/** 与详情投影共用 `segmentVisibility`，防止 UUID 直链绕过“后续未解锁”。 */
+export function createSegmentAudioAuthorizer(input: {
+  db: Db;
+  store: BottleStore;
+  clock: Clock;
+}): NonNullable<SegmentAudioRoutesOptions['canRead']> {
+  const actors = createActorResolver(input.db, input.clock);
+  return async (request, segmentId) => {
+    const rows = await input.db.query<{ bottle_id: string; index: number }>(
+      `select bottle_id, "index" from bottle_segments
+       where id = $1 and deleted_at is null`,
+      [segmentId],
+    );
+    const segment = rows[0];
+    if (segment === undefined) return false;
+    const state = await input.store.loadState(segment.bottle_id);
+    if (state === null) return false;
+    const actor = await actors.resolve(request);
+    return isSegmentVisible(
+      segmentVisibility({ state, viewerId: actor?.user.id ?? null }),
+      segment.index,
+    );
+  };
 }
 
 /** 404 只给"找不到"，不回显 id 或是否存在（避免成为探测接口）。 */
@@ -36,6 +67,9 @@ export function registerSegmentAudioRoutes(
     const segmentId = parsedId.data;
     const meta = await options.repository.stat(segmentId);
     if (meta === null || meta.byteSize <= 0) return sendNotFound(reply);
+    if (options.canRead !== undefined && !(await options.canRead(request, segmentId))) {
+      return sendNotFound(reply);
+    }
 
     const size = meta.byteSize;
     const range = parseRangeHeader(request.headers.range, size);

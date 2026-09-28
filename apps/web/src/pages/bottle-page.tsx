@@ -16,14 +16,15 @@
  * 三条不变量（ADR-015，页面不许自己推断）：段号 = `missingSegmentIndexes[0]`；
  * 完成度看缺口；备选去向由服务端给（发起者没有「回传」）。
  */
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import type { BottleDetail, RecordSegmentResponse, Resolution } from '@music-drift/shared';
+import { karaokeLyricsForTrack, planAccompaniedMix } from '@music-drift/shared/audio';
 import {
   useChooseResolution,
   useInvalidateBottle,
   usePutBack,
 } from '../features/api/mutations';
-import { useBottle, segmentAudioUrl } from '../features/api/queries';
+import { useBottle, segmentAudioUrl, useLibraryMetadata } from '../features/api/queries';
 import { ApiError } from '../features/api/client';
 import { ConflictNotice } from '../features/bottle/conflict-notice';
 import { RecordStep } from '../features/bottle/record-step';
@@ -44,6 +45,7 @@ import { useSession } from '../features/session/session-context';
 import { GroovePlaybackProvider, GrooveTimeline } from '../features/audio/groove-timeline';
 import {
   type AudioElementLike,
+  MixExportPanel,
   type RecorderEnvironment,
   type UploadTransport,
 } from '../features/audio';
@@ -53,6 +55,7 @@ import { Link } from './shell/router';
 import { useNavigate } from './shell/router-context';
 import { buildPath } from './shell/routes';
 import { TEXT_LINK, TEXT_LINK_STRONG } from './shell/link-styles';
+import './bottle-page.css';
 
 export interface BottlePageProps {
   id: string;
@@ -81,25 +84,27 @@ const NEXT_TEXT_LINK =
   'inline-flex min-h-11 items-center gap-[7px] whitespace-nowrap text-[0.875rem] text-coral underline underline-offset-[4px]';
 
 /**
- * 瓶身装置「段间距」收紧（一屏门禁 §46.3）：装置本体不删不重组，只经 `RelayTimeline`
- * 公开的 `className` 下沉覆盖内距 —— ol 内距 12→6、段位格 10→6、格内行距 6→4、水位标签下距 6→2。
- * `relay-timeline.tsx` 是别人的文件（只读），这里不改它一行。
+ * t17 深度复刻返工（用户打回「还是很丑」）：版式不再自己发明 ——
+ * 三层构图与坐标系整体照抄 `site/bottle.html` + `site/patches/bottle.css`，落在 `pages/bottle-page.css`：
+ *   场景层 `.bp-scene` / 标注层（RelayTimeline：segNum·segLab·cap·gapBox·selMark·callout·corkLab）/
+ *   仪器层（标题区 / `.listenCol` / `.destCol` / `.bottomRule`+`.bottom`），上部 `.bp-timeline` 时间轴。
+ * 窄屏（<1024）仍走流式 + order 让位（下面各块的 order-* 类），DOM 块序不动。
  */
-const RELAY_GAP_TIGHTEN = [
-  '[&_h2]:leading-none',
-  '[&_[data-testid=relay-timeline]]:py-[4px]',
-  '[&_[data-testid=relay-timeline]_li]:py-[4px]',
-  '[&_[data-testid=relay-timeline]_li]:gap-[4px]',
-  '[&_[data-testid=relay-timeline]_li_div]:gap-[4px]',
-  '[&_[data-testid=bottle-body]>p]:mb-[2px]',
-].join(' ');
 
 export function BottlePage({ id, seams }: BottlePageProps) {
   const bottle = useBottle(id);
   return (
     <GroovePlaybackProvider>
       {/* 页面自带 <main>（外壳不渲染）：稿的 76/30/16px 画布边距 → 流体（vw，rem 下限） */}
-      <main className="flex min-w-0 flex-col px-[max(1.5rem,5.278vw)] pt-[max(1.5rem,2.083vw)] pb-[max(1rem,1.111vw)] text-paper">
+      <main className="bottle-page flex min-w-0 flex-col px-[max(1.5rem,5.278vw)] pt-[max(1.5rem,2.083vw)] pb-[max(1rem,1.111vw)] text-paper md:h-[100dvh] md:overflow-hidden">
+        {/* 场景层（稿 .clip：platter / air / glint / deep / current）——纯装饰、零高度 */}
+        <div className="bp-scene" aria-hidden="true">
+          <span className="platter" />
+          <span className="air" />
+          <span className="glint" />
+          <span className="deep" />
+          <span className="current" />
+        </div>
         <AsyncBoundary query={bottle}>
           {(data) => <BottleView bottle={data} {...(seams === undefined ? {} : { seams })} />}
         </AsyncBoundary>
@@ -123,6 +128,8 @@ function BottleView({ bottle, seams }: { bottle: BottleDetail; seams?: BottlePag
   const [selectedSegmentId, setSelectedSegmentId] = useState<string | null>(null);
   /** 录制面板（录完才能选去向）：收进弹窗，页面本体只留稿上的 CTA。 */
   const [recorderOpen, setRecorderOpen] = useState(false);
+  /** 完整试听独占一个 Modal，避免把新增播放器撑进一屏画布，也不与录音/去向浮层叠加。 */
+  const [fullPreviewOpen, setFullPreviewOpen] = useState(false);
   /** 私密留言（§5）：声明式内容 + 表单 → 弹窗。 */
   const [messagesOpen, setMessagesOpen] = useState(false);
   /** 投票失败（409 冲突 / 网络层）→ 交给 ConflictNotice 给出口，不静默。 */
@@ -138,8 +145,44 @@ function BottleView({ bottle, seams }: { bottle: BottleDetail; seams?: BottlePag
     id: string;
   } | null>(null);
   const me = session.user?.id ?? null;
+  const library = useLibraryMetadata();
 
   const liveSegments = bottle.segments.filter((segment) => segment.deletedAt === null);
+  const libraryTrack = library.data?.tracks.find((track) => track.songId === bottle.songId) ?? null;
+  const fullMixPlan = useMemo(
+    () =>
+      libraryTrack === null
+        ? null
+        : planAccompaniedMix({
+            segments: liveSegments.flatMap((segment) => {
+              const durationMs =
+                libraryTrack.segments.find((preset) => preset.index === segment.index)?.durationMs ??
+                segment.durationMs;
+              return durationMs === null
+                ? []
+                : [
+                    {
+                      index: segment.index,
+                      durationMs,
+                      audioUrl: segmentAudioUrl(segment.id),
+                      ownerCode: segment.ownerCode,
+                    },
+                  ];
+            }),
+            totalSegments: bottle.totalSegments,
+            missingSegmentIndexes: bottle.missingSegmentIndexes,
+            hiddenLaterSegmentCount: bottle.hiddenLaterSegmentCount,
+            nominalDurationByIndex: Object.fromEntries(
+              libraryTrack.segments.map((segment) => [segment.index, segment.durationMs]),
+            ),
+            accompanimentUrl: libraryTrack.accompanimentRef,
+          }),
+    [bottle.hiddenLaterSegmentCount, bottle.missingSegmentIndexes, bottle.totalSegments, libraryTrack, liveSegments],
+  );
+  const fullLyrics = useMemo(
+    () => (libraryTrack === null ? [] : karaokeLyricsForTrack(libraryTrack).flatMap((part) => part.lines)),
+    [libraryTrack],
+  );
   /** 默认选段：补位上下文指的那一段，其次最后一段；用户点「听」后由 state 覆盖（派生默认，不用 effect）。 */
   const preferredSegmentId =
     bottle.replacementContext?.listenSegmentId ?? liveSegments[liveSegments.length - 1]?.id ?? null;
@@ -163,7 +206,12 @@ function BottleView({ bottle, seams }: { bottle: BottleDetail; seams?: BottlePag
   const canChooseResolution = bottle.availableResolutions.length > 0;
   /** 稿上 destCol 的三条水路 = 三选一入口；录完（或已录满）才摆出来 —— 与旧"选择去向"按钮同一门。 */
   const showDestinationRows = canChooseResolution && !canRecord;
-  const canPutBack = bottle.isHolder && bottle.status === 'HELD' && !mySegmentRecorded;
+  /**
+   * 放回（参考 page-bottle.js `renderPutBack`）：**判据只认服务端事实**
+   * `isHolder && HELD` —— 内核 `canPutBack` 同样只要求"持有 + 未处置"（唱没唱过不拦，
+   * 见 packages/shared domain/bottle.ts）。未登录/非持有者仍不渲染（不摆假按钮）。
+   */
+  const canPutBack = bottle.isHolder && bottle.status === 'HELD';
   const destinationRows = bottle.availableResolutions.map((choice) => ({
     choice,
     copy: resolutionCopy(choice),
@@ -172,7 +220,7 @@ function BottleView({ bottle, seams }: { bottle: BottleDetail; seams?: BottlePag
   return (
     <>
       {/* ── 顶栏（稿 .crumb）：回河道 + 状态 pill ─────────────────────────── */}
-      <nav aria-label="面包屑" className="flex flex-wrap items-center gap-[16px]">
+      <nav aria-label="面包屑" className="bp-crumb flex flex-wrap items-center gap-[16px]">
         <Link
           to="/river"
           className="inline-flex min-h-11 items-center gap-[7px] whitespace-nowrap text-[0.875rem] text-glass underline underline-offset-[4px]"
@@ -185,19 +233,18 @@ function BottleView({ bottle, seams }: { bottle: BottleDetail; seams?: BottlePag
         </span>
       </nav>
 
-      {/* ── 标题区（稿 h1/.work/.metaRow/.note + 右上 .maker 徽记） ───────── */}
-      {/* 间距收紧 = 一屏门禁（§46.3）：面包屑与标题、行间留白压到最小可读余量 */}
-      <header className="enter-rise stagger-1 relative flex flex-col">
+      {/* ── 标题区（稿 h1/.work/.metaRow/.note + 右上 .maker 徽记）：整列按参考坐标落位 ── */}
+      <header className="bp-head enter-rise stagger-1 relative flex flex-col">
         <h1 className="text-[clamp(2rem,3.9vw,3.5rem)] font-bold leading-none text-paper">
           漂流瓶详情
         </h1>
-        <p className="mt-[4px] text-[1.1875rem] font-bold leading-[1.1] text-paper">{bottle.songTitle}</p>
-        <p className="mt-[2px] flex flex-wrap gap-x-[20px] text-[0.875rem] leading-[1.1] text-muted">
+        <p className="bf-title mt-[4px] text-[1.1875rem] font-bold leading-[1.1] text-paper">{bottle.songTitle}</p>
+        <p className="bf-meta mt-[2px] flex flex-wrap gap-x-[20px] text-[0.875rem] leading-[1.1] text-muted">
           <span>{progressLabel(bottle)}</span>
           <span>{relayHeadline(bottle)}</span>
         </p>
         {gapNotice(bottle.missingSegmentIndexes) === null ? null : (
-          <p className="mt-[2px] flex max-w-[50rem] items-start gap-[11px] text-[0.9375rem] leading-[1.6] text-warm">
+          <p className="bf-note mt-[2px] flex max-w-[50rem] items-start gap-[11px] text-[0.9375rem] leading-[1.6] text-warm">
             {/* 缺口标记：一颗 5×5 的珊瑚方点（不是一个句首的圆角标签） */}
             <span aria-hidden="true" className="mt-[8px] h-[5px] w-[5px] shrink-0 bg-coral" />
             <span>缺口是歌里固定的段位，不会被别人的段顶替。成品里这段时间会留成静音。</span>
@@ -205,7 +252,7 @@ function BottleView({ bottle, seams }: { bottle: BottleDetail; seams?: BottlePag
         )}
 
         {/* 发起者徽记（稿 .maker）：桌面贴标题带右上，窄屏顺流跟在 note 后面 */}
-        <div className="mt-[8px] flex items-center gap-[16px] md:absolute md:right-0 md:top-0 md:mt-0">
+        <div className="maker mt-[8px] flex items-center gap-[16px] md:absolute md:right-0 md:top-0 md:mt-0">
           <span
             role="img"
             aria-label="发起者徽记"
@@ -228,7 +275,7 @@ function BottleView({ bottle, seams }: { bottle: BottleDetail; seams?: BottlePag
 
       {/* 层外提示（触发才出现，非稿块）：成功播报 + 投后下一步键（G2）/ 没听满提醒 / 投票冲突 */}
       {announcement === null ? null : (
-        <div className="flex flex-col">
+        <div className="bp-status-item flex flex-col">
           <Toast tone="success" message={announcement} />
           {/* G2：三选一成功后留在正文的语义下一步（播报保留，键不只活在 aria-live 里） */}
           {resolutionNext === null ? null : (
@@ -268,7 +315,12 @@ function BottleView({ bottle, seams }: { bottle: BottleDetail; seams?: BottlePag
         </Modal>
       )}
       {voteError === null ? null : (
-        <ConflictNotice error={voteError} bottleId={bottle.id} onRetry={() => { setVoteError(null); }} />
+        <ConflictNotice
+          error={voteError}
+          bottleId={bottle.id}
+          onRetry={() => { setVoteError(null); }}
+          className="bp-status-item"
+        />
       )}
 
       {/*
@@ -278,47 +330,38 @@ function BottleView({ bottle, seams }: { bottle: BottleDetail; seams?: BottlePag
         沟槽答"现在放到哪儿、这一段多长"（唱针跟随真实播放进度）。
       */}
       <GrooveTimeline
-        className="mt-[4px] order-4 lg:order-none"
+        className="bp-timeline bf-groove mt-[4px] order-4 lg:order-none"
         segments={liveSegments}
         totalSegments={bottle.totalSegments}
         missingSegmentIndexes={bottle.missingSegmentIndexes}
       />
 
-      {/* ── 瓶身装置（稿 .heroLab + 四格刻槽 + 水位 + .callout + .corkLab）：relay-timeline 承担（只读） ── */}
-      {/* order：<1024 让位到播放/录制之后；lg:order-none 归位稿序（DOM 块序不动） */}
-      <div className="mt-[6px] flex flex-col gap-[6px] order-3 lg:order-none">
-        <RelayTimeline
-          className={RELAY_GAP_TIGHTEN}
-          segments={liveSegments}
-          totalSegments={bottle.totalSegments}
-          missingSegmentIndexes={bottle.missingSegmentIndexes}
-          status={bottle.status}
-          selectedSegmentId={selectedSegment?.id ?? null}
-          onSelectSegment={setSelectedSegmentId}
-          onReportSegment={(segmentId) => {
-            setReportTarget({ type: 'SEGMENT', id: segmentId });
-          }}
-        />
-
-        {/* 第 4 格录制入口（稿 .gapBox）：缺口槽 + 逐字说明 + CTA，长在缺口位上 */}
-        {canRecord && nextIndex !== undefined ? (
-          <div
-            data-anchor="bottle-record"
-            className="order-[-9999] lg:order-none mx-auto flex w-full max-w-[211px] flex-col items-center text-center"
-          >
-            <span
-              aria-hidden="true"
-              className="h-[46px] w-[110px] rounded-[23px] border border-dashed border-warm/50"
-            />
-            <span className="mt-[6px] font-latin text-[0.6875rem] tracking-[0.24em] text-warm">
-              缺口
-            </span>
-            <p className="mt-[4px] text-[0.84375rem] text-paper">
-              第 {String(nextIndex)} 段由你开第一句
-            </p>
+      {/* ── 瓶身装置（标注层）：site/bottle.html 的四格剖面 —— 段号/段名/段位卡挂在刻度上，
+          缺口簇长在服务端给的那一格（可录给 CTA、不可录给参考的说明），落位全在 bottle-page.css。
+          order 类挂在装置根上：窄屏 <1024 让位到两栏之后，lg 归位稿序（DOM 块序不动）。 ── */}
+      <RelayTimeline
+        className="bf-relay order-3 lg:order-none"
+        segments={liveSegments}
+        totalSegments={bottle.totalSegments}
+        missingSegmentIndexes={bottle.missingSegmentIndexes}
+        status={bottle.status}
+        selectedSegmentId={selectedSegment?.id ?? null}
+        onSelectSegment={setSelectedSegmentId}
+        onReportSegment={(segmentId) => {
+          setReportTarget({ type: 'SEGMENT', id: segmentId });
+        }}
+        gapNote={
+          nextIndex === undefined
+            ? null
+            : canRecord
+              ? '这一段按该段的固定时长录，录完再选去向。不点开就不会占用你的麦克风。'
+              : '这一段只有发起者（尚未投河时）或当前持有者能录：你看得到缺口，但录不了它。'
+        }
+        gapAction={
+          !canRecord || nextIndex === undefined ? null : (
             <button
               type="button"
-              className="mt-[4px] inline-flex h-11 items-center gap-[8px] rounded-base bg-coral px-[17px] text-[0.9375rem] text-ink transition-colors duration-200 ease-out hover:bg-coral/90"
+              className="cta whitespace-nowrap"
               onClick={() => {
                 setRecorderOpen(true);
               }}
@@ -326,22 +369,19 @@ function BottleView({ bottle, seams }: { bottle: BottleDetail; seams?: BottlePag
               <Icon name="Mic" size={16} />
               录第 {String(nextIndex)} 段
             </button>
-            <p className="mt-[2px] text-[0.6875rem] leading-[1.5] text-muted">
-              这一段按该段的固定时长录，录完再选去向。不点开就不会占用你的麦克风。
-            </p>
-          </div>
-        ) : null}
+          )
+        }
+      />
 
-        {bottle.hiddenLaterSegmentCount === 0 ? null : (
-          <p
-            role="status"
-            className="rounded-base border border-info-border bg-info-tint px-[12px] py-[8px] text-[0.875rem] leading-[1.5] text-info"
-          >
-            还有 {bottle.hiddenLaterSegmentCount}{' '}
-            段现在看不到（CONTEXT §9.1：漂流中只能听到自己这一棒之前的部分），入海后全部解锁。
-          </p>
-        )}
-      </div>
+      {bottle.hiddenLaterSegmentCount === 0 ? null : (
+        <p
+          role="status"
+          className="bp-status-item order-3 lg:order-none rounded-base border border-info-border bg-info-tint px-[12px] py-[8px] text-[0.875rem] leading-[1.5] text-info"
+        >
+          还有 {bottle.hiddenLaterSegmentCount}{' '}
+          段现在看不到（CONTEXT §9.1：漂流中只能听到自己这一棒之前的部分），入海后全部解锁。
+        </p>
+      )}
 
       {/*
         稿两列：.listenCol（614） | .destCol（644），间距 30。
@@ -350,10 +390,10 @@ function BottleView({ bottle, seams }: { bottle: BottleDetail; seams?: BottlePag
       */}
       <div
         data-anchor="bottle-action"
-        className="mt-[8px] grid gap-x-[30px] gap-y-[16px] order-1 lg:order-none lg:grid-cols-[614fr_644fr] lg:items-start"
+        className="bp-cols mt-[8px] grid gap-x-[30px] gap-y-[16px] order-1 lg:order-none lg:grid-cols-[614fr_644fr] lg:items-start"
       >
         <section
-          className="enter-rise stagger-2 flex flex-col"
+          className="listenCol enter-rise stagger-2 flex flex-col"
           aria-labelledby="playback-heading"
           data-anchor="bottle-play"
         >
@@ -364,17 +404,64 @@ function BottleView({ bottle, seams }: { bottle: BottleDetail; seams?: BottlePag
             试听与投票
             <span className="text-[0.84375rem] font-normal text-muted">
               {selectedSegment === null
-                ? '还没有人唱过'
+                ? '现在没有你能试听的段'
                 : // 稿逐字含两个全角空格（U+3000）：模板串不被 no-irregular-whitespace 豁免 ⇒ 用 U+3000 转义保字节
                   `第 ${String(selectedSegment.index)} 段\u3000${selectedSegment.ownerCode}\u3000在瓶身上点「听」换段`}
             </span>
           </h2>
 
-          {selectedSegment === null ? null : (
+          <section className="bf-full-preview mt-[4px] flex flex-wrap items-center gap-x-[12px] gap-y-[4px]">
+            <h3 className="sr-only">试听完整作品</h3>
+            <p className="text-[0.8125rem] leading-[1.4] text-muted">
+              伴奏 + 四段人声；歌词随播放进度滚动。
+            </p>
+            <button
+              type="button"
+              disabled={fullMixPlan === null}
+              className="inline-flex min-h-11 items-center gap-[7px] whitespace-nowrap rounded-base border border-glass/40 px-[12px] text-[0.875rem] text-glass transition-[transform,opacity] duration-[var(--motion-hover-duration)] ease-[var(--motion-entry-easing)] hover:scale-[var(--motion-hover-scale)] disabled:cursor-not-allowed disabled:opacity-60 motion-reduce:transition-none motion-reduce:hover:scale-100"
+              onClick={() => {
+                setFullPreviewOpen(true);
+              }}
+            >
+              <Icon name="AudioWaveform" size={16} />
+              生成并试听完整作品
+            </button>
+          </section>
+
+          {selectedSegment === null ? (
+            /*
+             * 参考 renderListenColumn：没有可试听的段时 **transport 仍在位**（0:00 / 0:00），
+             * 但播放键**禁用** —— 几何与参考对齐，同时不制造点了没用的控件。
+             */
+            <div className="bf-player transport" data-testid="transport-empty" aria-disabled="true">
+              <button
+                type="button"
+                className="play"
+                disabled
+                aria-label="播放（现在没有你能试听的段）"
+              >
+                <svg viewBox="0 0 34 34" fill="none" aria-hidden="true">
+                  <circle cx="17" cy="17" r="16" stroke="var(--color-water-mid)" strokeOpacity=".45" />
+                  <circle cx="17" cy="17" r="11.5" stroke="var(--color-water-mid)" strokeOpacity=".2" />
+                  <path d="M14 11.8l9.4 5.2-9.4 5.2z" fill="var(--color-muted)" />
+                </svg>
+              </button>
+              <div className="bar" aria-hidden="true">
+                <svg viewBox="0 0 400 20" fill="none" aria-hidden="true">
+                  <path
+                    d="M0 11 q14 -7 28 0 t28 0 t28 0 t28 0 t28 0 t28 0 t28 0 t28 0 t28 0 t28 0 t28 0 t28 0 t28 0 t28 0"
+                    stroke="var(--color-water-mid)"
+                    strokeOpacity=".18"
+                  />
+                </svg>
+              </div>
+              <span className="timecode">0:00 / 0:00</span>
+            </div>
+          ) : (
             <VotableSegment
               // key 用段 id：换段就是换一个上报器实例（旧的覆盖进度不会串到新段上）
               key={selectedSegment.id}
-              className="mt-[6px] flex flex-col gap-[6px]"
+              className="bf-player"
               segment={{
                 id: selectedSegment.id,
                 index: selectedSegment.index,
@@ -401,17 +488,27 @@ function BottleView({ bottle, seams }: { bottle: BottleDetail; seams?: BottlePag
             />
           )}
 
-          <p className="mt-[4px] text-[0.8125rem] text-muted">
-            还没有听满这一段，继续听一会儿再点踩吧。
+          <p className="bf-hint votesNote mt-[4px] text-[0.8125rem] text-muted">
+            {selectedSegment === null
+              ? '还没有可试听的段，也就没有可投票的段。'
+              : '还没有听满这一段，继续听一会儿再点踩吧。'}
+            {/* 段附言（CONTEXT §12.2）按参考挂在 votesNote 上（page-bottle.js noteSuffix 同位） */}
+            {selectedSegment?.note === null || selectedSegment?.note === undefined || selectedSegment.note === '' ? null : (
+              <span>　｜ 本段附言：{selectedSegment.note}</span>
+            )}
           </p>
 
-          {/* 放回（稿 .putBack）：不接时把瓶子还给河道 */}
-          {canPutBack ? (
-            <div className="mt-[8px] flex flex-wrap items-center gap-[14px]">
+          {/* 放回（稿 .putBack）：参考这一行**常驻** —— 能放回给按钮，不能放回给禁用按钮+原因
+              （未登录仍不出现：不摆会 401 的假按钮，见 bottle-page.test 首条） */}
+          {canPutBack || session.status !== 'guest' ? (
+            <div
+              className="putBack mt-[8px] flex flex-wrap items-center gap-[14px]"
+              data-can-put-back={canPutBack ? 'true' : 'false'}
+            >
               <button
                 type="button"
-                disabled={putBack.isPending}
-                className="inline-flex min-h-11 items-center gap-[8px] rounded-base border border-paper/20 px-[15px] text-[0.875rem] text-paper transition-colors duration-200 ease-out hover:border-coral disabled:opacity-60"
+                disabled={!canPutBack || putBack.isPending}
+                className="ghost inline-flex min-h-11 items-center gap-[8px] rounded-base border border-paper/20 px-[15px] text-[0.875rem] text-paper transition-colors duration-200 ease-out hover:border-coral disabled:cursor-not-allowed disabled:opacity-60"
                 onClick={() => {
                   void putBack
                     .mutateAsync()
@@ -428,15 +525,17 @@ function BottleView({ bottle, seams }: { bottle: BottleDetail; seams?: BottlePag
                 放回海中，继续漂流
               </button>
               <span className="text-[0.8125rem] text-muted">
-                还没想好要不要唱？放回去不会记录任何东西。
+                {canPutBack
+                  ? '还没想好要不要唱？放回去不会记录任何东西。'
+                  : '你此刻不是这支瓶子的持有者，放回不成立。'}
               </span>
             </div>
           ) : null}
         </section>
 
-        <section className="enter-rise stagger-3 flex flex-col">
+        <section className="destCol enter-rise stagger-3 flex flex-col">
           <h2 className="text-[1.0625rem] font-bold leading-none text-paper">选择去向</h2>
-          <p className="mt-[4px] text-[0.8125rem] text-muted">
+          <p className="sub mt-[4px] text-[0.8125rem] text-muted">
             接下来决定它去哪。发起者的第一棒没有「回传」，可选去向由服务端给。
           </p>
 
@@ -446,17 +545,17 @@ function BottleView({ bottle, seams }: { bottle: BottleDetail; seams?: BottlePag
                 <button
                   key={choice}
                   type="button"
-                  className="mt-[6px] flex min-h-[46px] w-full items-start gap-[16px] rounded-base text-left transition-colors duration-200 ease-out hover:text-paper"
+                  className="destRow mt-[6px] flex min-h-[46px] w-full items-start gap-[16px] rounded-base text-left transition-colors duration-200 ease-out hover:text-paper"
                   onClick={() => {
                     setModalOpen(true);
                   }}
                 >
-                  <span aria-hidden="true" className="mt-[6px] w-[30px] shrink-0 text-glass/80">
+                  <span aria-hidden="true" className="glyph mt-[6px] w-[30px] shrink-0 text-glass/80">
                     <Icon name={DEST_GLYPH[choice]} size={32} />
                   </span>
                   <span className="min-w-0">
-                    <span className="block text-[1rem] font-bold">{copy.title}</span>
-                    <span className="mt-[3px] block text-[0.8125rem] leading-[1.4] text-muted">
+                    <span className="t block text-[1rem] font-bold">{copy.title}</span>
+                    <span className="d mt-[3px] block text-[0.8125rem] leading-[1.4] text-muted">
                       {copy.detail}
                     </span>
                   </span>
@@ -476,11 +575,11 @@ function BottleView({ bottle, seams }: { bottle: BottleDetail; seams?: BottlePag
               message: '请先登录再继续：登录之后就能接这一棒。',
             })
           }
-          className="max-w-[46rem] order-2 lg:order-none"
+          className="bp-status-item max-w-[46rem] order-2 lg:order-none"
         />
       ) : null}
       {!canActOnBottle ? (
-        <p className="order-2 lg:order-none flex flex-wrap items-center gap-x-[12px] gap-y-[2px] rounded-base border border-line/15 bg-ink px-4 py-[2px] text-[0.9375rem] leading-[1.6] text-muted">
+        <p className="bf-notice bp-status-item order-2 lg:order-none flex flex-wrap items-center gap-x-[12px] gap-y-[2px] rounded-base border border-line/15 bg-ink px-4 py-[2px] text-[0.9375rem] leading-[1.6] text-muted">
           <Icon name="Waves" size={18} />
           <span>这个瓶子现在不在你手上（同一条河道同一时刻只有一个人拿着它）。</span>
           <Link to="/river" className={TEXT_LINK_STRONG}>
@@ -492,23 +591,23 @@ function BottleView({ bottle, seams }: { bottle: BottleDetail; seams?: BottlePag
         <ConflictNotice
           error={putBack.error}
           bottleId={bottle.id}
-          className="order-2 lg:order-none"
+          className="bp-status-item order-2 lg:order-none"
         />
       ) : null}
       {resolution.isError && !modalOpen ? (
         <ConflictNotice
           error={resolution.error}
           bottleId={bottle.id}
-          className="order-2 lg:order-none"
+          className="bp-status-item order-2 lg:order-none"
         />
       ) : null}
 
       {/* ── 底栏（稿 .bottomRule + .bottom）：漂流日志 / 服务端记账 / 留言 / 举报 ── */}
       <div
         aria-hidden="true"
-        className="mt-[2px] h-px w-full bg-line/10 order-5 lg:order-none"
+        className="bottomRule bf-rule mt-[2px] h-px w-full bg-line/10 order-5 lg:order-none"
       />
-      <div className="mt-[2px] flex flex-wrap items-center gap-[22px] text-[0.8125rem] text-muted order-5 lg:order-none">
+      <div className="bottom bf-bottom mt-[2px] flex flex-wrap items-center gap-[22px] text-[0.8125rem] text-muted order-5 lg:order-none">
         <Link to={`/bottles/${bottle.id}/log`} className={`${TEXT_LINK} text-glass`}>
           看这只瓶子的漂流日志
         </Link>
@@ -553,6 +652,9 @@ function BottleView({ bottle, seams }: { bottle: BottleDetail; seams?: BottlePag
             totalSegments={bottle.totalSegments}
             recorderEnvironment={seams?.recorderEnvironment}
             uploadTransport={seams?.uploadTransport}
+            onCancel={() => {
+              setRecorderOpen(false);
+            }}
             onUploaded={async (response: RecordSegmentResponse) => {
               setAnnouncement(`已录下第 ${String(response.index)} 段，等待你选择去向。`);
               setRecorderOpen(false);
@@ -594,6 +696,23 @@ function BottleView({ bottle, seams }: { bottle: BottleDetail; seams?: BottlePag
             .catch(() => undefined);
         }}
       />
+
+      <Modal
+        open={fullPreviewOpen && fullMixPlan !== null}
+        title="试听完整作品"
+        className="max-h-[calc(100dvh-3rem)] overflow-y-auto"
+        onClose={() => {
+          setFullPreviewOpen(false);
+        }}
+      >
+        {fullMixPlan === null ? null : (
+          <MixExportPanel
+            plan={fullMixPlan}
+            title="伴奏与接唱合成"
+            lyrics={fullLyrics}
+          />
+        )}
+      </Modal>
 
       <PrivateMessages
         open={messagesOpen}

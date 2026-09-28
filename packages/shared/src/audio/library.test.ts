@@ -18,6 +18,7 @@ import {
   LIBRARY_LICENSE,
   LIBRARY_PEAK_CEILING_DBFS,
   LibraryMetadataSchema,
+  karaokeLyricsForTrack,
   dbToLinear,
   describeLibraryTrack,
   describeLibraryTrackMeta,
@@ -60,6 +61,34 @@ function legalTable(): LibrarySegment[] {
 }
 
 describe('真实生成物：三首曲目都满足产品硬约束', () => {
+  it('三首原伴奏各有四段原创歌词时间轴，且歌词行连续覆盖对应段', () => {
+    expect(metadata.tracks).toHaveLength(3);
+
+    for (const item of metadata.tracks) {
+      const lyrics = karaokeLyricsForTrack(item);
+      expect(lyrics).toHaveLength(4);
+
+      for (const [position, lyricSegment] of lyrics.entries()) {
+        const audioSegment = item.segments[position];
+        expect(audioSegment).toBeDefined();
+        expect(lyricSegment.index).toBe(audioSegment?.index);
+        expect(lyricSegment.lines.length).toBeGreaterThan(0);
+        expect(lyricSegment.lines[0]?.startMs).toBe(audioSegment?.startMs);
+        expect(lyricSegment.lines.at(-1)?.endMs).toBe(audioSegment?.endMs);
+
+        for (const [lineIndex, line] of lyricSegment.lines.entries()) {
+          expect(line.text.trim().length).toBeGreaterThan(0);
+          expect(line.endMs).toBeGreaterThan(line.startMs);
+          expect(line.startMs).toBeGreaterThanOrEqual(audioSegment?.startMs ?? 0);
+          expect(line.endMs).toBeLessThanOrEqual(audioSegment?.endMs ?? 0);
+          if (lineIndex > 0) {
+            expect(line.startMs).toBe(lyricSegment.lines[lineIndex - 1]?.endMs);
+          }
+        }
+      }
+    }
+  });
+
   it('至少 3 首、每首 4 段（Demo 固定 4 段），且段号 1..4 连续', () => {
     expect(metadata.tracks.length).toBeGreaterThanOrEqual(3);
     for (const item of metadata.tracks) {

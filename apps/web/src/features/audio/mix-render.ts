@@ -62,7 +62,7 @@ export interface AudioBufferLike {
 export interface AudioBufferSourceNodeLike {
   buffer: AudioBufferLike | null;
   connect: (destination: unknown) => void;
-  start: (when?: number) => void;
+  start: (when?: number, offset?: number, duration?: number) => void;
 }
 
 export interface OfflineAudioContextLike {
@@ -74,6 +74,8 @@ export interface OfflineAudioContextLike {
 export interface MixPcmOptions {
   /** 输出声道数；缺省 = 各段声道的最大值（至少 1）。 */
   channels?: number;
+  /** 与计划同长度的伴奏 PCM；缺口和锁定段仍保留这条轨道。 */
+  accompaniment?: readonly Float32Array[];
 }
 
 /**
@@ -89,10 +91,21 @@ export function mixPcm(
 ): MixedPcm {
   const byIndex = new Map(clips.map((clip) => [clip.index, clip]));
   const maxSourceChannels = clips.reduce((max, clip) => Math.max(max, clip.channels.length), 0);
-  const channels = Math.max(1, options.channels ?? maxSourceChannels);
+  const channels = Math.max(
+    1,
+    options.channels ?? Math.max(maxSourceChannels, options.accompaniment?.length ?? 0),
+  );
   const frames = plan.totalFrames;
 
   const output = Array.from({ length: channels }, () => new Float32Array(frames));
+  if (options.accompaniment !== undefined) {
+    for (let channel = 0; channel < channels; channel += 1) {
+      const source = options.accompaniment[channel] ?? options.accompaniment[0];
+      const target = output[channel];
+      if (source === undefined || target === undefined) continue;
+      target.set(source.subarray(0, frames));
+    }
+  }
   const missingAudioIndexes: number[] = [];
 
   for (const clip of plan.clips) {
@@ -109,7 +122,10 @@ export function mixPcm(
         const target = output[channel];
         if (target === undefined) continue;
         const copyFrames = Math.min(clip.durationFrame, sourceChannel.length);
-        target.set(sourceChannel.subarray(0, copyFrames), clip.startFrame);
+        for (let frame = 0; frame < copyFrames; frame += 1) {
+          const targetFrame = clip.startFrame + frame;
+          target[targetFrame] = (target[targetFrame] ?? 0) + (sourceChannel[frame] ?? 0);
+        }
       }
       // 缺口：什么都不写（静音占位）
     }
@@ -184,6 +200,8 @@ export function findNonSilentGaps(input: {
   plan: MixPlan;
   threshold?: number;
 }): number[] {
+  // 伴奏版的缺口本来就应有声音；这里只检查旧的纯人声静音占位。
+  if (input.plan.hasAccompaniment) return [];
   const threshold = input.threshold ?? PROBE_ALIGNMENT_THRESHOLD;
   const offenders: number[] = [];
   for (const clip of input.plan.clips) {
@@ -214,13 +232,22 @@ export function findNonSilentGaps(input: {
 export async function renderOfflineMix(input: {
   plan: MixPlan;
   buffers: ReadonlyMap<number, AudioBufferLike>;
+  accompaniment?: AudioBufferLike | null;
   createContext: (channels: number, frames: number, sampleRate: number) => OfflineAudioContextLike;
 }): Promise<AudioBufferLike> {
   const channels = Math.max(
     1,
+    input.accompaniment?.numberOfChannels ?? 0,
     ...[...input.buffers.values()].map((buffer) => buffer.numberOfChannels),
   );
   const context = input.createContext(channels, input.plan.totalFrames, input.plan.sampleRate);
+
+  if (input.accompaniment !== undefined && input.accompaniment !== null) {
+    const source = context.createBufferSource();
+    source.buffer = input.accompaniment;
+    source.connect(context.destination);
+    source.start(0);
+  }
 
   for (const clip of input.plan.clips) {
     if (clip.kind !== 'voice') continue;
@@ -229,7 +256,7 @@ export async function renderOfflineMix(input: {
     const source = context.createBufferSource();
     source.buffer = buffer;
     source.connect(context.destination);
-    source.start(clip.startMs / 1000);
+    source.start(clip.startMs / 1000, 0, clip.durationFrame / input.plan.sampleRate);
   }
 
   return context.startRendering();

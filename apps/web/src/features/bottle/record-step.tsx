@@ -9,12 +9,13 @@
  *
  * 失败语义用 **warning 而不是 danger**（DESIGN.md §Error States 第 4 条）：数据没丢，只是没传上去。
  */
-import { useSongs } from '../api/queries';
+import { useLibraryMetadata, useSongs } from '../api/queries';
 import { AsyncBoundary } from '../../pages/shell/async-boundary';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { RecordSegmentResponse } from '@music-drift/shared';
 import {
   RecorderPanel,
+  AccompanimentPlayer,
   createBrowserRecorderEnvironment,
   uploadSegmentAudio,
   type RecorderEnvironment,
@@ -40,6 +41,8 @@ export interface RecordStepProps {
   songId: string;
   /** 上传成功回调（拿到服务端确认的段号与最新详情）。 */
   onUploaded: (response: RecordSegmentResponse) => void;
+  /** 放弃未上传的本地录音并关闭录音窗口。 */
+  onCancel?: () => void;
   /** 附言（CONTEXT §12.2，可选）。 */
   note?: string;
   /** 录音环境覆盖（测试注入；生产自动探测浏览器能力）。 */
@@ -56,6 +59,7 @@ export function RecordStep({
   segmentIndex,
   totalSegments,
   onUploaded,
+  onCancel,
   note,
   recorderEnvironment,
   uploadTransport,
@@ -67,6 +71,7 @@ export function RecordStep({
     [recorderEnvironment],
   );
   const songs = useSongs();
+  const library = useLibraryMetadata();
   const [phase, setPhase] = useState<UploadPhase>('validating');
   const [ratio, setRatio] = useState<number | null>(null);
   const [failure, setFailure] = useState<{ message: string; retryable: boolean } | null>(null);
@@ -144,15 +149,36 @@ export function RecordStep({
     setFailure({ message: result.message, retryable: result.retryable });
   }
 
+  const discardPendingRecording = useCallback((): void => {
+    revokeLocalUrl();
+    setLocalUrl(null);
+    setPending(null);
+    setFailure(null);
+    setPhase('validating');
+  }, [revokeLocalUrl]);
+
   const uploadView: RecorderUploadView = {
     phase,
     ratio,
     message: null,
     retryable: failure?.retryable ?? false,
   };
+  const accompanimentTrack = library.data?.tracks.find((track) => track.songId === songId);
 
   return (
     <div className={cn('flex flex-col gap-4', className)}>
+      {library.isError ? (
+        <p role="status" className="text-[0.875rem] text-muted">
+          本段伴奏与歌词暂时无法读取，不影响继续录音。
+        </p>
+      ) : library.data !== undefined && accompanimentTrack === undefined ? (
+        <p role="status" className="text-[0.875rem] text-muted">
+          静态曲库中找不到这首歌的伴奏与歌词，不会使用其他曲目代替。
+        </p>
+      ) : accompanimentTrack === undefined ? null : (
+        <AccompanimentPlayer track={accompanimentTrack} segmentIndex={segmentIndex} />
+      )}
+
       {/*
         曲库是**异步**的，所以这里自己带加载/失败态（`AsyncBoundary`）：
         在拿到"这一段多长"之前不渲染录音控件 —— 否则会先给一个能点、随后被禁用的假按钮，
@@ -179,6 +205,15 @@ export function RecordStep({
               environment={environment}
               {...(phase === 'validating' ? {} : { upload: uploadView })}
               disabled={disabled || uploading}
+              onRetryRecording={discardPendingRecording}
+              {...(onCancel === undefined
+                ? {}
+                : {
+                    onCancel: () => {
+                      discardPendingRecording();
+                      onCancel();
+                    },
+                  })}
               onRecorded={(recording) => {
                 if (startedRef.current) return;
                 startedRef.current = true;

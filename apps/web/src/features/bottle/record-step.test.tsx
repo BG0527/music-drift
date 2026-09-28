@@ -1,11 +1,22 @@
 import { fireEvent, screen, waitFor } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { LibraryMetadataSchema } from '@music-drift/shared/audio';
 import { fakeRecorderEnvironment, renderWithProviders } from '../../test/harness';
 import { song } from '../../test/fixtures';
 import { RecordStep } from './record-step';
 
 const BOTTLE = '8f1d6c2e-0f1a-4a1e-9f2b-aaaaaaaaaaaa';
 const SONG_ID = '33333333-3333-4333-8333-333333333333';
+const libraryMetadata = LibraryMetadataSchema.parse(
+  JSON.parse(readFileSync(resolve(process.cwd(), 'public/library/library.json'), 'utf8')) as unknown,
+);
+const LIBRARY_SONG_ID = libraryMetadata.tracks[0]!.songId;
+
+afterEach(() => {
+  vi.restoreAllMocks();
+});
 
 /**
  * 曲库桩：第 2 段的固定时长 = 20 秒。
@@ -21,12 +32,47 @@ const songsWithoutPreset = {
   path: '/api/songs',
   respond: () => ({ body: [song({ id: SONG_ID, totalSegments: 4, segments: [] })] }),
 };
+const songsWithLibraryTrack = {
+  path: '/api/songs',
+  respond: () => ({ body: [song({ id: LIBRARY_SONG_ID })] }),
+};
+const libraryMetadataHandler = {
+  path: '/library/library.json',
+  respond: () => ({ body: libraryMetadata }),
+};
 
 /**
  * 录制步骤必须**原样复用**音频能力层（`features/audio`）：录音状态机、时长校验、
  * 上传重试都在那里做过 TDD，这里只负责"接上瓶子这一侧"（段号来自服务端、成功后刷新瓶子）。
  */
 describe('录制步骤', () => {
+  it('复核态取消只丢弃本地录音并关闭录音窗口，不触发上传成功回调', async () => {
+    const onCancel = vi.fn();
+    const onUploaded = vi.fn();
+    const recorder = fakeRecorderEnvironment();
+    renderWithProviders(
+      <RecordStep
+        bottleId={BOTTLE}
+        songId={SONG_ID}
+        segmentIndex={2}
+        totalSegments={4}
+        onUploaded={onUploaded}
+        onCancel={onCancel}
+        recorderEnvironment={recorder.environment}
+      />,
+      { handlers: [songsWithPreset] },
+    );
+
+    fireEvent.click(await screen.findByRole('button', { name: /开始录制/ }));
+    await waitFor(() => expect(screen.getByRole('button', { name: /停止录制/ })).toBeInTheDocument());
+    recorder.clock.value += 20_000;
+    fireEvent.click(screen.getByRole('button', { name: /停止录制/ }));
+    fireEvent.click(await screen.findByRole('button', { name: '取消录制' }));
+
+    expect(onCancel).toHaveBeenCalledTimes(1);
+    expect(onUploaded).not.toHaveBeenCalled();
+  });
+
   it('环境不支持录音时给出可照做的引导，并且不让用户白点（禁用）', async () => {
     renderWithProviders(
       <RecordStep
@@ -74,6 +120,8 @@ describe('录制步骤', () => {
   it('上传失败（网络）时保留录音、给「重试上传」与本地回放（warning 语义，不是 danger）', async () => {
     const onUploaded = vi.fn();
     const recorder = fakeRecorderEnvironment();
+    vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:pending-recording');
+    const revokeObjectURL = vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => undefined);
     renderWithProviders(
       <RecordStep
         bottleId={BOTTLE}
@@ -106,6 +154,46 @@ describe('录制步骤', () => {
       { timeout: 5_000 },
     );
     expect(screen.getByRole('button', { name: /重试上传/ })).toBeInTheDocument();
+    expect(screen.getByLabelText('本地回放确认')).toHaveAttribute('src', 'blob:pending-recording');
+    expect(onUploaded).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole('button', { name: '重录' }));
+
+    expect(screen.queryByRole('button', { name: /重试上传/ })).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('本地回放确认')).not.toBeInTheDocument();
+    expect(screen.queryByText(/网络中断/)).not.toBeInTheDocument();
+    expect(revokeObjectURL).toHaveBeenCalledWith('blob:pending-recording');
+  });
+
+  it('确认后进入上传态：冻结取消与重录，服务端未成功前不进入去向', async () => {
+    const onCancel = vi.fn();
+    const onUploaded = vi.fn();
+    const recorder = fakeRecorderEnvironment();
+    const transport = vi.fn(() => new Promise<never>(() => undefined));
+    renderWithProviders(
+      <RecordStep
+        bottleId={BOTTLE}
+        songId={SONG_ID}
+        segmentIndex={2}
+        totalSegments={4}
+        onUploaded={onUploaded}
+        onCancel={onCancel}
+        recorderEnvironment={recorder.environment}
+        uploadTransport={transport}
+      />,
+      { handlers: [songsWithPreset] },
+    );
+
+    fireEvent.click(await screen.findByRole('button', { name: /开始录制/ }));
+    await waitFor(() => expect(screen.getByRole('button', { name: /停止录制/ })).toBeInTheDocument());
+    recorder.clock.value += 20_000;
+    fireEvent.click(screen.getByRole('button', { name: /停止录制/ }));
+    fireEvent.click(await screen.findByRole('button', { name: /用这一段/ }));
+
+    expect(await screen.findByText(/上传中/)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '取消录制' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: '重录' })).toBeDisabled();
+    expect(onCancel).not.toHaveBeenCalled();
     expect(onUploaded).not.toHaveBeenCalled();
   });
 
@@ -205,6 +293,68 @@ describe('录制步骤', () => {
  * 两条断言分别钉住"接对了"与"真没预设时要说清楚为什么"。
  */
 describe('录制步骤：本段固定时长（presetDurationMs）的接线', () => {
+  it('songId 匹配静态曲库时，在录音控件前显示本段伴奏与同步歌词', async () => {
+    renderWithProviders(
+      <RecordStep
+        bottleId={BOTTLE}
+        songId={LIBRARY_SONG_ID}
+        segmentIndex={2}
+        totalSegments={4}
+        onUploaded={() => undefined}
+        recorderEnvironment={fakeRecorderEnvironment().environment}
+      />,
+      { handlers: [songsWithLibraryTrack, libraryMetadataHandler] },
+    );
+
+    expect(await screen.findByRole('button', { name: '播放本段伴奏' })).toBeInTheDocument();
+    expect(screen.getByLabelText('同步歌词')).toBeInTheDocument();
+    expect(screen.getByText('风从旧码头带来回响')).toHaveAttribute('aria-current', 'true');
+    expect(screen.getByRole('button', { name: /开始录制/ })).toBeEnabled();
+  });
+
+  it('静态曲库加载失败只给可读提示，不阻断真实录音主流程', async () => {
+    renderWithProviders(
+      <RecordStep
+        bottleId={BOTTLE}
+        songId={SONG_ID}
+        segmentIndex={2}
+        totalSegments={4}
+        onUploaded={() => undefined}
+        recorderEnvironment={fakeRecorderEnvironment().environment}
+      />,
+      {
+        handlers: [
+          songsWithPreset,
+          {
+            path: '/library/library.json',
+            respond: () => ({ status: 503, body: { error: { message: '暂不可用' } } }),
+          },
+        ],
+      },
+    );
+
+    expect(await screen.findByText(/伴奏与歌词暂时无法读取/)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /开始录制/ })).toBeEnabled();
+  });
+
+  it('songId 找不到对应静态曲目时明确说明且不拿其他伴奏伪造', async () => {
+    renderWithProviders(
+      <RecordStep
+        bottleId={BOTTLE}
+        songId={SONG_ID}
+        segmentIndex={2}
+        totalSegments={4}
+        onUploaded={() => undefined}
+        recorderEnvironment={fakeRecorderEnvironment().environment}
+      />,
+      { handlers: [songsWithPreset, libraryMetadataHandler] },
+    );
+
+    expect(await screen.findByText(/找不到这首歌的伴奏与歌词/)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '播放本段伴奏' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /开始录制/ })).toBeEnabled();
+  });
+
   it('有切分预设：录制按钮可用（预设已从曲库接到该段）', async () => {
     renderWithProviders(
       <RecordStep

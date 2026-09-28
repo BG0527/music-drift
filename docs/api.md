@@ -452,3 +452,31 @@ pnpm --filter @music-drift/api test:integration
 | **三种失败** | ① **目标段被斩**（`SEGMENT_CUT`）② **父链断裂 / `DAMAGED`** ③ **整首完成入海、却未回传到目标**（`BOTTLE_WENT_TO_SEA`）⇒ 一律 `UNDELIVERED` + **通知留言者** |
 | **通知收件人** | `MESSAGE_DELIVERED` ⇒ **目标**；`MESSAGE_UNDELIVERED` ⇒ **留言者** |
 | **唯一实现** | 内核 `messagesDeliveredTo` / `messagesUndelivered` / `messagesUndeliveredFor` 三个纯函数**是"送达/失败"的唯一实现**；投影层按**内核重放**同步，不得另写一份 |
+
+---
+
+## W18：同步歌词、完整试听与段音频可见性
+
+### 曲库歌词契约
+
+- `SongSegmentSchema.lyrics?: SongLyricLine[]`；旧曲库可暂缺，Demo 三首固定曲目均提供。
+- `SongLyricLine = { text, startMs, endMs }`，时间是歌曲全局绝对毫秒；`endMs > startMs`。
+- 歌词高亮只由媒体元素的 `currentTime` 派生，换音源或释放 object URL 后归零。
+
+### `GET /api/segments/:segmentId/audio`
+
+段音频直链与瓶子详情共用 `segmentVisibility`，不能用 UUID 绕过后续段隐藏：
+
+| 状态 | 结果 |
+| --- | --- |
+| 漂流中、该段对当前观看者不可见 | `404 NOT_FOUND` |
+| 漂流中、该段按详情规则可见 | 保持既有 Range/字节响应 |
+| 已完成并入海 | 匿名观看者也可读取四段 |
+
+### 完整伴奏试听语义
+
+- `RECORDED`：请求该段人声并叠加到固定曲库时间槽。
+- `UNRECORDED`：不请求人声；该时间槽继续播放伴奏。
+- `LOCKED`：服务端已隐藏的已录段；不请求人声，该时间槽继续播放伴奏，并明确显示“暂未解锁”。
+- 每段起止只取曲库固定 `startMs/durationMs`；人声即使超长也在本段槽位截断，不得压入下一段。
+- 只有真实缺口和锁定段都为空时 `isComplete=true`。

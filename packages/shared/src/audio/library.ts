@@ -13,6 +13,11 @@
  * 5. **CC BY 4.0 署名文案**（单一来源，与 `LICENSES.md` 逐字一致）。
  */
 import { z } from 'zod';
+import {
+  SongSegmentLyricsSchema,
+  type SongLyricLine,
+  type SongSegmentLyrics,
+} from '../contracts/songs';
 import { SEGMENT_MAX_MS, SEGMENT_MIN_MS } from './constants';
 
 /** 与 `CONTEXT.md` §3.1：每段 15–30 秒、总 60–120 秒。 */
@@ -129,6 +134,57 @@ export const LibraryMetadataSchema = z.object({
 export type LibrarySegment = z.infer<typeof LibrarySegmentSchema>;
 export type LibraryTrack = z.infer<typeof LibraryTrackSchema>;
 export type LibraryMetadata = z.infer<typeof LibraryMetadataSchema>;
+
+/**
+ * 原三首 CC BY 伴奏的原创 Demo 歌词。只保存文字，时间窗由权威分段表均分生成，
+ * 因而录音态与完整试听态共享同一条全曲绝对时间轴，不会另造一份易漂移的毫秒数据。
+ */
+const ORIGINAL_KARAOKE_TEXT = {
+  '00000000-0000-4000-8000-000000000001': [
+    ['潮声把夜色轻轻推远', '我沿着微光慢慢向前', '让这一句落进水面'],
+    ['风从旧码头带来回响', '陌生的旋律靠近身旁', '有人替我唱完想象'],
+    ['星光在深蓝河道停留', '每一道声音汇成暖流', '越过沉默也不回头'],
+    ['当天边泛起银色晨光', '我们把名字留给远方', '只让歌声记住彼此模样'],
+  ],
+  '00000000-0000-4000-8000-000000000002': [
+    ['雨点落在安静的窗', '一半心事一半微光', '我把旋律写成航向'],
+    ['云层背后海风正亮', '接住漂来的那句吟唱', '让孤单有新的声响'],
+    ['脚步跟着节拍摇晃', '远处灯塔穿过迷惘', '这一程有人同往'],
+    ['等雨停在清晨岸上', '所有回声并肩生长', '我们终会抵达晴朗'],
+  ],
+  '00000000-0000-4000-8000-000000000003': [
+    ['海岸醒在第一阵风里', '细沙收藏昨夜的秘密', '我唱给缓慢靠近的你'],
+    ['浪花翻开空白的信', '下一句等另一颗心', '沿着潮汐留下声音'],
+    ['飞鸟掠过蓝色天际', '远方回应熟悉旋律', '陌生也能拥有默契'],
+    ['夕阳沉入温柔海底', '四段歌声终于相遇', '把未说完的话唱给潮汐'],
+  ],
+} as const satisfies Record<string, readonly (readonly string[])[]>;
+
+function timeLyricLines(segment: LibrarySegment, texts: readonly string[]): SongLyricLine[] {
+  return texts.map((text, position) => {
+    const startMs = Math.round(
+      segment.startMs + (segment.durationMs * position) / texts.length,
+    );
+    const endMs =
+      position === texts.length - 1
+        ? segment.endMs
+        : Math.round(segment.startMs + (segment.durationMs * (position + 1)) / texts.length);
+    return { text, startMs, endMs };
+  });
+}
+
+/** 取得曲目的四段原创歌词；非 Demo 曲目返回空数组。 */
+export function karaokeLyricsForTrack(track: LibraryTrack): SongSegmentLyrics[] {
+  const textSegments = ORIGINAL_KARAOKE_TEXT[track.songId as keyof typeof ORIGINAL_KARAOKE_TEXT];
+  if (textSegments === undefined) return [];
+
+  return track.segments.map((segment, position) =>
+    SongSegmentLyricsSchema.parse({
+      index: segment.index,
+      lines: timeLyricLines(segment, textSegments[position] ?? []),
+    }),
+  );
+}
 
 export type LibraryViolationCode =
   | 'SEGMENT_INDEX_NOT_CONTIGUOUS'

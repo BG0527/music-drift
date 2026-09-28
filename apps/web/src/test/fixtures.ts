@@ -29,6 +29,7 @@ export function song(overrides: Partial<Song> = {}): Song {
 
 export interface BottleFixtureInput {
   id?: string;
+  songId?: BottleDetail['songId'];
   status?: BottleSummary['status'];
   recordedCount?: number;
   missingSegmentIndexes?: number[];
@@ -63,7 +64,7 @@ export function bottleDetail(overrides: BottleFixtureInput = {}): BottleDetail {
   const isComplete = overrides.isComplete ?? missingSegmentIndexes.length === 0;
   return {
     id: overrides.id ?? BOTTLE_ID,
-    songId: SONG_ID,
+    songId: overrides.songId ?? SONG_ID,
     songTitle: '深海鲸落',
     status: overrides.status ?? 'HELD',
     totalSegments: 4,

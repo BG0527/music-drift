@@ -2,12 +2,34 @@
 import { z } from 'zod';
 import { UuidSchema } from './common';
 
+/** 一句 K 歌歌词的全曲绝对时间窗；高亮进度只由媒体 currentTime 派生。 */
+export const SongLyricLineSchema = z
+  .object({
+    text: z.string().trim().min(1),
+    startMs: z.number().int().nonnegative(),
+    endMs: z.number().int().positive(),
+  })
+  .refine((line) => line.endMs > line.startMs, {
+    message: '歌词行 endMs 必须晚于 startMs',
+  });
+
+export const SongSegmentLyricsSchema = z.object({
+  /** 与歌曲固定段落位置一致（1-based，永不压缩）。 */
+  index: z.number().int().min(1),
+  lines: z.array(SongLyricLineSchema).min(1),
+});
+
+export type SongLyricLine = z.infer<typeof SongLyricLineSchema>;
+export type SongSegmentLyrics = z.infer<typeof SongSegmentLyricsSchema>;
+
 export const SongSegmentSchema = z.object({
   id: UuidSchema,
   /** 歌里的固定段落位置（1-based，永不压缩）。 */
   index: z.number().int().min(1),
   startMs: z.number().int().nonnegative(),
   durationMs: z.number().int().positive(),
+  /** 旧数据允许暂缺；曲库 Demo 的三首歌均由共享曲库补齐。 */
+  lyrics: z.array(SongLyricLineSchema).min(1).optional(),
 });
 
 export const SongSchema = z.object({

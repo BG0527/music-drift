@@ -17,6 +17,7 @@ import {
   MONO_SEQUENTIAL_STRATEGY,
   describeMissingSegments,
   mixSummaryLabel,
+  planAccompaniedMix,
   planMix,
   planMonoSequentialMix,
   summarizeAlignment,
@@ -25,6 +26,105 @@ import {
 } from './mix';
 
 const SAMPLE_RATE = 48_000;
+
+describe('planAccompaniedMix：服务端投影之外的声音永不进入计划', () => {
+  it('未完成作品把可见段、未录缺口、暂未解锁段明确分开，并始终保留伴奏', () => {
+    const result = planAccompaniedMix({
+      segments: [segment(1, 20_000)],
+      totalSegments: 4,
+      missingSegmentIndexes: [3],
+      hiddenLaterSegmentCount: 2,
+      nominalDurationByIndex: { 1: 20_000, 2: 20_000, 3: 20_000, 4: 20_000 },
+      accompanimentUrl: '/library/accompaniment.mp3',
+      sampleRate: SAMPLE_RATE,
+    });
+
+    expect(result.hasAccompaniment).toBe(true);
+    expect(result.accompanimentUrl).toBe('/library/accompaniment.mp3');
+    expect(result.clips.map((clip) => [clip.index, clip.availability, clip.audioUrl])).toEqual([
+      [1, 'RECORDED', '/api/segments/seg-1/audio'],
+      [2, 'LOCKED', null],
+      [3, 'UNRECORDED', null],
+      [4, 'LOCKED', null],
+    ]);
+  });
+
+  it('直接给出未录与暂未解锁段号，界面无需从颜色或数量反推状态', () => {
+    const result = planAccompaniedMix({
+      segments: [segment(1)],
+      totalSegments: 4,
+      missingSegmentIndexes: [3],
+      hiddenLaterSegmentCount: 2,
+      accompanimentUrl: '/library/accompaniment.mp3',
+    });
+
+    expect(result.unrecordedSegmentIndexes).toEqual([3]);
+    expect(result.lockedSegmentIndexes).toEqual([2, 4]);
+  });
+
+  it('服务端裁剪计数与推导出的锁定段不一致时 fail-closed', () => {
+    expect(() =>
+      planAccompaniedMix({
+        segments: [segment(1)],
+        totalSegments: 4,
+        missingSegmentIndexes: [3],
+        hiddenLaterSegmentCount: 1,
+        accompanimentUrl: '/library/accompaniment.mp3',
+      }),
+    ).toThrow(/hiddenLaterSegmentCount/);
+  });
+
+  it('完成且入海的访客投影可规划四段人声与整轨伴奏', () => {
+    const result = planAccompaniedMix({
+      segments: [segment(4), segment(2), segment(1), segment(3)],
+      totalSegments: 4,
+      missingSegmentIndexes: [],
+      hiddenLaterSegmentCount: 0,
+      accompanimentUrl: '/library/accompaniment.mp3',
+    });
+
+    expect(result.isComplete).toBe(true);
+    expect(result.lockedSegmentIndexes).toEqual([]);
+    expect(result.clips.map((clip) => clip.availability)).toEqual([
+      'RECORDED',
+      'RECORDED',
+      'RECORDED',
+      'RECORDED',
+    ]);
+    expect(result.clips.every((clip) => clip.audioUrl !== null)).toBe(true);
+  });
+
+  it('没有真实缺口但仍有锁定段时，不向当前观看者宣称作品完整', () => {
+    const result = planAccompaniedMix({
+      segments: [segment(1)],
+      totalSegments: 2,
+      missingSegmentIndexes: [],
+      hiddenLaterSegmentCount: 1,
+      accompanimentUrl: '/library/accompaniment.mp3',
+    });
+
+    expect(result.isComplete).toBe(false);
+    expect(mixSummaryLabel(result)).toBe('第 2 段暂未解锁 · 可试听 1 / 2 段（伴奏 + 人声）');
+  });
+
+  it('伴奏版始终使用曲库名义时间槽，不让人声实测时长挤动后续段', () => {
+    const result = planAccompaniedMix({
+      segments: [segment(1, 19_000), segment(2, 21_000)],
+      totalSegments: 2,
+      missingSegmentIndexes: [],
+      hiddenLaterSegmentCount: 0,
+      nominalDurationByIndex: { 1: 20_000, 2: 20_000 },
+      accompanimentUrl: '/library/accompaniment.mp3',
+      sampleRate: SAMPLE_RATE,
+    });
+
+    expect(result.clips.map((clip) => [clip.startMs, clip.durationMs])).toEqual([
+      [0, 20_000],
+      [20_000, 20_000],
+    ]);
+    expect(result.totalMs).toBe(40_000);
+  });
+});
 
 function segment(index: number, durationMs = 20_000): MixSourceSegment {
   return {

@@ -1,0 +1,1092 @@
+/**
+ * 漂流瓶详情页 —— t17 深度复刻返工：坐标系逐值照抄 `site/patches/bottle.css` + `site/bottle.html`。
+ *
+ * 参考的三层构图（补丁头注）：
+ *   1. **场景层** `.bp-scene` —— 水面上下的环境层（platter/air/glint/deep/current）；
+ *   2. **标注层**（挂在瓶身剖面刻度上，整块按 `--u` 缩放）—— `.heroLab` / `.segNum` / `.segLab` /
+ *      `.cap` / `.gapBox` / `.selMark` / `.callout` / `.corkLab` + 上部 `.bp-timeline` 时间轴；
+ *   3. **仪器层**（下层仪器，`--uv` 落位）—— 标题区 / `.listenCol` / `.destCol` / 底栏。
+ *
+ * 两把尺（与参考同源）：
+ *   `--u  = max(100vw/1440, 100dvh/900)` —— 场景要铺满（水面横贯全宽），≥16:10 时优先吃宽度；
+ *   `--uv = min(100vw/1440, 100dvh/900)` —— 下层两栏与页脚只要"装得下"（contain）；
+ *   `--nav-reserve = max(0, 顶栏底边 54 − 面包屑设计顶距 26·u)` —— 站点顶栏让位（页头那一列同进退）。
+ *
+ * 桌面（≥1024）走绝对落位；窄屏（<1024）退回流式竖排（同一套 DOM，order 让位见 bottle-page.tsx）。
+ * 矮窗（≤800px 高）只压间距、不动字号（参考 `@media (max-height: 800px)` 那一段）。
+ *
+ * 纪律：所有规则加 `.bottle-page` / `.bp-*` 作用域；字号留 px，区间用 clamp/min 收口。
+ */
+
+/* ── 作用域调色板（record-v1，与 profile-page.css 同手法） ───────────────── */
+.bottle-page {
+  --ink: #050f14;
+  --paper: #f3f9fa;
+  --muted: #a9c7cf;
+  --glass: #7fd1d9;
+  --coral: #d4553a;
+  --warm: #f6d79a;
+  --line: rgba(243, 249, 250, 0.13);
+  position: relative;
+  color: var(--paper);
+  font-family: 'LXGW WenKai', serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+.bottle-page .mono,
+.bottle-page .meta {
+  font-family: var(--font-latin), 'LXGW WenKai', serif;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── 场景层（环境）：绝对零高度装饰，对一屏门禁零贡献 ──────────────────── */
+.bp-scene {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* 窄屏不画环境与剖面（cover 缩放在窄屏会横向溢出；格位列表承担同一信息） */
+@media (max-width: 1023px) {
+  .bp-scene {
+    display: none;
+  }
+}
+
+.bp-scene .platter {
+  position: absolute;
+  inset: 0;
+  background:
+    repeating-radial-gradient(
+      circle at calc(1420 * var(--u, 100vw / 1440)) calc(960 * var(--u, 100dvh / 900)),
+      rgba(216, 243, 246, 0.02) 0 1.2px,
+      rgba(216, 243, 246, 0) 1.2px calc(15 * var(--u, 100vw / 1440))
+    ),
+    radial-gradient(
+      circle at calc(1420 * var(--u, 100vw / 1440)) calc(960 * var(--u, 100dvh / 900)),
+      rgba(127, 209, 217, 0.05) 0 30%,
+      rgba(127, 209, 217, 0) 68%
+    );
+}
+
+/* 水面之上：天光（标题区靠它撑亮度） */
+.bp-scene .air {
+  position: absolute;
+  left: -40px;
+  right: -40px;
+  top: -60px;
+  height: 560px;
+  background:
+    radial-gradient(46% 62% at 16% 6%, rgba(203, 238, 246, 0.115), rgba(203, 238, 246, 0) 70%),
+    radial-gradient(70% 50% at 78% 0%, rgba(127, 209, 217, 0.075), rgba(127, 209, 217, 0) 72%);
+}
+
+/* 水面之下：水色与深度 */
+.bp-scene .deep {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: calc(430 * var(--u, 100vw / 1440));
+  bottom: 0;
+  background: linear-gradient(
+    180deg,
+    rgba(127, 209, 217, 0.09) 0%,
+    rgba(10, 48, 60, 0.34) 34%,
+    rgba(5, 15, 20, 0.72) 100%
+  );
+}
+
+/* 水流线：河道在走 */
+.bp-scene .current {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: calc(430 * var(--u, 100vw / 1440));
+  bottom: 0;
+  background:
+    repeating-linear-gradient(
+      180deg,
+      rgba(216, 243, 246, 0.05) 0 1px,
+      rgba(216, 243, 246, 0) 1px 42px
+    ),
+    linear-gradient(
+      94deg,
+      rgba(228, 247, 252, 0) 40%,
+      rgba(228, 247, 252, 0.035) 52%,
+      rgba(228, 247, 252, 0) 62%
+    );
+}
+
+.bp-scene .glint {
+  position: absolute;
+  inset: 0;
+  mix-blend-mode: screen;
+  background: linear-gradient(
+    101deg,
+    rgba(228, 247, 252, 0) 28%,
+    rgba(228, 247, 252, 0.045) 45%,
+    rgba(228, 247, 252, 0.065) 50%,
+    rgba(228, 247, 252, 0.028) 55%,
+    rgba(228, 247, 252, 0) 72%
+  );
+}
+
+/* ── 窄屏（<1024）：流式竖排（同一套 DOM；桌面坐标全部在下面的 ≥1024 段里） ── */
+.bottle-page .bp-cells {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 0;
+  padding: 12px 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(3, 17, 23, 0.35);
+}
+
+.bottle-page .bp-cell {
+  position: relative;
+  padding: 10px 12px;
+  border: 1px solid rgba(243, 249, 250, 0.1);
+  border-radius: 6px;
+}
+
+.bottle-page .bp-cell[data-filled='true'] {
+  background: linear-gradient(180deg, rgba(3, 17, 23, 0) 45%, rgba(127, 209, 217, 0.14) 100%);
+}
+
+.bottle-page .bp-cell[data-filled='false'] {
+  border-style: dashed;
+  border-color: rgba(246, 215, 154, 0.4);
+}
+
+.bottle-page .segNum {
+  display: block;
+  font-size: 1.75rem;
+  line-height: 1;
+  color: rgba(243, 249, 250, 0.2);
+}
+
+.bottle-page .segNum.gap {
+  color: rgba(246, 215, 154, 0.4);
+}
+
+.bottle-page .segLab {
+  display: block;
+  margin-top: 4px;
+  font-size: 0.6875rem;
+  letter-spacing: 0.24em;
+  color: var(--muted);
+}
+
+.bottle-page .segLab.gap {
+  color: var(--warm);
+}
+
+.bottle-page .segLab.sel {
+  color: var(--coral);
+}
+
+.bottle-page .cap {
+  margin-top: 8px;
+}
+
+.bottle-page .cap .code {
+  margin: 0;
+  font-size: 0.90625rem;
+}
+
+.bottle-page .cap .line {
+  margin: 4px 0 0;
+  display: flex;
+  gap: 13px;
+  font-size: 0.78125rem;
+  color: var(--muted);
+}
+
+.bottle-page .cap .capAct {
+  margin: 8px 0 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.bottle-page .cap .listen {
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 12px;
+  border: 1px solid rgba(127, 209, 217, 0.42);
+  border-radius: 2px;
+  background: transparent;
+  color: var(--glass);
+  font-size: 0.8125rem;
+}
+
+.bottle-page .cap .capReport {
+  min-height: 44px;
+  min-width: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(243, 249, 250, 0.2);
+  border-radius: 2px;
+  background: transparent;
+  color: var(--muted);
+}
+
+.bottle-page .gapBox {
+  margin: 0;
+  text-align: center;
+}
+
+.bottle-page .gapBox .gapSlot {
+  display: block;
+  width: 110px;
+  height: 46px;
+  margin: 0 auto;
+  border: 1px dashed rgba(246, 215, 154, 0.5);
+  border-radius: 23px;
+}
+
+.bottle-page .gapBox .gapKind {
+  margin: 10px 0 0;
+  font-size: 0.6875rem;
+  line-height: 1.3;
+  letter-spacing: 0.24em;
+  color: var(--warm);
+}
+
+.bottle-page .gapBox .gapHead {
+  margin: 7px 0 0;
+  font-size: 0.84375rem;
+  line-height: 1.33;
+}
+
+.bottle-page .gapBox .cta {
+  margin-top: 5px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 44px;
+  padding: 0 17px;
+  border: 0;
+  border-radius: 2px;
+  background: var(--coral);
+  color: var(--ink);
+  font-size: 0.9375rem;
+}
+
+.bottle-page .gapBox .gapNote {
+  margin: 4px 0 0;
+  font-size: 0.6875rem;
+  line-height: 1.5;
+  color: var(--muted);
+}
+
+/* ══════════════════════════════════════════════════════════════════════
+   桌面（≥1024）：按参考坐标绝对落位（场景与标注 --u、下层仪器 --uv）
+   ══════════════════════════════════════════════════════════════════════ */
+@media (min-width: 1024px) {
+  .bottle-page {
+    --u: max(calc(100vw / 1440), calc(100dvh / 900));
+    --uv: min(calc(100vw / 1440), calc(100dvh / 900));
+    /* 站点顶栏（fixed top-10 + min-h-11 ⇒ 与参考同一条让位基线 44px）压住视口顶一条
+       ⇒ 页头那一列（面包屑 26u → 说明 184u）同进退：--nav-reserve = 44 − 26·u */
+    --nav-reserve: max(0px, calc(44px - 26 * var(--u)));
+    overflow: hidden;
+  }
+
+  /* ── 顶栏 crumb（稿 .crumb：26·u + 让位） ── */
+  .bottle-page .bp-crumb {
+    position: absolute;
+    left: 5.278%;
+    right: 5.278%;
+    top: calc(26 * var(--u) + var(--nav-reserve));
+    height: 26px;
+    margin: 0;
+    flex-wrap: nowrap;
+    z-index: 3;
+  }
+
+  .bottle-page .bp-crumb a {
+    position: relative;
+    min-height: 26px;
+  }
+
+  .bottle-page .bp-crumb a::after {
+    content: '';
+    position: absolute;
+    inset: -9px -8px;
+  }
+
+  /* ── 页头（稿 h1/.work/.metaRow/.note/.maker，整列按参考坐标落位） ── */
+  .bottle-page .bp-head {
+    position: absolute;
+    inset: 0;
+    z-index: 3;
+    pointer-events: none;
+  }
+
+  .bottle-page .bp-head > * {
+    pointer-events: auto;
+  }
+
+  .bottle-page .bp-head h1 {
+    position: absolute;
+    left: 5.278%;
+    top: calc(60 * var(--u) + var(--nav-reserve));
+    margin: 0;
+    font-size: clamp(34px, 3.89vw, 3.5rem);
+    line-height: 1;
+  }
+
+  .bottle-page .bp-head .bf-title {
+    position: absolute;
+    left: 5.278%;
+    top: calc(126 * var(--u) + var(--nav-reserve));
+    margin: 0;
+    font-size: 19px;
+    font-weight: 700;
+    line-height: 1.3;
+  }
+
+  .bottle-page .bp-head .bf-meta {
+    position: absolute;
+    left: 5.278%;
+    top: calc(156 * var(--u) + var(--nav-reserve));
+    margin: 0;
+    font-size: 14px;
+    line-height: 1.3;
+    gap: 20px;
+    color: var(--muted);
+  }
+
+  .bottle-page .bp-head .bf-note {
+    position: absolute;
+    left: 5.278%;
+    top: calc(184 * var(--u) + var(--nav-reserve));
+    width: min(55.56%, 62vw);
+    margin: 0;
+    font-size: 14.5px;
+    line-height: 1.3;
+    color: var(--warm);
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
+
+  .bottle-page .bp-head .maker {
+    position: absolute;
+    right: 5.278%;
+    top: calc(62 * var(--u) + var(--nav-reserve));
+    margin: 0;
+  }
+
+  /* ── 状态条（页内公告 / 冲突 / 守卫）：贴在页脚线之上，不挤任何一栏 ── */
+  .bottle-page .bp-status-item {
+    position: absolute;
+    left: 5.278%;
+    right: 5.278%;
+    bottom: calc(74 * var(--uv));
+    margin: 0;
+    z-index: 4;
+  }
+
+  /* “不在手上”是去向区的动作守卫；放在右栏，避免覆盖左栏仍可试听的附言。 */
+  .bottle-page .bf-notice.bp-status-item {
+    left: 50%;
+    right: 5.278%;
+  }
+
+  /* ── 时间轴（稿 .w7-timeline：76,210 / 宽 924 = 64.167%） ── */
+  .bottle-page .bp-timeline {
+    position: absolute;
+    left: 5.278%;
+    top: calc(228 * var(--u));
+    width: 64.167%;
+    margin: 0;
+    z-index: 2;
+  }
+
+  .bottle-page .bp-timeline h2 {
+    font-size: 11px;
+    font-weight: 400;
+    letter-spacing: 0.18em;
+    line-height: 1.3;
+    color: rgba(243, 249, 250, 0.5);
+  }
+
+  /* 参考这条带里没有说明句（11px 标签 + 沟槽 + 刻度，共 58·u） */
+  .bottle-page .bp-timeline h2 + span {
+    display: none;
+  }
+
+  .bottle-page .bp-timeline .groove-rail {
+    height: 38px;
+    margin-top: 2px;
+  }
+
+  /* ── 瓶身剖面装置（标注层）：整页铺开，子元素按参考坐标钉 ── */
+  .bottle-page .bp-profile {
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+    pointer-events: none;
+  }
+
+  .bottle-page .bp-profile > * {
+    pointer-events: auto;
+  }
+
+  .bottle-page .bp-profile svg.scene {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: calc(1440 * var(--u));
+    height: calc(900 * var(--u));
+    pointer-events: none;
+  }
+
+  .bottle-page .bp-profile .heroLab {
+    position: absolute;
+    left: 5.278%;
+    top: calc(272 * var(--u));
+    margin: 0;
+    font-size: 11px;
+    line-height: 1.3;
+    letter-spacing: 0.18em;
+    color: rgba(243, 249, 250, 0.5);
+    z-index: 1;
+    display: none;
+  }
+
+  .bottle-page .bp-cells {
+    position: absolute;
+    inset: 0;
+    display: block;
+    gap: 0;
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+    background: none;
+  }
+
+  /* 段位格 = 标注的定位框（参考坐标 320·u；子元素按 356/458 相对它落位）。
+     为什么格子必须自己定位：选中态的 `segment-pick` 动效挂在格子上，transform 会让格子
+     变成"包含块" —— 子元素若按页面坐标算，会瞬间跳到格内坐标（实测第 3 列 x478→258）。
+     格子定位 + 子元素相对格子 ⇒ 动效期间整列一起缩放，静止态与参考逐值一致。 */
+  .bottle-page .bp-cell {
+    position: absolute;
+    left: var(--cell-left);
+    width: var(--cell-w);
+    max-width: none;
+    top: calc(320 * var(--u));
+    height: calc(210 * var(--u));
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+    background: none;
+  }
+
+  .bottle-page .segNum {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    display: block;
+    margin: 0;
+    text-align: center;
+    font-size: 28px;
+    line-height: 1.1;
+    padding-left: 0.06em;
+    color: rgba(243, 249, 250, 0.18);
+  }
+
+  .bottle-page .segNum.gap {
+    color: rgba(246, 215, 154, 0.26);
+  }
+
+  .bottle-page .segLab {
+    position: absolute;
+    left: 0;
+    width: 100%;
+    /* 参考 356·u = 格顶 320·u + 36·u */
+    top: calc(36 * var(--u));
+    display: block;
+    margin: 0;
+    text-align: center;
+    font-size: 11px;
+    line-height: 1.3;
+    letter-spacing: 0.24em;
+    padding-left: 0.24em;
+    color: rgba(243, 249, 250, 0.5);
+  }
+
+  .bottle-page .cap {
+    position: absolute;
+    left: 0;
+    width: 100%;
+    /* 参考 458·u = 格顶 320·u + 138·u */
+    top: calc(138 * var(--u));
+    margin: 0;
+    text-align: center;
+  }
+
+  .bottle-page .cap .code {
+    margin: 0;
+    font-size: 14.5px;
+    font-weight: 400;
+    line-height: 1.2;
+  }
+
+  .bottle-page .cap .line {
+    margin: 6px 0 0;
+    display: flex;
+    justify-content: center;
+    gap: 13px;
+    font-size: 12.5px;
+    color: var(--muted);
+  }
+
+  .bottle-page .cap .capAct {
+    margin: 8px 0 0;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 14px;
+  }
+
+  /* 「听」= 参考的下划线文字链；热区用伪元素扩到 44px（视觉不变形） */
+  .bottle-page .cap .listen {
+    position: relative;
+    min-height: 0;
+    display: inline-block;
+    padding: 0;
+    border: 0;
+    background: none;
+    font-size: 13px;
+    color: var(--glass);
+    text-decoration: underline;
+    text-underline-offset: 4px;
+  }
+
+  .bottle-page .cap .listen::after {
+    content: '';
+    position: absolute;
+    inset: -14px -12px;
+  }
+
+  .bottle-page .cap .capReport {
+    min-height: 0;
+    min-width: 0;
+    width: 20px;
+    height: 20px;
+    position: relative;
+    padding: 0;
+    /* 参考这一列没有举报钮（产品要求 CONTEXT §8 三类对象都要有入口）⇒ 做成 20px 裸图标，
+       与「听」同一行、不把卡撑高（参考 .cap h66 的比例保住）；44px 热区由伪元素承担 */
+    border: 0;
+    color: rgba(169, 199, 207, 0.7);
+  }
+
+  .bottle-page .cap .capReport::after {
+    content: '';
+    position: absolute;
+    inset: -12px;
+  }
+
+  /* 缺口簇（稿 .gapBox：402·u，左右 = 格位内缩 10px，由内联 --gap-left/--gap-width 给） */
+  .bottle-page .gapBox {
+    position: absolute;
+    left: var(--gap-left);
+    width: var(--gap-width);
+    top: calc(402 * var(--u));
+    max-width: none;
+    z-index: 1;
+  }
+
+  .bottle-page .gapBox .gapHead {
+    font-size: 13.5px;
+  }
+
+  .bottle-page .gapBox .gapNote {
+    font-size: 11px;
+  }
+
+  /* 选中列的珊瑚刻度（稿 .selMark：451·u，宽 60·u） */
+  .bottle-page .selMark {
+    position: absolute;
+    left: var(--sel-left);
+    top: calc(451 * var(--u));
+    width: calc(60 * var(--u));
+    height: calc(2 * var(--u));
+    background: var(--coral);
+    z-index: 1;
+  }
+
+  .bottle-page .callout {
+    position: absolute;
+    left: 77.5%;
+    top: calc(322 * var(--u));
+    font-size: 11px;
+    line-height: 1.3;
+    letter-spacing: 0.18em;
+    color: rgba(169, 199, 207, 0.8);
+  }
+
+  .bottle-page .corkLab {
+    position: absolute;
+    right: 0.972%;
+    top: calc(468 * var(--u));
+    font-size: 11px;
+    line-height: 1.3;
+    letter-spacing: 0.12em;
+    color: rgba(246, 215, 154, 0.8);
+  }
+
+  /* ── 下层仪器：两栏（630·uv）+ 页脚（48/19·uv） ── */
+  .bottle-page .bp-cols {
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: calc(630 * var(--uv));
+    height: calc(200 * var(--uv));
+    margin: 0;
+    display: block;
+    z-index: 2;
+  }
+
+  .bottle-page .bp-cols > .listenCol {
+    position: absolute;
+    left: 5.278%;
+    top: 0;
+    width: 42.639%;
+  }
+
+  .bottle-page .bp-cols > .destCol {
+    position: absolute;
+    left: 50%;
+    top: 0;
+    width: 44.722%;
+  }
+
+  .bottle-page .listenCol h2,
+  .bottle-page .destCol h2 {
+    margin: 0;
+    display: flex;
+    align-items: baseline;
+    gap: 16px;
+    font-size: 17px;
+    font-weight: 700;
+    /* 参考 h2 盒高 23px（17px × 1.35）—— transport 的 14px 上距是从它量起的 */
+    line-height: 1.35;
+  }
+
+  .bottle-page .listenCol h2 span {
+    font-size: 13.5px;
+    font-weight: 400;
+    color: var(--muted);
+  }
+
+  .bottle-page .destCol .sub {
+    margin: 6px 0 0;
+    font-size: 12.5px;
+    line-height: 1.3;
+    color: var(--muted);
+  }
+
+  .bottle-page .transport {
+    margin-top: 14px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    height: 52px;
+  }
+
+  /* 播放键降级成一枚小唱片（参考：音乐载体，不再是母题） */
+  .bottle-page .play {
+    flex: none;
+    width: 52px;
+    height: 52px;
+    padding: 0;
+    border-radius: 50%;
+    border: 1px solid rgba(127, 209, 217, 0.42);
+    background: transparent;
+    display: grid;
+    place-items: center;
+    color: var(--paper);
+  }
+
+  /* 进度条 = 一条水道：听过的部分是灌进去的水（参考固定 400px，唱针比例按它算） */
+  .bottle-page .bar {
+    position: relative;
+    flex: none;
+    width: 400px;
+    height: 20px;
+    border-top: 1px solid rgba(243, 249, 250, 0.12);
+    border-bottom: 1px solid rgba(243, 249, 250, 0.12);
+    background: none;
+    overflow: visible;
+  }
+
+  .bottle-page .bar .fill {
+    position: absolute;
+    left: 0;
+    top: 0;
+    height: 18px;
+    background: rgba(127, 209, 217, 0.16);
+    border-top: 1px solid rgba(203, 238, 246, 0.5);
+    transform: none;
+  }
+
+  .bottle-page .bar .head {
+    position: absolute;
+    top: -6px;
+    width: 2px;
+    height: 32px;
+    background: var(--coral);
+  }
+
+  .bottle-page .timecode {
+    font-family: var(--font-latin), serif;
+    font-variant-numeric: tabular-nums;
+    font-size: 13px;
+    color: var(--muted);
+    white-space: nowrap;
+  }
+
+  .bottle-page .votes {
+    margin-top: 14px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .bottle-page .votes > div {
+    gap: 12px;
+  }
+
+  /* 参考 .voteBtn 形态（38px 高 / glass 描边 / 14px）：
+     盒高按参考走，44px 热区由伪元素承担（视觉不变形、可点范围不缩）。 */
+  .bottle-page .votes button {
+    position: relative;
+    height: 38px;
+    min-height: 0;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 0 15px;
+    border: 1px solid rgba(127, 209, 217, 0.42);
+    border-radius: 2px;
+    background: transparent;
+    color: var(--paper);
+    font-size: 14px;
+  }
+
+  .bottle-page .votes button::after {
+    content: '';
+    position: absolute;
+    inset: -16px -8px;
+  }
+
+  .bottle-page .votesNote {
+    margin-top: 10px;
+    font-size: 12.5px;
+    line-height: 1.35;
+    color: var(--muted);
+  }
+
+  .bottle-page .putBack {
+    margin-top: 14px;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    flex-wrap: wrap;
+  }
+
+  .bottle-page .putBack .ghost {
+    position: relative;
+    height: 36px;
+    min-height: 0;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 0 15px;
+    border: 1px solid rgba(243, 249, 250, 0.2);
+    border-radius: 2px;
+    background: transparent;
+    color: var(--paper);
+    font-size: 14px;
+  }
+
+  .bottle-page .putBack .ghost::after {
+    content: '';
+    position: absolute;
+    inset: -14px -8px;
+  }
+
+  .bottle-page .putBack span {
+    font-size: 12.5px;
+    color: var(--muted);
+  }
+
+  /* 三条水路（稿 .destRow） */
+  .bottle-page .destRow {
+    display: flex;
+    gap: 16px;
+    width: 100%;
+    height: 46px;
+    min-height: 46px;
+    margin-top: 9px;
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    color: inherit;
+    text-align: left;
+  }
+
+  .bottle-page .destRow .glyph {
+    flex: none;
+    width: 30px;
+    height: 30px;
+    margin-top: 6px;
+    color: rgba(127, 209, 217, 0.8);
+  }
+
+  .bottle-page .destRow .t {
+    display: block;
+    font-size: 16px;
+    font-weight: 700;
+    line-height: 1.2;
+  }
+
+  .bottle-page .destRow .d {
+    display: block;
+    margin-top: 3px;
+    font-size: 12.5px;
+    line-height: 1.4;
+    color: var(--muted);
+  }
+
+  /* ── 页脚（稿 bottomRule 48·uv / bottom 19·uv） ── */
+  .bottle-page .bottomRule {
+    position: absolute;
+    left: 5.278%;
+    width: 89.444%;
+    bottom: calc(48 * var(--uv));
+    margin-top: 0;
+    z-index: 2;
+  }
+
+  .bottle-page .bottom {
+    position: absolute;
+    left: 5.278%;
+    width: 89.444%;
+    bottom: calc(19 * var(--uv));
+    margin-top: 0;
+    font-size: 13px;
+    line-height: 1.3;
+    z-index: 2;
+  }
+
+  /* 参考底栏是一行 17px 的字（rule 在 48·uv、行在 19·uv，中间留 10px）——
+     min-h-11 会把行撑到 44px、让分隔线从字里穿过去 ⇒ 盒高回到内容高，
+     44px 热区改由伪元素承担（视觉不变形，可点范围不缩）。 */
+  .bottle-page .bottom a,
+  .bottle-page .bottom button {
+    min-height: 0;
+    position: relative;
+  }
+
+  .bottle-page .bottom a::after,
+  .bottle-page .bottom button::after {
+    content: '';
+    position: absolute;
+    inset: -14px -8px;
+  }
+
+  .bottle-page .putBack[data-can-put-back='false'] {
+    display: none;
+  }
+}
+
+/* ── 矮窗（≤800px 高）：只压间距、不动字号（参考同名媒体段） ─────────────── */
+@media (max-height: 800px) {
+  /* W18 完整试听入口：矮桌面压缩可视盒，但用伪元素保留 44px 点击热区。 */
+  .bottle-page .bf-full-preview button {
+    position: relative;
+    min-height: 36px;
+  }
+
+  .bottle-page .bf-full-preview button::after {
+    content: '';
+    position: absolute;
+    inset: -4px 0;
+  }
+
+  .bottle-page .transport {
+    margin-top: 4px;
+  }
+
+  .bottle-page .votes {
+    margin-top: 4px;
+  }
+
+  .bottle-page .votesNote {
+    margin-top: 2px;
+  }
+
+  .bottle-page .putBack {
+    margin-top: 2px;
+  }
+
+  .bottle-page .destCol .sub {
+    margin-top: 0;
+  }
+
+  .bottle-page .destRow {
+    height: 42px;
+    min-height: 42px;
+    margin-top: 3px;
+  }
+}
+
+@media (min-width: 1024px) and (max-height: 900px) {
+  .bottle-page .listenCol {
+    position: relative;
+  }
+
+  .bottle-page .listenCol h2 span,
+  .bottle-page .bf-full-preview p {
+    display: none;
+  }
+
+  .bottle-page .bf-full-preview {
+    position: absolute;
+    right: 0;
+    top: -7px;
+    margin: 0;
+  }
+
+  .bottle-page .transport .bar {
+    flex: 1 1 auto;
+    width: auto;
+    min-width: 0;
+  }
+}
+
+/* 1024×720 是桌面绝对布局的最紧边界：保留全部可用操作，把说明收成单行，
+   并把完整试听入口并入栏标题空位。热区仍由伪元素扩到 44px。 */
+@media (min-width: 1024px) and (max-width: 1199px) and (max-height: 800px) {
+  .bottle-page .bp-timeline {
+    top: 198px;
+  }
+
+  .bottle-page .bp-cols {
+    top: 486px;
+  }
+
+  .bottle-page .gapBox .gapNote {
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
+
+}
+
+/* ── 窄屏专属（<1024）：放在文件末尾，确保盖过上面的基础竖排样式 ──────────────
+   装置根改 `display: contents` ⇒ 它的子块直接参与 main 的 flex 排序：
+   缺口簇（录制入口）排到两栏**之前**（门禁：375 档 bottle-record 必须进首屏，
+   t17 修前 1304 → 修后 ~560），剖面格位/图注仍排到两栏之后（order 3，同 t5 让位序）。 */
+@media (max-width: 1023px) {
+  .bottle-page .bp-profile {
+    display: contents;
+  }
+
+  .bottle-page .bp-profile > [data-anchor='bottle-record'] {
+    order: 0;
+    margin: 8px auto 0;
+    max-width: 260px;
+  }
+
+  .bottle-page .bp-profile > .heroLab,
+  .bottle-page .bp-profile > .corkLab {
+    order: 3;
+    margin-top: 6px;
+  }
+
+  .bottle-page .bp-profile > .bp-cells {
+    order: 3;
+  }
+
+  /* 窄屏不画剖面场景：水位读数（heroLab）+ 格位列表承担同一信息 */
+  .bottle-page .bp-profile svg.scene,
+  .bottle-page .bp-profile > .callout,
+  .bottle-page .bp-profile > .selMark {
+    display: none;
+  }
+
+  /* 时间轴（t5 收口）：窄屏也压到 52px，不让它把装置顶出首屏 */
+  .bottle-page .bp-timeline .groove-rail {
+    height: 52px;
+  }
+
+  /* 格位列表收紧（t5 的段间距收口在窄屏继续生效） */
+  .bottle-page .bp-cells {
+    gap: 6px;
+    padding: 8px 6px;
+  }
+
+  .bottle-page .bp-cell {
+    padding: 6px 10px;
+  }
+
+  /* ── 两栏在窄屏让位（门禁：375 档 bottle-action 必须进首屏，实测 967 → ~790）──
+     保留动作与标题，压掉说明性长文本：去向副题整行让位、三条水路的描述收成一行、
+     放回行只留按钮（原因句在桌面完整显示）、投票说明与 h2 副题收成一行。 */
+  .bottle-page .destCol .sub {
+    display: none;
+  }
+
+  .bottle-page .destRow {
+    gap: 12px;
+    margin-top: 4px;
+  }
+
+  .bottle-page .destRow .d {
+    display: -webkit-box;
+    -webkit-line-clamp: 1;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  .bottle-page .putBack span {
+    display: none;
+  }
+
+  .bottle-page .votesNote {
+    display: none;
+  }
+
+  .bottle-page .listenCol h2 span {
+    display: -webkit-box;
+    -webkit-line-clamp: 1;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  .bottle-page .bp-cols {
+    row-gap: 8px;
+  }
+
+  .bottle-page .transport {
+    height: auto;
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+}

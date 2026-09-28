@@ -110,8 +110,9 @@ export function GrooveTimeline({
         </span>
       </div>
 
-      {/* 沟槽带（设计稿 .band：92px，上下两条细线靠右淡出；桌面收到 64px —— 一屏门禁优先，窄屏仍是 92px） */}
-      <div className="relative mt-1 h-[92px] lg:h-[64px]">
+      {/* 沟槽带（设计稿 .band：92px，上下两条细线靠右淡出；桌面收到 64px —— 一屏门禁优先，窄屏仍是 92px）
+          `.groove-rail` 是宿主页（bottle-page）压高度的挂点：1280×800 一屏收敛时桌面再收到 52px */}
+      <div className="groove-rail relative mt-1 h-[92px] lg:h-[64px]">
         <span
           aria-hidden="true"
           className="pointer-events-none absolute inset-x-0 top-0 h-px bg-linear-to-r from-line/[0.13] to-transparent"

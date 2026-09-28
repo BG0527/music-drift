@@ -1,26 +1,26 @@
 /**
- * 接力唱段链 = **横躺的玻璃瓶剖面**（record-v1 的 `/bottles/:id` 装置）。
+ * 瓶身剖面（`site/bottle.html` 的四格标注，t17 深度复刻返工）。
  *
- * 装置说的事（实施计划 §5.1「必须存活的装置」）：
- * - **瓶内水位 = 已录段数**：这一段有人唱过 ⇒ 这一格里有水；
- * - **干格 = 缺口**：歌里固定的段位，成品里留成静音，不会被别人的段顶替（不把后面的段前移）；
- * - **漂着的瓶塞 = 有人持有**：持有状态由页面把服务端的 `status` 交进来，组件不自己猜。
+ * 参考构图（patches/bottle.css 头注：场景与标注整块按 --u 缩放）——
+ * 装置不是"每格一张卡片"，而是**挂在瓶身剖面刻度上的一列列标注**：
+ *   段号 `.segNum`（320·u）→ 段名 `.segLab`（356·u）→ 段位卡 `.cap`（458·u：代号 / 时长·赞踩 / 听）
+ * 缺口列只有段号+段名（暖色 `gap`），缺口簇 `.gapBox` 长在**服务端给的那一格**里
+ * （`missingSegmentIndexes[0]`，402·u）—— 不可录的观看者也看得到它（参考常驻：说明为什么录不了）。
  *
- * 两条结构纪律：
- * 1. **一个段位 = 一个 `<li>`**（段号 1..totalSegments 全都在），所以"缺口"是**显式的一格**，
- *    不是"少一行"——斩浪之后的作品不会被误看成完整；
- * 2. **它同时是"选段器"**：界面上只放一个播放器，放哪一段由这里决定
- *    （`selectedSegmentId` / `onSelectSegment`）。不给这两个 prop 时它就只是展示，
- *    **不会渲染出点了没用的"听一段"**（不制造假控件）。
+ * 水位与纸卷在场景 SVG 里（`BottleScene`）：**只画到从第 1 段起连续录满的前沿** ——
+ * 中间有缺口时后面的水不凭空盖过去（参考 `waterFrontIndex()` 同款）。
  *
- * 响应式（375 也要读得出来）：水与干格是**每一格自己的**，所以
- * 桌面（4 格并排）读成"横躺的瓶里水位到第 N 段"，窄屏（4 格竖排）读成
- * "同一只瓶子立起来，水只到第 N 格"——两种朝向都保留"水 / 干格"两个可读信号。
+ * 两条结构纪律（沿用）：
+ * 1. **一个段位 = 一个 `<li>`**（段号 1..totalSegments 全在）⇒ 缺口是显式的一格，不是"少一行"；
+ * 2. **它同时是选段器**：给 `onSelectSegment` 才渲染「听」（不制造假控件），选中态 `aria-current` 表达。
+ *
+ * 响应式：≥1024 按参考坐标绝对落位（坐标在 `pages/bottle-page.css`）；<1024 退回流式竖排（同一套 DOM）。
  */
+import type { CSSProperties, ReactNode } from 'react';
 import type { BottleStatus } from '@music-drift/shared';
 import { formatClock } from '../audio';
 import { Icon, cn } from '../../design-system';
-import { BOTTLE_STATUS_LABEL, gapNotice } from './relay-status';
+import { BottleScene } from './bottle-scene';
 
 export interface TimelineSegmentLike {
   id: string;
@@ -29,11 +29,7 @@ export interface TimelineSegmentLike {
   note: string | null;
   durationMs: number | null;
   deletedAt: string | null;
-  /**
-   * 该段的赞/踩数（`SegmentSchema.likeCount/dislikeCount`，**服务端已聚合**）。
-   * 可选是因为历史调用点不必都传；但只要有段，页面就会把服务端给的值传进来 ——
-   * 这里**不做任何推算**（缺口行没有段，自然就没有计数）。
-   */
+  /** 赞/踩（服务端聚合；缺口没有段，自然没有计数）。 */
   likeCount?: number | undefined;
   dislikeCount?: number | undefined;
 }
@@ -49,19 +45,32 @@ export interface RelayTimelineProps {
   selectedSegmentId?: string | null | undefined;
   /** 选段试听：给了它才渲染「听第 N 段」。 */
   onSelectSegment?: ((segmentId: string) => void) | undefined;
-  /**
-   * 瓶子状态（服务端 `BottleDetail.status`）。
-   * **只用来决定瓶塞在不在瓶口**：`HELD` ⇒ 有人持有 ⇒ 画瓶塞 + 「瓶塞 · 有人持有」。
-   * 别的状态一律不画瓶塞（宁可不画，也不编一个"瓶子状态"出来）。
-   */
+  /** 瓶子状态（服务端）：只决定瓶塞在不在（HELD ⇒ 画瓶塞 + 图注）。 */
   status?: BottleStatus | undefined;
+  /**
+   * 缺口簇的说明（页面按服务端事实给参考文案：
+   * 可录 = "接唱只能唱这一段…"、不可录 = "这一段只有发起者（尚未投河时）或当前持有者能录…"）。
+   */
+  gapNote?: string | null | undefined;
+  /** 缺口簇 CTA（可录时 = 页面的「录第 N 段」按钮；不可录 = 不给，参考只留说明）。 */
+  gapAction?: ReactNode | null | undefined;
   className?: string;
 }
 
-/* ── 装置的三个数值（都写死在类名里，Tailwind 才扫得到；改它们要连着看剖面截图）──
-   ① 水带高度 = 格子下缘的 55%：水线落在"代号"那一行下面（与设计稿剖面一致）；
-   ② 水位读数 = 最高的已录段位（"水只到第 N 段"）；缺口格**没有水带**（干格 ⇒ 缺口可读）；
-   ③ 瓶口在右侧 15%（段位格 `md:mr-[15%]`），瓶塞就画在那段空白里。 */
+/** 设计画布宽（`svg.scene` viewBox = 1440×900）：设计 x → 百分比。 */
+const DESIGN_WIDTH = 1440;
+const PROFILE_LEFT = 76;
+const PROFILE_RIGHT = 1000;
+
+function cellSlot(index: number, total: number): { left: number; width: number } {
+  const width = (PROFILE_RIGHT - PROFILE_LEFT) / total;
+  return { left: PROFILE_LEFT + (index - 1) * width, width };
+}
+
+/** 设计 x → 百分比（与参考 `pct()` 同一入口）。 */
+function pct(designX: number): string {
+  return `${((designX / DESIGN_WIDTH) * 100).toFixed(4)}%`;
+}
 
 export function RelayTimeline({
   segments,
@@ -71,288 +80,155 @@ export function RelayTimeline({
   selectedSegmentId = null,
   onSelectSegment,
   status,
+  gapNote = null,
+  gapAction = null,
   className,
 }: RelayTimelineProps) {
   const live = segments.filter((segment) => segment.deletedAt === null);
   const byIndex = new Map(live.map((segment) => [segment.index, segment]));
+  const count = Math.max(1, totalSegments);
   const positions = Array.from({ length: totalSegments }, (_unused, offset) => offset + 1);
-  /** 水位读数：最高的**已录**段位（水"只到"那里；中间的缺口仍然读得出来是干格）。 */
-  const highestFilled = live.reduce((highest, segment) => Math.max(highest, segment.index), 0);
-  const waterText =
-    live.length === 0 ? '还没有人唱过' : `水只到第 ${String(highestFilled)} 段`;
-  /** 段位格数由数据决定 ⇒ 横向铺开用 flex（每个格子等分），不写死列数。 */
+  /** 水位＝从第 1 段起连续录满的段数（参考 `waterFrontIndex()`：缺口之后的水面不凭空盖过去）。 */
+  let waterFront = 0;
+  while (waterFront < totalSegments && byIndex.has(waterFront + 1)) waterFront += 1;
+  const waterText = live.length === 0 ? '水还没进来' : `水只到第 ${waterFront} 段`;
+  const selected = live.find((segment) => segment.id === selectedSegmentId) ?? null;
+  /** 缺口簇长在服务端给的那一格（下一次会录的段号）；没有缺口就没有缺口簇。 */
+  const gapIndex = missingSegmentIndexes[0];
+  const gapSlot = gapIndex === undefined ? null : cellSlot(gapIndex, count);
+  const canRecord = gapAction !== null && gapAction !== undefined;
 
   return (
-    <div className={cn('flex flex-col gap-2', className)}>
-      <h2 className="text-[1.0625rem] font-semibold text-paper">
-        接力唱段链
-        <span className="ml-2 text-[0.875rem] font-normal text-muted">
-          {gapNotice(missingSegmentIndexes) ?? '每个段位都有人唱过'}
-        </span>
-      </h2>
+    <div
+      data-testid="bottle-body"
+      className={cn('bp-profile', className)}
+      data-water-front={waterFront}
+    >
+      {/* 图注（稿 .heroLab）：水位读数只认"连续录满" */}
+      <p data-testid="bottle-water-level" className="heroLab meta">
+        瓶身剖面 · {waterText}
+      </p>
 
-      <div className="relative flex flex-col" data-testid="bottle-body">
-        <p
-          data-testid="bottle-water-level"
-          className="mb-[6px] text-[0.6875rem] leading-[1.5] tracking-[0.24em] text-muted"
-          style={{ fontFamily: 'var(--font-latin)' }}
-        >
-          瓶身剖面 · {waterText}
-        </p>
+      {/* 场景：玻璃瓶 / 水 / 纸卷 / 格位（纯装饰，零高度） */}
+      <BottleScene totalSegments={count} waterFront={waterFront} showCork={status === 'HELD'} />
 
-        <div className="relative isolate">
-          {/* 桌面：**横躺的玻璃瓶**（瓶口在右、瓶底在左）。纯装饰，不参与布局高度。 */}
-          <svg
-            aria-hidden="true"
-            viewBox="0 0 1000 300"
-            preserveAspectRatio="none"
-            className="pointer-events-none absolute inset-0 hidden h-full w-full md:block"
-          >
-            <path
-              d="M 150 10 H 820 V 112 H 978 V 188 H 820 V 290 H 150 A 140 140 0 0 1 150 10 Z"
-              fill="var(--color-water-deep)"
-              fillOpacity="0.02"
-              stroke="var(--color-line)"
-              strokeOpacity="0.38"
-              strokeWidth="1.5"
-              vectorEffect="non-scaling-stroke"
-            />
-            {/* 河道水面：只在瓶口那一段画（瓶身里的水线由每个段位格自己的水带给出，y 对齐水带高度 55%） */}
-            <line
-              x1="820"
-              y1="135"
-              x2="1000"
-              y2="135"
-              stroke="var(--color-line)"
-              strokeOpacity="0.25"
-              strokeDasharray="5 5"
-              strokeWidth="1.5"
-              vectorEffect="non-scaling-stroke"
-            />
-            {/* 水面引线（把「河道水面」这四个字接到水线上） */}
-            <line
-              x1="930"
-              y1="58"
-              x2="930"
-              y2="135"
-              stroke="var(--color-muted)"
-              strokeOpacity="0.34"
-              strokeWidth="1.5"
-              vectorEffect="non-scaling-stroke"
-            />
-          </svg>
+      {/* 四格标注（一个段位 = 一个 li；缺口是显式的一格） */}
+      <ol data-testid="relay-timeline" className="bp-cells">
+        {positions.map((index) => {
+          const segment = byIndex.get(index);
+          const dry = segment === undefined;
+          const isSelected = segment !== undefined && segment.id === selectedSegmentId;
+          const slot = cellSlot(index, count);
+          return (
+            <li
+              key={index}
+              data-state={dry ? 'gap' : 'filled'}
+              data-filled={dry ? 'false' : 'true'}
+              className={cn('bp-cell', dry && 'is-gap', isSelected && 'is-sel segment-pick')}
+              style={
+                {
+                  '--cell-left': pct(slot.left),
+                  '--cell-w': pct(slot.width),
+                } as CSSProperties
+              }
+            >
+              <span className={cn('segNum mono', dry && 'gap')} aria-hidden="true">
+                {index}
+              </span>
+              <span className={cn('segLab meta', dry && 'gap', isSelected && 'sel')}>
+                第 {index} 段
+                {dry ? <span className="sr-only">（缺口）</span> : null}
+              </span>
 
-          {/* 窄屏：**同一只瓶子立起来**（瓶口在上）。4 格竖排，水带一样在每格下方。 */}
-          <svg
-            aria-hidden="true"
-            viewBox="0 0 300 1000"
-            preserveAspectRatio="none"
-            className="pointer-events-none absolute inset-0 h-full w-full md:hidden"
-          >
-            <path
-              d="M 118 8 H 182 V 92 H 262 V 906 Q 262 944 226 944 H 74 Q 38 944 38 906 V 92 H 118 Z"
-              fill="var(--color-water-deep)"
-              fillOpacity="0.02"
-              stroke="var(--color-line)"
-              strokeOpacity="0.38"
-              strokeWidth="1.5"
-              vectorEffect="non-scaling-stroke"
-            />
-          </svg>
-
-          <ol
-            className="relative flex flex-col gap-[10px] px-[10px] py-[12px] md:mr-[15%] md:flex-row md:gap-0 md:px-[16px]"
-            data-testid="relay-timeline"
-          >
-            {positions.map((index) => {
-              const segment = byIndex.get(index);
-              const isSelected = segment !== undefined && segment.id === selectedSegmentId;
-              return (
-                <li
-                  key={index}
-                  data-state={segment === undefined ? 'gap' : 'filled'}
-                  data-filled={segment === undefined ? 'false' : 'true'}
-                  className={cn(
-                    'relative flex min-w-0 flex-col gap-[6px] px-[12px] py-[10px]',
-                    'md:flex-1 md:basis-0 md:border-r md:border-line/12 md:last:border-r-0',
-                  )}
-                >
-                  {segment === undefined ? (
-                    /* 干格 = 缺口：虚线框里没有水 */
-                    <span
-                      aria-hidden="true"
-                      className="pointer-events-none absolute inset-x-[6px] inset-y-[6px] rounded-md border border-dashed border-line/20"
-                    />
-                  ) : (
-                    /* 瓶里的水：这一段有人唱过（水位 = 已录段数） */
-                    <>
-                      <span
-                        aria-hidden="true"
-                        className="pointer-events-none absolute inset-x-0 bottom-0 h-[55%] bg-water-body/60"
-                      />
-                      <span
-                        aria-hidden="true"
-                        className={cn(
-                          'pointer-events-none absolute inset-x-0 bottom-[55%] border-t',
-                          isSelected ? 'border-coral' : 'border-line/25',
-                        )}
-                      />
-                    </>
-                  )}
-
-                  <div className="relative z-10 flex flex-col gap-[6px]">
-                    {/* 段位刻度：大号虚字（只有位置，不抢正文）+ 「第 N 段」标签 */}
-                    <span
-                      aria-hidden="true"
-                      className="text-[1.75rem] leading-none text-paper/20"
-                      style={{ fontFamily: 'var(--font-latin)' }}
-                    >
-                      {index}
-                    </span>
-                    <span
-                      className={cn(
-                        'text-[0.6875rem] tracking-[0.24em]',
-                        segment === undefined
-                          ? 'text-warm'
-                          : isSelected
-                            ? 'text-coral'
-                            : 'text-muted',
-                      )}
-                      style={{ fontFamily: 'var(--font-latin)' }}
-                    >
-                      {segment === undefined
-                        ? `缺第 ${String(index)} 段`
-                        : `第 ${String(index)} 段`}
-                    </span>
-
-                    {segment === undefined ? (
-                      <>
-                        <span className="text-[0.6875rem] tracking-[0.24em] text-warm">缺口</span>
-                        <span className="text-[0.8125rem] leading-[1.5] text-muted">
-                          空着，成品里留成静音，不会被顶替
-                        </span>
-                      </>
-                    ) : (
-                      <>
-                        {/* 这一段的声音：一条声槽（时长以服务端为准） */}
-                        <span className="flex h-[26px] w-fit max-w-full items-center gap-[6px] rounded-md border border-water-mid/50 bg-water-mid/10 px-[10px] text-[0.75rem] text-water-light">
-                          <Icon name="AudioWaveform" size={16} className="shrink-0" />
-                          <span
-                            className="whitespace-nowrap"
-                            style={{ fontFamily: 'var(--font-latin)' }}
-                          >
-                            {segment.durationMs === null ? '--:--' : formatClock(segment.durationMs)}
-                          </span>
-                        </span>
-                        <span className="text-[0.875rem] text-muted">{segment.ownerCode}</span>
-                        {segment.note === null ? null : (
-                          <span className="min-w-0 truncate text-[0.8125rem] text-muted">
-                            {segment.note}
-                          </span>
-                        )}
-                        {/*
-                          每段的票数：**有段就显示**（含 0），值直接来自服务端聚合的
-                          `SegmentSchema.likeCount/dislikeCount`，行内不相加、不推算。
-                          缺口格没有段，所以那一格不会出现票数。
-                        */}
-                        {segment.likeCount === undefined &&
-                        segment.dislikeCount === undefined ? null : (
-                          <span className="flex items-center gap-[12px] text-[0.8125rem] text-muted">
-                            <span className="flex items-center gap-1">
-                              <Icon name="ThumbsUp" size={16} />
-                              <span>赞 {segment.likeCount ?? 0}</span>
-                            </span>
-                            <span className="flex items-center gap-1">
-                              <Icon name="ThumbsDown" size={16} />
-                              <span>踩 {segment.dislikeCount ?? 0}</span>
-                            </span>
-                          </span>
-                        )}
-                      </>
+              {segment === undefined ? null : (
+                <div className="cap">
+                  <p className="code meta">{segment.ownerCode}</p>
+                  <p className="line mono">
+                    <span>{segment.durationMs === null ? '--:--' : formatClock(segment.durationMs)}</span>
+                    <span>赞 {segment.likeCount ?? 0}</span>
+                    <span>踩 {segment.dislikeCount ?? 0}</span>
+                  </p>
+                  <p className="capAct">
+                    {onSelectSegment === undefined ? null : (
+                      <button
+                        type="button"
+                        className="listen whitespace-nowrap"
+                        aria-label={`听第 ${String(index)} 段`}
+                        {...(isSelected ? { 'aria-current': 'true' as const } : {})}
+                        onClick={() => {
+                          onSelectSegment(segment.id);
+                        }}
+                      >
+                        听
+                      </button>
                     )}
+                    {onReportSegment === undefined ? null : (
+                      <button
+                        type="button"
+                        className="capReport"
+                        aria-label={`举报第 ${String(index)} 段`}
+                        title="举报这一段（进人工队列）"
+                        onClick={() => {
+                          onReportSegment(segment.id, segment.index);
+                        }}
+                      >
+                        <Icon name="Flag" size={16} />
+                      </button>
+                    )}
+                  </p>
+                </div>
+              )}
+            </li>
+          );
+        })}
+      </ol>
 
-                    <div className="flex flex-wrap items-center gap-[8px]">
-                      {segment !== undefined && onSelectSegment !== undefined ? (
-                        <button
-                          type="button"
-                          aria-label={`听第 ${String(index)} 段`}
-                          {...(isSelected ? { 'aria-current': 'true' as const } : {})}
-                          className={cn(
-                            'inline-flex min-h-11 items-center gap-[6px] rounded-base border px-[12px] text-[0.8125rem]',
-                            'transition-transform duration-200 ease-out hover:scale-[var(--motion-hover-scale)]',
-                            isSelected
-                              ? 'border-coral text-coral'
-                              : 'border-line/25 text-muted hover:text-paper',
-                          )}
-                          onClick={() => {
-                            onSelectSegment(segment.id);
-                          }}
-                        >
-                          <Icon name={isSelected ? 'Pause' : 'Play'} size={16} />
-                          <span className="whitespace-nowrap">
-                            {isSelected ? '正在听' : '听'}
-                          </span>
-                        </button>
-                      ) : null}
-                      {segment !== undefined && onReportSegment !== undefined ? (
-                        <button
-                          type="button"
-                          aria-label={`举报第 ${String(index)} 段`}
-                          title="举报这一段（进人工队列）"
-                          className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-base border border-line/20 text-muted transition-colors duration-200 ease-out hover:text-paper"
-                          onClick={() => {
-                            onReportSegment(segment.id, segment.index);
-                          }}
-                        >
-                          <Icon name="Flag" size={16} />
-                        </button>
-                      ) : null}
-                    </div>
-                  </div>
-                </li>
-              );
-            })}
-          </ol>
-        </div>
-
-        {/* 河道水面：一句话把水线交代清楚（装饰性导引，真正的水位读数在上面那行） */}
-        <span
-          aria-hidden="true"
-          className="pointer-events-none absolute right-0 top-[16%] hidden text-[0.6875rem] tracking-[0.18em] text-muted/80 md:block"
-          style={{ fontFamily: 'var(--font-latin)' }}
+      {/* 缺口簇（稿 .gapBox）：缺口槽 + 「缺口」+ 标题 + CTA + 说明 —— 常驻在服务端给的那一格 */}
+      {gapIndex === undefined || gapSlot === null ? null : (
+        <div
+          data-anchor="bottle-record"
+          className="gapBox order-[-9999] lg:order-none"
+          style={
+            {
+              '--gap-col': String(gapIndex),
+              '--gap-left': pct(gapSlot.left + 10),
+              '--gap-width': pct(gapSlot.width - 20),
+            } as CSSProperties
+          }
         >
-          河道水面
-        </span>
+          <span className="gapSlot" aria-hidden="true" />
+          <p className="gapKind meta">缺口</p>
+          <p className="gapHead">
+            {canRecord ? `第 ${String(gapIndex)} 段由你开第一句` : `第 ${String(gapIndex)} 段还空着`}
+          </p>
+          {gapAction}
+          {gapNote === null || gapNote === undefined ? null : <p className="gapNote">{gapNote}</p>}
+        </div>
+      )}
 
-        {/* 瓶塞在瓶口 = 有人持有（状态来自服务端；不在任何人手上时这一行不出现） */}
-        {status === 'HELD' ? (
-          <>
-            <svg
-              aria-hidden="true"
-              viewBox="0 0 40 60"
-              preserveAspectRatio="none"
-              className="pointer-events-none absolute right-0 top-[30%] hidden h-[40%] w-[9%] md:block"
-            >
-              <rect x="0" y="8" width="34" height="44" rx="10" fill="var(--color-warm)" fillOpacity="0.85" />
-            </svg>
-            <svg
-              aria-hidden="true"
-              viewBox="0 0 76 26"
-              preserveAspectRatio="none"
-              className="pointer-events-none absolute left-[39%] top-[-4px] h-[26px] w-[22%] md:hidden"
-            >
-              <rect x="0" y="0" width="76" height="26" rx="12" fill="var(--color-warm)" fillOpacity="0.85" />
-            </svg>
-            <span
-              data-testid="bottle-cork"
-              className="mt-[6px] text-[0.6875rem] leading-[1.5] tracking-[0.24em] text-warm md:absolute md:right-0 md:top-[74%] md:mt-0"
-              style={{ fontFamily: 'var(--font-latin)' }}
-            >
-              瓶塞 · {BOTTLE_STATUS_LABEL[status]}
-            </span>
-          </>
-        ) : null}
-      </div>
+      {/* 正在试听的那一段：珊瑚刻度挂在该列的水位带上（稿 .selMark） */}
+      {selected === null ? null : (
+        <span
+          className="selMark"
+          aria-hidden="true"
+          style={
+            {
+              '--sel-col': String(selected.index),
+              '--sel-left': pct(cellSlot(selected.index, count).left + (cellSlot(selected.index, count).width - 60) / 2),
+            } as CSSProperties
+          }
+        />
+      )}
+
+      {/* 图注：水面引线接到「河道水面」，瓶塞只在有人持有时挂图注 */}
+      <span className="callout meta" aria-hidden="true">
+        河道水面
+      </span>
+      {status === 'HELD' ? (
+        <span data-testid="bottle-cork" className="corkLab meta">
+          瓶塞 · 有人持有
+        </span>
+      ) : null}
     </div>
   );
 }

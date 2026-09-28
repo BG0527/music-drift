@@ -56,7 +56,9 @@ describe('分段音频：bytea 入库 → HTTP Range 流式播放', () => {
       durationMs,
     });
     segmentId = created.id;
-    app = buildApp({ db });
+    // 本文件只验证 bytea/Range 字节链路；业务可见性由 visibility.integration.test.ts
+    // 用真实会话与事件流覆盖。这里只注入仓储，避免无事件的底层夹具被业务权限正确拒绝。
+    app = buildApp({ segmentAudio: createSegmentAudioRepository(db) });
     await app.ready();
   });
 

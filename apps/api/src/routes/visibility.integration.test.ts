@@ -127,6 +127,7 @@ describe('§9.1 漂流中：看不到后面是谁、唱成什么样', () => {
   let holder: { cookie: string; userId: string };
   let stranger: { cookie: string; userId: string };
   let bottleId = '';
+  const segmentIds: string[] = [];
 
   beforeAll(async () => {
     initiator = await register('vi');
@@ -142,7 +143,7 @@ describe('§9.1 漂流中：看不到后面是谁、唱成什么样', () => {
       headers: { cookie: initiator.cookie },
     });
     bottleId = (created.json() as { id: string }).id;
-    await record(initiator.cookie, bottleId, '我发起的第一棒');
+    segmentIds.push(await record(initiator.cookie, bottleId, '我发起的第一棒'));
     const cast = await app.inject({
       method: 'POST',
       url: '/api/bottles/' + bottleId + '/resolution',
@@ -153,7 +154,7 @@ describe('§9.1 漂流中：看不到后面是谁、唱成什么样', () => {
 
     // 第二个人捞到并接唱第 2 段后**继续投河**（瓶子仍在漂流中）
     expect(await drawUntil(singerOne.cookie, bottleId)).toBe(bottleId);
-    await record(singerOne.cookie, bottleId, '第二棒的附言');
+    segmentIds.push(await record(singerOne.cookie, bottleId, '第二棒的附言'));
     await app.inject({
       method: 'POST',
       url: '/api/bottles/' + bottleId + '/resolution',
@@ -195,6 +196,16 @@ describe('§9.1 漂流中：看不到后面是谁、唱成什么样', () => {
     expect(detail.hiddenLaterSegmentCount).toBe(2);
   });
 
+  it('即使知道隐藏后续段 UUID，发起者也不能绕过详情投影直接取音频', async () => {
+    const response = await app.inject({
+      method: 'GET',
+      url: `/api/segments/${segmentIds[1] ?? ''}/audio`,
+      headers: { cookie: initiator.cookie },
+    });
+
+    expect(response.statusCode).toBe(404);
+  });
+
   it('漂流日志同样按同一判据裁剪：发起者只看到自己那一棒的日志', async () => {
     const events = await eventsOf(initiator.cookie, bottleId);
     expect(events.length).toBeGreaterThan(0);
@@ -210,7 +221,7 @@ describe('§9.1 漂流中：看不到后面是谁、唱成什么样', () => {
 
   it('入海后（§9.2）解锁完整接力链：所有参与者与陌生人都能看到全部段与完整日志', async () => {
     // 持有者录第 3 段后投河（同一人不能在同一瓶里唱两次）→ 第四个人录最后一段并送进公海
-    await record(holder.cookie, bottleId);
+    segmentIds.push(await record(holder.cookie, bottleId));
     const afterThird = await detailOf(holder.cookie, bottleId);
     expect(afterThird.missingSegmentIndexes).toEqual([4]);
     const cast = await app.inject({
@@ -223,7 +234,7 @@ describe('§9.1 漂流中：看不到后面是谁、唱成什么样', () => {
 
     const last = await register('vl');
     expect(await drawUntil(last.cookie, bottleId)).toBe(bottleId);
-    await record(last.cookie, bottleId);
+    segmentIds.push(await record(last.cookie, bottleId));
     const beforeSea = await detailOf(last.cookie, bottleId);
     expect(beforeSea.isComplete).toBe(true);
     const toSea = await app.inject({
@@ -242,6 +253,18 @@ describe('§9.1 漂流中：看不到后面是谁、唱成什么样', () => {
 
     const strangerView = await detailOf(stranger.cookie, bottleId);
     expect(strangerView.segments.map((segment) => segment.index)).toEqual([1, 2, 3, 4]);
+
+    const publicAudioStatuses = await Promise.all(
+      segmentIds.map(async (segmentId) =>
+        (
+          await app.inject({
+            method: 'GET',
+            url: `/api/segments/${segmentId}/audio`,
+          })
+        ).statusCode,
+      ),
+    );
+    expect(publicAudioStatuses).toEqual([200, 200, 200, 200]);
 
     const log = await eventsOf(stranger.cookie, bottleId);
     expect(log.length).toBeGreaterThan(5);

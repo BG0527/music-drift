@@ -39,6 +39,9 @@ export const DEFAULT_MIX_SAMPLE_RATE = 48_000;
 /** 段在成品里的角色：人声段 / 缺口（静音占位）。 */
 export type MixClipKind = 'voice' | 'gap';
 
+/** 完整试听里每个固定时间槽的可见状态。 */
+export type MixClipAvailability = 'RECORDED' | 'UNRECORDED' | 'LOCKED';
+
 /** 缺口占位时长的来源（写进 plan，便于报告说明"这个时长是怎么来的"）。 */
 export type GapDurationSource = 'NOMINAL' | 'MEDIAN' | 'DEFAULT' | 'MEASURED';
 
@@ -68,6 +71,8 @@ export interface MixClip {
   durationSource: GapDurationSource;
   audioUrl?: string | null;
   ownerCode?: string | null;
+  /** `LOCKED` 的段不得携带音频地址，也不得由客户端请求。 */
+  availability?: MixClipAvailability;
 }
 
 export type MixWarningCode =
@@ -93,7 +98,73 @@ export interface MixPlan {
   isComplete: boolean;
   /** 是否含伴奏轨道。阶段一恒为 false。 */
   hasAccompaniment: boolean;
+  /** 静态曲库伴奏；存在时贯穿所有时间槽，缺口不再是整段静音。 */
+  accompanimentUrl?: string | null;
+  /** 没有人声、但仍播放伴奏的真实缺口。 */
+  unrecordedSegmentIndexes?: number[];
+  /** 已有人声但当前观看者尚无权试听的后续段。 */
+  lockedSegmentIndexes?: number[];
   warnings: MixWarning[];
+}
+
+export interface AccompaniedMixPlanInput extends MixPlanInput {
+  /** 由详情投影返回的真实缺口；与不可见的已录段不是一回事。 */
+  missingSegmentIndexes: readonly number[];
+  /** 被服务端裁掉的已录后续段数量，仅用于一致性检查和界面解释。 */
+  hiddenLaterSegmentCount: number;
+  accompanimentUrl: string;
+}
+
+/** 固定伴奏时间轴上的完整试听计划；只信任调用方传入的服务端可见 `segments`。 */
+export function planAccompaniedMix(input: AccompaniedMixPlanInput): MixPlan {
+  const base = planMonoSequentialMix({
+    ...input,
+    // 人声文件的实测长短不能改变曲目时间轴；完整试听以曲库固定段界为准。
+    segments: input.segments.map((segment) => ({
+      ...segment,
+      durationMs: input.nominalDurationByIndex?.[segment.index] ?? segment.durationMs,
+    })),
+  });
+  const missing = new Set(input.missingSegmentIndexes);
+  const visible = new Set(input.segments.map((segment) => segment.index));
+  const clips = base.clips.map((clip) => {
+    const availability: MixClipAvailability = visible.has(clip.index)
+      ? 'RECORDED'
+      : missing.has(clip.index)
+        ? 'UNRECORDED'
+        : 'LOCKED';
+    return {
+      ...clip,
+      durationSource:
+        input.nominalDurationByIndex?.[clip.index] === undefined
+          ? clip.durationSource
+          : 'NOMINAL',
+      availability,
+      audioUrl: availability === 'RECORDED' ? (clip.audioUrl ?? null) : null,
+    };
+  });
+  const lockedSegmentIndexes = clips
+    .filter((clip) => clip.availability === 'LOCKED')
+    .map((clip) => clip.index);
+  if (lockedSegmentIndexes.length !== input.hiddenLaterSegmentCount) {
+    throw new Error(
+      `hiddenLaterSegmentCount=${String(input.hiddenLaterSegmentCount)} 与锁定段数量 ${String(lockedSegmentIndexes.length)} 不一致。`,
+    );
+  }
+  return {
+    ...base,
+    strategy: 'ACCOMPANIMENT_TIMELINE',
+    hasAccompaniment: true,
+    accompanimentUrl: input.accompanimentUrl,
+    clips,
+    missingSegmentIndexes: [...missing].sort((left, right) => left - right),
+    // `missing=[]` 只说明服务端没有真实缺口；仍有 LOCKED 时当前观看者不能确认/试听完整作品。
+    isComplete: missing.size === 0 && lockedSegmentIndexes.length === 0,
+    unrecordedSegmentIndexes: clips
+      .filter((clip) => clip.availability === 'UNRECORDED')
+      .map((clip) => clip.index),
+    lockedSegmentIndexes,
+  };
 }
 
 export interface MixPlanInput {
@@ -257,9 +328,18 @@ export function describeMissingSegments(missing: readonly number[]): string | nu
 /** 成品摘要（不得把不完整说成完整）。 */
 export function mixSummaryLabel(plan: MixPlan): string {
   const total = plan.clips.length;
-  if (plan.isComplete) return `${total} 段完整（纯人声）`;
+  const format = plan.hasAccompaniment ? '伴奏 + 人声' : '纯人声';
+  if (plan.isComplete) return `${total} 段完整（${format}）`;
+  if (plan.hasAccompaniment && (plan.lockedSegmentIndexes?.length ?? 0) > 0) {
+    const parts: string[] = [];
+    const missing = describeMissingSegments(plan.missingSegmentIndexes);
+    if (missing !== null) parts.push(missing);
+    parts.push(`第 ${plan.lockedSegmentIndexes?.join('、') ?? ''} 段暂未解锁`);
+    const visible = plan.clips.filter((clip) => clip.availability === 'RECORDED').length;
+    return `${parts.join(' · ')} · 可试听 ${String(visible)} / ${String(total)} 段（${format}）`;
+  }
   const missing = describeMissingSegments(plan.missingSegmentIndexes) ?? '';
-  return `${missing} · 有效 ${total - plan.missingSegmentIndexes.length} / ${total} 段（纯人声）`;
+  return `${missing} · 有效 ${total - plan.missingSegmentIndexes.length} / ${total} 段（${format}）`;
 }
 
 export interface AlignmentMeasurement {

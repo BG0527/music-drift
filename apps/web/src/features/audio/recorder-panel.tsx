@@ -82,6 +82,10 @@ export interface RecorderPanelProps {
   bars?: number;
   /** 点"用这一段"时把成品交给上层（上层负责上传与去向选择）。 */
   onRecorded?: (recording: SegmentRecording) => void;
+  /** 丢弃本地录音后通知上层关闭录音窗口。 */
+  onCancel?: () => void;
+  /** 重录前通知上层清理上一次上传失败的本地状态。 */
+  onRetryRecording?: () => void;
   /** 上传状态（由上层用 `uploadSegmentAudio` 驱动）。 */
   upload?: RecorderUploadView;
   /** 整体禁用（例如瓶子已被别人接走）。 */
@@ -97,6 +101,8 @@ export function RecorderPanel({
   presetToleranceMs,
   bars = 48,
   onRecorded,
+  onCancel,
+  onRetryRecording,
   upload,
   disabled = false,
   className,
@@ -125,14 +131,15 @@ export function RecorderPanel({
   /**
    * 已录进度（0..1）：分母**只认本段固定时长**；拿不到就返回 null —— 宁可没有进度条，
    * 也不拿一个假分母画一条假进度（这一段的时长本来就是服务端权威值）。
-   * 录完（`recorded`）用实际录到的时长，所以"差太多"时进度条诚实地停在那一格。
+   * 录完（`reviewing_local`）用实际录到的时长，所以"差太多"时进度条诚实地停在那一格。
    */
   const progressRatio =
     preset === null
       ? null
       : Math.min(
           1,
-          (status === 'recorded' ? (recording?.durationMs ?? elapsedMs) : elapsedMs) / preset,
+          (status === 'reviewing_local' ? (recording?.durationMs ?? elapsedMs) : elapsedMs) /
+            preset,
         );
 
   const statusText = ((): string => {
@@ -143,7 +150,7 @@ export function RecorderPanel({
         return '正在请求麦克风权限…';
       case 'recording':
         return `录制中 ${formatClock(elapsedMs)} / ${targetLabel}`;
-      case 'recorded':
+      case 'reviewing_local':
         return `已录 ${formatClock(recording?.durationMs ?? 0)} / ${targetLabel}`;
       default:
         return preset === null
@@ -171,7 +178,7 @@ export function RecorderPanel({
    * 拿不到地址（宿主不支持 objectURL）时**安静地不给这个按钮**，其余动作照常可用 ——
    * 试听是附加能力，不能因为它不可用挡住"用这一段"。
    */
-  const canPreview = status === 'recorded' && recorder.previewUrl !== null;
+  const canPreview = status === 'reviewing_local' && recorder.previewUrl !== null;
   const previewUi = PREVIEW_UI[recorder.previewState];
 
   const uploadTone =
@@ -302,7 +309,7 @@ export function RecorderPanel({
       {poiStatus(tooShort, status)}
 
       {/* t40：录完当场把"有没有声音"告诉用户（用户实测的问题正是"录到静音却毫无提示"） */}
-      {status === 'recorded' && clip !== null ? (
+      {status === 'reviewing_local' && clip !== null ? (
         clip.status === 'silent' ? (
           <p
             id={clipNoticeId}
@@ -369,7 +376,7 @@ export function RecorderPanel({
           </Button>
         )}
 
-        {status === 'recorded' ? (
+        {status === 'reviewing_local' ? (
           <>
             <Button
               variant="primary"
@@ -385,6 +392,7 @@ export function RecorderPanel({
             {canPreview ? (
               <Button
                 variant="ghost"
+                disabled={disabled}
                 onClick={recorder.togglePreview}
                 icon={<Icon name={previewUi.icon} size={18} />}
               >
@@ -393,11 +401,27 @@ export function RecorderPanel({
             ) : null}
             <Button
               variant="ghost"
-              onClick={recorder.reset}
+              disabled={disabled}
+              onClick={() => {
+                recorder.reset();
+                onRetryRecording?.();
+              }}
               icon={<Icon name="RotateCcw" size={18} />}
             >
               重录
             </Button>
+            {onCancel === undefined ? null : (
+              <Button
+                variant="ghost"
+                disabled={disabled}
+                onClick={() => {
+                  recorder.reset();
+                  onCancel();
+                }}
+              >
+                取消录制
+              </Button>
+            )}
           </>
         ) : null}
       </div>
@@ -447,7 +471,7 @@ export function RecorderPanel({
 
 /** 时长不合格的提示（warning：录音还在，只是不达标 → 只给"重录"这条路）。 */
 function poiStatus(message: string | null, status: string) {
-  if (message === null || status !== 'recorded') return null;
+  if (message === null || status !== 'reviewing_local') return null;
   return (
     <p
       role="status"

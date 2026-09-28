@@ -8,6 +8,7 @@
 import { act, renderHook } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import {
+  planAccompaniedMix,
   planMonoSequentialMix,
   type MixPlan,
   type MixSourceSegment,
@@ -100,6 +101,82 @@ const FULL_RENDER = pcmRenderer([
 ]);
 
 describe('useMixExport：成功路径', () => {
+  it('观看者没有可见人声时仍可试听伴奏，锁定段不会被请求', async () => {
+    const accompanied = planAccompaniedMix({
+      segments: [],
+      totalSegments: 2,
+      missingSegmentIndexes: [],
+      hiddenLaterSegmentCount: 2,
+      nominalDurationByIndex: { 1: 1_000, 2: 1_000 },
+      accompanimentUrl: '/library/accompaniment.mp3',
+      sampleRate: SAMPLE_RATE,
+    });
+    const h = harness({
+      render: async ({ plan: mixPlan, accompaniment }) => {
+        const mixed = mixPcm(mixPlan, [], {
+          ...(accompaniment === null
+            ? {}
+            : { accompaniment: [accompaniment.getChannelData(0)] }),
+        });
+        return mixed;
+      },
+    });
+    const { result } = renderHook(() =>
+      useMixExport({ plan: accompanied, environment: h.environment }),
+    );
+
+    expect(result.current.canExport).toBe(true);
+    await act(async () => {
+      await result.current.start();
+    });
+
+    expect(h.fetched).toEqual(['/library/accompaniment.mp3']);
+    expect(result.current.phase).toBe('done');
+  });
+
+  it('完整试听先解码伴奏，并把它与服务端可见人声一起交给渲染器', async () => {
+    let receivedAccompaniment: AudioBufferLike | null | undefined;
+    const accompanied = planAccompaniedMix({
+      segments: [{ index: 1, durationMs: 1_000, audioUrl: '/api/segments/a/audio' }],
+      totalSegments: 2,
+      missingSegmentIndexes: [2],
+      hiddenLaterSegmentCount: 0,
+      nominalDurationByIndex: { 1: 1_000, 2: 1_000 },
+      accompanimentUrl: '/library/accompaniment.mp3',
+      sampleRate: SAMPLE_RATE,
+    });
+    const h = harness({
+      render: async ({ plan: mixPlan, buffers, accompaniment }) => {
+        receivedAccompaniment = accompaniment;
+        const mixed = mixPcm(
+          mixPlan,
+          [...buffers.entries()].map(([index, item]) => ({
+            index,
+            channels: [item.getChannelData(0)],
+          })),
+          {
+            ...(accompaniment === null
+              ? {}
+              : { accompaniment: [accompaniment.getChannelData(0)] }),
+          },
+        );
+        return mixed;
+      },
+    });
+    const { result } = renderHook(() =>
+      useMixExport({ plan: accompanied, environment: h.environment }),
+    );
+
+    await act(async () => {
+      await result.current.start();
+    });
+
+    expect(h.fetched).toEqual(['/library/accompaniment.mp3', '/api/segments/a/audio']);
+    expect(receivedAccompaniment).not.toBeNull();
+    expect(result.current.phase).toBe('done');
+    expect(result.current.alignment).toBeNull();
+  });
+
   it('只取有效段的音频（缺口不请求），产出可播放的 objectURL 与文件名', async () => {
     const h = harness({ render: FULL_RENDER });
     const { result } = renderHook(() =>

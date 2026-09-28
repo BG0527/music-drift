@@ -1,5 +1,5 @@
 /**
- * `useRecorder`：录音状态机（默认 idle → requesting → recording → recorded）。
+ * `useRecorder`：录音状态机（默认 idle → requesting → recording → reviewing_local）。
  *
  * 设计要点：
  * - **浏览器能力全部走端口**（`RecorderEnvironment`），因此权限被拒、设备被占用、Safari 只支持
@@ -33,7 +33,12 @@ import {
 import { judgeClipLevel, type ClipLevel } from './clip-level';
 import type { AudioElementLike } from './use-segment-player';
 
-export type RecorderStatus = 'unsupported' | 'idle' | 'requesting' | 'recording' | 'recorded';
+export type RecorderStatus =
+  | 'unsupported'
+  | 'idle'
+  | 'requesting'
+  | 'recording'
+  | 'reviewing_local';
 
 export interface SegmentRecording {
   blob: Blob;
@@ -216,6 +221,8 @@ export function useRecorder(options: UseRecorderOptions = {}): UseRecorderResult
    * 而且第一路永远不被 stop）。ref 的读写只发生在事件处理函数里，不在 render 期。
    */
   const sessionActiveRef = useRef(false);
+  /** 作废迟到的 getUserMedia 结果（取消/卸载时自增）。 */
+  const requestGenerationRef = useRef(0);
   /** 试听元素与 objectURL（不参与渲染的数据放 ref；URL 也必须能被释放）。 */
   const previewElementRef = useRef<AudioElementLike | null>(null);
   const previewUrlRef = useRef<string | null>(null);
@@ -375,7 +382,7 @@ export function useRecorder(options: UseRecorderOptions = {}): UseRecorderResult
     setElapsedMs(durationMs);
     const produced: SegmentRecording = { blob, mime, durationMs };
     setRecording(produced);
-    setStatus('recorded');
+    setStatus('reviewing_local');
     // t40：当场量"有没有声音"（异步、不阻塞；新一轮 = 新会话号，旧结果自动作废）
     measureSessionRef.current += 1;
     setClipLevel(null);
@@ -406,6 +413,8 @@ export function useRecorder(options: UseRecorderOptions = {}): UseRecorderResult
     // fail-closed：没有本段固定时长就不开录（连麦克风都不要，别让用户以为在录）
     if (!support.ok || sessionActiveRef.current || presetMissing) return;
     sessionActiveRef.current = true;
+    const requestGeneration = requestGenerationRef.current + 1;
+    requestGenerationRef.current = requestGeneration;
 
     setError(null);
     setRecording(null);
@@ -418,9 +427,15 @@ export function useRecorder(options: UseRecorderOptions = {}): UseRecorderResult
     try {
       stream = await environment.getUserMedia({ audio: true });
     } catch (thrown) {
+      if (requestGeneration !== requestGenerationRef.current) return;
       sessionActiveRef.current = false;
       setError(describeMicrophoneError(thrown as { name?: string }));
       setStatus('idle');
+      return;
+    }
+
+    if (requestGeneration !== requestGenerationRef.current) {
+      stream.getTracks().forEach((track) => track.stop());
       return;
     }
 
@@ -500,6 +515,7 @@ export function useRecorder(options: UseRecorderOptions = {}): UseRecorderResult
 
   const reset = useCallback((): void => {
     sessionActiveRef.current = false;
+    requestGenerationRef.current += 1;
     measureSessionRef.current += 1; // 重录：上一段的电平结论不再适用
     setClipLevel(null);
     releasePreview();
@@ -517,6 +533,7 @@ export function useRecorder(options: UseRecorderOptions = {}): UseRecorderResult
   // 卸载时释放麦克风与定时器（否则标签页会一直显示"正在录音"）
   useEffect(
     () => () => {
+      requestGenerationRef.current += 1;
       stopTimers();
       meterRef.current?.stop();
       meterRef.current = null;

@@ -108,6 +108,36 @@ describe('useRecorder：环境与权限', () => {
 
     expect(result.current.error?.kind).toBe('NO_DEVICE');
   });
+
+  it('请求麦克风期间卸载：迟到的 stream 立即停轨，不再创建 MediaRecorder', async () => {
+    let resolveStream: ((stream: ReturnType<typeof fakeStream>) => void) | null = null;
+    const stopTrack = vi.fn();
+    const base = makeRecorderEnvironment();
+    const createMediaRecorder = vi.fn(base.environment.createMediaRecorder);
+    const { environment } = makeRecorderEnvironment({
+      getUserMedia: () =>
+        new Promise((resolve) => {
+          resolveStream = resolve;
+        }),
+      createMediaRecorder,
+    });
+    const { result, unmount } = renderHook(() =>
+      useRecorder({ environment, presetDurationMs: ANY_PRESET_MS }),
+    );
+
+    let startPromise: Promise<void> | undefined;
+    act(() => {
+      startPromise = result.current.start();
+    });
+    unmount();
+    await act(async () => {
+      resolveStream?.(fakeStream(stopTrack));
+      await startPromise;
+    });
+
+    expect(stopTrack).toHaveBeenCalledTimes(1);
+    expect(createMediaRecorder).not.toHaveBeenCalled();
+  });
 });
 
 describe('useRecorder：录完可以试听自己那一段（用户实测需求 ③）', () => {
@@ -339,7 +369,7 @@ describe('useRecorder：录制与停止', () => {
       vi.advanceTimersByTime(2_000);
     });
 
-    expect(result.current.status).toBe('recorded');
+    expect(result.current.status).toBe('reviewing_local');
     expect(result.current.recording?.durationMs).toBe(30_000);
     expect(result.current.recording?.mime).toBe('audio/webm');
   });
@@ -361,7 +391,7 @@ describe('useRecorder：录制与停止', () => {
       result.current.stop();
     });
 
-    expect(result.current.status).toBe('recorded');
+    expect(result.current.status).toBe('reviewing_local');
     expect(result.current.recording?.mime).toBe('audio/webm');
     expect(result.current.recording?.durationMs).toBe(19_400);
     expect(result.current.recording?.blob.size).toBeGreaterThan(0);
@@ -414,7 +444,7 @@ describe('useRecorder：录制与停止', () => {
     act(() => {
       result.current.stop();
     });
-    expect(result.current.status).toBe('recorded');
+    expect(result.current.status).toBe('reviewing_local');
 
     act(() => {
       result.current.reset();
@@ -468,7 +498,7 @@ describe('useRecorder：本段固定时长（用户第 4 条裁决 · t29 的曲
       vi.advanceTimersByTime(ANY_PRESET_MS + 5_000);
     });
 
-    expect(result.current.status).toBe('recorded');
+    expect(result.current.status).toBe('reviewing_local');
     expect(result.current.recording?.durationMs).toBe(ANY_PRESET_MS);
     // 录满：与曲库值一致 ⇒ 没有违规
     expect(result.current.durationViolations).toEqual([]);
