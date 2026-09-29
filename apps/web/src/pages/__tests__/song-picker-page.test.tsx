@@ -326,6 +326,51 @@ describe('选歌页：record-v1 语言（源码守卫）', () => {
   });
 
   /**
+   * 【用户可见缺陷】一屏放不下时**不许静默裁掉**。
+   *
+   * 本页根框是 `md:h-[100dvh]`，一旦配 `md:overflow-hidden`，凡是超出一屏的内容
+   * 就被裁掉且滚不动 —— 网格本来就随宽度换列（sm:2 / lg:3 / xl:5），列数一变必然超高。
+   * 实测（真实浏览器，1440 宽 900 高以外的中招）：
+   *   1366×768 → 卡片下沿被裁 58px
+   *   1250×900 → 掉 3 列、4 首歌折 2 行，被裁 397px（「选这首，录第 1 段」按钮看不见）
+   *   1024×768 → 被裁 529px
+   * 修法：根框 `overflow-y-auto`（本框仍 100dvh，背景三层 `absolute inset-0` 仍只铺满视口），
+   * 放得下就是完整一屏，放不下就滚动可达。1440×900 实测回到 0 溢出。
+   */
+  it('一屏放不下时可滚动抵达，不静默裁掉内容', () => {
+    expect(code, '根框仍在静默裁切内容（超一屏就看不见且滚不动）').toContain(
+      'md:overflow-y-auto',
+    );
+    expect(code, '根框不许用 overflow-hidden 裁内容').not.toMatch(/md:overflow-hidden/);
+  });
+
+  /**
+   * 【用户可见缺陷】页脚「先登录」是**行内**链接：design-discipline 契约要求它
+   * min-h-11（44px 可点目标），但 44px 的行内盒子会把 12.5px 段落的行盒从 20px
+   * 撑到 44px，整条底注涨成 64px，于是 900 高的窗口里底注底部 —— 正是用户反馈
+   * "底部提示看不见"的那块 —— 被推出首屏。
+   *
+   * 契约（两条都要成立，缺一即回归）：
+   *   1. 44px 可点目标**不许降**（design-discipline 守 `min-h-11`）；
+   *   2. 必须用负外边距把 44px 在版面上的贡献抵消回 20px 行盒
+   *      （负外边距不缩小元素本身，只收回它对块高的贡献）。
+   */
+  it('页脚行内「先登录」保 44px 可点目标，且不撑高底注（负外边距抵消行盒）', () => {
+    const footerLink = code.match(/to=\{?'\/login\?next='[\s\S]{0,260}?>/);
+    expect(footerLink, '找不到页脚「先登录」链接').not.toBeNull();
+    const chunk = footerLink?.[0] ?? '';
+
+    // 1) 可点目标不许降
+    expect(chunk, '页脚「先登录」必须保 min-h-11（44px 可点目标）').toContain('min-h-11');
+
+    // 2) 负外边距抵消：`-my-[12px]` ⇒ 44 - 12*2 = 20px，正好等于 12.5px × lh1.6
+    const counter = chunk.match(/-my-\[(\d+)px\]/);
+    expect(counter, '页脚「先登录」缺 -my-[..px] 负外边距，44px 行内盒子会撑高底注').not.toBeNull();
+    const rem = 44 - Number(counter?.[1]) * 2;
+    expect(rem, '负外边距抵消后应回到 12.5px × leading-1.6 = 20px 的行盒').toBe(20);
+  });
+
+  /**
    * 承载文字的颜色**不低于契约下限**：`muted`（#A9C7CF，10.84:1）本身就是文字的暗端下限，
    * 再往上叠 alpha 会掉到 4.5:1 以下（`text-muted/60` 合成后只有 ≈4.4:1、`text-muted/70` ≈5.7:1 但没必要）。
    * 元信息按契约用 `paper/50`（合成 ≈5.07:1 ✓）。

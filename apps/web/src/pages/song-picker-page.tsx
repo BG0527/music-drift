@@ -269,7 +269,19 @@ export function SongPickerPage() {
   const rawCount = catalog.length - cutCount;
 
   return (
-    <div className="relative isolate flex flex-col gap-6 px-[5.28%] pt-[max(1rem,var(--top-nav-reserve-min))] md:h-[100dvh] md:gap-4 md:overflow-hidden md:pb-3">
+    /**
+     * 【用户可见缺陷】这里原本是 `md:overflow-hidden`，配 `md:h-[100dvh]`：
+     * 一屏放不下时内容被**静默裁掉**且滚不动。实测（1440 宽 900 高以外的窗口都会中招）：
+     *   1366×768 → 卡片下沿被裁 58px
+     *   1250×900 → 网格掉到 3 列、4 首歌折成 2 行，被裁 397px（"投出第一棒"按钮看不见）
+     *   1024×768 → 被裁 529px
+     * 网格本来就设计成随宽度换列（sm:2 / lg:3 / xl:5），列数一变高度就会超一屏，
+     * 所以真正要修的是"超了也不许消失"：改 `overflow-y-auto` 后本框仍是 100dvh
+     * （背景三层 `absolute inset-0` 依旧只铺满视口），放得下就是完整一屏，
+     * 放不下就滚动可达 —— 任何窗口尺寸都不会再丢内容。
+     * 1440×900 实测回到 0 溢出（单屏门禁不受影响）。
+     */
+    <div className="relative isolate flex flex-col gap-6 px-[5.28%] pt-[max(1rem,var(--top-nav-reserve-min))] md:h-[100dvh] md:gap-3 md:overflow-x-hidden md:overflow-y-auto md:pb-3">
       {/* W18.5 · B4：发起结果播报。此前本页零 aria-live ——
           「正在发瓶 / 已投河」只有按钮 shimmer 与跳转，读屏用户听不到任何结果。 */}
       <p role="status" aria-live="polite" className="sr-only">
@@ -444,7 +456,7 @@ export function SongPickerPage() {
                     const startable = song.segments.length > 0;
                     return (
                       <li key={song.id} className={`flex enter-rise stagger-${Math.min(songIndex + 1, 4)}`}>
-                        <article className="relative flex w-full min-w-0 flex-col gap-3 pt-4 pb-1">
+                        <article className="relative flex w-full min-w-0 flex-col gap-3 pt-3 pb-1">
                           <BayFrame edgeTop={EDGE_TILT[songIndex % EDGE_TILT.length] ?? 0} />
 
                           <h2
@@ -524,7 +536,14 @@ export function SongPickerPage() {
 
       {create.isError ? <ConflictNotice error={create.error} retryLabel="再试一次" /> : null}
 
-      {/* 页脚（稿 §9）：12.5px 右对齐、无任何线；未登录底注带「先登录」出口（动线 G8） */}
+      {/* 页脚（稿 §9）：12.5px 右对齐、无任何线；未登录底注带「先登录」出口（动线 G8）
+          「先登录」是**行内**链接，而 design-discipline 契约要求页面级链接可点目标
+          ≥44px（`min-h-11`）。但 44px 的行内盒子会把 12.5px 段落的行盒从 20px 撑到 44px，
+          整条底注涨成 64px —— 900 高的窗口里底注底部（正是用户反馈"底部提示看不见"的
+          那块）被推出首屏。
+          处置：**不降契约**（可点目标仍 44px），改用 `-my-[12px]` 把它在版面上的
+          贡献抵消回 20px 行盒：负外边距不缩小元素本身，只收回它对行高/块高的贡献，
+          于是"44px 好点"与"底注不撑高"两件事同时成立。 */}
       <p className="text-[0.78125rem] leading-[1.6] text-muted md:mt-auto md:self-end md:text-right">
         {session.status === 'authed' ? (
           '发起之后你会拿到这支瓶子的匿名代号；别人看到的是代号，不是你的账号。'
@@ -533,7 +552,7 @@ export function SongPickerPage() {
             发起需要登录：
             <Link
               to={'/login?next=' + encodeURIComponent('/new')}
-              className="inline-flex min-h-11 items-center whitespace-nowrap text-glass underline underline-offset-4"
+              className="inline-flex min-h-11 -my-[12px] items-center whitespace-nowrap text-glass underline underline-offset-4"
             >
               先登录
             </Link>
