@@ -159,8 +159,6 @@ function BottleView({ bottle, seams }: { bottle: BottleDetail; seams?: BottlePag
   const [listenAllIndex, setListenAllIndex] = useState<number | null>(null);
   /** 播放器的命令柄：「听全部」要驱动**同一个**播放器，不能另起一个（否则声音打架）。 */
   const playerHandleRef = useRef<SegmentPlayerHandle | null>(null);
-  /** 连播是否正在播（按钮图标/文案；与播放器内部状态解耦，避免频繁重渲染）。 */
-  const [listenAllPlaying, setListenAllPlaying] = useState(false);
   /** G2（flow-audit P0）：三选一确认成功后的去向 —— 播报之外在正文留「语义下一步键」，不让流程死在 aria-live 里。 */
   const [resolutionNext, setResolutionNext] = useState<Resolution | null>(null);
   const [reportTarget, setReportTarget] = useState<{
@@ -185,9 +183,30 @@ function BottleView({ bottle, seams }: { bottle: BottleDetail; seams?: BottlePag
    * 用户点某段的「听」⇒ 退出连播（`listenAllIndex = null`），只播那一段。
    */
   const [autoplayToken, setAutoplayToken] = useState(0);
+  /**
+   * 连播的"正在播"标记由**播放器真实状态**驱动，不再是乐观 state。
+   *
+   * 之前用 `setListenAllPlaying(true)` 乐观置位，会造成"点了没声"却显示暂停的状态，
+   * 用户只好多点几次。真实驱动：连播激活（`listenAllIndex !== null`）时，
+   * 段切换后若新播放器确实在播，标记才为真。
+   */
+  const [listenAllPlaying, setListenAllPlaying] = useState(false);
   const startListenAll = (): void => {
     const first = liveSegments[0];
     if (first === undefined) return;
+    // 浏览器自动播放策略：`play()` 必须在**用户手势的那个任务里**同步调用才被放行；
+    // 放进 effect（另起一个任务）会被判为"无手势"而静默拒绝 —— 那正是"要点好几次
+    // 才开始播"的根因。所以分两种走法：
+    //   · 当前就是第 1 段 ⇒ 在点击处理函数里**同步** replay（不换段，令牌不动，避免二次 replay）；
+    //   · 当前不是第 1 段 ⇒ 必须换段，新播放器只能由令牌在挂载后起播（换 src 后
+    //     该播放器属于新一轮会话，自动播放策略对"已获用户激活的文档"放行）。
+    const handle = playerHandleRef.current;
+    if (handle !== null && selectedSegment?.id === first.id) {
+      handle.replay();
+      setListenAllIndex(0);
+      setAnnouncement(`从第 ${String(first.index)} 段开始连续试听，共 ${String(liveSegments.length)} 段。`);
+      return;
+    }
     setListenAllIndex(0);
     setSelectedSegmentId(first.id);
     setAutoplayToken((token) => token + 1);
@@ -230,23 +249,26 @@ function BottleView({ bottle, seams }: { bottle: BottleDetail; seams?: BottlePag
       aria-label={listenAllPlaying ? '暂停' : '听全部'}
       title={listenAllPlaying ? '暂停连续试听' : '从第 1 段按顺序播放所有已有录音'}
       onClick={() => {
+        // 「听全部」的播放/暂停图标与"是否在播"由播放器的 onPlayingChange 真实驱动，
+        // 这里**不**乐观置位 —— 乐观置位会造出"点了没声却显示暂停"，逼用户反复多点。
         if (listenAllPlaying) {
           playerHandleRef.current?.toggle(); // 暂停当前这一段
-          setListenAllPlaying(false);
           return;
         }
         if (listenAllIndex !== null) {
           // 已在连播中途（暂停了）⇒ 从当前段继续
           playerHandleRef.current?.toggle();
-          setListenAllPlaying(true);
           return;
         }
         startListenAll();
-        setListenAllPlaying(true);
       }}
     >
       <Icon name={listenAllPlaying ? 'Pause' : 'Play'} size={16} />
-      <span className="whitespace-nowrap">听全部</span>
+      <span className="whitespace-nowrap">
+        {listenAllIndex !== null && liveSegments.length > 0
+          ? `${String(listenAllIndex + 1)}/${String(liveSegments.length)}`
+          : '听全部'}
+      </span>
     </button>
   );
   /**
@@ -260,6 +282,17 @@ function BottleView({ bottle, seams }: { bottle: BottleDetail; seams?: BottlePag
   const mySegmentRecorded = bottle.segments.some((segment) => segment.isMine);
   const canRecord =
     canActOnBottle && !mySegmentRecorded && nextIndex !== undefined && !bottle.isComplete;
+  /**
+   * 能不能**接手**公海未完成作品的缺口（用户裁决：公海等待接力的瓶子也摆录音按钮）。
+   * 判据：未完成 + 在公海 + 已登录 + 本人还没在这支瓶子里唱过（服务端 ALREADY_SANG_IN_BOTTLE）。
+   * 点了会先抢占持有权（`targeted-segment`）再开录，所以不需要 `isHolder`。
+   */
+  const canTakeFromSea =
+    bottle.status === 'SEA' &&
+    !bottle.isComplete &&
+    session.status === 'authed' &&
+    !mySegmentRecorded &&
+    nextIndex !== undefined;
   const canChooseResolution = bottle.availableResolutions.length > 0;
   /** 稿上 destCol 的三条水路 = 三选一入口；录完（或已录满）才摆出来 —— 与旧"选择去向"按钮同一门。 */
   const showDestinationRows = canChooseResolution && !canRecord;
@@ -441,10 +474,12 @@ function BottleView({ bottle, seams }: { bottle: BottleDetail; seams?: BottlePag
             ? null
             : canRecord
               ? '这一段按该段的固定时长录，录完再选去向。不点开就不会占用你的麦克风。'
-              : '这一段只有发起者（尚未投河时）或当前持有者能录：你看得到缺口，但录不了它。'
+              : canTakeFromSea
+                ? '点它接手这一段，录完再选去向。'
+                : '这一段只有发起者（尚未投河时）或当前持有者能录：你看得到缺口，但录不了它。'
         }
         gapAction={
-          !canRecord || nextIndex === undefined ? null : (
+          nextIndex === undefined ? null : canRecord ? (
             <button
               type="button"
               className="cta bp-record-cta whitespace-nowrap"
@@ -456,7 +491,24 @@ function BottleView({ bottle, seams }: { bottle: BottleDetail; seams?: BottlePag
               <Icon name="Mic" size={16} />
               录第 {String(nextIndex)} 段
             </button>
-          )
+          ) : canTakeFromSea ? (
+            /*
+             * 用户裁决：公海等待接力的瓶子，缺口格**也要是录音按钮**，与「捞起来的瓶子」
+             * 完全一样。此前这里摆的是「第 N 段还空着 + 你看得到缺口，但录不了它」，
+             * 真正的录入口却藏在右列 —— 同一个动作分散在两处、形态还不一致。
+             * 现在两处合并到瓶身缺口格：点它 = 抢占持有权 → 直接开录。
+             */
+            <TargetedSegmentButton
+              bottleId={bottle.id}
+              segmentIndex={nextIndex}
+              onClaimed={(summary) => {
+                const claimedNext = summary.missingSegmentIndexes[0];
+                if (claimedNext === undefined) return;
+                setRecorderSegmentIndex(claimedNext);
+                setRecorderPhase('open');
+              }}
+            />
+          ) : null
         }
       />
 
@@ -491,31 +543,35 @@ function BottleView({ bottle, seams }: { bottle: BottleDetail; seams?: BottlePag
             /*
              * 参考 renderListenColumn：没有可试听的段时 **transport 仍在位**（0:00 / 0:00），
              * 但播放键**禁用** —— 几何与参考对齐，同时不制造点了没用的控件。
+             * 用户裁决（t2）：空态同样摆出「听全部」主键 —— 禁用、且不出假进度。
              */
-            <div className="bf-player transport" data-testid="transport-empty" aria-disabled="true">
-              <button
-                type="button"
-                className="play"
-                disabled
-                aria-label="播放（现在没有你能试听的段）"
-              >
-                <svg viewBox="0 0 34 34" fill="none" aria-hidden="true">
-                  <circle cx="17" cy="17" r="16" stroke="var(--color-water-mid)" strokeOpacity=".45" />
-                  <circle cx="17" cy="17" r="11.5" stroke="var(--color-water-mid)" strokeOpacity=".2" />
-                  <path d="M14 11.8l9.4 5.2-9.4 5.2z" fill="var(--color-muted)" />
-                </svg>
-              </button>
-              <div className="bar" aria-hidden="true">
-                <svg viewBox="0 0 400 20" fill="none" aria-hidden="true">
-                  <path
-                    d="M0 11 q14 -7 28 0 t28 0 t28 0 t28 0 t28 0 t28 0 t28 0 t28 0 t28 0 t28 0 t28 0 t28 0 t28 0 t28 0"
-                    stroke="var(--color-water-mid)"
-                    strokeOpacity=".18"
-                  />
-                </svg>
+            <>
+              <div className="bf-player transport" data-testid="transport-empty" aria-disabled="true">
+                <button
+                  type="button"
+                  className="play"
+                  disabled
+                  aria-label="播放（现在没有你能试听的段）"
+                >
+                  <svg viewBox="0 0 34 34" fill="none" aria-hidden="true">
+                    <circle cx="17" cy="17" r="16" stroke="var(--color-water-mid)" strokeOpacity=".45" />
+                    <circle cx="17" cy="17" r="11.5" stroke="var(--color-water-mid)" strokeOpacity=".2" />
+                    <path d="M14 11.8l9.4 5.2-9.4 5.2z" fill="var(--color-muted)" />
+                  </svg>
+                </button>
+                <div className="bar" aria-hidden="true">
+                  <svg viewBox="0 0 400 20" fill="none" aria-hidden="true">
+                    <path
+                      d="M0 11 q14 -7 28 0 t28 0 t28 0 t28 0 t28 0 t28 0 t28 0 t28 0 t28 0 t28 0 t28 0 t28 0 t28 0 t28 0"
+                      stroke="var(--color-water-mid)"
+                      strokeOpacity=".18"
+                    />
+                  </svg>
+                </div>
+                <span className="timecode">0:00 / 0:00</span>
               </div>
-              <span className="timecode">0:00 / 0:00</span>
-            </div>
+              <div className="votes">{listenAllButton}</div>
+            </>
           ) : (
             <VotableSegment
               // key 用段 id：换段就是换一个上报器实例（旧的覆盖进度不会串到新段上）
@@ -542,6 +598,14 @@ function BottleView({ bottle, seams }: { bottle: BottleDetail; seams?: BottlePag
               }}
               onFailed={setVoteError}
               onEnded={onSelectedSegmentEnded}
+              onPlayingChange={(isPlaying) => {
+                // 真实状态驱动「听全部」图标；单段试听（未连播）时不打扰连播标记
+                if (listenAllIndex === null) {
+                  setListenAllPlaying(false);
+                  return;
+                }
+                setListenAllPlaying(isPlaying);
+              }}
               playerHandleRef={playerHandleRef}
               autoPlayToken={autoplayToken}
               showPlayButton={false}
@@ -598,27 +662,6 @@ function BottleView({ bottle, seams }: { bottle: BottleDetail; seams?: BottlePag
           <p className="sub mt-[4px] text-[0.8125rem] text-muted">
             左边「听全部」按段号顺序连着听；点瓶身上某一段的「听」只听那一段。
           </p>
-          {bottle.status === 'SEA' && session.status === 'authed' ? (
-            <div className="bp-sea-actions mt-3 flex flex-wrap gap-3">
-              {!bottle.isComplete && !mySegmentRecorded && nextIndex !== undefined ? (
-                // 用户裁决：公海等待接力的瓶子统一成「从河道捞起来」的样子 ——
-                // 同一个「录第 N 段」措辞与外观，且点下去"抢占持有权 → 直接开录"一步到底，
-                // 不再让用户自己再找一遍录入口。段号取服务端 missingSegmentIndexes[0]。
-                // （收藏不在这里了：已完成的公海作品，收藏按钮在底栏右侧、举报正上方。）
-                <TargetedSegmentButton
-                  bottleId={bottle.id}
-                  segmentIndex={nextIndex}
-                  onClaimed={(summary) => {
-                    // 抢占成功后服务端才认我们持有；用返回的缺口开录，别拿旧数据猜
-                    const claimedNext = summary.missingSegmentIndexes[0];
-                    if (claimedNext === undefined) return;
-                    setRecorderSegmentIndex(claimedNext);
-                    setRecorderPhase('open');
-                  }}
-                />
-              ) : null}
-            </div>
-          ) : null}
         </section>}
       </div>
 
@@ -649,29 +692,32 @@ function BottleView({ bottle, seams }: { bottle: BottleDetail; seams?: BottlePag
         </Link>
         <span>捞取 / 录音 / 投河 / 回传 / 入海 全部记在服务端。</span>
         {/*
-          守卫/去留出口竖排（用户裁决）：右侧一列 —— 收藏在上、举报在下，同宽左对齐。
+          守卫/去留出口（用户裁决布局②）：评论/留言保持原行内顺序；
+          收藏与举报收进同一竖列 —— 收藏在举报正上方、items-center 让两者水平中心线同轴。
           收藏只对"已完成且在公海"的作品存在（服务端 COLLECTION_REQUIRES_FINISHED_WORK），
-          所以这里按 `isComplete && status==='SEA'` 摆；其余出口（评论/留言）保持原行内顺序。
+          缺位（未登录/未入海）时直接不渲染，竖列不留空占位。
         */}
-        <span className="flex flex-col items-start gap-[10px] md:ml-auto">
-          {bottle.status === 'SEA' && bottle.isComplete ? (
-            <CollectButton bottleId={bottle.id} />
+        <span className="flex flex-wrap items-end gap-[26px] md:ml-auto">
+          {bottle.status === 'SEA' ? (
+            <button type="button" className={TEXT_LINK}
+              onClick={() => setCommentsOpen(true)}><Icon name="ScrollText" size={16} />公开评论</button>
           ) : null}
-          <span className="flex flex-wrap items-center gap-[26px]">
-            {bottle.status === 'SEA' ? <button type="button" className={TEXT_LINK}
-              onClick={() => setCommentsOpen(true)}><Icon name="ScrollText" size={16} />公开评论</button> : null}
-            {bottle.status === 'SEA' ? null : (
-              <button
-                type="button"
-                className="inline-flex min-h-11 items-center gap-[7px] whitespace-nowrap text-muted underline underline-offset-[4px] transition-colors duration-[var(--motion-hover-duration)] ease-[var(--motion-entry-easing)] hover:text-paper"
-                onClick={() => {
-                  setMessagesOpen(true);
-                }}
-              >
-                <Icon name="ScrollText" size={16} />
-                私密留言
-              </button>
-            )}
+          {bottle.status === 'SEA' ? null : (
+            <button
+              type="button"
+              className="inline-flex min-h-11 items-center gap-[7px] whitespace-nowrap text-muted underline underline-offset-[4px] transition-colors duration-[var(--motion-hover-duration)] ease-[var(--motion-entry-easing)] hover:text-paper"
+              onClick={() => {
+                setMessagesOpen(true);
+              }}
+            >
+              <Icon name="ScrollText" size={16} />
+              私密留言
+            </button>
+          )}
+          <span className="flex flex-col items-center gap-[10px]">
+            {bottle.status === 'SEA' && bottle.isComplete ? (
+              <CollectButton bottleId={bottle.id} />
+            ) : null}
             <button
               type="button"
               className="inline-flex min-h-11 items-center gap-[7px] whitespace-nowrap text-muted underline underline-offset-[4px] transition-colors duration-[var(--motion-hover-duration)] ease-[var(--motion-entry-easing)] hover:text-paper"

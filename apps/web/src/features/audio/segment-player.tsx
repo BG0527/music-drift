@@ -77,6 +77,8 @@ export interface SegmentPlayerProps {
    * 「听」= 听这一段；点「听全部」= 从头按段号顺序连着听）。**只报状态，不改播放**。
    */
   onEnded?: (() => void) | undefined;
+  /** 播放状态变化回调（`isPlaying`）；「听全部」用它绑按钮图标，不做乐观置位。 */
+  onPlayingChange?: ((isPlaying: boolean) => void) | undefined;
   /**
    * 交出播放器的命令柄（`toggle` / `replay` / `isPlaying`）。
    *
@@ -146,6 +148,7 @@ export function SegmentPlayer({
   layout = 'card',
   className,
   onEnded,
+  onPlayingChange,
   playerHandleRef,
   autoPlayToken,
   showPlayButton = true,
@@ -165,6 +168,7 @@ export function SegmentPlayer({
       });
     },
     ...(onEnded === undefined ? {} : { onEnded }),
+    ...(onPlayingChange === undefined ? {} : { onPlayingChange }),
     ...(createElement === undefined ? {} : { createElement }),
   });
 

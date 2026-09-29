@@ -1336,3 +1336,270 @@ describe('门禁锚点与窄屏 order 让位', () => {
     ).toBe(true);
   });
 });
+
+/* ───────── t2 用户裁决：听全部主键 / 分段直播 / 两处布局对齐 ───────── */
+
+describe('听全部主键 + 分段直播 + 布局对齐（t2）', () => {
+  const fourSegments = [1, 2, 3, 4].map((index) => ({
+    id: `${String(index).repeat(8)}-${String(index).repeat(4)}-4${String(index).repeat(3)}-8${String(index).repeat(3)}-${String(index).repeat(12)}`,
+    index,
+    isMine: false,
+    note: null,
+    ownerCode: `接唱者#00${String(index)}`,
+    likeCount: 0,
+    dislikeCount: 0,
+    deletedAt: null,
+    audioMime: 'audio/webm',
+    durationMs: 20_000,
+  }));
+
+  /** 可驱动的假音频元素：记录 src 历史，允许手动 emit DOM 事件（沿用点踩用例的桩形态）。 */
+  function fakeAudioHarness() {
+    const listeners: Record<string, (() => void)[]> = {};
+    const srcs: string[] = [];
+    // 真实 audio 语义：play() ⇒ paused=false 并发 play 事件；pause() ⇒ paused=true 并发 pause。
+    // 此前这个假件把 play/pause 写成空函数，导致 onPlayingChange 永远收不到 true，
+    // 「听全部」按钮的播放态就测不出来（也掩盖了乐观置位的问题）。
+    const element = {
+      src: '',
+      currentTime: 0,
+      paused: true,
+      play: () => {
+        element.paused = false;
+        (listeners['play'] ?? []).forEach((handler) => handler());
+        return undefined;
+      },
+      pause: () => {
+        element.paused = true;
+        (listeners['pause'] ?? []).forEach((handler) => handler());
+      },
+      addEventListener: (type: string, handler: () => void) => {
+        listeners[type] = [...(listeners[type] ?? []), handler];
+      },
+      removeEventListener: (type: string, handler: () => void) => {
+        listeners[type] = (listeners[type] ?? []).filter((item) => item !== handler);
+      },
+    };
+    return {
+      srcs,
+      element,
+      factory: (src: string) => {
+        srcs.push(src);
+        element.src = src;
+        // 换段 = 新实例：重置成暂停态（与 useSegmentPlayer 重建元素一致）
+        element.paused = true;
+        element.currentTime = 0;
+        return element;
+      },
+      emit: (type: string) => (listeners[type] ?? []).forEach((handler) => handler()),
+    };
+  }
+
+  it('听全部：点一次就开播（播放态由播放器真实状态驱动，不需多点）', async () => {
+    const fake = fakeAudioHarness();
+    renderWithProviders(
+      <BottlePage id={BOTTLE_ID} seams={{ segmentElementFactory: fake.factory as never }} />,
+      {
+        route: `/bottles/${BOTTLE_ID}`,
+        handlers: [
+          {
+            path: `/api/bottles/${BOTTLE_ID}`,
+            respond: () => ({
+              body: bottleDetail({
+                status: 'SEA',
+                seaZone: 'COMPLETED',
+                isComplete: true,
+                isHolder: false,
+                availableResolutions: [],
+                missingSegmentIndexes: [],
+                segments: fourSegments,
+              }),
+            }),
+          },
+        ],
+      },
+    );
+
+    const listenAll = await screen.findByRole('button', { name: '听全部' });
+    // 点一次就该进入"暂停"态（= 真的在播）。此前乐观置位也会显示暂停，
+    // 但播放器并未起播；这里额外断言假件确实被 play 过。
+    fireEvent.click(listenAll);
+    expect(await screen.findByRole('button', { name: '暂停' })).toHaveTextContent(/^1\/4$/);
+    expect(fake.element.paused, '点一次「听全部」必须真的起播（不是只改图标）').toBe(false);
+  });
+
+  it('听全部主键显示连播段进度（1/4 → 2/4），随连播推进', async () => {
+    const fake = fakeAudioHarness();
+    renderWithProviders(
+      <BottlePage id={BOTTLE_ID} seams={{ segmentElementFactory: fake.factory as never }} />,
+      {
+        route: `/bottles/${BOTTLE_ID}`,
+        handlers: [
+          {
+            path: `/api/bottles/${BOTTLE_ID}`,
+            respond: () => ({
+              body: bottleDetail({
+                status: 'SEA',
+                seaZone: 'COMPLETED',
+                isComplete: true,
+                isHolder: false,
+                availableResolutions: [],
+                missingSegmentIndexes: [],
+                segments: fourSegments,
+              }),
+            }),
+          },
+        ],
+      },
+    );
+
+    const listenAll = await screen.findByRole('button', { name: '听全部' });
+    // 未开播：显示入口名，不显假进度
+    expect(listenAll.textContent).not.toMatch(/\d+\/\d+/);
+    fireEvent.click(listenAll);
+    // 开播后主键变段进度 1/4（aria 仍是 暂停/听全部 语义）
+    expect(await screen.findByRole('button', { name: '暂停' })).toHaveTextContent(/^1\/4$/);
+    // 第 1 段播完 → 游标推进 → 2/4（并切到第 2 段的音频）
+    act(() => {
+      fake.emit('ended');
+    });
+    expect(await screen.findByRole('button', { name: '暂停' })).toHaveTextContent(/^2\/4$/);
+    expect(fake.srcs.at(-1)).toContain(fourSegments[1]!.id);
+    // 关键回归：换段后新播放器必须**自动起播**（用户反馈"播完不会续放"）。
+    // 换段会重建元素并重置 paused=true，所以这里断言它又被 play 过 ⇒ paused=false。
+    expect(fake.element.paused, '第 2 段应自动续播，不能停在暂停').toBe(false);
+  });
+
+  it('没有已录段：听全部键禁用且不出假进度', async () => {
+    renderWithProviders(<BottlePage id={BOTTLE_ID} />, {
+      route: `/bottles/${BOTTLE_ID}`,
+      handlers: [
+        {
+          path: `/api/bottles/${BOTTLE_ID}`,
+          respond: () => ({
+            body: bottleDetail({ segments: [], recordedCount: 0, missingSegmentIndexes: [1, 2, 3, 4] }),
+          }),
+        },
+      ],
+    });
+    const listenAll = await screen.findByRole('button', { name: '听全部' });
+    expect(listenAll, '无已录段必须禁用').toBeDisabled();
+    expect(listenAll.textContent, '无已录段不出 0/0、1/4 之类假进度').not.toMatch(/\d+\/\d+/);
+  });
+
+  it('连播中点某段「听」：停下连播改播该段（主键退回听全部）', async () => {
+    const fake = fakeAudioHarness();
+    renderWithProviders(
+      <BottlePage id={BOTTLE_ID} seams={{ segmentElementFactory: fake.factory as never }} />,
+      {
+        route: `/bottles/${BOTTLE_ID}`,
+        handlers: [
+          songsHandler,
+          { path: '/api/auth/me', respond: () => ({ body: SESSION_B }) },
+          {
+            path: `/api/bottles/${BOTTLE_ID}`,
+            respond: () => ({
+              body: bottleDetail({
+                recordedCount: 2,
+                missingSegmentIndexes: [3, 4],
+                segments: [
+                  ...bottleDetail().segments,
+                  {
+                    id: SEGMENT_2,
+                    index: 2,
+                    isMine: false,
+                    note: null,
+                    ownerCode: '河岸听众#017',
+                    likeCount: 0,
+                    dislikeCount: 0,
+                    deletedAt: null,
+                    audioMime: 'audio/webm',
+                    durationMs: 22_000,
+                  },
+                ],
+              }),
+            }),
+          },
+        ],
+      },
+    );
+
+    fireEvent.click(await screen.findByRole('button', { name: '听全部' }));
+    expect(screen.getByRole('button', { name: '暂停' })).toHaveTextContent(/^1\/2$/);
+
+    // 连播进行中点第 2 段的「听」：退出连播（主键回到 听全部、无进度），并改播该段
+    fireEvent.click(await screen.findByRole('button', { name: '听第 2 段' }));
+    const mainKey = await screen.findByRole('button', { name: '听全部' });
+    expect(mainKey.textContent, '退出连播后主键回到入口名、不残留进度').not.toMatch(/\d+\/\d+/);
+    expect(fake.srcs.at(-1), '改播第 2 段').toContain(SEGMENT_2);
+  });
+
+  it('布局②：收藏在举报正上方同一竖列同轴；无收藏时竖列不留空位', async () => {
+    const handlers = [
+      { path: '/api/auth/me', respond: () => ({ body: SESSION_B }) },
+      { path: '/api/me/collections', respond: () => ({ body: [] }) },
+      {
+        path: `/api/bottles/${BOTTLE_ID}`,
+        respond: () => ({
+          body: bottleDetail({
+            status: 'SEA',
+            seaZone: 'COMPLETED',
+            isComplete: true,
+            isHolder: false,
+            availableResolutions: [],
+            missingSegmentIndexes: [],
+          }),
+        }),
+      },
+    ];
+    const view = renderWithProviders(<BottlePage id={BOTTLE_ID} />, { route: `/bottles/${BOTTLE_ID}`, handlers });
+    const collect = await screen.findByRole('button', { name: '收藏这支作品' });
+    const report = screen.getByRole('button', { name: /举报（进人工队列，不是自动删除）/ });
+    const pair = report.parentElement as HTMLElement;
+    expect(pair.className, '竖列容器').toMatch(/flex-col/);
+    expect(pair.className, '水平中心线同轴').toMatch(/items-center/);
+    expect(pair.contains(collect), '收藏与举报必须同属一个竖列').toBe(true);
+    const kids = [...pair.children];
+    const collectSlot = kids.findIndex((kid) => kid === collect || kid.contains(collect));
+    expect(collectSlot, '收藏必须在竖列里').toBeGreaterThanOrEqual(0);
+    expect(collectSlot, '收藏在上、举报在下').toBeLessThan(kids.indexOf(report));
+
+    // 收藏缺位（未入海完成）：竖列里只剩举报，不留收藏的空占位
+    view.unmount();
+    renderWithProviders(<BottlePage id={BOTTLE_ID} />, {
+      route: `/bottles/${BOTTLE_ID}`,
+      handlers: [
+        ...handlers.slice(0, 2),
+        {
+          path: `/api/bottles/${BOTTLE_ID}`,
+          respond: () => ({
+            body: bottleDetail({ status: 'SEA', seaZone: 'INCOMPLETE', isHolder: false, availableResolutions: [] }),
+          }),
+        },
+      ],
+    });
+    const reportOnly = await screen.findByRole('button', { name: /举报（进人工队列，不是自动删除）/ });
+    const pairOnly = reportOnly.parentElement as HTMLElement;
+    expect(screen.queryByRole('button', { name: /收藏/ })).not.toBeInTheDocument();
+    expect(
+      [...pairOnly.querySelectorAll('button')],
+      '无收藏时竖列不摆空占位',
+    ).toHaveLength(1);
+  });
+
+  it('布局①：听全部在 .votes 投票行内且右对齐于该行（margin-left:auto）', async () => {
+    renderWithProviders(<BottlePage id={BOTTLE_ID} />, {
+      route: `/bottles/${BOTTLE_ID}`,
+      handlers: [
+        { path: `/api/bottles/${BOTTLE_ID}`, respond: () => ({ body: bottleDetail() }) },
+      ],
+    });
+    const listenAll = await screen.findByRole('button', { name: /听全部/ });
+    expect(listenAll.closest('.votes'), '主键必须在 .votes 行里（与赞/踩同行）').not.toBeNull();
+    const css = readFileSync(join(process.cwd(), 'src', 'pages', 'bottle-page.css'), 'utf8');
+    expect(
+      css,
+      '听全部键必须 margin-left:auto 推到 .votes 行右端',
+    ).toMatch(/\.bottle-page \.votes button\.listenAllBtn \{[^}]*margin-left:\s*auto/);
+  });
+});

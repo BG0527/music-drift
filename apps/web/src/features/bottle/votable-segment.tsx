@@ -54,6 +54,8 @@ export interface VotableSegmentProps {
    * 本段播完时通知页面（「听全部」串段用；只报状态、不改播放）。
    */
   onEnded?: (() => void) | undefined;
+  /** 播放状态变化回调（`isPlaying`）；页面用它把「听全部」图标绑到真实状态。 */
+  onPlayingChange?: ((isPlaying: boolean) => void) | undefined;
   /**
    * 交出播放器的命令柄 —— 页面把「播放键」搬去与赞/踩同一行、并让它变成
    * 「听全部」时，要命令的是**同一个**播放器（否则两个播放器声音打架）。
@@ -90,6 +92,7 @@ export function VotableSegment({
   createElement,
   className,
   onEnded,
+  onPlayingChange,
   playerHandleRef,
   autoPlayToken,
   showPlayButton,
@@ -133,6 +136,7 @@ export function VotableSegment({
         layout="transport"
         onProgress={listen.observe}
         {...(onEnded === undefined ? {} : { onEnded })}
+        {...(onPlayingChange === undefined ? {} : { onPlayingChange })}
         {...(playerHandleRef === undefined ? {} : { playerHandleRef })}
         {...(autoPlayToken === undefined ? {} : { autoPlayToken })}
         {...(showPlayButton === undefined ? {} : { showPlayButton })}

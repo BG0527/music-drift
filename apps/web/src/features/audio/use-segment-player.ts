@@ -56,6 +56,13 @@ export interface UseSegmentPlayerOptions {
   onProgress?: (snapshot: PlayerProgressSnapshot) => void;
   /** 本段播完（`ended` 事件）时回调一次：「听全部」用它换下一段接着播。 */
   onEnded?: (() => void) | undefined;
+  /**
+   * 播放状态变化时回调（`isPlaying`）。
+   *
+   * 「听全部」用它把按钮的播放/暂停图标绑到**播放器真实状态**，而不是乐观置位 ——
+   * 乐观置位会出现"点了没声却显示暂停"，逼用户反复多点。
+   */
+  onPlayingChange?: ((isPlaying: boolean) => void) | undefined;
 }
 
 export interface UseSegmentPlayerResult {
@@ -130,6 +137,10 @@ export function useSegmentPlayer(options: UseSegmentPlayerOptions): UseSegmentPl
   useEffect(() => {
     onEndedRef.current = options.onEnded;
   }, [options.onEnded]);
+  const onPlayingChangeRef = useRef(options.onPlayingChange);
+  useEffect(() => {
+    onPlayingChangeRef.current = options.onPlayingChange;
+  }, [options.onPlayingChange]);
 
   const key = `${src}|${duration}`;
   const [state, setState] = useState<ProgressState>({ key, ...EMPTY_PROGRESS });
@@ -166,9 +177,10 @@ export function useSegmentPlayer(options: UseSegmentPlayerOptions): UseSegmentPl
     if (tracker === null) return;
     const progress = tracker.progress();
     const element = elementRef.current;
+    const isPlaying = element !== null && !element.paused;
     setState({
       key,
-      isPlaying: element !== null && !element.paused,
+      isPlaying,
       playbackState: derivePlaybackState(element),
       positionMs: progress.positionMs,
       coveredMs: progress.coveredMs,
@@ -177,6 +189,8 @@ export function useSegmentPlayer(options: UseSegmentPlayerOptions): UseSegmentPl
       dislikeUnlocked: progress.dislikeUnlocked,
       // 注意：不在这里展示 ratio=NaN 之类的中间态，ListenTracker 已保证 0..1
     });
+    // 真实播放状态回报（「听全部」按钮图标据此显示播放/暂停，不做乐观置位）
+    onPlayingChangeRef.current?.(isPlaying);
     onProgressRef.current?.({
       ratio: progress.ratio,
       coveredMs: progress.coveredMs,
