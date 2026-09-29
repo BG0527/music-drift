@@ -1,5 +1,8 @@
 /*
- * W22 Landing锛氫竴鏉℃渤銆佷竴鏀摱銆佷竴娆″畬鏁磋埅绋嬨€? * 浠呬綔鐢ㄤ簬 .landing-v4锛涗笉鏀瑰叏灞€ token锛屼笉寮曞叆鍥剧墖鎴栬繍琛屾椂渚濊禆銆? * 鍔ㄦ晥鍙繃娓?transform / opacity锛屾椂闀夸笌缂撳姩寮曠敤鐜版湁 motion 濂戠害銆? */
+ * W22 Landing：一条河、一支瓶、一次完整航程。
+ * 仅作用于 .landing-v4；不改全局 token，不引入图片或运行时依赖。
+ * 动效只过渡 transform / opacity，时长与缓动引用现有 motion 契约。
+ */
 
 .landing-v4 {
   background:
