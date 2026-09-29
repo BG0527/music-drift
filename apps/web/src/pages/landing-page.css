@@ -1,8 +1,5 @@
 /*
- * W22 Landing：一条河、一支瓶、一次完整航程。
- * 仅作用于 .landing-v4；不改全局 token，不引入图片或运行时依赖。
- * 动效只过渡 transform / opacity，时长与缓动引用现有 motion 契约。
- */
+ * W22 Landing锛氫竴鏉℃渤銆佷竴鏀摱銆佷竴娆″畬鏁磋埅绋嬨€? * 浠呬綔鐢ㄤ簬 .landing-v4锛涗笉鏀瑰叏灞€ token锛屼笉寮曞叆鍥剧墖鎴栬繍琛屾椂渚濊禆銆? * 鍔ㄦ晥鍙繃娓?transform / opacity锛屾椂闀夸笌缂撳姩寮曠敤鐜版湁 motion 濂戠害銆? */
 
 .landing-v4 {
   background:
@@ -29,7 +26,11 @@
 .landing-river-stage {
   position: absolute;
   inset: 0;
-  z-index: 3;
+  /* 装饰层：必须在内容轨道（.landing-track，z-index:2）之下。
+     原为 3（高于内容）——桌面上河道在内容下方的空区里看不出问题，
+     但窄屏内容更高、滚过来就会被河盖住字。河道是 aria-hidden 的装饰，
+     永远不该压住可读内容，所以放在 1（高于 underlay 背景 0，低于内容 2）。 */
+  z-index: 1;
   overflow: hidden;
   pointer-events: none;
 }
@@ -303,6 +304,14 @@
     width: 172%;
     height: 44%;
     transform: translateX(-38%) translateY(-4%);
+  }
+
+  .landing-river-stage {
+    /* 窄屏：河道压到视口**最底部**当一条水带，绝不横穿正文。
+       桌面河道在内容下方的空区，窄屏内容更高会滚进河道区 ——
+       所以这里把整条 stage 往下推，让它只露在底部，正文在其上方滚动。 */
+    top: auto;
+    height: 30%;
   }
 
   .landing-screen-inner {

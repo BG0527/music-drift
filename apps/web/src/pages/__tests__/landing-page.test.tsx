@@ -26,7 +26,7 @@ import { matchRoute } from '../shell/routes';
 /* 文案常量（与 docs/landing-copy-v3.md §2 逐字一致；brainstorm §5 落点表同步收录） */
 const HOOK = '唱过无痕，声声有应。';
 const DEFINITION = '匿名接力唱：唱约 20 秒投进河里，陌生人接唱下一段，四段拼成一首。';
-const VALUE_LINE = '接力链不公开账号，也不比谁唱得好——只问一件事：有没有人，接住你的声音。';
+const VALUE_LINE = '不署名，不入册，不比谁唱得好——只问一件事：有没有人，接住你的声音。';
 const CTA = '去开始体验';
 /** 用户示例（brainstorm 红线）：最终文案不得逐字出现。 */
 const USER_EXAMPLE_FRAGMENTS = ['想唱但怕被评价', '不用露脸', '不用唱完', '不用等点赞'];
@@ -87,6 +87,7 @@ const AUTHED_ME: FetchHandler = {
   path: '/api/auth/me',
   respond: () => ({
     body: {
+      // W21 账号契约：AuthUserSchema strict 且 account 必填（正名），email 已退役不回显。
       user: {
         id: '11111111-1111-4111-8111-111111111111',
         handle: '午夜歌手',
@@ -322,7 +323,7 @@ describe('功能页守卫回归（guest → /login）', () => {
       route: '/river',
       handlers: [AUTHED_ME],
     });
-    expect(await screen.findByRole('heading', { level: 1 })).toHaveAttribute('id', 'river-title');
+    expect(await screen.findByRole('heading', { name: '暖流河道' })).toBeInTheDocument();
     expect(window.location.pathname).toBe('/river');
   });
 });
@@ -354,7 +355,11 @@ describe('内容来自头脑风暴且不逐字照搬用户示例', () => {
     }
     const brainstorm = readFileSync(brainstormPath, 'utf8');
     expect(brainstorm).toContain(HOOK);
-    expect(brainstorm).toContain(VALUE_LINE);
+    // 价值句的唯一依据 = docs/landing-copy-v3.md §2（用户逐屏锁定）；
+    // brainstorm §5 落点表的价值句措辞后经并发会话按公开评论身份口径改写（docs 不归本任务改），
+    // 页面文案仍逐字跟随 copy-v3 定稿，此处按定稿文档断言。
+    const copyV3 = readFileSync(join(repoRoot, 'docs', 'landing-copy-v3.md'), 'utf8');
+    expect(copyV3).toContain(VALUE_LINE);
   });
 
   it('红线：无 emoji / AI 陈词 / lorem / 15–30 旧口径 / 内联 hex / h-screen', () => {
@@ -414,53 +419,91 @@ describe('内容来自头脑风暴且不逐字照搬用户示例', () => {
   });
 });
 
-describe('W22 连续河流视觉叙事', () => {
-  it('整页只有一支主瓶；翻屏时复用同一节点并更新航程状态', async () => {
+/* ─────────────── 8. 底部河流 + 主瓶横向漂移（用户裁决：推翻 9/29 的「自上而下」方案） ─────────────── */
+
+describe('底部河流与主瓶横向漂移（用户裁决：推翻 9/29 的「自上而下」方案）', () => {
+  it('河道是横贯底部的一条河 + 右端有海口；主瓶在河道之上', async () => {
     renderLanding();
     await screen.findByRole('heading', { level: 1, name: HOOK });
-    const page = screen.getByTestId('landing-page');
-    const bottle = page.querySelector('[data-journey-bottle]');
-
-    expect(bottle).not.toBeNull();
-    expect(page.querySelectorAll('[data-journey-bottle]')).toHaveLength(1);
-    expect(page).toHaveAttribute('data-journey', '0');
-
-    fireEvent.keyDown(window, { key: 'ArrowDown' });
-    expect(page).toHaveAttribute('data-journey', '1');
-    expect(page.querySelector('[data-journey-bottle]')).toBe(bottle);
+    const stage = document.querySelector<HTMLElement>('.landing-river-stage');
+    expect(stage, '底部河流层缺失').not.toBeNull();
+    // 河道是一条 SVG（viewBox 1600x900 的横向长河），末端是"海口"椭圆
+    const map = document.querySelector<SVGSVGElement>('.landing-river-map');
+    expect(map, '河道 SVG 缺失').not.toBeNull();
+    expect(map?.getAttribute('viewBox')).toBe('0 0 1600 900');
+    const sea = document.querySelector<SVGEllipseElement>('[data-river-sea]');
+    expect(sea, '海口（入河终点）缺失').not.toBeNull();
+    // 海口在河道右端（cx 1540 / 1600 ⇒ 靠右），主瓶存在
+    expect(Number(sea?.getAttribute('cx'))).toBeGreaterThan(1200);
+    expect(document.querySelector('[data-journey-bottle]'), '主瓶缺失').not.toBeNull();
   });
 
-  it('同一条河贯穿八屏，远景瓶与末端海口只承担环境信息', async () => {
+  it('每翻一页 data-journey 递增（驱动主瓶向右走一格）；末页最右（入河）', async () => {
     renderLanding();
     await screen.findByRole('heading', { level: 1, name: HOOK });
-    const page = screen.getByTestId('landing-page');
+    /** 根节点的 data-journey = 当前屏序号：CSS 按它把主瓶一格一格往右挪。 */
+    const journeyIndex = (): number =>
+      Number(document.querySelector<HTMLElement>('[data-journey]')?.dataset['journey'] ?? '-1');
 
-    expect(page.querySelectorAll('[data-river-continuity]')).toHaveLength(1);
-    expect(page.querySelectorAll('[data-far-bottle]')).toHaveLength(3);
-    expect(page.querySelector('[data-river-sea]')).not.toBeNull();
-    expect(page.querySelector('[data-bottle-lane]')).not.toBeNull();
+    expect(activeScreenIndex()).toBe(0);
+    expect(journeyIndex()).toBe(0);
+    fireEvent.wheel(window, { deltaY: 120 });
+    expect(activeScreenIndex()).toBe(1);
+    expect(journeyIndex(), '翻一页 data-journey 应 +1（主瓶随之右移一格）').toBe(1);
+    fireEvent.keyDown(window, { key: 'End' });
+    expect(activeScreenIndex()).toBe(SCREEN_COUNT - 1);
+    expect(journeyIndex(), '末屏 data-journey = 7（主瓶最右 = 入海口）').toBe(SCREEN_COUNT - 1);
+    fireEvent.keyDown(window, { key: 'Home' });
+    expect(activeScreenIndex()).toBe(0);
+    expect(journeyIndex(), '回到首页反向漂回起点').toBe(0);
   });
 
-  it('社交身份文案遵守最新版规则：公开评论实名，私密留言仅送达后双向解匿名', async () => {
-    renderLanding();
-    await screen.findByRole('heading', { level: 1, name: HOOK });
-    const pageText = screen.getByTestId('landing-page').textContent ?? '';
-
-    expect(pageText).toContain('公开评论直接显示账号名');
-    expect(pageText).toContain('私密留言送达后，只有通信双方互相看到账号名');
-    expect(pageText).not.toContain('出瓶即隐身');
-    expect(pageText).not.toContain('不露脸，不记名');
-  });
-
-  it('Landing 独立样式只为 transform/opacity 做动效，并完整降级 reduced-motion', () => {
-    const source = readFileSync(resolve(process.cwd(), 'src', 'pages', 'landing-page.tsx'), 'utf8');
+  it('主瓶横向位移由 CSS 按 data-journey 驱动：只动 transform/opacity、x 单调递增', () => {
     const css = readFileSync(resolve(process.cwd(), 'src', 'pages', 'landing-page.css'), 'utf8');
+    // 河道层是装饰：不吃指针、不吃无障碍（内容在其上方滚动）
+    expect(css).toMatch(/\.landing-river-stage\s*\{[^}]*pointer-events:\s*none/);
+    expect(css).toMatch(/\.landing-river-stage\s*\{[^}]*z-index:\s*1/);
+    // 主瓶逐屏横移（只取 @media 之外的桌面段；窄屏段是另一套刻度，不在此断言）：
+    // x 分量从 -39vw 单调走到 +40vw（每页一格、由左到右）。
+    const desktopCss = css.split('@media')[0] ?? '';
+    const desktopXs = [...desktopCss.matchAll(/\[data-journey='(\d)'\]\s*\.landing-protagonist\s*\{[^}]*translate3d\(\s*calc\(-50%\s*([+-])\s*(\d+)vw/g)]
+      .map((m) => (m[2] === '-' ? -Number(m[3]) : Number(m[3])));
+    expect(desktopXs.length, '应逐屏定义主瓶横移').toBeGreaterThanOrEqual(7);
+    for (let i = 1; i < desktopXs.length; i += 1) {
+      expect(desktopXs[i], `第 ${String(i)} 屏的 x 必须大于上一屏（向右漂）`).toBeGreaterThan(desktopXs[i - 1] ?? 0);
+    }
+    expect(desktopXs[0]).toBeLessThan(0);
+    expect(desktopXs[desktopXs.length - 1] ?? 0, '末屏应漂到右侧（入海口）').toBeGreaterThan(0);
+    // 逐屏位移只允许 transform / opacity，且时长走 token
+    const proto = /\.landing-protagonist\s*\{([^}]*)\}/.exec(css)?.[1] ?? '';
+    expect(proto).toContain('transition-property: transform, opacity');
+    expect(proto).toContain('var(--motion-page-duration)');
+    expect(proto).toContain('var(--motion-entry-easing)');
+    // 海口随接近而点亮（末屏最亮）
+    expect(css).toMatch(/\[data-journey='7'\]\s*\.landing-river-sea\s*\{[^}]*opacity:\s*0\.9/);
+    // 动效只动 transform/opacity：全文件不许有 transition 动画 width/height/top/left
+    expect(css).not.toMatch(/transition(?:-property)?:[^;}]*\b(width|height|top|left)\b/);
+    // 源码里不内联毫秒/缓动
+    const source = readFileSync(resolve(process.cwd(), 'src', 'pages', 'landing-page.tsx'), 'utf8');
+    expect(source).not.toMatch(/transitionDuration:\s*['"]?\d/);
+    expect(source).not.toMatch(/transition:\s*['"][^'"]*\d+ms/);
+  });
+});
 
-    expect(source).toContain("import './landing-page.css'");
-    expect(css).toMatch(/\.landing-protagonist[\s\S]*transition-property:\s*transform,\s*opacity/);
-    expect(css).toMatch(/\.landing-screen-inner[\s\S]*padding-bottom:\s*clamp\(/);
-    expect(css).toMatch(/\.landing-screen-content[\s\S]*background:\s*linear-gradient\(/);
-    expect(css).toMatch(/@media\s*\(prefers-reduced-motion:\s*reduce\)/);
-    expect(css).not.toMatch(/transition(?:-property)?:[^;]*(?:width|height|top|left|margin|padding)/);
+/* ─────────────── 9. 末屏入海意向（用户 9/29 裁决） ─────────────── */
+
+describe('末屏「投出你的第一瓶」CTA 入海意向', () => {
+  it('CTA 区呈现入海/公海语义（data-cta-into-sea），链接仍指 /login?next=%2Friver', async () => {
+    renderLanding();
+    await screen.findByRole('heading', { level: 1, name: HOOK });
+    fireEvent.keyDown(window, { key: 'End' });
+    expect(activeScreenIndex()).toBe(SCREEN_COUNT - 1);
+    const cta = screen.getByRole('link', { name: CTA });
+    expect(cta).toHaveAttribute('href', '/login?next=%2Friver');
+    const ctaArea = cta.closest('[data-cta-into-sea]');
+    expect(ctaArea, 'CTA 区需要入海意向标记 data-cta-into-sea').not.toBeNull();
+    expect(ctaArea?.textContent ?? '').toMatch(/入海|公海/);
+    const tryScreen = document.querySelectorAll('[data-landing-screen]')[SCREEN_COUNT - 1];
+    expect(tryScreen?.textContent ?? '').toContain('投出你的第一瓶');
   });
 });

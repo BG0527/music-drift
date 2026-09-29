@@ -40,7 +40,17 @@ import {
   type TouchEvent as ReactTouchEvent,
 } from 'react';
 import type { BottleDetail } from '@music-drift/shared';
-import { BottleMark, BottleVessel, Button, Icon, Skeleton, cn, motion } from '../design-system';
+import {
+  BottleMark,
+  BottleVessel,
+  Button,
+  Glint,
+  Icon,
+  Platter,
+  Skeleton,
+  cn,
+  motion,
+} from '../design-system';
 import { segmentAudioUrl, useBottle, useSeaList } from '../features/api/queries';
 import { useSegmentPlayer } from '../features/audio';
 import { TEXT_LINK, TEXT_LINK_GHOST, TEXT_LINK_PRIMARY } from './shell/link-styles';
@@ -83,8 +93,7 @@ const HOOK = '唱过无痕，声声有应。';
 const DEFINITION = '匿名接力唱：唱约 20 秒投进河里，陌生人接唱下一段，四段拼成一首。';
 
 /** 价值句（双轴总纲：轴一不署名不入册 / 轴二有没有人接住你的声音）。 */
-const VALUE_LINE =
-  '接力链不公开账号，也不比谁唱得好——只问一件事：有没有人，接住你的声音。';
+const VALUE_LINE = '不署名，不入册，不比谁唱得好——只问一件事：有没有人，接住你的声音。';
 
 /** 链尾 CTA（t12 用户指定动作词）：去开始体验 → /login → 河道（next 走 encodeURIComponent）。 */
 const CTA_HREF = `/login?next=${encodeURIComponent('/river')}`;
@@ -293,7 +302,7 @@ function ExperienceSection() {
 
 function SectionHeading({ index, id, children }: { index: string; id: string; children: string }) {
   return (
-    <div className="landing-section-heading mb-6 flex items-baseline gap-4">
+    <div className="mb-6 flex items-baseline gap-4">
       <span aria-hidden="true" className="font-latin text-[0.6875rem] tracking-[0.24em] text-coral">
         {index}
       </span>
@@ -347,15 +356,15 @@ const SCENES: ReadonlyArray<{ key: string; title: string; body: string; span: st
 const WAIT_CARDS: ReadonlyArray<{ title: string; body: string }> = [
   {
     title: '漂流日志',
-    body: '瓶子漂到哪了，随时看得见：每一棒的瓶级代号和核心漂流事件，不暴露账号。',
+    body: '你的瓶子漂到哪了，随时看得见：每一棒的代号，每一次出手的时间。只给你自己看。',
   },
   {
     title: '漂流中',
-    body: '「已传 3 棒 · 最后活跃在 2 小时前 · 正在等待下一棒」。当前已录的每一段都可以试听。',
+    body: '「已传 3 棒 · 最后活跃在 2 小时前 · 正在等待下一棒」。你只看得见自己唱过的部分——后面是什么，是悬念。',
   },
   {
     title: '揭晓',
-    body: '入海后，完整作品进入公海；完成作品可以收藏，等待接力的作品也能继续接唱。',
+    body: '入海那一刻，完整接力链才解锁：谁接过你的歌，在哪儿接的，每一句附言。',
   },
   {
     title: '敲门',
@@ -375,9 +384,17 @@ const TRUST: ReadonlyArray<{ title: string; body: string }> = [
   },
 ];
 
+/* ────────────────────────────── 页面 ────────────────────────────── */
+
 /**
- * 全页唯一的河与主瓶。它不在翻页轨道中，因此切屏时不会 remount；视觉连续性由根节点
- * `data-journey` 驱动，CSS 只过渡 transform / opacity。远景瓶是静态环境信息。
+ * 全页唯一的河与主瓶（用户裁决：底部一条河，瓶从左往右漂、每翻一页走一格，最后入河）。
+ *
+ * - 它**不在翻页轨道里**，所以切屏时不会 remount，视觉连续性由根节点 `data-journey`
+ *   （= 当前屏索引）驱动，CSS 只过渡 transform / opacity（motion-web §3）；
+ * - 河道是一条横贯屏幕底部的 SVG（左 → 右），末端是"海口"椭圆；
+ *   瓶随 `data-journey` 一页一格向右漂，接近海口时海口逐渐变亮（= 入河）；
+ * - 远景瓶是静态环境信息，pointer-events 全关，不与内容抢交互；
+ * - 动效参数全部来自 `--motion-*` token，reduced-motion 由 `landing-page.css` 降级为即时切换。
  */
 function RiverJourney() {
   return (
@@ -444,15 +461,13 @@ function RiverJourney() {
   );
 }
 
-/* ────────────────────────────── 页面 ────────────────────────────── */
-
 /** 屏内容（body 不含屏壳）：0 = 开场三问，1–7 = 七段追问。 */
 function screenBody(screenIndex: number): ReactNode {
   switch (screenIndex) {
     case 0:
       return (
-        <div className="landing-hero grid grid-cols-1 items-start gap-8 md:grid-cols-[1.1fr_0.9fr] md:gap-12">
-          <div className="landing-hero-copy flex min-w-0 flex-col gap-5">
+        <div className="grid grid-cols-1 items-start gap-8 md:grid-cols-[1.1fr_0.9fr] md:gap-12">
+          <div className="flex min-w-0 flex-col gap-5">
             <p className="font-latin text-[0.6875rem] tracking-[0.24em] text-muted">
               音乐共创 · 匿名接力
             </p>
@@ -475,7 +490,7 @@ function screenBody(screenIndex: number): ReactNode {
 
           <div
             id="intro-experience"
-            className="landing-listen-deck scroll-mt-24 rounded-lg border border-line/20 bg-water-void p-5 md:p-6"
+            className="scroll-mt-24 rounded-lg border border-line/20 bg-water-void p-5 md:p-6"
           >
             <p className="font-latin text-[0.6875rem] tracking-[0.24em] text-muted">
               公海成品 · 免注册
@@ -508,12 +523,12 @@ function screenBody(screenIndex: number): ReactNode {
                 我的声音会和谁的声音拼在一起？
               </p>
             </div>
-            <dl className="landing-glossary grid grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-2">
+            <dl className="grid grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-2">
               {[
                 ['漂流瓶', '一段尚未唱完的歌，正在河上'],
                 ['河道', '没有搜索，没有关注——只能随机遇见'],
                 ['公海', '所有歌的终点，谁都能来听'],
-                ['匿名代号', '接力链只显示瓶级代号，不公开账号'],
+                ['匿名代号', '一只瓶一个名字，出瓶即隐身'],
               ].map(([term, desc]) => (
                 <div key={term} className="flex flex-col gap-1 border-l border-hairline pl-3">
                   <dt className="text-[0.9375rem] font-semibold text-paper">{term}</dt>
@@ -530,7 +545,7 @@ function screenBody(screenIndex: number): ReactNode {
           <SectionHeading index="02" id="h-how">
             怎么漂起来
           </SectionHeading>
-          <ol className="landing-steps grid grid-cols-1 gap-6 md:grid-cols-3 md:gap-8">
+          <ol className="grid grid-cols-1 gap-6 md:grid-cols-3 md:gap-8">
             {[
               ['唱一段', '挑一首你熟的歌，系统替你切成四段，每段约 20 秒；你只录第 1 段。'],
               ['投进河', '不挑听众，不看主页，谁捞到它，由河说了算。'],
@@ -570,7 +585,7 @@ function screenBody(screenIndex: number): ReactNode {
           <SectionHeading index="03" id="h-diff">
             歌，都漂去哪儿
           </SectionHeading>
-          <div className="landing-comparison w-full min-w-0 overflow-x-auto">
+          <div className="w-full min-w-0 overflow-x-auto">
             <table className="w-full table-fixed border-collapse text-left">
               <colgroup>
                 <col style={{ width: '20%' }} />
@@ -630,7 +645,7 @@ function screenBody(screenIndex: number): ReactNode {
               <article
                 key={scene.key}
                 className={cn(
-                  'landing-scene-card flex flex-col gap-3 rounded-base border border-hairline p-6',
+                  'flex flex-col gap-3 rounded-base border border-hairline p-6',
                   scene.span,
                   scene.key === 'commute' && 'bg-water-void',
                 )}
@@ -657,11 +672,11 @@ function screenBody(screenIndex: number): ReactNode {
           <p className="text-[1.0625rem] leading-[1.85] text-paper">
             等待不是空白——日志里每一行，都是有人来过。
           </p>
-          <ul className="landing-info-grid mt-6 grid grid-cols-1 gap-4 md:grid-cols-2">
+          <ul className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-2">
             {WAIT_CARDS.map((item) => (
               <li
                 key={item.title}
-                className="landing-info-card flex min-w-0 flex-col gap-1 rounded-base border border-hairline p-5"
+                className="flex min-w-0 flex-col gap-1 rounded-base border border-hairline p-5"
               >
                 <h3 className="text-[0.9375rem] font-semibold text-paper">{item.title}</h3>
                 <p className="text-[0.8125rem] leading-[1.8] text-muted">{item.body}</p>
@@ -679,20 +694,17 @@ function screenBody(screenIndex: number): ReactNode {
           <SectionHeading index="06" id="h-trust">
             漂流的规矩
           </SectionHeading>
-          <ul className="landing-info-grid landing-trust-grid grid grid-cols-1 gap-4 md:grid-cols-2">
+          <ul className="grid grid-cols-1 gap-4 md:grid-cols-2">
             {TRUST.map((item) => (
               <li
                 key={item.title}
-                className="landing-info-card flex min-w-0 flex-col gap-1 rounded-base border border-hairline p-5"
+                className="flex min-w-0 flex-col gap-1 rounded-base border border-hairline p-5"
               >
                 <h3 className="text-[0.9375rem] font-semibold text-paper">{item.title}</h3>
                 <p className="text-[0.8125rem] leading-[1.8] text-muted">{item.body}</p>
               </li>
             ))}
           </ul>
-          <p className="mt-5 border-l-2 border-coral pl-4 text-[0.8125rem] leading-[1.8] text-muted">
-            公开评论直接显示账号名；私密留言送达后，只有通信双方互相看到账号名。
-          </p>
         </div>
       );
     default:
@@ -701,8 +713,8 @@ function screenBody(screenIndex: number): ReactNode {
           <SectionHeading index="07" id="h-try">
             投出你的第一瓶
           </SectionHeading>
-          <ol className="landing-final-steps grid grid-cols-1 gap-4 md:grid-cols-3 md:gap-6">
-            <li className="landing-step-card flex flex-col gap-2 rounded-base border border-hairline p-5">
+          <ol className="grid grid-cols-1 gap-4 md:grid-cols-3 md:gap-6">
+            <li className="flex flex-col gap-2 rounded-base border border-hairline p-5">
               <span
                 aria-hidden="true"
                 className="font-latin text-[0.6875rem] tracking-[0.24em] text-glass"
@@ -716,7 +728,7 @@ function screenBody(screenIndex: number): ReactNode {
                 回到第一屏的播放器，不用注册，点开就播。
               </p>
             </li>
-            <li className="landing-step-card flex flex-col gap-2 rounded-base border border-hairline p-5">
+            <li className="flex flex-col gap-2 rounded-base border border-hairline p-5">
               <span
                 aria-hidden="true"
                 className="font-latin text-[0.6875rem] tracking-[0.24em] text-glass"
@@ -730,7 +742,7 @@ function screenBody(screenIndex: number): ReactNode {
                 随机打捞，听到别人的半句，再决定接不接。
               </p>
             </li>
-            <li className="landing-step-card flex flex-col gap-2 rounded-base border border-hairline p-5">
+            <li className="flex flex-col gap-2 rounded-base border border-hairline p-5">
               <span
                 aria-hidden="true"
                 className="font-latin text-[0.6875rem] tracking-[0.24em] text-glass"
@@ -745,13 +757,20 @@ function screenBody(screenIndex: number): ReactNode {
               </p>
             </li>
           </ol>
-          {/* 链尾 CTA（t12）：去开始体验 → /login → 河道页（正式体验入口） */}
-          <div className="mt-6 flex flex-wrap items-center gap-x-6 gap-y-3">
+          {/* 链尾 CTA（t12）：去开始体验 → /login → 河道页（正式体验入口）；
+              入海意向（用户 9/29 裁决）：CTA 区文案汇入公海，链接目标与旁支动作不变 */}
+          <div
+            data-cta-into-sea=""
+            className="mt-6 flex flex-wrap items-center gap-x-6 gap-y-3"
+          >
             <Link to={CTA_HREF} className={TEXT_LINK_PRIMARY}>
               去开始体验
             </Link>
             <p className="text-[0.9375rem] leading-[1.85] text-paper">
-              接力链使用瓶级代号；唱完一段，就把下一棒交给河流。
+              不露脸，不记名，唱完一段就可以走。
+            </p>
+            <p className="text-[0.8125rem] leading-[1.8] text-muted">
+              这一段会顺着河漂向下一棒；四段齐了它会入海——所有人的公共作品集。
             </p>
           </div>
         </div>
@@ -872,11 +891,16 @@ export function LandingPage() {
       onTouchStart={onTouchStart}
       onTouchEnd={onTouchEnd}
     >
+      <Platter />
+      <Glint />
+
+      {/* 航程层（用户裁决：底部一条河，瓶从左往右每翻一页走一格，最后入海口）。
+          独立于翻页轨道，切屏不 remount；只动 transform/opacity，参数走 --motion-* token。 */}
       <RiverJourney />
 
       {/* 翻页轨道：只动 transform；时长/缓动全部来自 --motion-* 契约 token */}
       <div
-        className="landing-track relative z-base flex flex-col transition-[transform] duration-[var(--motion-page-duration)] ease-[var(--motion-entry-easing)]"
+        className="flex flex-col transition-[transform] duration-[var(--motion-page-duration)] ease-[var(--motion-entry-easing)]"
         style={{ transform: `translateY(calc(${-index} * 100dvh))` }}
       >
         {SCREENS.map((screen, screenIndex) => (
@@ -888,10 +912,14 @@ export function LandingPage() {
             // 第一屏的 one-screen 锚点（tools/one-screen-check 的 `/` 路由条目要用）
             {...(screenIndex === 0 ? { 'data-anchor': 'intro-hero' } : {})}
             aria-label={screen.title}
-            className="landing-screen h-[100dvh] shrink-0 overflow-y-auto overscroll-contain"
+            className="h-[100dvh] shrink-0 overflow-y-auto overscroll-contain"
           >
-            <div className="landing-screen-inner mx-auto flex min-h-full w-full max-w-[1280px] min-w-0 flex-col justify-center px-6 pb-[88px] pt-[72px] md:px-12">
-              <div className="landing-screen-content">{screenBody(screenIndex)}</div>
+            {/* 窄屏底部留白加大（pb-[16rem]）：河道在窄屏是压在视口底部的一条水带
+                （.landing-river-stage 高度 30%），内容比视口高、会在它上面滚动，
+                底部留白必须够scroll到最后一行时不被水带盖住。桌面河道在内容下方空区，
+                保持稿值 88px。 */}
+            <div className="mx-auto flex min-h-full w-full max-w-[1280px] min-w-0 flex-col justify-center px-6 pb-[16rem] pt-[72px] md:px-12 md:pb-[88px]">
+              {screenBody(screenIndex)}
             </div>
           </section>
         ))}
@@ -901,14 +929,14 @@ export function LandingPage() {
       <p
         data-testid="landing-indicator"
         aria-live="polite"
-        className="landing-indicator font-latin fixed bottom-5 left-6 z-sticky text-[0.6875rem] tracking-[0.24em] text-muted"
+        className="font-latin fixed bottom-5 left-6 z-sticky text-[0.6875rem] tracking-[0.24em] text-muted"
       >
         {String(index + 1).padStart(2, '0')} / {String(SCREENS.length).padStart(2, '0')} ·{' '}
         {meta.title}
       </p>
 
       {/* 圆点导航：带屏名、可点、热区 ≥44px */}
-      <nav aria-label="翻页导航" className="landing-screen-nav fixed right-3 top-1/2 z-sticky -translate-y-1/2">
+      <nav aria-label="翻页导航" className="fixed right-3 top-1/2 z-sticky -translate-y-1/2">
         <ul className="flex flex-col items-center">
           {SCREENS.map((screen, screenIndex) => {
             const active = screenIndex === index;
@@ -931,7 +959,7 @@ export function LandingPage() {
                     className={cn(
                       'block h-2 w-2 rounded-full border transition-[transform,background-color] duration-[var(--motion-hover-duration)] ease-[var(--motion-entry-easing)]',
                       active
-                        ? 'scale-[1.03] border-coral bg-coral'
+                        ? 'scale-[var(--motion-hover-scale)] border-coral bg-coral'
                         : 'border-muted bg-transparent hover:bg-muted',
                     )}
                   />
