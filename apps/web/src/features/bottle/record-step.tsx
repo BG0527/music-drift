@@ -77,6 +77,13 @@ export function RecordStep({
   const library = useLibraryMetadata();
   const [phase, setPhase] = useState<UploadPhase>('validating');
   const [ratio, setRatio] = useState<number | null>(null);
+  /**
+   * 录制态 + 一次"开录"计数（用户裁决：伴奏与录音同时进行，不再是两个分开的功能）。
+   * 开录那一刻令 `accompanimentSignal` 触发自动起播；停录时它带回 false 让伴奏停下。
+   * `token` 每次开录 +1，所以"录了又重录一次"会重新从头起播。
+   */
+  const [recordingActive, setRecordingActive] = useState(false);
+  const [recordStartToken, setRecordStartToken] = useState(0);
   const [failure, setFailure] = useState<{ message: string; retryable: boolean } | null>(null);
   const [pending, setPending] = useState<SegmentRecording | null>(null);
   const [localUrl, setLocalUrl] = useState<string | null>(null);
@@ -171,6 +178,14 @@ export function RecordStep({
     retryable: failure?.retryable ?? false,
   };
   const accompanimentTrack = library.data?.tracks.find((track) => track.songId === songId);
+  /**
+   * 传给伴奏播放器的同步信号：`play = recordingActive`，`token` 只在**开录**时 +1。
+   * 停录（`play` 由 true→false）让伴奏停下；重录一次 = 新的 token ⇒ 从头再起播。
+   */
+  const accompanimentSignal = useMemo(
+    () => ({ play: recordingActive, token: recordStartToken }),
+    [recordingActive, recordStartToken],
+  );
 
   return (
     <div className={cn('flex flex-col gap-4', className)}>
@@ -183,7 +198,11 @@ export function RecordStep({
           静态曲库中找不到这首歌的伴奏与歌词，不会使用其他曲目代替。
         </p>
       ) : accompanimentTrack === undefined ? null : (
-        <AccompanimentPlayer track={accompanimentTrack} segmentIndex={segmentIndex} />
+        <AccompanimentPlayer
+          track={accompanimentTrack}
+          segmentIndex={segmentIndex}
+          autoPlaySignal={accompanimentSignal}
+        />
       )}
 
       {/*
@@ -216,6 +235,11 @@ export function RecordStep({
               presetDurationMs={preset}
               environment={environment}
               {...(phase === 'validating' ? {} : { upload: uploadView })}
+              onRecordingStateChange={(isRecording) => {
+                // 开录 ⇒ 让本段伴奏同时起播（token +1 让它从头来）；停录 ⇒ 伴奏停下。
+                setRecordingActive(isRecording);
+                if (isRecording) setRecordStartToken((token) => token + 1);
+              }}
               disabled={disabled || uploading}
               onRetryRecording={discardPendingRecording}
               {...(onCancel === undefined

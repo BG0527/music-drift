@@ -13,7 +13,7 @@
  *
  * 段号（`segmentIndex`）**由服务端给**（`nextRecordIndex`），组件只显示，不推算（ADR-015 §16.8）。
  */
-import { useId } from 'react';
+import { useEffect, useId, useRef } from 'react';
 import type { RecorderEnvironment } from './recorder-environment';
 import { useRecorder, type PreviewState, type SegmentRecording } from './use-recorder';
 import { formatClock, formatSeconds } from './format';
@@ -82,6 +82,15 @@ export interface RecorderPanelProps {
   bars?: number;
   /** 点"用这一段"时把成品交给上层（上层负责上传与去向选择）。 */
   onRecorded?: (recording: SegmentRecording) => void;
+  /**
+   * 录制**开始 / 停止**时通知上层（`isRecording`）。
+   *
+   * 用户裁决："我希望能播放伴奏的同时进行录制，而不是单独分开功能。"
+   * 上层（RecordStep）据此在开录那一刻自动起播本段伴奏、停录时停伴奏 ——
+   * 伴奏与录音成为同一个流程，而不是两个要分别点的按钮。
+   * 只在**跨越**录制态时触发（进入 true / 离开 false），不随每帧进度重复上报。
+   */
+  onRecordingStateChange?: (isRecording: boolean) => void;
   /** 丢弃本地录音后通知上层关闭录音窗口。 */
   onCancel?: () => void;
   /** 重录前通知上层清理上一次上传失败的本地状态。 */
@@ -101,6 +110,7 @@ export function RecorderPanel({
   presetToleranceMs,
   bars = 48,
   onRecorded,
+  onRecordingStateChange,
   onCancel,
   onRetryRecording,
   upload,
@@ -118,6 +128,23 @@ export function RecorderPanel({
   });
   const { status, support, error, elapsedMs, levels, nearLimit, recording, durationViolations } =
     recorder;
+
+  /**
+   * 录制态的**边沿**通知（只在进入/离开 `recording` 时触发一次）。
+   * 上层据此同步伴奏（开录即起播、停录即停），把"录音 + 伴奏"合成一个流程。
+   * 用 ref 记住上次是否在录，避免每帧进度变化都重复回调。
+   */
+  const onRecordingStateChangeRef = useRef(onRecordingStateChange);
+  useEffect(() => {
+    onRecordingStateChangeRef.current = onRecordingStateChange;
+  }, [onRecordingStateChange]);
+  const wasRecordingRef = useRef(false);
+  useEffect(() => {
+    const isRecording = status === 'recording';
+    if (isRecording === wasRecordingRef.current) return;
+    wasRecordingRef.current = isRecording;
+    onRecordingStateChangeRef.current?.(isRecording);
+  }, [status]);
 
   /** 本段固定时长的展示口径（拿不到就是 null，一切文案退回区间口径）。 */
   const preset = recorder.presetDurationMs;

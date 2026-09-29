@@ -6,7 +6,7 @@
  * 卡片的底色用 `deep-current`（DESIGN.md：录制/波形区走深水暗底），与录制面板同一语义。
  */
 import { Button, Icon, cn } from '../../design-system';
-import { useMemo } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import {
   describeLibraryTrackMeta,
   karaokeLyricsForTrack,
@@ -22,6 +22,12 @@ export interface AccompanimentPlayerProps {
   segmentIndex: number;
   environment?: Partial<AccompanimentEnvironment>;
   onSegmentEnded?: () => void;
+  /**
+   * 自动起播信号（用户裁决：伴奏与录音同时进行）。
+   * 每次变化且为"起播"时，组件自动播放本段伴奏（停录时上层用 `stopWithRecording`
+   * 或再传 `paused` 停下）。默认 undefined = 不自动播（保留手动按钮的独立用法）。
+   */
+  autoPlaySignal?: { play: boolean; token: number } | undefined;
   className?: string;
 }
 
@@ -30,6 +36,7 @@ export function AccompanimentPlayer({
   segmentIndex,
   environment,
   onSegmentEnded,
+  autoPlaySignal,
   className,
 }: AccompanimentPlayerProps) {
   const view = useAccompaniment({
@@ -38,6 +45,31 @@ export function AccompanimentPlayer({
     ...(environment === undefined ? {} : { environment }),
     ...(onSegmentEnded === undefined ? {} : { onSegmentEnded }),
   });
+
+  /**
+   * 与录音同步的自动起播（用户裁决）。
+   * `autoPlaySignal.play` 变 true ⇒ 从本段开头起播（从头来，不接着上次的尾）；
+   * 变 false ⇒ 停下并回到段首（停录即停伴奏，两者同一个生命周期）。
+   * 用 token 区分"同一状态下重复触发"（重录一次 = 一次新的 play 边沿）。
+   */
+  const { play, stop } = view;
+  const handledTokenRef = useRef(0);
+  const lastPlayRef = useRef(false);
+  useEffect(() => {
+    if (autoPlaySignal === undefined) return;
+    if (autoPlaySignal.token === 0) return; // 0 = 还没触发过
+    if (autoPlaySignal.play) {
+      if (lastPlayRef.current && autoPlaySignal.token === handledTokenRef.current) return;
+      handledTokenRef.current = autoPlaySignal.token;
+      lastPlayRef.current = true;
+      play();
+      return;
+    }
+    // 停录即停伴奏
+    if (!lastPlayRef.current) return;
+    lastPlayRef.current = false;
+    stop();
+  }, [autoPlaySignal, play, stop]);
 
   const gainLabel = `${view.gainDb >= 0 ? '+' : ''}${view.gainDb.toFixed(2)} dB`;
   const lyricSegment = useMemo(
