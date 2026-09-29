@@ -317,6 +317,72 @@ describe('A6 按下反馈：触屏也要有即时回应（DESIGN §Interaction S
   });
 });
 
+describe('C3 滚动驱动一次性入场：只播一次、参数来自契约、不引入新通道', () => {
+  /**
+   * 契约依据：DESIGN 零装饰动效规则的第 ③ 类例外（2026-09-29 用户裁决）。
+   * 四条硬边界：只对内容块 / 一次性（once）/ 参数只来自既有契约 / 首屏内容不进观察器。
+   *
+   * 特别要防的是"变成 scroll 劫持"：如果实现里出现 `unobserve` 缺失、
+   * 反复 add/remove 类、或 `animation-timeline`，就说明它在随滚动来回播 ——
+   * 那是本项目明令禁止的不适来源。
+   */
+  const src = read('design-system/scroll-enter.ts');
+  const code = src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\n]*/g, '');
+
+  it('用 IntersectionObserver，而不是连续 scroll-driven（animation-timeline）', () => {
+    expect(code, '应使用 IntersectionObserver').toMatch(/IntersectionObserver/);
+    expect(code, '不得引入 animation-timeline（连续 scroll-driven，用户裁决明确排除）').not.toMatch(
+      /animation-timeline/,
+    );
+  });
+
+  it('一次性：命中即 unobserve（不回滚、不来回播）', () => {
+    expect(code, '命中后必须 unobserve，否则会随滚动反复播').toMatch(/observer\.unobserve\(/);
+    expect(code, '必须有幂等保护（appliedRef）').toMatch(/appliedRef/);
+  });
+
+  it('参数只来自既有契约（复用 enter-rise，不新增时长/位移）', () => {
+    expect(code, '应挂既有的 enter-rise 类（时长与位移在 motion.css 的 --entry-* 里）').toMatch(
+      /classList\.add\('enter-rise'\)/,
+    );
+    // 不得自造任何时长/位移数值
+    expect(code, '不得内联时长字面量').not.toMatch(/\d+(?:\.\d+)?ms\b/);
+    expect(code, '不得内联 translateY 位移').not.toMatch(/translateY\(/);
+  });
+
+  it('首屏内容不进观察器（它们本来就该直接可见）', () => {
+    expect(code, '必须先量 rect 判断是否已在视口内').toMatch(/getBoundingClientRect\(\)/);
+    expect(code, '视口内直接挂类，不 observe').toMatch(/if \(!inViewport\) observer\.observe/);
+  });
+
+  it('装饰与母题装置不参与（只对内容块）', () => {
+    // 契约第 1 条：只对内容块。选择器只认 data-scroll-enter 标记的内容块，
+    // 不去扫装饰层（.clip / .bp-scene / aria-hidden 的层）。
+    expect(code, '只通过 data-scroll-enter 标记参与').toMatch(/data-scroll-enter/);
+    expect(code, '不得扫装饰层选择器').not.toMatch(/aria-hidden|\.clip|\.platter/);
+  });
+
+  it('reduced-motion 由全局兜底降级（本实现不另开通道）', () => {
+    expect(code, '应读 prefersReducedMotion（reduce 下不建观察器）').toMatch(
+      /prefersReducedMotion/,
+    );
+    // 入场类本身在 motion.css 的 reduce 块里被复位为 opacity 淡入
+    const motionCss = read('design-system/motion.css');
+    expect(motionCss, 'enter-rise 必须在 reduce 块里被复位').toMatch(
+      /\.enter-rise,[\s\S]{0,80}?animation: none/,
+    );
+  });
+
+  it('契约条款已写进 DESIGN.md（四条边界 + 理由）', () => {
+    const design = readFileSync(join(here, '..', '..', '..', '..', '..', 'DESIGN.md'), 'utf8');
+    expect(design, 'DESIGN.md 缺 guidance 型滚动入场条款').toMatch(/guidance 型滚动入场/);
+    const clause = /guidance 型滚动入场[\s\S]{0,1200}/.exec(design)?.[0] ?? '';
+    expect(clause, '条款必须写明"只对内容块"').toMatch(/只对内容块/);
+    expect(clause, '条款必须写明"一次性"').toMatch(/一次性/);
+    expect(clause, '条款必须写明不新增 token').toMatch(/不新增任何时长|不新增时长/);
+  });
+});
+
 describe('C2 触觉反馈：有守卫、有最短 pattern、不阻塞（用户裁决：全量无开关）', () => {
   /**
    * 触觉是**最早到达**的反馈通道：用户按下按钮的那一瞬往往还没看结果。

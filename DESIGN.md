@@ -481,6 +481,17 @@ Water contours, tide lines, river-channel guides, ripples, drift-bottle silhouet
 3. **动效只用于状态过渡**（进入 / 离开 / hover / 按下 / 加载 / 播报），且**只动 `transform` / `opacity`**；禁止动画 `width` / `height` / `top` / `left` / `margin` / `box-shadow` 的尺寸与位置。
 4. `prefers-reduced-motion: reduce` 时：漂移、涟漪、交错全部冻结，入场降级为 150ms opacity 淡入。
 
+**③ guidance 型滚动入场（2026-09-29 用户裁决 · W18.5 · C3）** —— 零装饰规则的第三类例外，四条硬边界：
+
+- **只对内容块**，不对装饰、不对母题装置（那仍是第 2 条的两类）。
+- **一次性**：`IntersectionObserver` 首次进入视口时播一次，**不回滚、不来回**（`once: true`）——
+  反复随滚动重播是本项目明令禁止的"滚动劫持"类不适。
+- **参数全部来自既有契约**：`entryDuration`（480ms）+ `entryShift`（16px）+ `listStagger`（100ms），
+  **不新增任何时长/缓动 token**，也不引入视差、缩放跟随、进度联动。
+- **内容不许被延迟太久**：首屏内的内容不进观察器（它已经在视口里），只有滚动后才到的内容参与；
+  且 reduced-motion 下同样降级为 150ms opacity 淡入（与第 4 条一致）。
+
+
 - **Performance:** Only transform and opacity animated. No layout-triggering properties.
 
 深度层级（形态语言）:
