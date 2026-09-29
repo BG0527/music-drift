@@ -14,7 +14,7 @@
  * **禁用必有可见文字原因**（DESIGN.md），原因不写在 `title` 里。
  */
 import { useEffect, useRef, type MouseEvent as ReactMouseEvent } from 'react';
-import { TapRippleLayer, useTapRipple } from '../../design-system';
+import { TapRippleLayer, hapticTap, useTapRipple } from '../../design-system';
 import { Icon, cn, motion, prefersReducedMotion } from '../../design-system';
 
 export type MyVote = 'LIKE' | 'DISLIKE' | null;
@@ -164,6 +164,9 @@ function VoteButton({
           // W18.5 · C1：落点涟漪。播一次即停（`both` 停在末帧 = 完全透明），
           // 所以「下一次点击能不能再看见」取决于这枚是否已被卸载 ——
           // 投票按钮一次交互内是幂等的（已投过就 disabled），不需要连播。
+          // W18.5 · C2：触感与涟漪同拍触发（用户裁决：全量无开关）。
+          // 桌面浏览器没有 navigator.vibrate，hapticTap 内部静默跳过。
+          hapticTap();
           if (event !== undefined && onRippleAt !== undefined) {
             onRippleAt(event.clientX, event.clientY);
           }

@@ -317,6 +317,62 @@ describe('A6 按下反馈：触屏也要有即时回应（DESIGN §Interaction S
   });
 });
 
+describe('C2 触觉反馈：有守卫、有最短 pattern、不阻塞（用户裁决：全量无开关）', () => {
+  /**
+   * 触觉是**最早到达**的反馈通道：用户按下按钮的那一瞬往往还没看结果。
+   * 投瓶 / 捞瓶 / 投票这类"一次性或不可逆"的操作给一次短促震动，操作更有实感。
+   *
+   * 但它也是最容易做坏的一层：桌面浏览器根本没有 `navigator.vibrate`，
+   * 所以守卫钉住三条底线：
+   *   ① **有守卫**：不支持时静默跳过，绝不抛错、绝不 await；
+   *   ② **pattern 最短**：单次 12ms / 确认两下 10-40-18，不做成"震动 DSL"；
+   *   ③ **不阻塞**：触感是纯副作用，失败不影响操作结果。
+   */
+  const haptics = read('design-system/haptics.ts');
+
+  it('不支持 vibrate 的环境静默跳过（桌面浏览器）', () => {
+    expect(haptics, '必须先探测 navigator.vibrate 是否存在').toMatch(
+      /typeof api\.vibrate !== 'function'|\.vibrate === undefined|typeof .*\.vibrate/,
+    );
+    expect(haptics, '必须有 try/catch（无用户手势时部分浏览器抛错）').toMatch(/try\s*\{/);
+    expect(haptics, 'catch 必须为空操作（触感是纯副作用）').toMatch(/catch\s*\{[\s\S]{0,200}?\}/);
+  });
+
+  it('pattern 保持最短（不做成震动 DSL）', () => {
+    const code = haptics.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\n]*/g, '');
+    const tap = /const TAP_MS = (\d+)/.exec(code)?.[1];
+    expect(tap, '未找到单击时长').toBeDefined();
+    // 低于 ~10ms 多数马达不响应；高于 ~20ms 开始像"敲"
+    expect(Number(tap), `单击 ${String(tap)}ms 超出 10..20 的可用区间`).toBeGreaterThanOrEqual(10);
+    expect(Number(tap), `单击 ${String(tap)}ms 超出 10..20 的可用区间`).toBeLessThanOrEqual(20);
+    // 只有两种模式，不做可配置的震动序列表
+    expect(code, '只允许 tap / confirm 两种模式').toMatch(/type HapticPattern = 'tap' \| 'confirm'/);
+    expect(code, '不得出现可配置的模式表').not.toMatch(/Record<HapticPattern/);
+  });
+
+  it('触感不参与 await（纯副作用，不阻塞交互）', () => {
+    expect(haptics, 'vibrate 的返回值不可 await').not.toMatch(/await\s+.*vibrate/);
+    expect(haptics, '导出函数不得返回 Promise').not.toMatch(/async function haptic/);
+  });
+
+  it('落点处同时给触感（与涟漪同拍：视觉之外多一条通道）', () => {
+    const vote = read('features/bottle/vote-controls.tsx');
+    expect(vote, '投票按钮未接触感').toMatch(/hapticTap\(\)/);
+  });
+
+  it('投/捞两个泊位都接上了（这是产品的一等动作）', () => {
+    const river = read('pages/river-page.tsx');
+    const taps = (river.match(/hapticTap\(\)/g) ?? []).length;
+    expect(taps, '投下与捞取都应给触感').toBeGreaterThanOrEqual(2);
+    expect(river, '捞取成功应给确认触感').toMatch(/hapticConfirm\(\)/);
+  });
+
+  it('河道页的红灯语义不受影响（reduced-motion 下触感仍可发）', () => {
+    // 触感不是动效，不受 prefers-reduced-motion 管 —— 那是视觉通道的规则
+    expect(haptics, '触感实现里不应出现 motion 相关判断').not.toMatch(/prefers-reduced-motion/);
+  });
+});
+
 describe('C1 落点涟漪：与场景涟漪是两个角色，参数来自契约', () => {
   /**
    * 关键区分（DESIGN「Ripples — 两个角色，不可混为一谈」）：

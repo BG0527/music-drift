@@ -44,6 +44,7 @@ import { toApiErrorView } from '../features/api/errors';
 import { useDrawBottle, useInvalidateBottle } from '../features/api/mutations';
 import { MoodChips } from '../features/bottle/mood-chips';
 import { useSession } from '../features/session/session-context';
+import { hapticConfirm, hapticTap } from '../design-system';
 import { Link } from './shell/router';
 import { useNavigate } from './shell/router-context';
 import { interceptTarget } from './shell/routes';
@@ -219,6 +220,7 @@ export function RiverPage() {
     }
     busyRef.current = true;
     pendingNavRef.current = null;
+    hapticTap(); // W18.5 路 C2：按下即给触感（桌面无 vibrate 时静默跳过）
     setDrawStatus('正在打捞…');
     if (prefersReducedMotion()) {
       // reduce：不起动画、只留文字状态，成功后 requestNav 立即跳（§103.3 回归守卫）。
@@ -232,6 +234,7 @@ export function RiverPage() {
       .mutateAsync()
       .then(async (response) => {
         await invalidate(response.bottle.id);
+        hapticConfirm(); // W18.5 · C2：捞到了给两下确认
         setDrawStatus('捞到了，正在打开…');
         requestNav(`/bottles/${response.bottle.id}`);
       })
@@ -258,6 +261,7 @@ export function RiverPage() {
     if (path === null) return;
     event.preventDefault();
     if (flowRef.current !== null) return;
+    hapticTap(); // W18.5 路 C2：投下与捞取同拍
     setCastStatus('瓶子落水了，正顺河而下…');
     if (prefersReducedMotion()) {
       navigate(path);
