@@ -158,7 +158,7 @@ export function LoginPage() {
             setAccount(event.target.value);
           }}
           className={cn(
-            'mt-2 h-8 w-full max-w-[440px] border-0 border-b bg-transparent px-px pb-1.5 text-[1rem] text-paper',
+            'mt-2 min-h-11 w-full max-w-[440px] border-0 border-b bg-transparent px-px pb-1.5 text-[1rem] leading-[1.6] text-paper',
             'focus:outline-none focus:border-glass',
             fieldErrors.account === undefined ? 'border-paper/40' : 'border-coral',
           )}
@@ -192,7 +192,7 @@ export function LoginPage() {
             setPassword(event.target.value);
           }}
           className={cn(
-            'mt-2 h-8 w-full max-w-[440px] border-0 border-b bg-transparent px-px pb-1.5 text-[1rem] text-paper',
+            'mt-2 min-h-11 w-full max-w-[440px] border-0 border-b bg-transparent px-px pb-1.5 text-[1rem] leading-[1.6] text-paper',
             'focus:outline-none focus:border-glass',
             fieldErrors.password === undefined ? 'border-paper/40' : 'border-coral border-b-2',
           )}

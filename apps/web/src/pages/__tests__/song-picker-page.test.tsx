@@ -472,7 +472,12 @@ describe('选歌页：照稿差值收尾', () => {
   });
 
   it('发起按钮照稿语态：32px 描边幽灵 + 透明扩边保热区（44px 触控底线用 hit-area 实现）', () => {
-    expect(code).toContain('before:absolute');
+    // W18.5 路 B6：原断言钉的是"透明外扩伪元素实现 >=44px"。那是**手段**
+    // （DESIGN §Accessibility 明文写「不靠伪元素外扩」），目的只是 >=44px 可点。
+    // 现在改用真实盒高 min-h-11（Tailwind 44px 档），键盘用户也因此真正拿到 44px
+    // —— 伪元素撑出来的范围键盘是拿不到的。视觉形态（描边 + 淡底）仍照参考稿。
+    expect(code).toContain('min-h-11');
+    expect(code).not.toContain('before:absolute');
     expect(code).toContain('border-paper/25');
     expect(code).toContain('bg-paper/[0.03]');
   });

@@ -476,7 +476,12 @@ export function SongPickerPage() {
 
                           <Button
                             variant="ghost"
-                            className="relative h-8 min-h-0 justify-center border border-paper/25 bg-paper/[0.03] px-3 text-[0.78125rem] text-paper before:absolute before:inset-x-0 before:-inset-y-1.5 before:content-[''] hover:border-glass hover:text-glass disabled:border-dashed disabled:border-paper/[0.14] disabled:text-muted"
+                            /* W18.5 · B6：热区不再靠 `before:-inset-y-1.5` 外扩。
+                               伪元素撑出来的可点范围不参与布局，父级一旦有 transform
+                               参照系就会变，用户会点到"看起来不是这里"的地方；
+                               而且键盘用户根本拿不到这多出来的 6px。
+                               现在是真实盒高 min-h-11（44px），视觉密度靠内部排版保持。 */
+                            className="min-h-11 justify-center border border-paper/25 bg-paper/[0.03] px-3 text-[0.78125rem] leading-tight text-paper hover:border-glass hover:text-glass disabled:border-dashed disabled:border-paper/[0.14] disabled:text-muted"
                             loading={create.isPending}
                             disabled={!startable}
                             icon={<Icon name="Mic" size={16} />}
