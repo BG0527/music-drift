@@ -70,7 +70,10 @@ describe('唱针 = 播放头', () => {
       </GroovePlaybackProvider>,
     );
 
-    expect(screen.getByTestId('groove-playhead').style.left).toBe('62.5%');
+    // 位置经 transform 表达（W18.5 · A5：只动 transform，不再写 left%）
+    expect(screen.getByTestId('groove-playhead').style.transform).toBe(
+      'translateX(62.5%)',
+    );
     // 正在放的那一段用 aria-current 标出（不只靠唱针的位置）
     const current = screen.getByTestId('groove-marks').querySelector('[aria-current]');
     expect(current?.textContent).toContain('第 3 段');

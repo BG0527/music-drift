@@ -16,7 +16,7 @@ describe('SequentialSegmentPlayer', () => {
     Object.defineProperty(audio, 'duration', { value: 20 });
     audio.currentTime = 10;
     fireEvent.timeUpdate(audio);
-    expect(screen.getByTestId('groove-playhead').style.left).toBe('12.5%');
+    expect(screen.getByTestId('groove-playhead').style.transform).toBe('translateX(12.5%)');
     fireEvent.pause(audio);
     expect(screen.getByText(/已暂停第 1 段/)).toBeInTheDocument();
   });

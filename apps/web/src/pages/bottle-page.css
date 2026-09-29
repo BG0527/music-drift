@@ -737,18 +737,28 @@
     position: absolute;
     left: 0;
     top: 0;
+    width: 100%;
     height: 18px;
     background: rgba(127, 209, 217, 0.16);
     border-top: 1px solid rgba(203, 238, 246, 0.5);
-    transform: none;
+    /* W18.5 · A5：已播段 = scaleX(比例)。`width:100%` 是**满槽**基准，
+       视觉宽度由 scaleX 给出（等价于旧实现的 width: ratio*400px，但不再每帧重排）。
+       transform-origin 必须钉在左端 —— 否则会从槽中心向两侧长。
+       过渡时长 = 媒体 timeupdate 采样周期 ⇒ 4Hz 采样被插值成滑行。 */
+    transform-origin: left center;
+    transition:
+      transform var(--motion-progress-duration) var(--motion-progress-easing);
   }
 
   .bottle-page .bar .head {
     position: absolute;
     top: -6px;
+    left: -2px;
     width: 2px;
     height: 32px;
     background: var(--coral);
+    transition:
+      transform var(--motion-progress-duration) var(--motion-progress-easing);
   }
 
   .bottle-page .timecode {

@@ -967,15 +967,16 @@ describe('瓶子详情：播放沟槽 + 唱针', () => {
     );
 
     // 播放器挂载即上报（选中段 = 第 1 段，段内 0%）⇒ 唱针停在槽 1 起点
+    // 位置经 transform 表达（W18.5 · A5：只动 transform）
     const playhead = await screen.findByTestId('groove-playhead');
-    expect(playhead.style.left).toBe('0%');
+    expect(playhead.style.transform).toBe('translateX(0%)');
 
     // 驱动真实播放进度（服务端段长 20s；10s ⇒ 段内 50% ⇒ 槽 1 内一半 = 全轴 12.5%）
     element.currentTime = 10;
     for (const handler of listeners['timeupdate'] ?? []) handler();
 
     await waitFor(() => {
-      expect(screen.getByTestId('groove-playhead').style.left).toBe('12.5%');
+      expect(screen.getByTestId('groove-playhead').style.transform).toBe('translateX(12.5%)');
     });
   });
 

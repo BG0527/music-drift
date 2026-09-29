@@ -154,6 +154,12 @@ export function SegmentPlayer({
    * 唱片播放键 `.play`（52px 圆）+ 400px 水道 `.bar`（波形 + 已播水 + 珊瑚游标）+ `.timecode`。
    * 信息一条不减：进度条仍是 `role="progressbar"`，状态与已听读数进 sr 文本（aria-live）。
    * 进度条固定 400px 是参考的硬约定（唱针比例按"整条 400px"算，改宽度会让比例说谎）。
+   *
+   * W18.5 · A5（真平滑）：已播段与游标头此前直接写 `width` / `left`，而进度数据每 ~250ms
+   * 才推一次（媒体 `timeupdate`），于是每 250ms 跳一格并触发重排。现在：
+   * 已播段 = `scaleX(比例)`（CSS 里 `width:100%` + `transform-origin:left`）、
+   * 游标头 = `translateX(px)`，两者都挂 `--motion-progress-duration/easing` 的过渡 ——
+   * 时长等于采样周期，相邻两次采样被插值，观感从跳格变成滑行（守卫：playhead-smoothness.test.tsx）。
    */
   if (layout === 'transport') {
     const fillPx = Math.round(groovePositionRatio * 400);
@@ -195,8 +201,8 @@ export function SegmentPlayer({
               strokeOpacity=".18"
             />
           </svg>
-          <div className="fill" style={{ width: `${String(fillPx)}px` }} />
-          <div className="head" style={{ left: `${String(Math.max(0, fillPx - 2))}px` }} />
+          <div className="fill" style={{ transform: `scaleX(${String(groovePositionRatio)})` }} />
+          <div className="head" style={{ transform: `translateX(${String(fillPx)}px)` }} />
         </div>
 
         <span className="timecode">

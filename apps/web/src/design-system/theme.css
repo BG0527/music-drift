@@ -166,6 +166,14 @@
   --motion-animated-properties: transform, opacity;
   --motion-reduced-duration: 150ms;
 
+  /* ── W18.5 · A5：播放进度与唱针的「真平滑」 ──────────────────────────────
+     进度数据来自媒体 `timeupdate`（≈250ms 一次）。落点改用 scaleX / translateX 后，
+     必须有过渡把相邻两次采样插值起来，否则只是从「跳格」变成「瞬移」。
+     时长 = 采样周期（相等时观感连续），缓动 = linear（唱针是物理位置，匀速才对）。
+     契约见 DESIGN.md 的 motion 块同名字段；守卫：features/audio/playhead-smoothness.test.tsx。 */
+  --motion-progress-duration: 250ms;
+  --motion-progress-easing: linear;
+
   /* ── 水域母题层（2026-09-24 amend · t43）：装饰强度与纹理周期 ──────────────
      契约在 DESIGN.md 的 `motif:` 块。组件/样式只能引用这里的 --motif-*，
      禁止在 water.css 或页面里内联 alpha / px（守卫：__tests__/water-motif.test.tsx）。 */

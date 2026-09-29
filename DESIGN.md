@@ -159,6 +159,17 @@ motion:
                               # 这是全站**唯一**允许用动效延后跳转的地方。
                               # 落地与取证：`site/patches/river.css` + `site/app/page-river.js`
                               # （探针 `.tmp-w17/probe-motion.mjs` 断言"三圈末圈 end = 这个数"）。
+  # ── W18.5 补的两条：播放进度与唱针的「真平滑」（A5）────────────────────────
+  # 补这两条不是为了"更有动感"，而是因为**落地时缺这两个值就只有一个非法选项**：
+  # 进度数据来自媒体元素的 `timeupdate`，浏览器每 ~250ms 才推一次；落点此前直接写
+  # `width` / `left`，于是每 250ms 跳一格（4Hz 阶跃）且每次都触发重排。
+  # 改成 `scaleX` / `translateX` 之后，**必须**有一条时长 ≥ 采样周期的过渡把相邻两次
+  # 采样插值起来，否则只是从"跳"变成"瞬移"；而这个时长被外部事实（timeupdate ≈4Hz）
+  # 钉死，不是设计口味 —— 与 W17 补 `castRippleDuration` 是同一种"缺值"情形。
+  progressDuration: 250ms     # = timeupdate 采样周期。过渡时长与采样周期**相等**时观感连续：
+                              # 短于它 ⇒ 两次采样之间停顿；长于它 ⇒ 追不上真实位置。
+  progressEasing: "linear"    # 唱针必须匀速：ease-out 会让等速播放的指针越走越慢、像卡带。
+                              # 播放进度是"物理位置"而不是"界面入场"，故不适用 entryEasing。
   animatedProperties: [transform, opacity]
 # 水域母题层（2026-09-24 amend · t43）：只在这里定装饰的**强度**与**纹理周期**。
 # 组件只能引用 --motif-*，禁止内联 alpha / px（守卫：__tests__/water-motif.test.tsx）。

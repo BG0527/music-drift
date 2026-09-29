@@ -246,13 +246,17 @@ export function GrooveTimeline({
             </svg>
           )}
 
-          {/* 唱针（播放头）：位置 = (前面整槽 + 段内比例) / 槽总数 */}
+          {/* 唱针（播放头）：位置 = (前面整槽 + 段内比例) / 槽总数
+              W18.5 · A5：此前写 `left: X%`（每 ~250ms 一次 ⇒ 4Hz 跳格 + 重排）。
+              现在容器铺满轨道（`left-0 w-full`），位置改由 `translateX(百分比)` 表达 ——
+              百分比相对**容器宽**即轨道宽，语义与旧的 left% 完全一致，但只动 transform。
+              过渡时长 = timeupdate 采样周期（token），线性 ⇒ 匀速滑行，像真的唱针。 */}
           {playheadPercent === null ? null : (
             <div
               data-testid="groove-playhead"
               aria-hidden="true"
-              className="absolute inset-y-0"
-              style={{ left: `${playheadPercent}%` }}
+              className="absolute inset-y-0 left-0 w-full transition-transform duration-[var(--motion-progress-duration)] ease-[var(--motion-progress-easing)] motion-reduce:transition-none"
+              style={{ transform: `translateX(${String(playheadPercent)}%)` }}
             >
               {/* 落水涟漪（设计稿 .rip1/.rip2） */}
               <span
