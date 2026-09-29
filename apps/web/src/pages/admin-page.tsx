@@ -1,4 +1,4 @@
-/**
+﻿/**
  * 审核台（`/admin`，`CONTEXT.md` §8.3）—— **逐块照抄
  * `docs/ui-review/design-explore/s2-admin-record.html`**（约 340 行分 2 段读完即写）。
  *
@@ -28,7 +28,7 @@ import { Link } from './shell/router';
 const META = 'font-latin text-[0.6875rem] tracking-[0.24em] text-paper/50';
 /** 稿 `.view`：15px、baseline 起行、gap 9、下沿 2px（选中换 coral）。 */
 const VIEW =
-  'flex items-baseline gap-[9px] border-b-2 pb-[10px] text-[0.9375rem] transition-colors duration-200 ease-out focus-visible:ring-2 focus-visible:ring-coral focus-visible:ring-offset-2 focus-visible:ring-offset-ink';
+  'flex items-baseline gap-[9px] border-b-2 pb-[10px] text-[0.9375rem] transition-colors duration-[var(--motion-hover-duration)] ease-[var(--motion-entry-easing)] focus-visible:ring-2 focus-visible:ring-coral focus-visible:ring-offset-2 focus-visible:ring-offset-ink';
 /** 稿 `.view .n`：Quattrocento 12.5px、透明度 .75。 */
 const VIEW_N = 'font-latin text-[0.78125rem] opacity-75';
 

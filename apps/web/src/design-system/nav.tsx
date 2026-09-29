@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+﻿import type { ReactNode } from 'react';
 import { Icon, type IconName } from './icon';
 import { cn } from './utils';
 
@@ -73,7 +73,7 @@ export function SidebarNav({ items, current, footer, className }: NavProps) {
                   'flex h-[44px] w-[212px] items-center gap-[16px] overflow-hidden rounded-base px-[16px] text-[1rem]',
                   'focus-visible:ring-2 focus-visible:ring-coral focus-visible:ring-offset-2 focus-visible:ring-offset-ink',
                   // 颜色过渡（motion-web §1 feedback）：原来 hover 是瞬变，与按钮的 200ms 手感不一致
-                  'transition-colors duration-200 ease-out',
+                  'transition-colors duration-[var(--motion-hover-duration)] ease-[var(--motion-entry-easing)]',
                   active
                     ? 'bg-water-void font-medium text-coral'
                     : 'font-normal text-muted hover:bg-water-void hover:text-paper',
@@ -120,7 +120,7 @@ export function BottomNav({ items, current, className }: NavProps) {
               'flex min-h-11 flex-1 flex-col items-center justify-center gap-1 px-2 py-2 text-[0.75rem]',
               // feedback（motion-web §1「按下缩放」）：移动端没有 hover，`:active` 是唯一即时回应。
               // 只动颜色与背景（DESIGN.md §Interaction States：颜色变化允许，不动布局属性）。
-              'transition-colors duration-200 ease-out hover:bg-water-void active:bg-water-void',
+              'transition-colors duration-[var(--motion-hover-duration)] ease-[var(--motion-entry-easing)] hover:bg-water-void active:bg-water-void',
               // 焦点环：与侧栏同款（两处导航的键盘手感必须一致）
               'focus-visible:ring-2 focus-visible:ring-coral focus-visible:ring-offset-2 focus-visible:ring-offset-ink',
               active ? 'font-medium text-coral' : 'text-muted',

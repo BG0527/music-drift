@@ -1,4 +1,4 @@
-/**
+﻿/**
  * 去向三选一（CONTEXT §3.3）——模态实现。
  *
  * 三条纪律：
@@ -107,7 +107,7 @@ export function ResolutionModal({
                   }}
                   className={cn(
                     'flex w-full min-h-11 flex-col gap-[6px] rounded-base border px-4 py-[12px] text-left',
-                    'transition-colors duration-200 ease-out',
+                    'transition-colors duration-[var(--motion-hover-duration)] ease-[var(--motion-entry-easing)]',
                     isSelected
                       ? 'border-coral bg-coral/10'
                       : 'border-line/15 bg-ink hover:border-line/30',

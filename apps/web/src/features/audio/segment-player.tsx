@@ -1,4 +1,4 @@
-/**
+﻿/**
  * 分段播放条（试听 + 已听进度 + 点踩）。
  *
  * - 音频来自 `GET /api/segments/:id/audio`（带 HTTP Range，拖动进度条只取需要的字节）；
@@ -278,7 +278,7 @@ export function SegmentPlayer({
       >
         {/* 只动 transform：DESIGN.md 禁止动画 width/height；已播进度用唯一的强调色 coral */}
         <div
-          className="h-2 origin-left rounded-sm bg-coral transition-transform duration-200 ease-out"
+          className="h-2 origin-left rounded-sm bg-coral transition-transform duration-[var(--motion-hover-duration)] ease-[var(--motion-entry-easing)]"
           style={{ transform: `scaleX(${player.ratio})` }}
         />
       </div>

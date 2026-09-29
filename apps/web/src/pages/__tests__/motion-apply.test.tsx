@@ -206,8 +206,11 @@ describe('⑥ 阶段2 每页动效类存在（方案 §1.1 / §1.2 / §1.3 / §1
     expect(driftLogPage).not.toMatch(/\banimate-/);
   });
 
-  it('admin：分区 tab 既有 transition-colors（§1.8-1）+ 队列面板 enter-rise（§1.8-2 页面层落点）', () => {
-    expect(adminPage).toMatch(/transition-colors duration-200 ease-out/);
+  it('admin：分区 tab 既有 token 化 transition-colors（§1.8-1）+ 队列面板 enter-rise（§1.8-2 页面层落点）', () => {
+    // W18.5 · B2：这里原本钉的是字面档 `duration-200 ease-out`，现已统一为 token 化写法
+    expect(adminPage).toMatch(
+      /transition-colors duration-\[var\(--motion-hover-duration\)\] ease-\[var\(--motion-entry-easing\)\]/,
+    );
     expect(adminPage).toMatch(/data-anchor="admin-queue"[\s\S]{0,160}className="enter-rise"/);
     expect(adminPage).not.toMatch(/stagger-[5-9]/);
   });
@@ -244,6 +247,23 @@ describe('⑦ 阶段2 源码扫描：无发明值（方案 §2 / §3 / skill §2
       expect(src, `${name}: 自造 animate-*`).not.toMatch(/\banimate-/);
       expect(src, `${name}: 过渡布局属性`).not.toMatch(
         /transition[^;\n}]*(?:width|height|margin|padding|top|left|right|bottom)\s*:/,
+      );
+    }
+  });
+
+  /**
+   * W18.5 · B2：口径合一。
+   * 此前 PAGES（4 个文件）禁 `duration-<数字>` 与 `ease-out` 字面档，而 PAGES2（这 8 个）
+   * **不禁** —— 于是同一个契约值有两种"合法"写法，全站因此裂成 15 处 `duration-200 ease-out`
+   * 与 20 处 `duration-[var(--motion-*)]`。现在两组同样严。
+   */
+  it('PAGES2 与 PAGES 同严：无内联时长档、无 ease-* 字面缓动（口径已合一）', () => {
+    for (const [name, src] of PAGES2) {
+      expect(src, `${name}: 内联时长档 duration-<数字>（token 用 duration-[var(--motion-*)]）`).not.toMatch(
+        /\b(?:duration|delay)-\d+(?:\.\d+)?\b/,
+      );
+      expect(src, `${name}: 内联缓动档 ease-out 等（token 用 ease-[var(--motion-entry-easing)]）`).not.toMatch(
+        /\bease-(?:linear|in|out|in-out)\b/,
       );
     }
   });

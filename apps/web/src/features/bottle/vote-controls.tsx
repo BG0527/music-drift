@@ -1,4 +1,4 @@
-/**
+﻿/**
  * 赞 / 踩读数（用户裁决的最新交互）。
  *
  * 用户原话拆成可执行规格：
@@ -140,7 +140,7 @@ function VoteButton({
         {...(title === undefined ? {} : { title })}
         className={cn(
           'inline-flex min-h-11 items-center gap-[6px] rounded-base border px-[12px] text-[0.8125rem]',
-          'transition-transform duration-200 ease-out hover:scale-[var(--motion-hover-scale)] active:translate-y-[-1px]',
+          'transition-transform duration-[var(--motion-hover-duration)] ease-[var(--motion-entry-easing)] hover:scale-[var(--motion-hover-scale)] active:translate-y-[-1px]',
           'disabled:cursor-not-allowed',
           pressed
             ? 'border-coral bg-coral/10 font-medium text-danger'

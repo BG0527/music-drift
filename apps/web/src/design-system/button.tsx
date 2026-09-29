@@ -1,4 +1,4 @@
-import type { ButtonHTMLAttributes, ReactNode } from 'react';
+﻿import type { ButtonHTMLAttributes, ReactNode } from 'react';
 import { cn } from './utils';
 
 export type ButtonVariant = 'primary' | 'ghost';
@@ -25,7 +25,7 @@ export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 
 const base =
   'relative inline-flex items-center justify-center gap-2 rounded-base px-6 text-[0.9375rem] font-semibold ' +
-  'min-h-11 transition-[transform,background-color] duration-200 ease-out ' +
+  'min-h-11 transition-[transform,background-color] duration-[var(--motion-hover-duration)] ease-[var(--motion-entry-easing)] ' +
   'focus-visible:ring-2 focus-visible:ring-coral focus-visible:ring-offset-2 focus-visible:ring-offset-ink ' +
   'disabled:cursor-not-allowed';
 
@@ -41,13 +41,13 @@ const variants: Record<ButtonVariant, Record<ButtonShape, string>> = {
   primary: {
     plate: 'bg-coral text-ink hover:brightness-[1.06] hover-lift active:translate-y-[-1px]',
     // 主 CTA 的圆盘 = 一枚 coral 标签盘（盘身就是填充，其上 ink 字）
-    disc: 'bg-coral text-ink hover:scale-[1.03] active:translate-y-[-1px]',
+    disc: 'bg-coral text-ink hover:scale-[var(--motion-hover-scale)] active:translate-y-[-1px]',
   },
   ghost: {
     plate:
       'border border-muted bg-transparent text-coral ' +
-      'hover:border-water-mid hover:scale-[1.03] active:translate-y-[-1px]',
-    disc: 'bg-transparent text-paper hover:scale-[1.03] active:translate-y-[-1px]',
+      'hover:border-water-mid hover:scale-[var(--motion-hover-scale)] active:translate-y-[-1px]',
+    disc: 'bg-transparent text-paper hover:scale-[var(--motion-hover-scale)] active:translate-y-[-1px]',
   },
 };
 

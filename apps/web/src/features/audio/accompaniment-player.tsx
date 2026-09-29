@@ -1,4 +1,4 @@
-/**
+﻿/**
  * 伴奏播放条（t13）：**只播当前段**的伴奏，并显示依据（BPM / 拍号 / 归一增益）。
  *
  * 为什么界面要显示 BPM / 拍号 / 增益：这三项是 t13 的"交付证据"——
@@ -107,7 +107,7 @@ export function AccompanimentPlayer({
             className="h-2 w-full overflow-hidden rounded-sm bg-line/10"
           >
             <div
-              className="h-2 origin-left rounded-sm bg-glass transition-transform duration-200 ease-out"
+              className="h-2 origin-left rounded-sm bg-glass transition-transform duration-[var(--motion-hover-duration)] ease-[var(--motion-entry-easing)]"
               style={{ transform: `scaleX(${view.segmentPositionMs / view.segment.durationMs})` }}
             />
           </div>

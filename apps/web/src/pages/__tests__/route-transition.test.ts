@@ -88,3 +88,58 @@ describe('B1-3 关闭 key 重播后门（守卫侧）', () => {
     );
   });
 });
+
+describe('B2 全站只有一套 token 写法（守卫口径也要一样严）', () => {
+  /**
+   * 缺陷：`motion-apply.test.tsx` 把页面分成两组 ——
+   *   PAGES（route-view / settings / login / profile）**禁** `duration-\d` 与 `ease-out` 字面档；
+   *   PAGES2（其余 8 个）**不禁**。
+   * 于是同一个契约值（200ms / ease-out）有两种合法写法，取决��文件恰好在哪一组 ——
+   * 15 处写 `duration-200 ease-out`、20 处写 `duration-[var(--motion-hover-duration)]`。
+   * 本条把两组口径合一，并要求所有引用点只经 token。
+   */
+  const SOURCES: ReadonlyArray<readonly [string, string]> = [
+    ['design-system/button.tsx', read('src/design-system/button.tsx')],
+    ['design-system/nav.tsx', read('src/design-system/nav.tsx')],
+    ['design-system/tabs.tsx', read('src/design-system/tabs.tsx')],
+    ['features/audio/recorder-panel.tsx', read('src/features/audio/recorder-panel.tsx')],
+    ['features/audio/segment-player.tsx', read('src/features/audio/segment-player.tsx')],
+    ['features/audio/accompaniment-player.tsx', read('src/features/audio/accompaniment-player.tsx')],
+    ['features/audio/mix-export-panel.tsx', read('src/features/audio/mix-export-panel.tsx')],
+    ['features/bottle/vote-controls.tsx', read('src/features/bottle/vote-controls.tsx')],
+    ['features/bottle/resolution-modal.tsx', read('src/features/bottle/resolution-modal.tsx')],
+    ['pages/admin-page.tsx', read('src/pages/admin-page.tsx')],
+    ['pages/bottle-page.tsx', read('src/pages/bottle-page.tsx')],
+  ];
+
+  it.each(SOURCES)('%s 不再用 duration-<数字> 字面档', (name, src) => {
+    expect(src, `${name} 仍有 duration-200 之类的字面档`).not.toMatch(/\bduration-\d/);
+  });
+
+  it.each(SOURCES)('%s 不再用 ease-out/ease-in 字面档', (name, src) => {
+    expect(src, `${name} 仍有 ease-out 之类的字面缓动档`).not.toMatch(
+      /\bease-(?:linear|in|out|in-out)\b/,
+    );
+  });
+
+  it('两处 scale 悬停写法统一为 token（scale-[1.03] → scale-[var(--motion-hover-scale)]）', () => {
+    for (const [name, src] of SOURCES) {
+      expect(src, `${name} 的 hover scale 仍是写死的 1.03`).not.toMatch(
+        /hover:scale-\[1\.03\]/,
+      );
+    }
+  });
+
+  it('守卫两组口径已合一（PAGES2 也禁字面档与字面缓动）', () => {
+    const guard = read('src/pages/__tests__/motion-apply.test.tsx');
+    // PAGES2 的循环里必须出现"禁内联时长档"与"禁 ease-* 字面缓动"两条规则
+    const pages2Block = /for \(const \[name, src\] of PAGES2\)/.exec(guard);
+    expect(pages2Block, '找不到 PAGES2 的扫描循环').not.toBeNull();
+    const guardCode = guard.replace(/\/\*\*[\s\S]*?\*\//g, '').replace(/\/\/[^\n]*/g, '');
+    // 找的是"守卫源码里出现的模式文本"：`/\b(?:duration|delay)-\d+…/`
+    const inlineDurationRule = /\(\?:duration\|delay\)-/.test(guardCode);
+    const inlineEasingRule = /ease-\(\?:linear\|in\|out\|in-out\)/.test(guardCode);
+    expect(inlineDurationRule, '守卫里找不到禁内联时长档的规则（口径未合一）').toBe(true);
+    expect(inlineEasingRule, '守卫里找不到禁 ease-* 字面缓动的规则（口径未合一）').toBe(true);
+  });
+});

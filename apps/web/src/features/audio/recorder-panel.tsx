@@ -1,4 +1,4 @@
-/**
+﻿/**
  * 录制面板：录音页的**全部状态**（DESIGN.md 明确要求自建状态，不得以"Figma 没有状态帧"为由跳过）。
  *
  * 状态清单与对应语义：
@@ -253,7 +253,7 @@ export function RecorderPanel({
           className="h-2 w-full overflow-hidden rounded-sm bg-line/10"
         >
           <div
-            className="h-2 origin-left rounded-sm bg-water-deep transition-transform duration-200 ease-out"
+            className="h-2 origin-left rounded-sm bg-water-deep transition-transform duration-[var(--motion-hover-duration)] ease-[var(--motion-entry-easing)]"
             style={{ transform: `scaleX(${progressRatio})` }}
           />
         </div>

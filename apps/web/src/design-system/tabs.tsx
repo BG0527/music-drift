@@ -1,4 +1,4 @@
-import { useId, useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
+﻿import { useId, useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
 import { cn } from './utils';
 
 export interface TabItem {
@@ -75,7 +75,7 @@ export function Tabs({ items, value, defaultValue, onChange, className }: TabsPr
                 'min-h-11 rounded-none border-b border-transparent px-1 text-[0.875rem] font-medium',
                 'focus-visible:ring-2 focus-visible:ring-coral focus-visible:ring-offset-2 focus-visible:ring-offset-ink',
                 // feedback（motion-web §1）：选中态原来是瞬变，颜色过渡让「切到哪一档」看得见
-                'transition-colors duration-200 ease-out',
+                'transition-colors duration-[var(--motion-hover-duration)] ease-[var(--motion-entry-easing)]',
                 // W18.5 · A6：按下 1px —— 触屏没有 hover，这个 active 是唯一的即时回应
                 'active:translate-y-px',
                 selected ? 'border-coral text-coral' : 'text-muted hover:text-paper',

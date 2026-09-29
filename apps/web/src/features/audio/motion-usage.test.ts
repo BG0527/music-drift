@@ -26,13 +26,24 @@ describe('动效契约（motion-web §2/§5/§8）：只用契约 token、不内
     expect(RECORDER_PANEL).toMatch(/className="enter-fade text-\[0\.875rem\]/);
   });
 
-  it('没有内联新的动效数值（禁止 duration-[…] / cubic-bezier / animate-[…] / 内联 transition）', () => {
+  it('没有内联新的动效数值（禁止 duration-[任意值] / cubic-bezier / animate-[…] / 内联 transition）', () => {
     for (const [name, source] of [
       ['segment-player.tsx', SEGMENT_PLAYER],
       ['recorder-panel.tsx', RECORDER_PANEL],
     ] as const) {
-      expect(source, `${name} 不得内联任意动效值`).not.toMatch(
-        /duration-\[|cubic-bezier|animate-\[|transition-\[/,
+      // W18.5 · B2：这条原本禁的是**任意**内联值，但写法写成了 `duration-\[`，
+      // 于是把 token 引用（`duration-[var(--motion-hover-duration)]`）也一起禁了 ——
+      // 结果这个目录成了全站唯一允许写 `duration-200` 字面档的地方（口径分裂的源头）。
+      // 现在精确化：禁 `duration-[` 后面跟**非 var(--token)** 的写法。
+      const inlineDurations = source.match(/duration-\[(?!var\(--)[\w.#%/[\]-]*\]/g) ?? [];
+      expect(
+        inlineDurations.join(' '),
+        `${name} 不得内联任意时长（只允许 duration-[var(--motion-*)]）`,
+      ).toBe('');
+      expect(source, `${name} 不得手写缓动曲线`).not.toMatch(/cubic-bezier/);
+      expect(source, `${name} 不得自造 animate-[任意值]`).not.toMatch(/animate-\[(?!none)/);
+      expect(source, `${name} 不得内联 transition-[任意值]`).not.toMatch(
+        /transition-\[(?!\s*transform)/,
       );
       // 禁止动画布局属性（§3）：本目录里不得出现这几类工具类
       expect(source, `${name} 不得动画布局属性`).not.toMatch(

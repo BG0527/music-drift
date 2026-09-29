@@ -1,4 +1,4 @@
-import { useState } from 'react';
+﻿import { useState } from 'react';
 import {
   BottleMark,
   BottomNav,
@@ -432,7 +432,7 @@ export function Showcase() {
                       type="button"
                       onClick={() => setDestination(choice.key)}
                       aria-pressed={destination === choice.key}
-                      className={`flex min-h-11 w-full flex-col items-start gap-2 rounded-base border p-4 text-left transition-colors duration-200 ease-out ${
+                      className={`flex min-h-11 w-full flex-col items-start gap-2 rounded-base border p-4 text-left transition-colors duration-[var(--motion-hover-duration)] ease-[var(--motion-entry-easing)] ${
                         destination === choice.key
                           ? 'border-coral bg-info-tint'
                           : 'border-muted bg-ink hover:border-water-mid'

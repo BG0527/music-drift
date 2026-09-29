@@ -1,4 +1,4 @@
-/**
+﻿/**
  * 漂流瓶页 —— 逐块照抄设计稿 `docs/ui-review/design-explore/p-bottle-record.html`：
  * 块顺序 / 装置 / 文案逐字 / 值逐值，不省块不发明不重组；唯一翻译 = 固定 px → 流体
  * （稿是 1440×900 绝对定位画布：本页改成正常流，边距 76/30/16px → vw + rem 下限）。
@@ -491,7 +491,7 @@ function BottleView({ bottle, seams }: { bottle: BottleDetail; seams?: BottlePag
                 <button
                   key={choice}
                   type="button"
-                  className="destRow mt-[6px] flex min-h-[46px] w-full items-start gap-[16px] rounded-base text-left transition-colors duration-200 ease-out hover:text-paper"
+                  className="destRow mt-[6px] flex min-h-[46px] w-full items-start gap-[16px] rounded-base text-left transition-colors duration-[var(--motion-hover-duration)] ease-[var(--motion-entry-easing)] hover:text-paper"
                   onClick={() => {
                     setModalOpen(true);
                   }}
@@ -552,7 +552,7 @@ function BottleView({ bottle, seams }: { bottle: BottleDetail; seams?: BottlePag
           {bottle.status === 'SEA' ? null : (
             <button
               type="button"
-              className="inline-flex min-h-11 items-center gap-[7px] whitespace-nowrap text-muted underline underline-offset-[4px] transition-colors duration-200 ease-out hover:text-paper"
+              className="inline-flex min-h-11 items-center gap-[7px] whitespace-nowrap text-muted underline underline-offset-[4px] transition-colors duration-[var(--motion-hover-duration)] ease-[var(--motion-entry-easing)] hover:text-paper"
               onClick={() => {
                 setMessagesOpen(true);
               }}
@@ -563,7 +563,7 @@ function BottleView({ bottle, seams }: { bottle: BottleDetail; seams?: BottlePag
           )}
           <button
             type="button"
-            className="inline-flex min-h-11 items-center gap-[7px] whitespace-nowrap text-muted underline underline-offset-[4px] transition-colors duration-200 ease-out hover:text-paper"
+            className="inline-flex min-h-11 items-center gap-[7px] whitespace-nowrap text-muted underline underline-offset-[4px] transition-colors duration-[var(--motion-hover-duration)] ease-[var(--motion-entry-easing)] hover:text-paper"
             onClick={() => {
               setReportTarget({ type: 'BOTTLE', id: bottle.id });
             }}

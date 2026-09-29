@@ -1,4 +1,4 @@
-/**
+﻿/**
  * `MixExportPanel`：阶段一成品导出的界面（导出 → 试听 → 下载 → 对齐报告）。
  *
  * ## 状态清单（DESIGN.md 要求自建，Figma 没有状态帧不等于可以不做）
@@ -167,7 +167,7 @@ export function MixExportPanel({
           <a
             href={view.objectUrl}
             download={view.fileName}
-            className="inline-flex min-h-11 w-fit items-center gap-2 rounded-base border-[1.5px] border-line/30 px-6 text-[0.9375rem] font-semibold text-coral transition-transform duration-200 ease-out hover:scale-[1.03] focus-visible:ring-2 focus-visible:ring-coral focus-visible:ring-offset-2 focus-visible:ring-offset-ink"
+            className="inline-flex min-h-11 w-fit items-center gap-2 rounded-base border-[1.5px] border-line/30 px-6 text-[0.9375rem] font-semibold text-coral transition-transform duration-[var(--motion-hover-duration)] ease-[var(--motion-entry-easing)] hover:scale-[var(--motion-hover-scale)] focus-visible:ring-2 focus-visible:ring-coral focus-visible:ring-offset-2 focus-visible:ring-offset-ink"
           >
             <Icon name="UploadCloud" size={18} />
             下载成品（WAV · {view.fileName}）
