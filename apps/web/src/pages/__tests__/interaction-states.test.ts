@@ -316,3 +316,53 @@ describe('A6 按下反馈：触屏也要有即时回应（DESIGN §Interaction S
     }
   });
 });
+
+describe('A7 加载态只有一种观感：统一用 DS Skeleton（shimmer）', () => {
+  /**
+   * 为什么统一：`DESIGN.md` §Components 规定 Skeletons 用 shimmer、禁 spinner；
+   * 但此前仓库里有**三套**加载占位 —— ① DS `<Skeleton>`（真 shimmer）② 手写静态灰块
+   * （`bg-water-void` 裸块，永不变化）③ 纯文字行。前两种同时出现时，同一个产品会
+   * 同时出现"会掠光的骨架"和"死灰的方块"两种观感，看起来像坏了而不是像在加载。
+   */
+  const HAND_ROLLED = [
+    'pages/admin-page.tsx',
+    'features/bottle/private-messages.tsx',
+    'features/bottle/record-step.tsx',
+  ];
+
+  it.each(HAND_ROLLED)('%s 不再手写静态灰块作加载占位', (rel) => {
+    const src = read(rel);
+    // 加载占位里出现的 `bg-water-void` 必须来自 <Skeleton>（组件内部），不是手写块
+    const handRolled: string[] = [
+      ...(src.match(/<div[^>]*aria-busy="true"[^>]*bg-water-void/g) ?? []),
+      ...(src.match(/<span[^>]*aria-hidden="true"[^>]*bg-water-void/g) ?? []),
+    ];
+    expect(handRolled.join('\n'), `${rel} 仍有手写静态灰块当加载占位`).toBe('');
+  });
+
+  it.each(HAND_ROLLED)('%s 的加载占位改用 <Skeleton>', (rel) => {
+    const src = read(rel);
+    const busyBlocks = (src.match(/aria-busy="true"/g) ?? []).length;
+    const skeletons = (src.match(/<Skeleton/g) ?? []).length;
+    expect(busyBlocks, `${rel} 有 aria-busy 加载态`).toBeGreaterThan(0);
+    expect(skeletons, `${rel} 的加载态应使用 DS <Skeleton>（自带 shimmer）`).toBeGreaterThan(0);
+  });
+
+  it('评论加载用 shimmer 骨架而不是纯文字行（文字行没有"正在填充"的视觉预期）', () => {
+    const src = read('features/bottle/public-comments.tsx');
+    const loadingLine = /comments\.isLoading \?[\s\S]{0,400}?:\s*null/.exec(src)?.[0] ?? '';
+    expect(loadingLine, '没找到评论加载分支').not.toBe('');
+    expect(loadingLine, '评论加载仍是纯文字行，应改用 <Skeleton>').toMatch(/<Skeleton/);
+    // 文字播报不许被删掉：动效不得是唯一反馈（DESIGN §Accessibility）
+    expect(loadingLine, '加载文案必须保留（读屏播报 + 空态引导）').toMatch(/正在听海里的回声/);
+  });
+
+  it('DS Skeleton 自身保持 shimmer、禁 spinner（不得被本轮改坏）', () => {
+    const src = read('design-system/skeleton.tsx');
+    expect(src, 'Skeleton 必须挂 shimmer 动效').toMatch(/skeleton-shimmer/);
+    // 只查**代码**里的 spinner 用法；文件头注记里写着"禁 spinner"是纪律说明，不是用法
+    const code = src.replace(/\/\*\*[\s\S]*?\*\//g, '');
+    expect(code, 'Skeleton 不得引入 spinner').not.toMatch(/animate-spin|[Ss]pinner/);
+    expect(src, 'Skeleton 必须对读屏隐藏').toMatch(/aria-hidden/);
+  });
+});

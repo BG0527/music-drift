@@ -17,7 +17,7 @@
  * 侧边栏已删，本页不依赖任何侧栏：页面自带 `<main>`，页脚计数全部来自 `useAdminReports`。
  */
 import { useRef, useState, type KeyboardEvent } from 'react';
-import { Glint, Icon, Platter, WaterSheen, Waterline, cn } from '../design-system';
+import { Glint, Icon, Platter, Skeleton, WaterSheen, Waterline, cn } from '../design-system';
 import { ReportQueue } from '../features/admin/report-queue';
 import { useAdminReports } from '../features/api';
 import { useSession } from '../features/session/session-context';
@@ -58,9 +58,11 @@ export function AdminPage() {
 
   if (session.status === 'loading') {
     return (
+      // W18.5 · A7：改用 DS <Skeleton>（自带 shimmer）。此前是两块永不变化的死灰，
+      // 与站内其他加载态（会掠光的骨架）观感不一致，看着像坏了而不是像在加载。
       <div className="flex flex-col gap-4" aria-busy="true">
-        <span className="h-[36px] w-[160px] rounded-base bg-water-void" />
-        <span className="h-[96px] w-full rounded-base bg-water-void" />
+        <Skeleton width="160px" height="36px" className="rounded-base" />
+        <Skeleton width="100%" height="96px" className="rounded-base" />
       </div>
     );
   }

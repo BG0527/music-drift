@@ -23,7 +23,7 @@ import {
   type UploadPhase,
   type UploadTransport,
 } from '../audio';
-import { Button, Icon, cn } from '../../design-system';
+import { Button, Icon, Skeleton, cn } from '../../design-system';
 import type { RecorderUploadView } from '../audio';
 
 export interface RecordStepProps {
@@ -193,7 +193,12 @@ export function RecordStep({
       */}
       <AsyncBoundary
         query={songs}
-        skeleton={<div aria-busy="true" className="h-[140px] rounded-base bg-water-void" />}
+        skeleton={
+          // W18.5 · A7：统一用 DS <Skeleton>（shimmer），不再用永不变化的死灰块
+          <div aria-busy="true">
+            <Skeleton width="100%" height="140px" className="rounded-base" />
+          </div>
+        }
       >
         {(items) => {
           /**

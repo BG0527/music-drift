@@ -18,7 +18,7 @@ import { useAttachMessage } from '../api/mutations';
 import { useBottle, useBottleMessages } from '../api/queries';
 import { AsyncBoundary } from '../../pages/shell/async-boundary';
 import { ConflictNotice } from './conflict-notice';
-import { Button, Icon, Modal, cn } from '../../design-system';
+import { Button, Icon, Modal, Skeleton, cn } from '../../design-system';
 
 export interface PrivateMessagesProps {
   open: boolean;
@@ -96,7 +96,12 @@ export function PrivateMessages({ open, bottleId, canWrite, onClose }: PrivateMe
         {canWrite ? (
           <AsyncBoundary
             query={bottle}
-            skeleton={<div aria-busy="true" className="h-[96px] rounded-base bg-water-void" />}
+            skeleton={
+          // W18.5 · A7：统一用 DS <Skeleton>（shimmer），不再用永不变化的死灰块
+          <div aria-busy="true">
+            <Skeleton width="100%" height="96px" className="rounded-base" />
+          </div>
+        }
           >
             {() =>
               candidates.length === 0 ? (
@@ -171,7 +176,12 @@ export function PrivateMessages({ open, bottleId, canWrite, onClose }: PrivateMe
 
         <AsyncBoundary
           query={messages}
-          skeleton={<div aria-busy="true" className="h-[64px] rounded-base bg-water-void" />}
+          skeleton={
+          // W18.5 · A7：统一用 DS <Skeleton>（shimmer）
+          <div aria-busy="true">
+            <Skeleton width="100%" height="64px" className="rounded-base" />
+          </div>
+        }
           emptyWhen={(items) => items.length === 0}
           empty={
             <p className="rounded-base border border-line/15 bg-ink px-4 py-[10px] text-[0.9375rem] text-muted">

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Button } from '../../design-system';
+import { Button, Skeleton } from '../../design-system';
 import { usePublicComments } from '../api/queries';
 import { useCreatePublicComment, useDeletePublicComment } from '../api/mutations';
 import { ConflictNotice } from './conflict-notice';
@@ -69,7 +69,17 @@ export function PublicComments({ bottleId, canComment, onReport }: PublicComment
       )}
 
       <div className="mt-5 max-h-64 space-y-3 overflow-y-auto pr-1" aria-live="polite">
-        {comments.isLoading ? <p className="text-sm text-muted">正在听海里的回声…</p> : null}
+        {/* W18.5 · A7：纯文字行 → 骨架 + 文字播报。
+            文字仍在（`sr-only`，承「正在听海里的回声…」这句读屏播报与空态引导），
+            视觉改由 shimmer 骨架承担 —— 纯文字行没有"正在填充"的视觉预期，
+            与站内其他加载态观感也不一致。 */}
+        {comments.isLoading ? (
+          <div aria-busy="true">
+            <span className="sr-only">正在听海里的回声…</span>
+            <Skeleton width="100%" height="56px" className="rounded-xl" />
+            <Skeleton width="100%" height="56px" className="mt-3 rounded-xl" />
+          </div>
+        ) : null}
         {comments.isError ? <ConflictNotice error={comments.error} /> : null}
         {!comments.isLoading && !comments.isError && items.length === 0 ? (
           <p className="text-sm text-muted">还没有评论，第一句留给你。</p>
