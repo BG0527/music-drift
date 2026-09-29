@@ -213,12 +213,20 @@ function BottleView({ bottle, seams }: { bottle: BottleDetail; seams?: BottlePag
               navigate('/river');
               return;
             }
+            // W18.5 · A8：失败**不是**被吞掉的 —— `putBack.isError` 会渲染
+            // `ConflictNotice`（role="alert"，见本文件下方），留在详情页并给出可恢复提示
+            // （DESIGN §Error States 第 4 条 + review.md「500 失败留页并显示错误」）。
+            // 这里仍然要 `.catch`：否则 mutateAsync 的 rejection 变成 unhandled rejection。
+            // 关键是 catch 里**只做标记、不做展示** —— 展示由 mutation 状态驱动，
+            // 写成 `.catch(() => undefined)` 会让人误以为失败被静默吞掉。
             void putBack
               .mutateAsync()
               .then(() => {
                 navigate('/river');
               })
-              .catch(() => undefined);
+              .catch(() => {
+                // 已在页面上呈现（ConflictNotice）；此处仅阻止 unhandled rejection。
+              });
           }}
           className="inline-flex min-h-11 items-center gap-[7px] whitespace-nowrap text-[0.875rem] text-glass underline underline-offset-[4px]"
         >
@@ -637,7 +645,11 @@ function BottleView({ bottle, seams }: { bottle: BottleDetail; seams?: BottlePag
               // G2：成功去向记下来 → 播报容器内渲染语义下一步键（SEA 去公海听；其余回河道）
               setResolutionNext(choice);
             })
-            .catch(() => undefined);
+            .catch(() => {
+              // W18.5 · A8：失败不是被吞掉的 —— 错误由 mutation 状态驱动、在页面上呈现
+              // （`resolution.isError` → ConflictNotice，且同一 error 传进 ResolutionModal）。
+              // 此处只阻止 unhandled rejection，不做任何展示。
+            });
         }}
       />
 

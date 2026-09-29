@@ -366,3 +366,55 @@ describe('A7 加载态只有一种观感：统一用 DS Skeleton（shimmer）', 
     expect(src, 'Skeleton 必须对读屏隐藏').toMatch(/aria-hidden/);
   });
 });
+
+describe('A8 放回失败必须让用户看见（不许静默吞掉）', () => {
+  /**
+   * 探索阶段曾判这里是"静默失败"（`.catch(() => undefined)`），实测**证伪**了：
+   * `putBack.isError` 会渲染 `ConflictNotice`（role="alert"），且已有测试钉住
+   * （bottle-page.test.tsx「持有者放回失败时留在详情页，并显示可恢复错误」）。
+   * 但那个 `() => undefined` 的写法仍然有害：它让人以为失败被吞，而它真正的唯一作用
+   * 是阻止 unhandled rejection。所以本条守卫钉的是**意图的可见性**：
+   *   ① 失败态必须渲染 role="alert"（读屏能听到）；
+   *   ② catch 里不得再出现 `() => undefined` 这种「看起来在吞」的空处理。
+   */
+  const src = read('pages/bottle-page.tsx');
+  /** 去掉注释再匹配：注记里会讨论这些模式本身（"此前写的是 `() => undefined`"）。 */
+  const code = src
+    .replace(/\/\*[\s\S]*?\*\//g, '')
+    .replace(/\/\/[^\n]*/g, '');
+
+  it('put-back 的失败态渲染 role="alert" 出口', () => {
+    expect(src, 'putBack.isError 必须接一个出口').toMatch(/putBack\.isError/);
+    expect(src, '失败出口必须是 ConflictNotice（role="alert"）').toMatch(
+      /putBack\.isError\s*\?\s*\(?\s*<ConflictNotice/,
+    );
+  });
+
+  it('catch 里不得用空处理（undefined）伪装成"已处理"', () => {
+    expect(
+      code,
+      '出现 `.catch(() => undefined)` —— 读代码的人会以为失败被静默吞掉',
+    ).not.toMatch(/\.catch\(\(\)\s*=>\s*undefined\)/);
+    expect(code, '放回链路的 catch 必须带说明（阻止 unhandled rejection，错误已在页面上呈现）').toMatch(
+      /mutateAsync\(\)[\s\S]{0,400}?\.catch\(\(\)\s*=>/,
+    );
+  });
+
+  it('catch 分支里不含 navigate（失败必须留在原页面）', () => {
+    // 逐个取出每个 `.catch(...)` 的函数体（到配对的收尾括号为止），逐个查 navigate
+    const bodies = [...code.matchAll(/\.catch\(\(\)\s*=>\s*\{([^}]*)\}/g)].map((m) => m[1] ?? '');
+    expect(bodies.length, '没找到任何 catch 分支').toBeGreaterThan(0);
+    for (const body of bodies) {
+      expect(body, 'catch 分支里出现 navigate（失败必须留在原页面）').not.toMatch(/navigate\(/);
+    }
+  });
+
+  it('去向选择（resolution）的失败也有出口，不是静默', () => {
+    expect(src, 'resolution 失败必须接 ConflictNotice').toMatch(
+      /resolution\.isError[\s\S]{0,80}?<ConflictNotice/,
+    );
+    expect(src, 'resolution 的错误要传进 ResolutionModal').toMatch(
+      /resolution\.isError\s*\?\s*\{\s*error:\s*resolution\.error/,
+    );
+  });
+});
