@@ -25,6 +25,10 @@ const here = dirname(fileURLToPath(import.meta.url));
 const webRoot = join(here, '..', '..', '..');
 const gate = readFileSync(join(webRoot, 'tools', 'one-screen-check.mjs'), 'utf8');
 
+/** 读页面源文件（B8/B9 两组共用）。 */
+const readPage = (name: string): string =>
+  readFileSync(join(webRoot, 'src', 'pages', name), 'utf8');
+
 describe('B3-1 窄屏（<1024）门禁查顶栏重叠，不再只查高度与横向', () => {
   it('measure() 量了顶栏矩形（top-nav）', () => {
     expect(gate, '门禁没有量顶栏矩形').toMatch(/top-nav|topNav/);
@@ -138,5 +142,43 @@ describe('B8 顶栏让位是契约值，且各页都引用它（不再各写各�
         `根级设计顶距 ${String(px)}px < 让位底线 62px，却没引 var(--top-nav-reserve-min)`,
       ).toBe(true);
     }
+  });
+});
+
+describe('B9 公海大厅必须有真正的窄屏布局（此前完全没有）', () => {
+  /**
+   * 缺陷：公海大厅是全站唯一**完全没有 <768 分支**的页面 ——
+   * `SEA_HALL_CSS` 里只有一条 `@media (min-width:768px)`（只管 height/overflow），
+   * 而 `.hero{top:98px}`、`.zones{top:98px}`、`.col{width:13.24%}`、`.entry{top:452px}`、
+   * `.foot{bottom:34px}` 全部**无条件生效**。于是 375 下：
+   *   六列各 ≈50px 宽 → 文字两字一换行；六条「听这支作品」互相压叠；
+   *   h1「公海大厅」被右侧分区 tab 压住；fixed 顶栏压住页头。
+   *
+   * 修法不是"逐个调数字"，而是给窄屏一条**流式竖排**分支：
+   * 绝对定位的坐标全部关进 min-width:768，窄屏回退到文档流 + 单列。
+   * 这样 375 的正确性由"没有绝对定位"保证，而不是由"数字调对了"保证。
+   */
+  const sea = readPage('sea-page.tsx');
+
+  it('存在面向窄屏的媒体查询（max-width 方向）', () => {
+    expect(sea, '公海没有窄屏媒体查询（375 下走的是桌面绝对定位）').toMatch(
+      /@media[^{]*max-width:\s*767px/,
+    );
+  });
+
+  it('关键绝对定位坐标在窄屏被解除（单列 + 文档流）', () => {
+    const narrow = /@media[^{]*max-width:\s*767px\)\s*\{([\s\S]*?)\n\}/.exec(sea)?.[1] ?? '';
+    expect(narrow, '找不到窄屏分支的样式体').not.toBe('');
+    // 窄屏必须：列宽复原为 100%（不是 13.24%）、绝对定位改为 static、给顶栏让位
+    expect(narrow, '窄屏未把六列改回单列').toMatch(/width:\s*100%/);
+    expect(narrow, '窄屏未解除绝对定位').toMatch(/position:\s*static/);
+    expect(narrow, '窄屏未给顶栏让位').toMatch(/--top-nav-reserve-min|padding-top/);
+  });
+
+  it('窄屏下不出现横向溢出的根因（min-width 撑破容器）', () => {
+    const narrow = /@media[^{]*max-width:\s*767px\)\s*\{([\s\S]*?)\n\}/.exec(sea)?.[1] ?? '';
+    // 六列并排 = 6 × 13.24% + 间隙；窄屏必须堆叠，且瓶身不能写死宽度大于容器
+    expect(narrow).not.toMatch(/width:\s*13\.2410%/);
+    expect(narrow, '窄屏仍有写死宽度大于视口的元素').not.toMatch(/min-width:\s*[5-9]\d\dpx/);
   });
 });

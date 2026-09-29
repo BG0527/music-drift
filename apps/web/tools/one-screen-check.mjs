@@ -412,7 +412,10 @@ function routesFor(seed) {
     // intro-hero；保留 / 行让根路由继续受一屏守卫覆盖，河道锚点由 /river 行承担。
     { path: '/', anchors: ['intro-hero'] },
     { path: '/river', anchors: ['river-draw', 'river-drop'] },
-    { path: '/sea', anchors: ['sea-list'] },
+    
+    // W18.5 · B9：公海在窄屏是单列长列表（内容超过一屏是正确行为，页面可滚）
+    // ⇒ 窄屏不查「锚点在一屏内」，只查无横滚 / 无压叠 / 锚点存在。
+    { path: '/sea', anchors: ['sea-list'], scrollableOnMobile: true },
     { path: '/new', anchors: ['new-catalog'] },
     // ⚠️ 2026-09-27：`/sea/:id` 路由已按用户 §17 裁决删除（公海详情并入瓶子详情）⇒ 不再量这一页；
     // seed.seaId 仍保留（`/sea` 列表需要一支完整作品才量得到真实内容）。
@@ -788,11 +791,18 @@ for (const route of routes) {
   }
   // 锚点**两种口径都查**：它同时是"这页真的渲染出来了"的证据 ——
   // 只看高度会被 `min-h-[100dvh]` 骗（白屏的高度也正好等于视口高）。
+  //
+  // W18.5 · B9：`scrollableOnMobile` 例外 —— 公海在 375 下是**真正的单列长列表**
+  // （B9 之前它根本没有窄屏分支，六列各 50px 互相压叠）。单列堆叠后内容必然
+  // 超过一屏，而这是正确行为（页面可滚）。对这类页面，窄屏只查
+  // 「无横向溢出 + 无压叠 + 锚点存在」，不查「锚点在一屏内」——
+  // 与 §56「375 不强制一屏，只要求无横滚 + 锚点存在」的口径一致。
+  const anchorMustFit = !(mobile && route.scrollableOnMobile === true);
   for (const selector of route.anchors) {
     const bottom = after.anchors[selector];
     if (bottom === null || bottom === undefined) {
       problems.push(`锚点缺失 data-anchor="${selector}"`);
-    } else if (bottom > heightThreshold) {
+    } else if (anchorMustFit && bottom > heightThreshold) {
       problems.push(`锚点 ${selector} 下沿 ${String(bottom)} > ${String(heightThreshold)}`);
     }
   }

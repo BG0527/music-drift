@@ -182,6 +182,41 @@ const SEA_HALL_CSS = `
    （三态块由 zonegroup 包装渲染 ⇒ 选择器跟着走；含块仍是 main，坐标一像素不变） */
 .sea-hall .zonegroup>[aria-busy='true']{position:absolute;left:6.1111%;right:6.1111%;top:452px}
 .sea-hall .zonegroup>[role='alert']{position:absolute;left:6.1111%;right:6.1111%;top:452px;max-width:430px}
+
+/* ── W18.5 · B9：窄屏（<768）退回流式竖排 ─────────────────────────────────────
+   此前本页**完全没有窄屏分支**：上面那些绝对定位坐标（main inset:0 /
+   .hero top:98 / .zones top:98 / .col width:13.24% / .entry top:452 /
+   .foot bottom:34）都是无条件生效的，于是 375 下六列各 ≈50px 宽（文字两字
+   一行换）、六条「听这支作品」互相压叠、h1 被右侧 tab 压住、fixed 顶栏压页头。
+
+   选择是「**关掉绝对定位**」而不是「逐个调数字」—— 窄屏的正确性由
+   「没有绝对定位」保证，而不是由「这批数字调对了」保证。
+
+   位置纪律：本块与上面的桌面规则**优先级相同**（都是后代选择器），所以必须
+   放在它们**之后**靠源序取胜；绝不用 !important（那会绕过契约）。 */
+@media (max-width:767px){
+  .sea-hall{height:auto;min-height:100dvh;overflow-x:hidden;overflow-y:auto}
+  .sea-hall main{position:static;inset:auto;z-index:auto;padding:calc(var(--top-nav-reserve-min) + 12px) 20px 32px;display:flex;flex-direction:column;gap:20px}
+  .sea-hall .topbar{position:static;inset:auto;display:flex}
+  .sea-hall .rule{position:static;inset:auto;height:1px;margin:0 0 4px}
+  .sea-hall .hero{position:static;inset:auto;padding:0}
+  .sea-hall .hero h1{font-size:clamp(2rem,9vw,2.75rem);line-height:1.05}
+  .sea-hall .lede{margin-top:12px;max-width:none;font-size:14px;line-height:1.75}
+  .sea-hall .zones{position:static;inset:auto;text-align:left;margin:0}
+  .sea-hall .zones ul{gap:20px;margin-top:10px;flex-wrap:wrap}
+  .sea-hall .zones li{font-size:14px;padding-bottom:6px}
+  .sea-hall .zonegroup{position:static;inset:auto}
+  .sea-hall .zonegroup>[aria-busy='true'],.sea-hall .zonegroup>[role='alert']{position:static;inset:auto;max-width:none;left:auto;right:auto;top:auto}
+  .sea-hall .fleet{position:static;inset:auto;display:flex;flex-direction:column;gap:16px;list-style:none}
+  .sea-hall .col{position:static;inset:auto;width:100%;height:auto}
+  .sea-hall .bottle{position:static;left:auto;top:auto;margin:0 0 8px;width:48px;height:99px}
+  .sea-hall .note{position:static;inset:auto;height:14px}
+  .sea-hall .entry{position:static;inset:auto;padding:12px 0 0;border-top:1px solid rgba(243,249,250,.12)}
+  .sea-hall .foot{position:static;inset:auto;padding-top:16px}
+  .sea-hall .sub{position:static;inset:auto;height:120px}
+  .sea-hall .sky,.sea-hall .beam{height:200px}
+  .sea-hall .empty{position:static;inset:auto}
+}
 `;
 
 export function SeaPage() {
