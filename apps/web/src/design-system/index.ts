@@ -12,6 +12,7 @@ export { Skeleton, type SkeletonProps } from './skeleton';
 export { TapRippleLayer, useTapRipple } from './tap-ripple';
 export { hapticConfirm, hapticTap, type HapticPattern } from './haptics';
 export { useScrollEnter, scrollEnterEnabled } from './scroll-enter';
+export { OfflineBanner, useNetworkGuard, useOnline } from './offline';
 export { EmptyState, type EmptyStateProps } from './empty-state';
 export { Toast, type ToastProps } from './toast';
 export { Modal, type ModalProps } from './modal';

@@ -13,7 +13,7 @@
  *   loading 期间保持骨架、不提前跳。
  */
 import { useEffect, type ReactNode } from 'react';
-import { Skeleton } from '../../design-system';
+import { OfflineBanner, Skeleton, useOnline } from '../../design-system';
 import { useSession } from '../../features/session/session-context';
 import { useInternalLinkHandler, useRouter } from './router-context';
 import { ADMIN_NAV_ITEM, INTRO_NAV_ITEM, NAV_ITEMS, type AppNavItem } from './routes';
@@ -74,11 +74,15 @@ function AppShellFrame({
   // 页面渲染的是自己的 <a>（属主是各页面，不改它）：
   // 在外壳这一层把站内锚点点击拦成客户端导航，外链/新窗口/修饰键点击照旧交给浏览器。
   const onClick = useInternalLinkHandler();
+  // W18.5 · C4：断网横幅挂在**外壳**层 ⇒ 全站每一页都自动覆盖（此前全站零 onLine 处理）。
+  // 位置在顶栏下方 sticky —— 断网是全局状态，不该要用户滚到底部去找。
+  const online = useOnline();
   return (
     // 容器 + 拦截点击 + 顶部常显导航：不套 flex、不出 <main>、不加 padding（页面自己带）
     <div className="min-h-[100dvh] bg-wave-white text-abyss" onClick={onClick}>
       {children}
       <TopNav items={items} current={current} />
+      <OfflineBanner online={online} />
     </div>
   );
 }

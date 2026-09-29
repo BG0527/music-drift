@@ -14,7 +14,7 @@
  * **禁用必有可见文字原因**（DESIGN.md），原因不写在 `title` 里。
  */
 import { useEffect, useRef, type MouseEvent as ReactMouseEvent } from 'react';
-import { TapRippleLayer, hapticTap, useTapRipple } from '../../design-system';
+import { TapRippleLayer, hapticTap, useOnline, useTapRipple } from '../../design-system';
 import { Icon, cn, motion, prefersReducedMotion } from '../../design-system';
 
 export type MyVote = 'LIKE' | 'DISLIKE' | null;
@@ -53,6 +53,8 @@ export function VoteControls({
   const disliked = myVote === 'DISLIKE';
   // W18.5 路 C1：落点涟漪（就地操作反馈）。容器 relative + 截断，涟漪从触点扩散。
   const { taps, rippleAt, setContainer } = useTapRipple();
+  // W18.5 路 C4：断网时禁用投票（走网络请求）。
+  const online = useOnline();
 
   return (
     <div
@@ -66,7 +68,8 @@ export function VoteControls({
         count={likeCount}
         pressed={liked}
         // 已赞：内核会 LIKE_ALREADY_CAST（同一段不能重复投同一票）→ 不再发不可能成功的请求
-        disabled={liked}
+        // W18.5 路 C4：断网时禁用投票（依赖网络请求）。**录音不禁** —— 音频在本地。
+        disabled={liked || !online}
         disabledReason="你已经赞过这一段"
         busy={busy}
         onClick={onLike}
@@ -78,7 +81,7 @@ export function VoteControls({
         ariaLabel={`给第 ${String(segmentIndex)} 段点踩`}
         count={dislikeCount}
         pressed={disliked}
-        disabled={disliked}
+        disabled={disliked || !online}
         disabledReason="你已经踩过这一段"
         busy={busy}
         onClick={onDislike}

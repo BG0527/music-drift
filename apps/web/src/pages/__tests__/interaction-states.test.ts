@@ -317,6 +317,58 @@ describe('A6 按下反馈：触屏也要有即时回应（DESIGN §Interaction S
   });
 });
 
+describe('C4 离线态：预告而不是静默失败（横幅 + 禁危险操作，录音继续）', () => {
+  /**
+   * 缺口：全站此前**零** `navigator.onLine` 处理（grep = 0 命中），
+   * 只有一句兜底文案。于是在录音/上传/投票场景里，断网的表现是
+   * "点了没反应"或"过一会儿才报错" —— 录音是最不能接受这种不确定性的场景。
+   *
+   * 三条决定（用户裁决）：
+   *   1. 横幅 = 顶栏下方 sticky 细条（断网是全局状态，不该要用户滚到底部找）；
+   *   2. 禁用「会把数据丢在网络请求上」的操作；**录音不禁**（音频在本地）；
+   *   3. 不静默：横幅走 role="status"，断网与恢复都要被读屏播报。
+   */
+  const offline = read('design-system/offline.tsx');
+  const appShell = read('pages/shell/app-shell.tsx');
+
+  it('订阅 online/offline 事件（不是轮询 navigator.onLine）', () => {
+    expect(offline, "必须监听 'online' 事件").toMatch(/addEventListener\('online'/);
+    expect(offline, "必须监听 'offline' 事件").toMatch(/addEventListener\('offline'/);
+    expect(offline, '必须解绑（否则热重载会叠加监听）').toMatch(/removeEventListener\('offline'/);
+  });
+
+  it('横幅挂在外壳层 ⇒ 全站每一页自动覆盖', () => {
+    expect(appShell, '离线横幅必须挂在 AppShell（外壳），而不是某个页面').toMatch(
+      /OfflineBanner/,
+    );
+    expect(appShell, '外壳必须用 useOnline 订阅').toMatch(/useOnline\(\)/);
+  });
+
+  it('横幅可读：role=status + 图标 + 说明「录音仍可继续」', () => {
+    expect(offline, '横幅必须 role="status"（读屏要能听到）').toMatch(/role="status"/);
+    expect(offline, '横幅必须 aria-live').toMatch(/aria-live="polite"/);
+    expect(offline, '横幅必须带图标（不能只靠颜色）').toMatch(/<Icon/);
+    expect(offline, '文案必须说明录音仍可录（这是本条的关键承诺）').toMatch(/继续录音/);
+  });
+
+  it('危险操作被禁用，但录音不受影响', () => {
+    const vote = read('features/bottle/vote-controls.tsx');
+    expect(vote, '投票（依赖网络请求）应在断网时禁用').toMatch(/disabled=\{[^}]*!online/);
+    // 关键：录音链路不得引入 offline 禁用
+    const recorder = read('features/audio/recorder-panel.tsx');
+    expect(recorder, '录音面板不得因断网被禁用（音频在本地，禁掉更差）').not.toMatch(
+      /useOnline|!online|OfflineBanner/,
+    );
+  });
+
+  it('不静默失败：断网态由全局兜底文案之外的横幅承担', () => {
+    // 横幅文案必须具体说明"哪些还能做、哪些不能"，而不是只说"网络异常"
+    const copy = /网络没有接通[\s\S]{0,120}/.exec(offline)?.[0] ?? '';
+    expect(copy, '横幅文案要具体（说明录音可继续、投票要等网络）').toMatch(/录音/);
+    expect(copy, '横幅文案要说明受限操作').toMatch(/投票|评论/);
+  });
+});
+
 describe('C3 滚动驱动一次性入场：只播一次、参数来自契约、不引入新通道', () => {
   /**
    * 契约依据：DESIGN 零装饰动效规则的第 ③ 类例外（2026-09-29 用户裁决）。
