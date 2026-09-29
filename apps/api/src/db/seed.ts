@@ -51,19 +51,22 @@ export const PLACEHOLDER_SONGS: readonly PlaceholderSong[] = [
   {
     ordinal: 1,
     id: '00000000-0000-4000-8000-000000000001',
-    title: '占位曲目 · 一',
+    // 用户裁决：占位曲目改名 —— 用曲库里**真实存在的**伴奏曲名（Immersed / Rains Will
+    // Fall / On the Shore，与 public/library/library.json 的 title 一致），
+    // 不再显示"占位曲目 · 一"这种一看就知道是假数据的名字。
+    title: 'Immersed',
     totalSegments: 4,
   },
   {
     ordinal: 2,
     id: '00000000-0000-4000-8000-000000000002',
-    title: '占位曲目 · 二',
+    title: 'Rains Will Fall',
     totalSegments: 4,
   },
   {
     ordinal: 3,
     id: '00000000-0000-4000-8000-000000000003',
-    title: '占位曲目 · 三',
+    title: 'On the Shore',
     totalSegments: 4,
   },
 ];
