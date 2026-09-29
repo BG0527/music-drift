@@ -1106,3 +1106,64 @@
     gap: 12px;
   }
 }
+
+/* ══════════════════════════════════════════════════════════════════════
+   交互态（DESIGN §Interaction States；守卫：__tests__/interaction-states.test.ts）
+
+   为什么单独一块、且全部走 `@media (hover: hover)`：
+   1. 本页每个控件的默认态都按参考稿逐值照抄过（按钮 44/38/36px、描边 0.42/0.2 透明度），
+      补交互态时**只允许加过渡与悬停/按下态**，不得回改默认几何 —— 否则一屏门禁与
+      参考稿对照会同时漂移；
+   2. 触屏上 `:hover` 会「粘住」（点完高亮不消），所以悬停态一律关进 hover-capable 媒体查询，
+      只让 `:active`（按下）作为触屏的即时回应；
+   3. 过渡只动 `transform` 与颜色（不触发重排），时长/缓动只引 `--motion-*` 契约 token；
+      `filter: brightness()` 作用于 coral 实心面（DESIGN「Hover = 亮度差」），
+      它既不是颜色也不是几何，**故意不进 transition 列表**（§Elevation 只允许动
+      transform/opacity + 颜色变化）。
+   ══════════════════════════════════════════════════════════════════════ */
+.bottle-page .gapBox .cta,
+.bottle-page .play,
+.bottle-page .votes button,
+.bottle-page .putBack .ghost,
+.bottle-page .destRow,
+.bottle-page .bp-crumb a,
+.bottle-page .bottom a,
+.bottle-page .bottom button {
+  transition:
+    transform var(--motion-hover-duration) var(--motion-entry-easing),
+    background-color var(--motion-hover-duration) var(--motion-entry-easing),
+    border-color var(--motion-hover-duration) var(--motion-entry-easing),
+    color var(--motion-hover-duration) var(--motion-entry-easing);
+}
+
+@media (hover: hover) {
+  .bottle-page .gapBox .cta:hover {
+    transform: scale(var(--motion-hover-scale));
+    filter: brightness(1.06);
+  }
+
+  .bottle-page .play:hover,
+  .bottle-page .votes button:hover,
+  .bottle-page .putBack .ghost:hover {
+    border-color: rgba(216, 243, 246, 0.4);
+    color: var(--glass);
+  }
+
+  .bottle-page .bp-crumb a:hover,
+  .bottle-page .destRow:hover,
+  .bottle-page .bottom a:hover,
+  .bottle-page .bottom button:hover {
+    color: var(--glass);
+  }
+}
+
+.bottle-page .gapBox .cta:active,
+.bottle-page .play:active,
+.bottle-page .votes button:active,
+.bottle-page .putBack .ghost:active,
+.bottle-page .destRow:active,
+.bottle-page .bp-crumb a:active,
+.bottle-page .bottom a:active,
+.bottle-page .bottom button:active {
+  transform: translateY(-1px);
+}
