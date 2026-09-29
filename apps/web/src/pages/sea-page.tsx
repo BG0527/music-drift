@@ -22,7 +22,7 @@
  * 以稿为准落地后这些断言会红；断言行待整合者按稿修订，本文件不引用其字面量以免误绿。
  */
 import { useState } from 'react';
-import type { CSSProperties } from 'react';
+import type { CSSProperties, KeyboardEvent as ReactKeyboardEvent } from 'react';
 import type { BottleSummary } from '@music-drift/shared';
 import { useSeaPages } from '../features/api/queries';
 import { gapNotice } from '../features/bottle/relay-status';
@@ -206,6 +206,21 @@ export function SeaPage() {
     setAnnouncement(next === 'COMPLETED' ? '已切到：已完成的顺流而下' : '已切到：还在等人接的');
   };
 
+  /**
+   * tablist 左右方向键（W18.5 · B5，APG Tabs Pattern）：切到相邻分区并把焦点带过去。
+   * `<li role="tab">` 是非可聚焦元素之外的写法，focus 要显式调 —— 靠 ref 拿。
+   */
+  function onZoneTabKeyDown(event: ReactKeyboardEvent<HTMLLIElement>, from: Zone): void {
+    if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return;
+    event.preventDefault();
+    const next: Zone = from === 'COMPLETED' ? 'INCOMPLETE' : 'COMPLETED';
+    switchZone(next);
+    const tab = document.getElementById(
+      next === 'COMPLETED' ? 'sea-tab-completed' : 'sea-tab-incomplete',
+    );
+    if (tab instanceof HTMLElement) tab.focus();
+  }
+
   return (
     <div className="sea-hall relative isolate md:h-[100dvh] md:overflow-hidden">
       <style>{SEA_HALL_CSS}</style>
@@ -384,16 +399,22 @@ export function SeaPage() {
         {/* one-screen 锚点 sea-list（1440/375 两档判据都查它）：zones + 数据区的**共同祖先**，
             骨架/空/列表/错任何数据态都渲染；.zonegroup 是静态透传 div —— 不建立包含块，
             zones / fleet / 空态 / 三态块的绝对定位仍以 main 为含块，稿几何一像素不动 */}
-        <div className="zonegroup" data-anchor="sea-list">
+        <div id="sea-zone-panel" role="tabpanel" aria-labelledby={`sea-tab-${zone}`} className="zonegroup" data-anchor="sea-list">
           {/* 稿块 4：分区（两个分区 = 两个水位；计数位算不出真数 ⇒ 留空）
               t3：stagger-1 错拍跟在页头之后（阅读序：meta → 页头 → 分区） */}
           <div className="zones enter-rise stagger-1">
             <p className="meta">分区 · SECTIONS</p>
+            {/* W18.5 · B5：roving tabIndex（此前两个 tab 都是 0 = 焦点不会随选中走）
+                + 左右方向键（此前只有 Enter/Space，读屏用户按方向键毫无反应）
+                + aria-controls 指向真正承载列表的 zonegroup。
+                规范写法见 admin-page.tsx（样板）。 */}
             <ul role="tablist" aria-label="分区">
               <li
                 role="tab"
+                id="sea-tab-completed"
                 aria-selected={zone === 'COMPLETED'}
-                tabIndex={0}
+                aria-controls="sea-zone-panel"
+                tabIndex={zone === 'COMPLETED' ? 0 : -1}
                 onClick={() => {
                   switchZone('COMPLETED');
                 }}
@@ -402,14 +423,17 @@ export function SeaPage() {
                     event.preventDefault();
                     switchZone('COMPLETED');
                   }
+                  onZoneTabKeyDown(event, 'COMPLETED');
                 }}
               >
                 完整作品<span className="mono n" />
               </li>
               <li
                 role="tab"
+                id="sea-tab-incomplete"
                 aria-selected={zone === 'INCOMPLETE'}
-                tabIndex={0}
+                aria-controls="sea-zone-panel"
+                tabIndex={zone === 'INCOMPLETE' ? 0 : -1}
                 onClick={() => {
                   switchZone('INCOMPLETE');
                 }}
@@ -418,6 +442,7 @@ export function SeaPage() {
                     event.preventDefault();
                     switchZone('INCOMPLETE');
                   }
+                  onZoneTabKeyDown(event, 'INCOMPLETE');
                 }}
               >
                 等待接力<span className="mono n" />

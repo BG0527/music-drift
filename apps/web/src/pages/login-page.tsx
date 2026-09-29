@@ -24,7 +24,7 @@
  * - 其余（凭证错误、结构错误、网络；含已无字段可落的 `EMAIL_TAKEN`）→ **表单级**提示，
  *   留在原地，AUTH_ERROR_CODES 的中文文案照常显示。
  */
-import { useState, type FormEvent } from 'react';
+import { useRef, useState, type FormEvent, type KeyboardEvent as ReactKeyboardEvent } from 'react';
 import { ApiError } from '../features/api/client';
 import { useLogin, useRegister } from '../features/api/mutations';
 import { useSession } from '../features/session/session-context';
@@ -55,6 +55,8 @@ export function LoginPage() {
   const search = useSearch();
   const next = safeNextPath(search.get('next'));
   const [mode, setMode] = useState<Mode>('login');
+  /** W18.5 · B5：roving tabIndex 需要把焦点带过去（ref 跟随每个 tab） */
+  const tabRefs = useRef<Record<Mode, HTMLButtonElement | null>>({ login: null, register: null });
   const [account, setAccount] = useState('');
   const [password, setPassword] = useState('');
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
@@ -101,12 +103,29 @@ export function LoginPage() {
   }
 
   /**
+   * tablist 键盘语（APG Tabs Pattern，W18.5 · B5）。
+   * 此前本页的 tab 只绑了 click：两个 tab 都能被 Tab 键聚焦（= 没有 roving），
+   * 也没有左右方向键 —— 读屏用户在这两个 tab 上按方向键什么都不会发生。
+   * 规范写法见 `admin-page.tsx` 的 `onTabKeyDown`（本轮把它当作样板统一）。
+   */
+  function onTabKeyDown(event: ReactKeyboardEvent<HTMLButtonElement>): void {
+    if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return;
+    event.preventDefault();
+    const next: Mode = mode === 'login' ? 'register' : 'login';
+    switchMode(next);
+    tabRefs.current[next]?.focus();
+  }
+
+  /**
    * 表单本体（逐块照稿 review-login-blocks §4：图注 → 字段行(下划线) → 按钮 → 誓词；
    * 间距照稿：tip mt20 / 账号 mt32 / 密码 mt26 / 按钮 mt36 / 誓词 mt40）。
    * 两种模式共用同一份状态，切换档位不丢输入。
    */
   const form = (
       <form
+        id="login-form-panel"
+        role="tabpanel"
+        aria-labelledby={`login-tab-${mode}`}
         data-anchor="login-card"
         className="enter-rise flex max-w-[452px] flex-col"
         onSubmit={submit}
@@ -306,16 +325,25 @@ export function LoginPage() {
 
         {authed ? null : (
           <>
-            {/* §4.1 tabs 自绘照稿：15px/700/.14em、gap26；激活 coral 2px 下框、未激活 muted 1px */}
+            {/* §4.1 tabs 自绘照稿：15px/700/.14em、gap26；激活 coral 2px 下框、未激活 muted 1px
+                W18.5 · B5：roving tabIndex（选中 0 / 其余 -1）+ 左右方向键 + aria-controls 指向共享的 form
+                —— 登录与注册共用同一份 form（切换不丢输入），所以 panel 就是那一个。 */}
             <div role="tablist" className="flex gap-[26px]">
               {(['login', 'register'] as const).map((key) => {
                 const activeTab = mode === key;
                 return (
                   <button
                     key={key}
+                    ref={(node) => {
+                      tabRefs.current[key] = node;
+                    }}
                     type="button"
                     role="tab"
+                    id={`login-tab-${key}`}
                     aria-selected={activeTab}
+                    aria-controls="login-form-panel"
+                    tabIndex={activeTab ? 0 : -1}
+                    onKeyDown={onTabKeyDown}
                     onClick={() => {
                       switchMode(key);
                     }}
