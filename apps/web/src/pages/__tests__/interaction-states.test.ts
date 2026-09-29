@@ -159,3 +159,60 @@ describe('A2 公海大厅：分区 tab 的交互态', () => {
     expect(hover).not.toMatch(/cubic-bezier|ease-(?:linear|in|out|in-out)/);
   });
 });
+
+describe('A3 文字链接：6 个变体的悬停/按下反馈（DESIGN §Interaction States）', () => {
+  const linkStyles = read('pages/shell/link-styles.ts');
+
+  /** 取 `export const NAME = … '类名字符串'`：定义与字符串之间允许有注释行与换行。 */
+  const classNameOf = (src: string, name: string): string =>
+    new RegExp(`\\b${name}\\s*=\\s*(?:cn\\()?[^']{0,600}?'([^']*)'`, 's').exec(src)?.[1] ?? '';
+
+  /** 只有这两个变体已带反馈；其余四个（TEXT_LINK / TEXT_LINK_STRONG / NEXT / COOL）本轮补齐。 */
+  const SHARED = [
+    { file: 'pages/shell/link-styles.ts', name: 'TEXT_LINK' },
+    { file: 'pages/shell/link-styles.ts', name: 'TEXT_LINK_STRONG' },
+    { file: 'pages/bottle-page.tsx', name: 'NEXT_TEXT_LINK' },
+    { file: 'pages/login-page.tsx', name: 'TEXT_LINK_COOL' },
+    { file: 'pages/not-found-page.tsx', name: 'TEXT_LINK_COOL' },
+  ];
+
+  it.each(SHARED)('$name 声明了 token 化过渡', ({ file, name }) => {
+    const decl = classNameOf(read(file), name);
+    expect(decl, `${name} 的类名字符串没找到（定义形态变了？）`).not.toBe('');
+    expect(decl, `${name} 缺 transition`).toMatch(/transition-/);
+    expect(decl, `${name} 的过渡必须引 var(--motion-hover-duration)`).toMatch(
+      /duration-\[var\(--motion-hover-duration\)\]/,
+    );
+    expect(decl, `${name} 不得写内联时长档 duration-200`).not.toMatch(/\bduration-\d/);
+    expect(decl, `${name} 不得写 ease-out 字面档`).not.toMatch(/\bease-(?:linear|in|out|in-out)\b/);
+  });
+
+  it.each(SHARED)('$name 的悬停有可见变化且带焦点环', ({ file, name }) => {
+    const decl = classNameOf(read(file), name);
+    expect(decl, `${name} 缺 hover 态`).toMatch(/hover:/);
+    expect(decl, `${name} 缺 focus-visible 焦点环（DESIGN §Accessibility：2px coral）`).toMatch(
+      /focus-visible:ring-2/,
+    );
+    expect(decl, `${name} 不得 transition-all`).not.toMatch(/transition-all/);
+  });
+
+  it('scale 悬停只挂在按钮/实心行动链上，文字链不放大（避免与相邻内容重叠）', () => {
+    // TEXT_LINK / TEXT_LINK_STRONG 是行内文字链：放大 1.03 会与同行相邻文字互相压边，
+    // 因此文字链只做提亮 + 下划线位移，按钮族（GHOST/PRIMARY）才 scale。
+    for (const name of ['TEXT_LINK', 'TEXT_LINK_STRONG']) {
+      const decl = classNameOf(linkStyles, name);
+      expect(decl, `${name} 不该有 hover:scale（文字链放大会压到相邻内容）`).not.toMatch(
+        /hover:scale/,
+      );
+      expect(decl, `${name} 应改文字色或下划线作为悬停信号`).toMatch(
+        /hover:(?:text|decoration|underline)/,
+      );
+    }
+    for (const name of ['TEXT_LINK_GHOST', 'TEXT_LINK_PRIMARY']) {
+      const decl = classNameOf(linkStyles, name);
+      expect(decl, `${name} 保持 token 化 scale 悬停`).toMatch(
+        /hover:scale-\[var\(--motion-hover-scale\)\]/,
+      );
+    }
+  });
+});

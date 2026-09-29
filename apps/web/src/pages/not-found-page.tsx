@@ -23,7 +23,7 @@ const META = 'text-[0.6875rem] tracking-[0.24em] text-paper/50';
     名字里的 `TEXT_LINK_` 前缀是**故意的**：`design-discipline.test.ts` 用它与 `min-h-11`
     作为"这条链接是可点目标"的静态判据（同 `pages/shell/link-styles.ts` 的两个常量）。 */
 const TEXT_LINK_COOL =
-  'inline-flex min-h-11 items-center gap-2 whitespace-nowrap text-glass underline underline-offset-5';
+  'inline-flex min-h-11 items-center gap-2 whitespace-nowrap text-glass underline underline-offset-5 transition-[color,text-decoration-color] duration-[var(--motion-hover-duration)] ease-[var(--motion-entry-easing)] hover:text-paper focus-visible:ring-2 focus-visible:ring-coral focus-visible:ring-offset-2 focus-visible:ring-offset-ink active:translate-y-px';
 
 /**
  * 稿 §1-4 水路纹理组（review-404-blocks；坐标按 1440 画布换算，纵偏移相对水线 y=355）。

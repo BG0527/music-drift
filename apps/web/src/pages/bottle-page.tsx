@@ -82,7 +82,7 @@ const DEST_GLYPH: Record<Resolution, 'Waves' | 'RotateCcw' | 'Ship'> = {
  * 不用 `TEXT_LINK`（peacock 底色）：这里按审计语汇要 coral，且不可靠覆盖已导入的 utility 颜色。
  */
 const NEXT_TEXT_LINK =
-  'inline-flex min-h-11 items-center gap-[7px] whitespace-nowrap text-[0.875rem] text-coral underline underline-offset-[4px]';
+  'inline-flex min-h-11 items-center gap-[7px] whitespace-nowrap text-[0.875rem] text-coral underline underline-offset-[4px] transition-[color,text-decoration-color] duration-[var(--motion-hover-duration)] ease-[var(--motion-entry-easing)] hover:text-paper focus-visible:ring-2 focus-visible:ring-coral focus-visible:ring-offset-2 focus-visible:ring-offset-ink active:translate-y-px';
 
 /**
  * t17 深度复刻返工（用户打回「还是很丑」）：版式不再自己发明 ——
