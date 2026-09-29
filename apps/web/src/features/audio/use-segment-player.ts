@@ -63,6 +63,17 @@ export interface UseSegmentPlayerOptions {
    * 乐观置位会出现"点了没声却显示暂停"，逼用户反复多点。
    */
   onPlayingChange?: ((isPlaying: boolean) => void) | undefined;
+  /**
+   * 自动起播令牌（用户裁决「听全部」用）。每次外部请求"起播"就 +1。
+   *
+   * 为什么在**元素创建 effect 内部**消费（而不是在外层 effect 调 `replay()`）：
+   * 换段时 `key` 变 ⇒ `publish`/`key` 变 ⇒ 元素 effect 会**重跑**（cleanup 里
+   * `element.pause()` + 重建）。若起播放在外层 effect，它会与这次 cleanup **竞态**：
+   * 先 play()、紧接着被 cleanup 的 pause() 打断（`AbortError: play() interrupted by
+   * pause()`）—— 表现正是"要点好几次才响"。放进同一个 effect、挂在监听就绪之后，
+   * 起播就是这个元素的最后一次动作，不会再被 cleanup 打断。
+   */
+  autoPlayToken?: number | undefined;
 }
 
 export interface UseSegmentPlayerResult {
@@ -141,6 +152,11 @@ export function useSegmentPlayer(options: UseSegmentPlayerOptions): UseSegmentPl
   useEffect(() => {
     onPlayingChangeRef.current = options.onPlayingChange;
   }, [options.onPlayingChange]);
+  // 自动起播令牌用 ref 读取：它的变化**不**要重建元素（重建 = cleanup pause = 打断起播）
+  const autoPlayTokenRef = useRef(options.autoPlayToken ?? 0);
+  useEffect(() => {
+    autoPlayTokenRef.current = options.autoPlayToken ?? 0;
+  }, [options.autoPlayToken]);
 
   const key = `${src}|${duration}`;
   const [state, setState] = useState<ProgressState>({ key, ...EMPTY_PROGRESS });
@@ -237,6 +253,15 @@ export function useSegmentPlayer(options: UseSegmentPlayerOptions): UseSegmentPl
     element.addEventListener('ended', onEnded);
     element.addEventListener('play', onPlay);
     element.addEventListener('pause', onPlayStateChange);
+
+    // 自动起播：放在监听挂好之后、return 之前 —— 这是本元素生命周期的**最后一个动作**。
+    // 「听全部」换段后由它接上（不会再被外层 cleanup 的 pause 打断）。
+    if ((autoPlayTokenRef.current ?? 0) > 0) {
+      playbackStore?.claimAudio(element);
+      void Promise.resolve(element.play()).catch(() => {
+        publish();
+      });
+    }
 
     return () => {
       element.removeEventListener('timeupdate', onTimeUpdate);

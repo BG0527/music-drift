@@ -8,7 +8,7 @@
  *   不依赖颜色表达进度（DESIGN.md §Accessibility 媒体条款）；
  * - 只给**结构性提示**（第几段 / 时长），不显示歌词正文（版权约束，CONTEXT §3.2 的 Demo 口径）。
  */
-import { useEffect, useRef } from 'react';
+import { useEffect } from 'react';
 import type { AudioElementLike } from './use-segment-player';
 import { useSegmentPlayer, type PlaybackState } from './use-segment-player';
 import { useGrooveReporter } from './groove-playback';
@@ -90,9 +90,8 @@ export interface SegmentPlayerProps {
   /**
    * 自动起播令牌：每次外部请求"起播"就 +1（页面在点「听全部」/ 点某段「听」时递增）。
    *
-   * 为什么用令牌而不是布尔：换段会**卸载并重挂**这个播放器（`key = 段 id`），
-   * 新挂载的实例必须是 idle，起播意图靠 prop 传不进来 —— 令牌让"新实例"在
-   * 挂载后看到"有一个新的起播请求"从而自动播。令牌为 0 = 没人请求，静默等待用户点。
+   * 消费点在 `useSegmentPlayer` 的**元素创建 effect 内部**（见那里的说明）——
+   * 放外层 effect 会与换段时元素重建的 cleanup `pause()` 竞态，导致"要点多次才响"。
    */
   autoPlayToken?: number | undefined;
   /**
@@ -169,6 +168,7 @@ export function SegmentPlayer({
     },
     ...(onEnded === undefined ? {} : { onEnded }),
     ...(onPlayingChange === undefined ? {} : { onPlayingChange }),
+    ...(autoPlayToken === undefined ? {} : { autoPlayToken }),
     ...(createElement === undefined ? {} : { createElement }),
   });
 
@@ -181,19 +181,6 @@ export function SegmentPlayer({
       isPlaying: () => player.isPlaying,
     };
   }, [playerHandleRef, player.isPlaying, player.replay, player.toggle]);
-
-  /**
-   * 自动起播：令牌每 +1 就播一次（且只播一次 —— `handledTokenRef` 记住本实例已响应的值）。
-   * 换段重挂载后新实例从 0 开始，令牌必然更大 ⇒ 新段自动接着播（连播不断声）。
-   * 令牌为 0 = 没人请求过，绝不擅自出声（尊重浏览器自动播放策略与用户意图）。
-   */
-  const handledTokenRef = useRef(0);
-  useEffect(() => {
-    if (autoPlayToken === undefined || autoPlayToken === 0) return;
-    if (autoPlayToken === handledTokenRef.current) return;
-    handledTokenRef.current = autoPlayToken;
-    player.replay();
-  }, [autoPlayToken, player.replay]);
   const percent = Math.round(player.ratio * 100);
   const listenedSeconds = formatSeconds(player.coveredMs);
   const totalSeconds = formatSeconds(typeof durationMs === 'number' ? durationMs : 0);
