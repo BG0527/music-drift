@@ -276,3 +276,43 @@ describe('A4 我的 / 漂流日志 / 设置：可点元素的反馈完整性', (
     }
   });
 });
+
+describe('A6 按下反馈：触屏也要有即时回应（DESIGN §Interaction States 的 active 行）', () => {
+  /**
+   * 为什么单列一条守卫：悬停在触屏上不存在（`ui-ux` ux-guidelines #11「主交互不能只靠
+   * hover」），所以 `active:` 是触屏唯一的即时反馈。此前只有 DS Button / BottomNav /
+   * 投票按钮有，主顶栏、DS Tabs、landing 圆点导航这三处最显眼的导航件反而缺。
+   */
+  it('主顶栏入口有 active 按下反馈', () => {
+    const src = read('pages/shell/top-nav.tsx');
+    // 顶栏入口的 className 块以 `hover:-translate-y-px` 为锚（该入口唯一的悬停动作）
+    const navItem = /'hover:-translate-y-px',[\s\S]{0,600}?\)\}/.exec(src)?.[0] ?? '';
+    expect(navItem, '没找到顶栏入口的 className 块').not.toBe('');
+    expect(navItem, '顶栏入口缺 active 按下反馈').toMatch(/active:/);
+  });
+
+  it('设计系统 Tabs 有 active 按下反馈', () => {
+    const src = read('design-system/tabs.tsx');
+    expect(src, 'Tabs 缺 active 按下反馈').toMatch(/active:/);
+  });
+
+  it('Landing 圆点导航有 active 按下反馈', () => {
+    const src = read('pages/landing-page.tsx');
+    const dot = /aria-label=\{`第 \$\{screenIndex \+ 1\} 屏[\s\S]{0,600}?className=\{cn\(([\s\S]{0,400}?)\)\}/.exec(
+      src,
+    )?.[1];
+    expect(dot, '没找到圆点按钮的 className').toBeTruthy();
+    expect(dot, '圆点按钮缺 active 按下反馈').toMatch(/active:/);
+  });
+
+  it('按下位移只用 Tailwind 的 1px 档（不写 translateY(2px) 之类自造值）', () => {
+    for (const rel of [
+      'pages/shell/top-nav.tsx',
+      'design-system/tabs.tsx',
+      'pages/landing-page.tsx',
+    ]) {
+      const src = read(rel);
+      expect(src, `${rel} 出现了自造的按下位移`).not.toMatch(/translate-y-\[(?!1px)/);
+    }
+  });
+});

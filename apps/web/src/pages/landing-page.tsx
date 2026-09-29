@@ -921,6 +921,8 @@ export function LandingPage() {
                   onClick={() => goTo(screenIndex)}
                   className={cn(
                     'flex h-11 w-11 items-center justify-center rounded-full',
+                    // W18.5 · A6：按下 1px（触屏唯一即时回应）；圆点本身是 8px，靠父级整体位移才看得见
+                    'active:translate-y-px',
                     'focus-visible:ring-2 focus-visible:ring-coral focus-visible:ring-offset-2 focus-visible:ring-offset-ink',
                   )}
                 >

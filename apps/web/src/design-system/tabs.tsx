@@ -76,6 +76,8 @@ export function Tabs({ items, value, defaultValue, onChange, className }: TabsPr
                 'focus-visible:ring-2 focus-visible:ring-coral focus-visible:ring-offset-2 focus-visible:ring-offset-ink',
                 // feedback（motion-web §1）：选中态原来是瞬变，颜色过渡让「切到哪一档」看得见
                 'transition-colors duration-200 ease-out',
+                // W18.5 · A6：按下 1px —— 触屏没有 hover，这个 active 是唯一的即时回应
+                'active:translate-y-px',
                 selected ? 'border-coral text-coral' : 'text-muted hover:text-paper',
               )}
             >

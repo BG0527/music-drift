@@ -49,6 +49,10 @@ export function TopNav({ items, current }: TopNavProps) {
                     // transition-property 显式列举（v4 的 translate/scale 是独立属性，不含在 transform 里）
                     'transition-[transform,translate,scale,color] duration-[var(--motion-hover-duration)] ease-[var(--motion-entry-easing)]',
                     'hover:-translate-y-px',
+                    // W18.5 · A6：按下 1px。悬停在触屏上不存在，`active:` 是触屏唯一的即时回应
+                    // （ux-guidelines #11「主交互不能只靠 hover」）；幅度取 Tailwind 的 1px 档，
+                    // 与按钮族的 translateY(-1px) 同量级，不自造数值。
+                    'active:translate-y-px',
                     // continuity（t3）：应用落位时入口逐个淡入一次（AppShell 跨路由常驻 ⇒ 换页不重播）；
                     // 参数只经契约类 enter-fade / stagger-*（值在 motion.css 的 --motion-* token），封顶 4 档
                     'enter-fade',
