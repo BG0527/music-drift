@@ -146,6 +146,15 @@ export function RiverPage() {
   const session = useSession();
   const newHref =
     session.status === 'authed' ? '/new' : `/login?next=${encodeURIComponent('/new')}`;
+  /**
+   * W18.5 · A9：捞取侧的登录回跳，与 `newHref` **严格对称**。
+   * 此前只有投下侧有回跳，匿名用户点「捞一个漂流瓶」会真的发请求吃一个 401，
+   * 然后只得到「打捞失败，请看下面的说明」——而下面是固定文案、没有任何出口，
+   * 于是主 CTA 对匿名用户是死路。两个泊位都是产品的一等公民，入口必须对称。
+   */
+  const isGuest = session.status === 'guest';
+  const drawHref =
+    session.status === 'authed' ? '/river' : `/login?next=${encodeURIComponent('/river')}`;
 
   /** f0 三段状态机：瓶子只在一次操作里出现（null = 常驻态，只有水在流）。 */
   const [flow, setFlow] = useState<FlowState | null>(null);
@@ -199,6 +208,15 @@ export function RiverPage() {
 
   function onDraw(): void {
     if (busyRef.current) return;
+    // W18.5 · A9：未登录先去登录（与 onCast 的 newHref 同构）。
+    // 判据是 `guest` 而不是「非 authed」：会话还在 `loading` 时不能当未登录处理，
+    // 否则刷新页面的人会在会话到达前被推去登录页。
+    // 状态文字说明"为什么"，而不是报"打捞失败"——用户还没捞，是被引导去登录。
+    if (isGuest) {
+      setDrawStatus('捞瓶要先认领一个代号 —— 带你去登录，登录完就回到这条河。');
+      requestNav(drawHref);
+      return;
+    }
     busyRef.current = true;
     pendingNavRef.current = null;
     setDrawStatus('正在打捞…');
@@ -587,6 +605,13 @@ export function RiverPage() {
         >
           <p className="text-[0.9375rem] font-semibold">{errorView.title}</p>
           <p className="text-[0.875rem] leading-[1.6]">{errorView.detail}</p>
+          {/* W18.5 · A9：会话可能在请求途中失效（401），此时给一个登录出口 ——
+              「错误必须给出路」（DESIGN §Error States 第 1 条：文案必须给出修正动作）。 */}
+          {isGuest ? (
+            <Link to={drawHref} className={`mt-2 ${TEXT_LINK}`}>
+              去登录，回来接着捞
+            </Link>
+          ) : null}
         </div>
       ) : null}
 

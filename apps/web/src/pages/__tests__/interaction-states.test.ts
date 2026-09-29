@@ -418,3 +418,47 @@ describe('A8 放回失败必须让用户看见（不许静默吞掉）', () => {
     );
   });
 });
+
+describe('A9 河道的两个泊位对称：未登录时「捞取」也有登录出口', () => {
+  /**
+   * 缺陷：投下侧有 `newHref`（未登录 → `/login?next=/new`），捞取侧**没有**对应物 ——
+   * 匿名用户点「捞一个漂流瓶」会真的发请求、吃一个 401，然后只得到一句
+   * 「打捞失败，请看下面的说明」，而下面的说明是固定文案、**没有任何出口**。
+   * 也就是说主 CTA 对匿名用户是一条死路，而对称的另一半（投下）却是通的。
+   */
+  const src = read('pages/river-page.tsx');
+
+  it('捞取侧有与投下侧对称的登录回跳地址', () => {
+    expect(src, '缺少捞取侧的登录回跳地址（应与 newHref 对称）').toMatch(
+      /session\.status === 'authed'[\s\S]{0,200}?\/login\?next=/,
+    );
+    // 两个泊位都要有：newHref（投下）与 drawHref（捞取）
+    const loginHrefs = (src.match(/\/login\?next=/g) ?? []).length;
+    expect(loginHrefs, '登录回跳地址应成对出现（投下 + 捞取）').toBeGreaterThanOrEqual(2);
+  });
+
+  it('onDraw 在未登录时不发请求，直接走登录回跳（与 onCast 同构）', () => {
+    const onDraw = /function onDraw\(\)[\s\S]{0,900}?mutateAsync/.exec(src)?.[0] ?? '';
+    expect(onDraw, '没找到 onDraw 函数体').not.toBe('');
+    // 判据必须是 `isGuest`（会话已到达且确为访客），不能是「非 authed」——
+    // 否则会话还在 loading 时刷新页面的人会被推去登录页。
+    expect(src, '应先算出 isGuest（session.status === guest）').toMatch(
+      /const isGuest = session\.status === 'guest'/,
+    );
+    expect(onDraw, 'onDraw 缺访客判定').toMatch(/if \(isGuest\)/);
+    // 未登录分支必须在 `mutateAsync` **之前** return，并走登录回跳地址
+    const guard = onDraw.slice(0, onDraw.indexOf('mutateAsync'));
+    expect(guard, '未登录分支必须在发请求之前 return').toMatch(/return;/);
+    expect(guard, '未登录分支必须走登录回跳地址（drawHref）').toMatch(
+      /requestNav\(drawHref\)|navigate\(drawHref\)/,
+    );
+  });
+
+  it('未登录时用户看到的状态文字说明为什么要登录（不是"打捞失败"）', () => {
+    const src2 = read('pages/river-page.tsx');
+    expect(src2, '未登录时不该报"打捞失败"（用户还没捞，是被引导去登录）').not.toMatch(
+      /session\.status\s*!==\s*'authed'[\s\S]{0,400}?打捞失败/,
+    );
+    expect(src2, '未登录引导应有可读文案').toMatch(/登录/);
+  });
+});
