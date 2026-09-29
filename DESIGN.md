@@ -170,6 +170,14 @@ motion:
                               # 短于它 ⇒ 两次采样之间停顿；长于它 ⇒ 追不上真实位置。
   progressEasing: "linear"    # 唱针必须匀速：ease-out 会让等速播放的指针越走越慢、像卡带。
                               # 播放进度是"物理位置"而不是"界面入场"，故不适用 entryEasing。
+  # ── W18.5 补的第三条：漂移类动效的缓动（母题层唯一的常驻动画）────────────────
+  # 补它是因为落地时 `water.css` 的两条常驻动画（drift / passage）直接写了
+  # `ease-in-out` 字面量 —— 守卫只扫时间字面量，缓动字面量一直是盲区（P1-10）。
+  # 为什么是 ease-in-out 而不是 entryEasing（ease-out）：漂移是**往返**动画
+  # （`alternate`），两端都要平滑停下才不会一顿一顿；ease-out 只在末端收，
+  # 回到起点时会是"弹一下"。物理隐喻也对得上：水到岸边要减速，不是急停。
+  driftEasing: "ease-in-out"  # 只用于 drift / passage 两条常驻装饰动画；
+                              # 状态过渡（hover/enter/exit）一律用 entryEasing。
   animatedProperties: [transform, opacity]
 # 水域母题层（2026-09-24 amend · t43）：只在这里定装饰的**强度**与**纹理周期**。
 # 组件只能引用 --motif-*，禁止内联 alpha / px（守卫：__tests__/water-motif.test.tsx）。

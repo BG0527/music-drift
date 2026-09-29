@@ -40,7 +40,7 @@
   }
 
   .water-drift {
-    animation: ocean-drift var(--drift-duration) ease-in-out infinite alternate;
+    animation: ocean-drift var(--drift-duration) var(--motion-drift-easing) infinite alternate;
     /* 平移会让图层露边 ⇒ 先按同一 token 出血；margin 是**静态**声明，不在动画属性白名单之外 */
     margin: calc(var(--drift-shift) * -1);
   }
@@ -197,7 +197,7 @@
   }
 
   .passage-drift {
-    animation: ocean-passage var(--passage-duration) ease-in-out infinite alternate;
+    animation: ocean-passage var(--passage-duration) var(--motion-drift-easing) infinite alternate;
   }
 }
 

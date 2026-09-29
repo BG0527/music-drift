@@ -317,6 +317,56 @@ describe('A6 按下反馈：触屏也要有即时回应（DESIGN §Interaction S
   });
 });
 
+describe('B7 母题缓动也是契约值（补 water.css 的守卫盲区）', () => {
+  /**
+   * 缺陷：守卫一直只扫**时间**字面量（`\d+ms`），**缓动**字面量是盲区 ——
+   * 于是 `water.css` 的两条常驻装饰动画（drift / passage）长期直接写 `ease-in-out`，
+   * 绕过了「参数只来自设计契约」这条纪律（与 W17 补 `castRippleDuration`、
+   * 本轮补 `progressDuration/progressEasing` 是同一类"缺值/无据"问题）。
+   *
+   * 这条守卫的价值在于把**缓动**也纳入契约，并明确区分两类：
+   *   - 状态过渡（hover / enter / exit）→ `entryEasing`（ease-out）
+   *   - 母题漂移（drift / passage）→ `driftEasing`（ease-in-out，往返动画两端都要平滑）
+   */
+  const waterCss = read('design-system/water.css');
+  const themeCss = read('design-system/theme.css');
+  // `here` = apps/web/src/pages/__tests__ ⇒ 上溯四级到仓库根（DESIGN.md 在那里）
+  const design = readFileSync(join(here, '..', '..', '..', '..', '..', 'DESIGN.md'), 'utf8');
+
+  it('water.css 的常驻动画缓动引 token，不写字面量', () => {
+    const code = waterCss.replace(/\/\*[\s\S]*?\*\//g, '');
+    const animations = (code.match(/animation:[^;]+;/g) ?? []).join('\n');
+    expect(animations, 'water.css 里有 animation 声明').not.toBe('');
+    expect(animations, '仍有 ease-in-out/ease-out 等缓动字面量').not.toMatch(
+      /\bease-(?:linear|in|out|in-out)\b/,
+    );
+    expect(animations, 'drift / passage 必须引 var(--motion-drift-easing)').toMatch(
+      /var\(--motion-drift-easing\)/,
+    );
+  });
+
+  it('契约三处同源：DESIGN.md 与 theme.css 都登记了 driftEasing', () => {
+    expect(design, 'DESIGN.md motion 块缺 driftEasing').toMatch(/driftEasing:\s*"ease-in-out"/);
+    expect(themeCss, 'theme.css 未暴露 --motion-drift-easing').toContain(
+      '--motion-drift-easing: ease-in-out',
+    );
+  });
+
+  it('缓动与时长的分工写进了契约注释（不许后来者把 drift 改成 entryEasing）', () => {
+    // 理由必须留在 DESIGN.md 里：漂移是往返动画，ease-out 只在末端收、回程会"弹一下"。
+    // 注记写在 token 的**上一段**（YAML front matter 的注释块），所以连同上文一起取。
+    const driftNote = /# ── W18\.5 补的第三条[\s\S]{0,900}?driftEasing[\s\S]{0,200}/.exec(
+      design,
+    )?.[0] ?? '';
+    expect(driftNote, 'DESIGN.md 里找不到 driftEasing 的注记块').not.toBe('');
+    expect(driftNote, 'driftEasing 缺少理由注记（往返动画 / alternate / 回程）').toMatch(
+      /往返|alternate|回程/,
+    );
+    // 并且要写明它**只**用于漂移，状态过渡仍走 entryEasing
+    expect(driftNote, '未写明 driftEasing 与 entryEasing 的分工').toMatch(/entryEasing/);
+  });
+});
+
 describe('A7 加载态只有一种观感：统一用 DS Skeleton（shimmer）', () => {
   /**
    * 为什么统一：`DESIGN.md` §Components 规定 Skeletons 用 shimmer、禁 spinner；

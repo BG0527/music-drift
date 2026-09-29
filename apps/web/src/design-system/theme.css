@@ -173,6 +173,11 @@
      契约见 DESIGN.md 的 motion 块同名字段；守卫：features/audio/playhead-smoothness.test.tsx。 */
   --motion-progress-duration: 250ms;
   --motion-progress-easing: linear;
+  /* W18.5 · B7：漂移类动效的缓动。此前 `water.css` 的两条常驻动画（drift / passage）
+     直接写 `ease-in-out` 字面量 —— 守卫只扫时间字面量，缓动一直是盲区。
+     为什么不是 entryEasing：漂移是往返动画（alternate），两端都要平滑收；
+     ease-out 只在末端收，回程会"弹一下"。 */
+  --motion-drift-easing: ease-in-out;
 
   /* ── 水域母题层（2026-09-24 amend · t43）：装饰强度与纹理周期 ──────────────
      契约在 DESIGN.md 的 `motif:` 块。组件/样式只能引用这里的 --motif-*，
