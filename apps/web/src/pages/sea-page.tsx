@@ -75,7 +75,13 @@ const SEA_TEXT_LINK = cn(
  * 仅：横向定值 px→%、`#fff`→等值 rgba、色值取 var(--color-*) token）。
  */
 const SEA_HALL_CSS = `
-.sea-hall{min-height:max(100dvh,900px)}
+/* t5 一屏收敛（docs/replica-gap.md §2.2 / P0-4）：旧值是一条写死 900px 的硬地板，
+   1280×800 下正是那多出来的 100px —— 已按守卫口径删除，只留视口高；md+ 钉死视口高
+   （本页全部块都绝对锚视口，高度变了只是"水位随窗"，构图不散）。<md 维持流式。 */
+.sea-hall{min-height:100dvh}
+@media (min-width:768px){
+  .sea-hall{height:100dvh;min-height:0;overflow:hidden}
+}
 
 /* ── 稿 .clip：水线之上是空气（天光），之下是沉在水里的盘面 ── */
 .sea-hall .clip{position:absolute;inset:0;overflow:hidden;z-index:0}
@@ -109,8 +115,12 @@ const SEA_HALL_CSS = `
 .sea-hall .zones ul{list-style:none;display:flex;gap:30px;margin-top:15px}
 .sea-hall .zones li{padding-bottom:7px;border-bottom:2px solid transparent;font-size:15px;letter-spacing:.04em;color:rgba(243,249,250,.5);cursor:pointer;transition:color var(--motion-hover-duration) var(--motion-entry-easing),border-color var(--motion-hover-duration) var(--motion-entry-easing)}
 .sea-hall .zones li .n{margin-left:6px;font-size:12px;color:rgba(243,249,250,.42)}
-.sea-hall .zones li[aria-selected='true']{color:var(--color-paper);border-bottom-color:var(--color-coral)}
+.sea-hall .zones li[aria-selected='true']{color:var(--color-paper);border-bottom-color:var(--color-coral);animation:sea-tab-pick var(--motion-entry-duration) var(--motion-entry-easing) both}
 .sea-hall .zones li[aria-selected='true'] .n{color:var(--color-glass)}
+/* t6 分区切换的确认动效（guidance：现在看的是哪个分区）。一次性「起-落」，
+   幅度取契约 hoverScale、时长/缓动取 --motion-* token；只动 transform，静止态 = 基态。 */
+@keyframes sea-tab-pick{0%{transform:scale(1)}50%{transform:scale(var(--motion-hover-scale))}100%{transform:scale(1)}}
+@media (prefers-reduced-motion:reduce){.sea-hall .zones li[aria-selected='true']{animation:none}}
 
 /* ── 稿：船队 —— 六支瓶子跨骑同一条水线；涟漪环的四段弧 = 四个段位 ── */
 .sea-hall .fleet{position:absolute;inset:0;list-style:none}
@@ -147,7 +157,10 @@ const SEA_HALL_CSS = `
 .sea-hall .tail .dot{display:inline-block;width:4px;height:4px;background:var(--color-coral);margin-right:9px}
 .sea-hall .pages{display:flex;align-items:center;gap:20px}
 .sea-hall .pages ol{list-style:none;display:flex;gap:8px}
-.sea-hall .pages button{display:flex;align-items:center;justify-content:center;width:26px;height:22px;padding:0;border:1px solid rgba(243,249,250,.16);border-radius:2px;font-family:var(--font-latin);font-size:12px;color:rgba(243,249,250,.66);background:transparent;cursor:pointer}
+.sea-hall .pages button{display:flex;align-items:center;justify-content:center;width:26px;height:22px;padding:0;border:1px solid rgba(243,249,250,.16);border-radius:2px;font-family:var(--font-latin);font-size:12px;color:rgba(243,249,250,.66);background:transparent;cursor:pointer;transition:transform var(--motion-hover-duration) var(--motion-entry-easing)}
+/* t3 微交互：分页按钮 hover 缩放（feedback —— 可点目标有回应；参数只引 --motion-* token，
+   只动 transform；reduced-motion 下由 motion.css 全局重置为瞬时状态变化） */
+.sea-hall .pages button:hover{transform:scale(var(--motion-hover-scale))}
 .sea-hall .pages button[aria-current='page']{position:relative;border-color:rgba(212,85,58,.62);background:rgba(212,85,58,.16);color:var(--color-paper)}
 
 /* ── 稿：空态 潮位退到最低，水线上空着 ── */
@@ -170,7 +183,7 @@ export function SeaPage() {
   const [zone, setZone] = useState<Zone>('COMPLETED');
 
   return (
-    <div className="sea-hall relative isolate">
+    <div className="sea-hall relative isolate md:h-[100dvh] md:overflow-hidden">
       <style>{SEA_HALL_CSS}</style>
 
       {/* 页级底图 + 水线 + 涟漪：稿的 .clip，位置照稿（main 之前、z-0、装饰 ⇒ 整块隐藏） */}
@@ -314,8 +327,8 @@ export function SeaPage() {
       </div>
 
       <main>
-        {/* 稿块 1：两行 meta */}
-        <div className="topbar">
+        {/* 稿块 1：两行 meta（t3：enter-fade 只淡入 —— 页级第一拍，guidance 起手） */}
+        <div className="topbar enter-fade">
           <p className="meta">音乐漂流瓶 · MUSIC DRIFT</p>
           <p className="meta">CATALOGUE OF THE OPEN SEA</p>
         </div>
@@ -325,8 +338,8 @@ export function SeaPage() {
           <i />
         </div>
 
-        {/* 稿块 3：页头 */}
-        <header className="hero">
+        {/* 稿块 3：页头（t3：enter-rise 主角唯一 —— 页头是本页第一眼，先于分区落位） */}
+        <header className="hero enter-rise">
           <h1>公海大厅</h1>
           <p className="lede">
             聆听那些经历漂流与合唱、完全绽放的终极乐章。作品一旦入海就不再漂流 —— 这里只能听，不能接。
@@ -343,8 +356,9 @@ export function SeaPage() {
             骨架/空/列表/错任何数据态都渲染；.zonegroup 是静态透传 div —— 不建立包含块，
             zones / fleet / 空态 / 三态块的绝对定位仍以 main 为含块，稿几何一像素不动 */}
         <div className="zonegroup" data-anchor="sea-list">
-          {/* 稿块 4：分区（两个分区 = 两个水位；计数位算不出真数 ⇒ 留空） */}
-          <div className="zones">
+          {/* 稿块 4：分区（两个分区 = 两个水位；计数位算不出真数 ⇒ 留空）
+              t3：stagger-1 错拍跟在页头之后（阅读序：meta → 页头 → 分区） */}
+          <div className="zones enter-rise stagger-1">
             <p className="meta">分区 · SECTIONS</p>
             <ul role="tablist" aria-label="分区">
               <li
@@ -455,7 +469,7 @@ function SeaZoneList({ zone }: { zone: Zone }) {
 
   /** 稿 `footer.foot`：tail（本页实数）+ .pages（PAGE / 页码 / 状态位）。 */
   const foot = (count: number) => (
-    <footer className="foot">
+    <footer className="foot enter-fade">
       <p className="meta tail">
         <span className="dot" aria-hidden="true" />
         {ZONE_LABEL[zone]} · 本页 <span className="mono">{String(count)}</span> 支

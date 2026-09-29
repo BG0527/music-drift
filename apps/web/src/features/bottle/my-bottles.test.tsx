@@ -86,6 +86,33 @@ describe('我参与过的漂流瓶（服务端）', () => {
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
   });
 
+  /**
+   * t17 空态构图（用户打回后按**参考** `site/me.html` + `page-me.js showEmpty({target: windowBox})`）：
+   * 空态说明**落在 `.window` 里**（窗是这一块的展示位），不套独立右卡 —— 参考没有那张卡，
+   * 而"说明在窗里"正好消掉用户指出的「左半屏大片空区」。
+   * （t14 的「右列卡」方案被 t17 的参考对齐取代：同一目标，走参考自己的做法。）
+   */
+  it('t17 空态构图：说明落在 .window 内（参考 showEmpty target=windowBox），没有独立右卡', async () => {
+    const { container } = renderWithProviders(<MyBottles />, {
+      handlers: [
+        { path: /\/api\/me\/bottles/, respond: () => ({ body: { items: [], nextCursor: null } }) },
+      ],
+    });
+    await screen.findByText(/你还没有参与过任何漂流瓶/);
+
+    const win = container.querySelector('.window');
+    expect(win, '缺 .window 列表窗').not.toBeNull();
+    // 说明必须在窗里（左半屏不留白）
+    expect(win!.textContent, '空态说明必须在 window 里').toContain('你还没有参与过任何漂流瓶');
+    expect(win!.querySelectorAll('li'), '空态没有卡片').toHaveLength(0);
+    // 参考没有独立空态卡/两栏带
+    expect(container.querySelector('[data-device="crate-empty"]')).toBeNull();
+    expect(container.querySelector('[data-device="crate-band"]')).toBeNull();
+    // 出口语义原样保留（两个出口都在）
+    expect(screen.getByRole('link', { name: '去河道捞一个' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: '自己发起一支' })).toBeInTheDocument();
+  });
+
   it('未登录（401）时说明要登录并给出口（组件自身不许崩）', async () => {
     renderWithProviders(<MyBottles />, {
       handlers: [

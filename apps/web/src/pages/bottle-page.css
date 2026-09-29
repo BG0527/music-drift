@@ -297,7 +297,7 @@
     /* 站点顶栏（fixed top-10 + min-h-11 ⇒ 与参考同一条让位基线 44px）压住视口顶一条
        ⇒ 页头那一列（面包屑 26u → 说明 184u）同进退：--nav-reserve = 44 − 26·u */
     --nav-reserve: max(0px, calc(44px - 26 * var(--u)));
-    overflow: hidden;
+    overflow: clip;
   }
 
   /* ── 顶栏 crumb（稿 .crumb：26·u + 让位） ── */
@@ -961,16 +961,13 @@
     position: relative;
   }
 
-  .bottle-page .listenCol h2 span,
-  .bottle-page .bf-full-preview p {
+  .bottle-page .listenCol h2 span {
     display: none;
   }
 
   .bottle-page .bf-full-preview {
-    position: absolute;
-    right: 0;
-    top: -7px;
-    margin: 0;
+    position: static;
+    margin-top: 10px;
   }
 
   .bottle-page .transport .bar {
@@ -978,6 +975,20 @@
     width: auto;
     min-width: 0;
   }
+}
+
+.bottle-page .bf-full-preview { margin-top: 12px; min-width: 0; }
+.bottle-page .sequential-player audio { width: min(100%, 260px); height: 40px; }
+.bottle-page .listenCol .sequential-player { gap: 8px; }
+.bottle-page .listenCol .sequential-status { display: none; }
+.bottle-page .listenCol .sequential-status[role='alert'] { display: block; }
+.bottle-page .transport .bar { flex: 1 1 auto; min-width: 0; width: auto; }
+@media (min-width: 1024px) {
+  .bottle-page .listenCol .bf-full-preview { margin-top: 8px; }
+  .bottle-page .listenCol .sequential-player audio { flex: 1; min-width: 120px; }
+  .bottle-page .votes button::after { inset: -3px 0; }
+  .bottle-page .bp-status-item { pointer-events: none; }
+  .bottle-page .bp-status-item a, .bottle-page .bp-status-item button { pointer-events: auto; }
 }
 
 /* 1024×720 是桌面绝对布局的最紧边界：保留全部可用操作，把说明收成单行，
@@ -1004,6 +1015,11 @@
    缺口簇（录制入口）排到两栏**之前**（门禁：375 档 bottle-record 必须进首屏，
    t17 修前 1304 → 修后 ~560），剖面格位/图注仍排到两栏之后（order 3，同 t5 让位序）。 */
 @media (max-width: 1023px) {
+  .bottle-page { padding-top: 60px; }
+  .bottle-page .bp-head h1 { line-height: 1.2; margin-bottom: 8px; }
+  .bottle-page .bf-meta { line-height: 1.5; row-gap: 4px; }
+  .bottle-page .listenCol h2 { line-height: 1.4; row-gap: 4px; }
+  .bottle-page .bp-cols { flex-shrink: 0; }
   .bottle-page .bp-profile {
     display: contents;
   }

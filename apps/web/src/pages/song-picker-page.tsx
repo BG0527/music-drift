@@ -269,7 +269,7 @@ export function SongPickerPage() {
   const rawCount = catalog.length - cutCount;
 
   return (
-    <div className="relative isolate flex flex-col gap-6">
+    <div className="relative isolate flex flex-col gap-6 px-[5.28%] md:h-[100dvh] md:gap-4 md:overflow-hidden md:pb-3">
       {/* 稿 §8 背景三层：platter →（盆体在内容层）→ deep → glint；装饰零布局、token 驱动（本页守卫禁 rgba/hex） */}
       <span
         aria-hidden="true"
@@ -296,7 +296,7 @@ export function SongPickerPage() {
         回河道
       </Link>
 
-      <header className="relative flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+      <header className="enter-rise relative flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div className="flex flex-col">
           {/* 元信息用契约的 `.meta` 口径：11px + .24em + paper/50 */}
           <p className="font-latin text-[11px] tracking-[0.24em] text-paper/50">SIDE A · 未刻</p>
@@ -509,7 +509,7 @@ export function SongPickerPage() {
       {create.isError ? <ConflictNotice error={create.error} retryLabel="再试一次" /> : null}
 
       {/* 页脚（稿 §9）：12.5px 右对齐、无任何线；未登录底注带「先登录」出口（动线 G8） */}
-      <p className="text-[0.78125rem] leading-[1.6] text-muted md:self-end md:text-right">
+      <p className="text-[0.78125rem] leading-[1.6] text-muted md:mt-auto md:self-end md:text-right">
         {session.status === 'authed' ? (
           '发起之后你会拿到这支瓶子的匿名代号；别人看到的是代号，不是你的账号。'
         ) : (

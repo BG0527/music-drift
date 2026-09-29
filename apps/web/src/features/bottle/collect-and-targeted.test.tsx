@@ -16,6 +16,16 @@ import { renderWithProviders } from '../../test/harness';
 const BOTTLE_ID = '11111111-1111-4111-8111-111111111111';
 
 describe('收藏按钮', () => {
+  it('收藏失败显示可恢复错误而不是静默吞掉', async () => {
+    renderWithProviders(<CollectButton bottleId={BOTTLE_ID} />, { handlers: [
+      { path: '/api/me/collections', respond: () => ({ body: [] }) },
+      { method: 'POST', path: `/api/collections/${BOTTLE_ID}`, respond: () => ({
+        status: 500, body: { error: { message: '收藏暂时不可用，请重试。', violations: [] } },
+      }) },
+    ] });
+    fireEvent.click(await screen.findByRole('button', { name: '收藏这支作品' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('收藏暂时不可用，请重试。');
+  });
   it('未收藏时点一下收藏：POST 到 /api/collections/:id', async () => {
     const { fetchMock } = renderWithProviders(<CollectButton bottleId={BOTTLE_ID} />, {
       handlers: [

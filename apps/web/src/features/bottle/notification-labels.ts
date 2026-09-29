@@ -41,14 +41,14 @@ export function describeNotification(notification: NotificationLike): Notificati
     case 'MESSAGE_DELIVERED':
       return {
         label: '收到一条私密留言',
-        detail: `${titled(songTitle) || '你的漂流瓶'}回传到发起者手里了，留言已送达，去发起者那边可以看到。`,
+        detail: `${titled(songTitle) || '这支漂流瓶'}已回传到你手中，留言已送达；你与发送者在这条私密留言中可看到双方账号。`,
         tone: 'info',
         href: bottleId === null ? null : `/bottles/${bottleId}`,
       };
     case 'MESSAGE_UNDELIVERED':
       return {
         label: '你的留言未送达',
-        detail: `${titled(songTitle) || '这支漂流瓶'}在中途进了公海，留言没能交到发起者手里。下次可以再录一段带上一句话。`,
+        detail: `${titled(songTitle) || '这支漂流瓶'}已完成进入公海，或回传链已中断；留言未能交到你选择的接收者手中。`,
         tone: 'warning',
         href: bottleId === null ? null : `/bottles/${bottleId}`,
       };

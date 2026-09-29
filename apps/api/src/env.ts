@@ -1,7 +1,11 @@
 import { z } from 'zod';
 
 const EnvSchema = z.object({
-  PORT: z.coerce.number().int().positive().default(8787),
+  /**
+   * 默认 8788（用户裁决 2026-09-27：原回环端口被本机校园网工具占用 ⇒ vite 代理全 404；
+   * 8788 同时避开 127.0.0.1 与 0.0.0.0 两族冲突）。`.env` 的 `PORT=` 是运行时覆盖源。
+   */
+  PORT: z.coerce.number().int().positive().default(8788),
   HOST: z.string().min(1).default('0.0.0.0'),
   LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace', 'silent']).default('info'),
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),

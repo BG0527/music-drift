@@ -13,3 +13,15 @@ export const TEXT_LINK =
 /** 需要更醒目的（主行动级别的文字链接）。 */
 export const TEXT_LINK_STRONG =
   'inline-flex min-h-11 items-center gap-2 whitespace-nowrap text-[0.9375rem] font-semibold text-peacock underline';
+
+/**
+ * 边框式行动链接（ghost 按钮形态，landing 次级 CTA 用）。
+ * 同样带 `min-h-11` + `whitespace-nowrap`，design-discipline 的 `TEXT_LINK` 口径可静态识别。
+ * 过渡参数只引 `--motion-*` 契约 token（motion-web §2）。
+ */
+export const TEXT_LINK_GHOST =
+  'inline-flex min-h-11 items-center whitespace-nowrap rounded-base border border-muted px-6 text-[0.9375rem] font-semibold text-coral transition-[transform,colors] duration-[var(--motion-hover-duration)] ease-[var(--motion-entry-easing)] hover:scale-[1.03] focus-visible:ring-2 focus-visible:ring-coral focus-visible:ring-offset-2 focus-visible:ring-offset-ink';
+
+/** 实心主行动链接（coral 填充 + ink 文字；landing 链尾「去开始体验」）。 */
+export const TEXT_LINK_PRIMARY =
+  'inline-flex min-h-11 items-center whitespace-nowrap rounded-base bg-coral px-8 text-[1rem] font-semibold text-ink transition-[transform,colors] duration-[var(--motion-hover-duration)] ease-[var(--motion-entry-easing)] hover:scale-[1.03] focus-visible:ring-2 focus-visible:ring-coral focus-visible:ring-offset-2 focus-visible:ring-offset-ink';

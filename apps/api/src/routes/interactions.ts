@@ -17,15 +17,13 @@ import {
   DEFAULT_POLICY,
   attachPrivateMessage,
   castVote,
-  evaluateBadges,
-  participants,
-  seaZoneOf,
   visibleMessagesFor,
 } from '@music-drift/shared/domain';
 import { canDislike } from '@music-drift/shared/audio';
 import {
   AttachPrivateMessageRequestSchema,
   CastVoteRequestSchema,
+  CreateReportRequestSchema,
   SubmitListenProgressRequestSchema,
   UuidSchema,
 } from '@music-drift/shared';
@@ -326,15 +324,20 @@ export function registerInteractionRoutes(
     if (actor === null) {
       return sendProblem(reply, transportProblem('UNAUTHENTICATED'));
     }
-    const body = z
-      .object({
-        targetType: z.enum(['BOTTLE', 'SEGMENT', 'MESSAGE']),
-        targetId: UuidSchema,
-        reason: z.string().min(1).max(500),
-      })
-      .safeParse(request.body);
+    const body = CreateReportRequestSchema.safeParse(request.body);
     if (!body.success) {
       return sendProblem(reply, transportProblem('INVALID_BODY'));
+    }
+    if (body.data.targetType === 'COMMENT') {
+      const comments = await db.query<{ author_id: string }>(
+        `select author_id from public_comments where id = $1 and deleted_at is null`,
+        [body.data.targetId],
+      );
+      const comment = comments[0];
+      if (comment === undefined) return sendProblem(reply, transportProblem('NOT_FOUND'));
+      if (comment.author_id === actor.user.id) {
+        return sendProblem(reply, transportProblem('FORBIDDEN'));
+      }
     }
     await db.query(
       `insert into reports (id, target_type, target_id, reporter_id, reason, status, created_at)
@@ -396,35 +399,4 @@ export function registerInteractionRoutes(
       : reply.code(204).send();
   });
 
-  /** 徽章：派生判定（ADR-014 #1 不落库）；只返回本人参与过、且已定稿（在公海）的作品。 */
-  app.get('/api/me/badges', async (request, reply) => {
-    const actor = await actors.resolve(request);
-    if (actor === null) {
-      return sendProblem(reply, transportProblem('UNAUTHENTICATED'));
-    }
-    const seaRows = await db.query<{ id: string }>(
-      `select id from bottles where status = 'SEA' order by updated_at desc limit 200`,
-    );
-    const awards = [];
-    for (const row of seaRows) {
-      const state = await store.loadState(row.id);
-      if (state === null || seaZoneOf(state) === null) {
-        continue;
-      }
-      if (!participants(state).some((record) => record.userId === actor.user.id)) {
-        continue;
-      }
-      for (const award of evaluateBadges(state).filter(
-        (candidate) => candidate.userId === actor.user.id,
-      )) {
-        awards.push({
-          userId: award.userId,
-          kind: award.kind,
-          bottleId: award.bottleId,
-          grantedAt: new Date(award.grantedAt).toISOString(),
-        });
-      }
-    }
-    return reply.send(awards);
-  });
 }

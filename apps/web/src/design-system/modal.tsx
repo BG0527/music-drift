@@ -144,7 +144,7 @@ export function Modal({
       aria-hidden={open ? undefined : 'true'}
       inert={open ? undefined : true}
       className={cn(
-        'fixed inset-0 flex items-center justify-center p-6',
+        'z-overlay fixed inset-0 flex items-center justify-center p-6',
         open ? 'enter-fade' : 'exit-fade',
       )}
     >

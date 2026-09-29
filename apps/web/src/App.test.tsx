@@ -12,7 +12,13 @@ describe('App 入口', () => {
     window.history.replaceState({}, '', '/');
   });
 
-  it('默认落在首页，未登录也能浏览（不整页重定向）', async () => {
+  /**
+   * ⚠️ 断言原文 → 新文（用户 t12 裁决，覆盖旧「默认落在河道」口径）：
+   * 原文：默认落在首页（`/` 规范化为 /river），未登录也能浏览河道。
+   * 新文：`/` 直接渲染 landing（翻页式介绍页）；未登录浏览的是 landing，
+   *      功能页（/river、/sea、/settings）访客进 /login（守卫见 landing-page.test）。
+   */
+  it('默认落在 landing（根路由直达介绍页，不整页重定向）', async () => {
     const mock = installFetchMock([
       {
         path: '/api/sea?zone=COMPLETED&limit=30',
@@ -21,8 +27,8 @@ describe('App 入口', () => {
     ]);
     try {
       render(<App />);
-      expect(await screen.findByRole('heading', { name: '暖流河道' })).toBeInTheDocument();
-      // 返工令（2026-09-27 二轮）：侧边栏/底栏已删，导航 = 页面上方常显 top-nav（四入口）
+      expect(await screen.findByRole('heading', { level: 1 })).toBeInTheDocument();
+      expect(window.location.pathname).toBe('/');
       expect(screen.getByTestId('top-nav')).toBeInTheDocument();
       expect(screen.getByRole('link', { name: '河道' })).toBeInTheDocument();
       expect(screen.queryByRole('navigation', { name: '主导航' })).not.toBeInTheDocument();

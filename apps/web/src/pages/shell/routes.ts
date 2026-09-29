@@ -35,7 +35,8 @@ interface RoutePattern {
 
 const PATTERNS: readonly RoutePattern[] = [
   { name: 'login', segments: ['login'] },
-  // `home` 只作为**旧入口**保留在表里（否则 `/` 会掉进 404）：router 会把 `/` 规范化成 `/river`
+  // `home` = `/`：**t12 用户新裁决** —— 根路由直接渲染 landing（翻页式介绍页）。
+  // 原「`/` 是河道旧入口、规范化成 /river」的第十三轮裁决已被覆盖（canonicalHref 已删除）。
   { name: 'home', segments: [] },
   { name: 'new', segments: ['new'] },
   { name: 'river', segments: ['river'] },
@@ -55,14 +56,6 @@ function toSegments(pathname: string): string[] {
 }
 
 /** 把一条 pathname 解析成「哪一页 + 参数」；认不出来就是 `notFound`（页面渲染 404 空态，不白屏）。 */
-/**
- * 旧入口 `/` ⇒ 河道（canonical `/river`）。**唯一的 URL 规范化点**：匹配路由之前先过它
- * （河道页合并，用户第十三轮 ①）。
- */
-export function canonicalHref(pathname: string): string {
-  return pathname === '/' ? '/river' : pathname;
-}
-
 export function matchRoute(pathname: string): RouteMatch {
   const segments = toSegments(pathname);
   for (const pattern of PATTERNS) {
@@ -98,7 +91,7 @@ export function buildPath(name: RouteName, params: Record<string, string> = {}):
 }
 
 export interface AppNavItem {
-  key: 'river' | 'sea' | 'mine' | 'settings' | 'admin';
+  key: 'intro' | 'river' | 'sea' | 'mine' | 'settings' | 'admin';
   label: string;
   href: string;
 }
@@ -111,6 +104,13 @@ export interface AppNavItem {
 /** 审核台入口：只在 `session.isAdmin` 时追加（**权限判定在服务端**，这里只是别露错入口）。 */
 export const ADMIN_NAV_ITEM: AppNavItem = { key: 'admin', label: '审核台', href: '/admin' };
 
+/**
+ * 项目介绍 landing 入口（**t12 新裁决**：landing 收编进根路由 `/`，顶栏「介绍」指向 `/`）。
+ * **不进 `NAV_ITEMS`** —— 那张表是产品四入口（routes.test 钉住顺序），
+ * 介绍页是站内元入口，由外壳单独追加在最前。
+ */
+export const INTRO_NAV_ITEM: AppNavItem = { key: 'intro', label: '介绍', href: '/' };
+
 export const NAV_ITEMS: readonly AppNavItem[] = [
   { key: 'river', label: '河道', href: '/river' },
   { key: 'sea', label: '公海', href: '/sea' },
@@ -118,10 +118,11 @@ export const NAV_ITEMS: readonly AppNavItem[] = [
   { key: 'settings', label: '设置', href: '/settings' },
 ];
 
-/** 侧栏高亮归属：漂流瓶页与日志属于「河道」。 */
+/** 侧栏高亮归属：landing（`/`）归「介绍」入口；漂流瓶页与日志属于「河道」。 */
 export function activeNavKey(name: RouteName): AppNavItem['key'] | null {
   switch (name) {
     case 'home':
+      return 'intro';
     case 'river':
     case 'bottle':
     case 'bottleLog':

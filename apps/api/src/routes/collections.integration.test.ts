@@ -28,7 +28,7 @@ describe('收藏：仅限已完成公海作品（API 层功能码）', () => {
     const response = await app.inject({
       method: 'POST',
       url: '/api/auth/register',
-      payload: { handle, email: handle + '@example.com', password: PASSWORD },
+      payload: { account: handle, password: PASSWORD },
     });
     const cookie = response.cookies.find((entry) => entry.name === 'mdb_session');
     return cookie === undefined ? '' : cookie.name + '=' + cookie.value;

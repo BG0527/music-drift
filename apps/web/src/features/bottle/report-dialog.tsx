@@ -13,7 +13,7 @@ import { ConflictNotice } from './conflict-notice';
 
 export interface ReportDialogProps {
   open: boolean;
-  targetType: 'BOTTLE' | 'SEGMENT' | 'MESSAGE';
+  targetType: 'BOTTLE' | 'SEGMENT' | 'MESSAGE' | 'COMMENT';
   targetId: string;
   onClose: () => void;
 }
@@ -22,6 +22,7 @@ const TARGET_LABEL: Record<ReportDialogProps['targetType'], string> = {
   BOTTLE: '这支漂流瓶',
   SEGMENT: '这一段唱',
   MESSAGE: '这条留言',
+  COMMENT: '这条评论',
 };
 
 export function ReportDialog({ open, targetType, targetId, onClose }: ReportDialogProps) {

@@ -1,5 +1,4 @@
 import { describe, expect, it } from 'vitest';
-import { evaluateBadges } from './badges';
 import { chooseResolution, drawBottle, recordSegment } from './bottle';
 import {
   gaps,
@@ -271,11 +270,6 @@ describe('ADR-015 Q1（captain 裁决）— 父链指向前一段的作者，SYS
 
     const finished = resolve(state, ctx, 'u:A', 'SEA');
     expect(finished.returnCompleted).toBe(true);
-    expect(evaluateBadges(finished).map((award) => `${award.userId}:${award.kind}`)).toEqual([
-      'u:A:RETURN_COMPLETED',
-      'u:NEW:DRIFT_PARTICIPANT',
-      'u:C:DRIFT_PARTICIPANT',
-    ]);
   });
 });
 

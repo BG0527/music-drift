@@ -4,7 +4,7 @@
  * 顺序（任务书给定的顺序，本文件按同一顺序实现）：
  *   预置演示账号 → 登录/注册 → 选歌（/new.html 建 DRAFT 瓶）→ 接唱（真 MediaRecorder，≥15 秒）
  *   → 瓶子详情（试听 / 投票 / 留言）→ 三选一去向 → 河道捞取（换一个接棒账号）→ 接唱 → 真留言
- *   → 漂流日志 → 公海（点「听这支作品」直达瓶子详情）→ 我的（**演示账号**的收藏/徽章/通知都要 > 0）
+ *   → 漂流日志 → 公海（点「听这支作品」直达瓶子详情）→ 我的（**演示账号**的收藏/通知都要 > 0）
  *   → 通知「标记已读」就地生效。
  *
  * ⚠️ W7 起流程变了（用户第 3 轮需求，`docs/deploy-plan-html.md` §17）：**公海详情页已删除**，
@@ -261,15 +261,14 @@ async function main() {
     step('0. 预置演示账号（seed-demo 的声明式保证）');
     const seeded = await ensureDemoData({ base: BASE, log: () => {} });
     check(
-      '演示账号在「我的」页有内容（参与过 ≥2 · 收藏 ≥1 · 徽章 ≥1 · 未读通知 ≥1）',
+      '演示账号在「我的」页有内容（参与过 ≥2 · 收藏 ≥1 · 未读通知 ≥1）',
       seeded.participated >= 2 &&
         seeded.completedSea >= 1 &&
         seeded.inRiver >= 1 &&
         seeded.collections >= 1 &&
-        seeded.badges >= 1 &&
         seeded.unread >= 1,
       `参与过 ${String(seeded.participated)}（完整入海 ${String(seeded.completedSea)} · 河道 ${String(seeded.inRiver)}）` +
-        ` 收藏 ${String(seeded.collections)} 徽章 ${String(seeded.badges)} 通知 ${String(seeded.notifications)} 未读 ${String(seeded.unread)}`,
+        ` 收藏 ${String(seeded.collections)} 通知 ${String(seeded.notifications)} 未读 ${String(seeded.unread)}`,
     );
 
     // ─────────────────────────────────────────────────────────── 1. 登录
@@ -616,7 +615,7 @@ async function main() {
     );
 
     // ─────────────────────────────────────────────────────────── 9. 我的（演示账号）
-    step('9. 我的（/me.html，演示账号）—— 收藏 / 徽章 / 通知都要有内容');
+    step('9. 我的（/me.html，演示账号）—— 收藏 / 通知都要有内容');
     const judge = await openSession(browser, 'demo');
     await signInThroughUi(judge.page, DEMO, { register: false, next: '/me.html' });
     await judge.page.waitForFunction(() => document.documentElement.dataset.pageReady === 'me');
@@ -628,7 +627,6 @@ async function main() {
       `参与过 ${String(meData.participated)}（完整入海 ${String(meData.completedSea)} · 河道/持有中 ${String(meData.inRiver)}）`,
     );
     check('「我的」接口侧：收藏 ≥1', meData.collections >= 1, `收藏 ${String(meData.collections)} 件`);
-    check('「我的」接口侧：徽章 ≥1', meData.badges >= 1, `徽章 ${String(meData.badges)} 枚`);
     check(
       '「我的」接口侧：通知 ≥1 且有未读',
       meData.notifications >= 1 && meData.unread >= 1,
@@ -640,24 +638,21 @@ async function main() {
       const rowsOf = (pocket) => [...(pocket?.querySelectorAll('.mrow') ?? [])];
       const labelsOf = (rows) => rows.map((row) => row.querySelector('.lab')?.textContent ?? '');
       const collectionRows = rowsOf(pockets[0]);
-      const badgeRows = rowsOf(pockets[1]);
       return {
         cards: document.querySelectorAll('.window ul > li').length,
         crate: document.querySelector('.crate .chead .cat')?.textContent ?? '',
         collections: collectionRows.length,
-        badges: badgeRows.length,
         messages: document.querySelectorAll('.msgs ul > li').length,
         unreadPills: document.querySelectorAll('.msgs .mrow .pill').length,
         collectedLabels: labelsOf(collectionRows),
-        badgeLabels: labelsOf(badgeRows),
         messageLabels: [...document.querySelectorAll('.msgs .mrow .lab')].map((node) => node.textContent ?? ''),
       };
     });
     check(
-      '「我的」页面侧：漂流卡 ≥2 且收藏/徽章/消息三块都非空（构图未坏：都不是空态）',
-      meDom.cards >= 2 && meDom.collections >= 1 && meDom.badges >= 1 && meDom.messages >= 1,
+      '「我的」页面侧：漂流卡 ≥2 且收藏/消息都非空（构图未坏：都不是空态）',
+      meDom.cards >= 2 && meDom.collections >= 1 && meDom.messages >= 1,
       `卡片=${String(meDom.cards)}（${meDom.crate.trim()}）收藏行=${String(meDom.collections)}[${meDom.collectedLabels.join('、')}]` +
-        ` 徽章行=${String(meDom.badges)}[${meDom.badgeLabels.join('、')}] 消息行=${String(meDom.messages)}[${meDom.messageLabels.join('、')}]`,
+        ` 消息行=${String(meDom.messages)}[${meDom.messageLabels.join('、')}]`,
     );
     check('「我的」页面侧：至少一条通知是未读态', meDom.unreadPills >= 1, `未读标记 ${String(meDom.unreadPills)} 条`);
     await judge.page.screenshot({ path: join(SHOTS, 'w3-me-demo.png') });
@@ -839,19 +834,17 @@ async function waitForLikeCount(client, bottleId, index) {
   return detail.segments.find((candidate) => candidate.index === index)?.likeCount ?? 0;
 }
 
-/** 「我的」页的三块面板（接口侧口径）。 */
+/** 「我的」页的收藏与通知面板（接口侧口径）。 */
 async function collectMe(client) {
   const bottles = await api(client, 'GET', '/api/me/bottles');
   const notifications = await api(client, 'GET', '/api/notifications');
   const collections = await api(client, 'GET', '/api/me/collections');
-  const badges = await api(client, 'GET', '/api/me/badges');
   const items = bottles.items ?? [];
   return {
     participated: items.length,
     completedSea: items.filter((item) => item.status === 'SEA' && item.seaZone === 'COMPLETED').length,
     inRiver: items.filter((item) => item.status === 'IN_RIVER' || item.status === 'HELD').length,
     collections: collections.length,
-    badges: badges.length,
     notifications: (notifications.items ?? []).length,
     unread: (notifications.items ?? []).filter((row) => row.readAt === null).length,
   };

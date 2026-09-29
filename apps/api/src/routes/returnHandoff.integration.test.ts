@@ -55,7 +55,7 @@ async function register(prefix: string): Promise<string> {
   const response = await app.inject({
     method: 'POST',
     url: '/api/auth/register',
-    payload: { handle, email: handle + '@example.com', password: PASSWORD },
+    payload: { account: handle, password: PASSWORD },
   });
   expect(response.statusCode).toBe(201);
   const cookie = response.cookies.find((entry) => entry.name === 'mdb_session');

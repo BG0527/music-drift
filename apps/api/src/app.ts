@@ -10,6 +10,7 @@ import { registerInteractionRoutes } from './routes/interactions';
 import { registerSeaRoutes } from './routes/sea';
 import { registerRiverRoutes } from './routes/river';
 import { registerSongRoutes } from './routes/songs';
+import { registerCommentRoutes } from './routes/comments';
 import type { ScryptParams } from './auth/password';
 import { createSegmentAudioRepository } from './audio/repository';
 import { createSegmentAudioAuthorizer, registerSegmentAudioRoutes } from './audio/routes';
@@ -108,6 +109,7 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
     registerSeaRoutes(app, { db: options.db, store, clock });
     registerInteractionRoutes(app, { db: options.db, store, clock });
     registerCollectionRoutes(app, { db: options.db, store, clock });
+    registerCommentRoutes(app, { db: options.db, clock });
     registerAdminRoutes(app, { db: options.db, clock });
     registerRiverRoutes(app, {
       db: options.db,

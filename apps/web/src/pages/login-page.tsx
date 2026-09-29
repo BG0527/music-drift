@@ -216,13 +216,13 @@ export function LoginPage() {
 
       {/* §4.6 誓词（稿 mt40 / 13.5px / 1.9） */}
       <p className="mt-10 max-w-[452px] text-[0.84375rem] leading-[1.9] text-muted">
-        不用真名，不用露脸，只要一段声音。同一个瓶子里，不同的人看到的是不同的匿名代号。
+        不用真名，不用露脸，只要一段声音。同一支瓶子里的接唱代号保持不变。
       </p>
     </form>
   );
 
   return (
-    <main className="relative isolate flex min-h-[100dvh] flex-col bg-ink px-6 pb-6 pt-8 text-paper md:px-12">
+    <main className="relative isolate flex min-h-[100dvh] flex-col bg-ink px-6 pb-6 pt-8 text-paper md:px-12 md:h-[100dvh] md:overflow-hidden">
       {/* 世界的底与上方：盘面沟槽 + 斜穿的掠光（背景层，零布局高度） */}
       <Platter />
       <Glint />
@@ -284,7 +284,7 @@ export function LoginPage() {
       </div>
 
       <div className="flex flex-1 flex-col gap-6 pr-[84px] md:pr-[144px]">
-        <header className="flex flex-col gap-4">
+        <header className="enter-fade flex flex-col gap-4">
           {/* §2 标题：稿 52px/700/1.1/.005em */}
           <h1 className="text-[1.625rem] font-bold leading-[1.05] tracking-[0.005em] text-paper md:text-[3.25rem]">
             每一段旋律，

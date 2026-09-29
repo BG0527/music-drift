@@ -39,10 +39,17 @@ interface ReportRow {
   action: string | null;
   reviewed_at: Date | null;
   created_at: Date;
+  comment_content: string | null;
+  comment_author_account: string | null;
+  comment_deleted_at: Date | null;
 }
 
-const REPORT_SELECT = `select id, target_type, target_id, reporter_id, reason, status, action, reviewed_at, created_at
-  from reports`;
+const REPORT_SELECT = `select r.id, r.target_type, r.target_id, r.reporter_id, r.reason, r.status,
+  r.action, r.reviewed_at, r.created_at, pc.content as comment_content,
+  cu.handle as comment_author_account, pc.deleted_at as comment_deleted_at
+  from reports r
+  left join public_comments pc on r.target_type = 'COMMENT' and pc.id = r.target_id
+  left join users cu on cu.id = pc.author_id`;
 
 function toReport(row: ReportRow) {
   return ReportSchema.parse({
@@ -54,6 +61,21 @@ function toReport(row: ReportRow) {
     action: row.action,
     createdAt: row.created_at.toISOString(),
     reviewedAt: row.reviewed_at === null ? null : row.reviewed_at.toISOString(),
+    ...(row.target_type === 'COMMENT'
+      ? {
+          commentEvidence:
+            row.comment_content === null || row.comment_author_account === null
+              ? null
+              : {
+                  content: row.comment_content,
+                  authorAccount: row.comment_author_account,
+                  deletedAt:
+                    row.comment_deleted_at === null
+                      ? null
+                      : row.comment_deleted_at.toISOString(),
+                },
+        }
+      : {}),
   });
 }
 
@@ -70,10 +92,11 @@ const DecisionSchema = z.object({
 
 /** 动作 → 允许的举报对象类型（不匹配就是 422，绝不是静默成功）。 */
 const ACTION_TARGETS: Record<string, readonly string[]> = {
-  NONE: ['BOTTLE', 'SEGMENT', 'MESSAGE'],
+  NONE: ['BOTTLE', 'SEGMENT', 'MESSAGE', 'COMMENT'],
   REMOVE_SEGMENT: ['SEGMENT'],
   RESTORE_SEGMENT: ['SEGMENT'],
   REMOVE_BOTTLE: ['BOTTLE'],
+  REMOVE_COMMENT: ['COMMENT'],
   BAN_USER: ['BOTTLE', 'SEGMENT', 'MESSAGE'],
 };
 
@@ -107,11 +130,11 @@ export function registerAdminRoutes(app: FastifyInstance, options: AdminRoutesOp
     }
     const rows =
       query.data.status === 'ALL'
-        ? await options.db.query<ReportRow>(`${REPORT_SELECT} order by created_at asc limit $1`, [
+        ? await options.db.query<ReportRow>(`${REPORT_SELECT} order by r.created_at asc limit $1`, [
             query.data.limit,
           ])
         : await options.db.query<ReportRow>(
-            `${REPORT_SELECT} where status = $1 order by created_at asc limit $2`,
+            `${REPORT_SELECT} where r.status = $1 order by r.created_at asc limit $2`,
             [query.data.status, query.data.limit],
           );
     return reply.send(rows.map(toReport));
@@ -129,7 +152,7 @@ export function registerAdminRoutes(app: FastifyInstance, options: AdminRoutesOp
       return sendProblem(reply, transportProblem('INVALID_BODY'));
     }
 
-    const rows = await options.db.query<ReportRow>(`${REPORT_SELECT} where id = $1`, [
+    const rows = await options.db.query<ReportRow>(`${REPORT_SELECT} where r.id = $1`, [
       params.data.id,
     ]);
     const report = rows[0];
@@ -185,7 +208,7 @@ export function registerAdminRoutes(app: FastifyInstance, options: AdminRoutesOp
       );
     });
 
-    const updated = await options.db.query<ReportRow>(`${REPORT_SELECT} where id = $1`, [
+    const updated = await options.db.query<ReportRow>(`${REPORT_SELECT} where r.id = $1`, [
       report.id,
     ]);
     return reply.send(toReport(updated[0] as ReportRow));
@@ -240,6 +263,12 @@ async function applyAction(
       return;
     case 'REMOVE_BOTTLE':
       await removeBottle({ tx, bottleId: report.target_id, at: now });
+      return;
+    case 'REMOVE_COMMENT':
+      await tx.query(
+        `update public_comments set deleted_at = coalesce(deleted_at, $2) where id = $1`,
+        [report.target_id, now],
+      );
       return;
     case 'BAN_USER':
       if (ownerId === null) return;

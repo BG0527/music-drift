@@ -8,8 +8,8 @@
  * 装依赖被 AGENTS §7 禁止，所以只用 `node:http`。
  *
  * 用法：
- *   node tools/site-server.mjs                      # 站点 5173，反代到 API 8787
- *   node tools/site-server.mjs --port=5173 --api-port=8787
+ *   node tools/site-server.mjs                      # 站点 5173，反代到 API 8788
+ *   node tools/site-server.mjs --port=5173 --api-port=8788
  *
  * 路由：
  *   `/`            → 302 → `/river.html`
@@ -86,9 +86,9 @@ function readPort(argv, name, fallback) {
 }
 
 const argv = process.argv.slice(2);
-const DEFAULT_API_PORT = Number.parseInt(process.env.API_PORT ?? '8787', 10);
+const DEFAULT_API_PORT = Number.parseInt(process.env.API_PORT ?? '8788', 10);
 const PORT = readPort(argv, 'port', 5173);
-const API_PORT = readPort(argv, 'api-port', Number.isInteger(DEFAULT_API_PORT) ? DEFAULT_API_PORT : 8787);
+const API_PORT = readPort(argv, 'api-port', Number.isInteger(DEFAULT_API_PORT) ? DEFAULT_API_PORT : 8788);
 
 function isProxyPath(pathname) {
   return pathname === '/healthz' || pathname === '/api' || pathname.startsWith('/api/');

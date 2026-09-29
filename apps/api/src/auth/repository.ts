@@ -17,8 +17,6 @@ export interface UserRow {
   id: string;
   /** **账号**（W6 正名 = `account`）：注册/登录都只用它。 */
   handle: string;
-  /** 邮箱可空（账号注册的用户没有邮箱）；旧注册写法仍会写入。 */
-  email: string | null;
   passwordHash: string;
   role: 'USER' | 'ADMIN';
   /** 封禁时间（t12 审核台）；非空 = 被封禁，身份解析层直接拒绝（401）。 */
@@ -33,7 +31,7 @@ export interface AnonCodeRow {
 }
 
 export type CreateUserResult =
-  { ok: true; user: UserRow } | { ok: false; code: 'EMAIL_TAKEN' | 'HANDLE_TAKEN' };
+  { ok: true; user: UserRow } | { ok: false; code: 'HANDLE_TAKEN' };
 
 export type AssignAnonCodeResult =
   { ok: true; code: string; created: boolean } | { ok: false; code: 'ANON_CODE_TAKEN' };
@@ -41,8 +39,6 @@ export type AssignAnonCodeResult =
 export interface CreateUserInput {
   /** 账号（= `users.handle`）。 */
   handle: string;
-  /** 邮箱可省略（`null` = 账号注册，没有邮箱）。 */
-  email: string | null;
   passwordHash: string;
   role?: 'USER' | 'ADMIN' | undefined;
   /** 仅供测试/种子指定 id（幂等重放）；缺省由 DB 生成。 */
@@ -66,8 +62,6 @@ export interface AuthRepository {
   createUser(input: CreateUserInput): Promise<CreateUserResult>;
   /** 按**账号**（= `handle`，大小写敏感）查用户：W6 起登录/注册的主路径。 */
   findUserByHandle(handle: string): Promise<UserRow | null>;
-  /** 按邮箱查用户：仅旧登录写法（`{ email, password }`）使用。 */
-  findUserByEmail(email: string): Promise<UserRow | null>;
   findUserById(id: string): Promise<UserRow | null>;
   createSession(input: CreateSessionInput): Promise<void>;
   findSessionByTokenHash(tokenHash: string): Promise<SessionWithUser | null>;
@@ -87,7 +81,6 @@ export interface AuthRepository {
 interface UserDbRow {
   id: string;
   handle: string;
-  email: string | null;
   password_hash: string;
   role: string;
   banned_at: Date | null;
@@ -118,7 +111,6 @@ function toUserRow(row: UserDbRow): UserRow {
   return {
     id: row.id,
     handle: row.handle,
-    email: row.email,
     passwordHash: row.password_hash,
     role: row.role === 'ADMIN' ? 'ADMIN' : 'USER',
     bannedAt: row.banned_at,
@@ -131,13 +123,12 @@ export function createAuthRepository(db: Db): AuthRepository {
     async createUser(input: CreateUserInput): Promise<CreateUserResult> {
       try {
         const rows = await db.query<UserDbRow>(
-          `insert into users (id, handle, email, password_hash, role)
-           values ($1, $2, $3, $4, $5)
-           returning id, handle, email, password_hash, role, created_at`,
+          `insert into users (id, handle, password_hash, role)
+           values ($1, $2, $3, $4)
+           returning id, handle, password_hash, role, banned_at, created_at`,
           [
             input.id ?? randomUUID(),
             input.handle,
-            input.email,
             input.passwordHash,
             input.role ?? 'USER',
           ],
@@ -149,9 +140,6 @@ export function createAuthRepository(db: Db): AuthRepository {
         return { ok: true, user: toUserRow(row) };
       } catch (error) {
         const constraint = uniqueViolationConstraint(error);
-        if (constraint === 'users_email_uniq') {
-          return { ok: false, code: 'EMAIL_TAKEN' };
-        }
         if (constraint === 'users_handle_uniq') {
           return { ok: false, code: 'HANDLE_TAKEN' };
         }
@@ -161,17 +149,8 @@ export function createAuthRepository(db: Db): AuthRepository {
 
     async findUserByHandle(handle: string): Promise<UserRow | null> {
       const rows = await db.query<UserDbRow>(
-        `select id, handle, email, password_hash, role, banned_at, created_at from users where handle = $1`,
+        `select id, handle, password_hash, role, banned_at, created_at from users where handle = $1`,
         [handle],
-      );
-      const row = rows[0];
-      return row === undefined ? null : toUserRow(row);
-    },
-
-    async findUserByEmail(email: string): Promise<UserRow | null> {
-      const rows = await db.query<UserDbRow>(
-        `select id, handle, email, password_hash, role, banned_at, created_at from users where email = $1`,
-        [email],
       );
       const row = rows[0];
       return row === undefined ? null : toUserRow(row);
@@ -179,7 +158,7 @@ export function createAuthRepository(db: Db): AuthRepository {
 
     async findUserById(id: string): Promise<UserRow | null> {
       const rows = await db.query<UserDbRow>(
-        `select id, handle, email, password_hash, role, banned_at, created_at from users where id = $1`,
+        `select id, handle, password_hash, role, banned_at, created_at from users where id = $1`,
         [id],
       );
       const row = rows[0];
@@ -195,7 +174,7 @@ export function createAuthRepository(db: Db): AuthRepository {
 
     async findSessionByTokenHash(tokenHash: string): Promise<SessionWithUser | null> {
       const rows = await db.query<UserDbRow & { expires_at: Date }>(
-        `select u.id, u.handle, u.email, u.password_hash, u.role, u.banned_at, u.created_at, s.expires_at
+        `select u.id, u.handle, u.password_hash, u.role, u.banned_at, u.created_at, s.expires_at
          from sessions s
          join users u on u.id = s.user_id
          where s.token_hash = $1`,

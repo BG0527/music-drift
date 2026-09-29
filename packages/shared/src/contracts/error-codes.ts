@@ -12,6 +12,8 @@
  */
 export const API_RULE_CODES = [
   'COLLECTION_REQUIRES_FINISHED_WORK',
+  /** 创建事务锁瓶后发现作品已离海：客户端保留草稿并提示未发布。 */
+  'COMMENT_BOTTLE_LEFT_SEA',
   /**
    * 同一条举报已被裁决过、且这次裁决与上次**不同**（t12）。
    *

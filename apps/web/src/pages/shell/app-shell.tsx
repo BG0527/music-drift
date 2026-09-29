@@ -5,16 +5,18 @@
  * 三条硬约束：
  * - 外壳用 `min-h-[100dvh]`，**禁用**被禁的 `h-screen`；
  * - 外壳**不渲染 `<main>`、不给 padding** —— 每个页面自带 `<main>`（各自设计稿的边距）；
- *   唯一例外是未登录闸门（见 LoginGate，自己包一层 `<main>` 保证地标）；
- * - 未登录访问"我的 / 设置"这类需要身份的页面时，**不静默跳走**：就地说明并给登录出口（带 `next`）。
+ *   唯一例外是未登录闸门（闸门期自己包一层 `<main>` 保证地标）；
+ * - requireLogin 页（河道 / 公海 / 我的 / 设置 / 审核台 —— 河道与公海按 **t12 验收④**
+ *   接入同一守卫；其余页单列在 route-view）在会话**落定**后未登录（guest，含读不到登录态
+ *   unavailable）时**自动跳** `/login?next=当前路径`（登录后回跳）——
+ *   用户本轮裁决，**覆盖** 2026-09-27「不静默跳走」旧口径（旧的就地空态出口按 YAGNI 清理）；
+ *   loading 期间保持骨架、不提前跳。
  */
-import type { ReactNode } from 'react';
-import { EmptyState, Skeleton } from '../../design-system';
+import { useEffect, type ReactNode } from 'react';
+import { Skeleton } from '../../design-system';
 import { useSession } from '../../features/session/session-context';
-import { Link } from './router';
 import { useInternalLinkHandler, useRouter } from './router-context';
-import { ADMIN_NAV_ITEM, NAV_ITEMS, type AppNavItem } from './routes';
-import { TEXT_LINK_STRONG } from './link-styles';
+import { ADMIN_NAV_ITEM, INTRO_NAV_ITEM, NAV_ITEMS, type AppNavItem } from './routes';
 import { TopNav } from './top-nav';
 
 export interface AppShellProps {
@@ -25,22 +27,32 @@ export interface AppShellProps {
 
 export function AppShell({ current, requireLogin = false, children }: AppShellProps) {
   const session = useSession();
-  const { href } = useRouter();
+  const { href, navigate } = useRouter();
   const blocked = requireLogin && session.status !== 'authed';
 
+  // 用户本轮裁决（覆盖旧「不静默跳走」）：会话落定且非 authed（guest 分支同时覆盖
+  // 读不到登录态 unavailable —— 两者 status 同为 guest，区别只在 unavailable 标志）
+  // ⇒ 自动跳登录页并带 next= 原路径（replace 不留历史条目，返回键不会在两页间打转）。
+  // loading 不跳（保持骨架）；href 已在 /login 上不再跳（防直渲染时自嵌套）。
+  useEffect(() => {
+    if (blocked && session.status === 'guest' && !href.startsWith('/login')) {
+      navigate(`/login?next=${encodeURIComponent(href)}`, { replace: true });
+    }
+  }, [blocked, session.status, href, navigate]);
+
   // 审核台入口只对管理员显示（**服务端**才是权限判定；这里避免普通用户看到死入口）
-  const items = session.isAdmin ? [...NAV_ITEMS, ADMIN_NAV_ITEM] : NAV_ITEMS;
+  // 「介绍」（项目 landing）是站内元入口，排在最前；产品四入口的顺序由 NAV_ITEMS 自己钉住
+  const base = [INTRO_NAV_ITEM, ...NAV_ITEMS];
+  const items = session.isAdmin ? [...base, ADMIN_NAV_ITEM] : base;
 
   return (
     // 外壳层拦截站内锚点点击 → 设计系统的导航无需感知路由
     <AppShellFrame current={current} items={items}>
       {blocked ? (
-        <main className="flex min-w-0 flex-col gap-[32px] px-[24px] py-[40px] md:px-[48px]">
-          <LoginGate
-            pending={session.status === 'loading'}
-            unavailable={session.unavailable}
-            next={href}
-          />
+        // t3：闸门顶替内容时的 continuity 引拍（enter-rise 契约类）；
+        // 跳转前的每一帧都是骨架（禁 spinner），旧死端空态已按 YAGNI 清理。
+        <main className="enter-rise flex min-w-0 flex-col gap-[32px] px-[24px] py-[40px] md:px-[48px]">
+          <LoginGate />
         </main>
       ) : (
         children
@@ -71,43 +83,16 @@ function AppShellFrame({
   );
 }
 
-/** 未登录闸门：加载态用骨架（禁 spinner）；**读不到登录状态**与"确实没登录"分开说。 */
-function LoginGate({
-  pending,
-  unavailable,
-  next,
-}: {
-  pending: boolean;
-  unavailable: boolean;
-  next: string;
-}) {
-  if (pending) {
-    return (
-      <div className="flex flex-col gap-4" aria-busy="true">
-        <Skeleton height="2.25rem" width="12rem" />
-        <Skeleton height="8rem" width="100%" />
-      </div>
-    );
-  }
-  if (unavailable) {
-    return (
-      <EmptyState
-        icon="AlertTriangle"
-        title="读不到你的登录状态"
-        description="服务器暂时没有回应。等一下再刷新这一页，你之前录的内容不受影响。"
-      />
-    );
-  }
+/**
+ * 未登录闸门：跳转前的每一帧都给骨架（禁 spinner）。
+ * 用户本轮裁决下这里**没有**「需要先登录 / 读不到登录状态」死端空态 ——
+ * 会话落定后由 AppShell 的 effect 自动跳 /login?next=（原空态分支按 YAGNI 清理）。
+ */
+function LoginGate() {
   return (
-    <EmptyState
-      icon="UserRound"
-      title="需要先登录"
-      description="这一页放的是你自己的漂流瓶与代号。登录之后就能看到它们，回到刚才那一步也不会丢。"
-      action={
-        <Link to={`/login?next=${encodeURIComponent(next)}`} className={TEXT_LINK_STRONG}>
-          去登录
-        </Link>
-      }
-    />
+    <div className="flex flex-col gap-4" aria-busy="true">
+      <Skeleton height="2.25rem" width="12rem" />
+      <Skeleton height="8rem" width="100%" />
+    </div>
   );
 }

@@ -1,6 +1,8 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it } from 'vitest';
 import { installFetchMock, renderWithProviders } from '../../test/harness';
+import { USER_A } from '../../test/fixtures';
+import { LoginPage } from '../login-page';
 import { AppShell } from './app-shell';
 import { RouterProvider } from './router';
 import { useRoute } from './router-context';
@@ -132,7 +134,13 @@ describe('外壳与导航', () => {
     }
   });
 
-  it('未登录时包裹受保护内容会提示并给登录出口（不静默跳走），闸门自带 <main>` 地标', async () => {
+  /**
+   * ⚠️ 断言原文 → 新文（用户本轮裁决，覆盖 2026-09-27 旧口径）：
+   * 原文：就地显示「需要先登录」+「去登录」出口（不静默跳走）。
+   * 新文：会话落定后**自动跳** /login?next=原路径（死端空态与手动出口按 YAGNI 清理）；
+   *      闸门帧给骨架，<main> 地标结构约定保留。
+   */
+  it('未登录包裹受保护内容：落定后自动跳登录（覆盖旧「不静默跳走」），闸门帧给骨架且自带 <main>` 地标', async () => {
     const mock = installFetchMock([
       {
         path: '/api/auth/me',
@@ -147,16 +155,19 @@ describe('外壳与导航', () => {
         <AppShell current="mine" requireLogin>
           <h1>我的</h1>
         </AppShell>,
+        { route: '/mine' },
       );
-      expect(await screen.findByText(/需要先登录/)).toBeInTheDocument();
-      expect(screen.getByRole('link', { name: '去登录' })).toHaveAttribute(
-        'href',
-        expect.stringContaining('/login'),
-      );
-      expect(screen.queryByRole('heading', { name: '我的' })).not.toBeInTheDocument();
-      // 结构约定 2：闸门替代 children 时自己包一层 <main> 保证地标
+      // 闸门帧（loading 与跳转前）：骨架 + 自包 <main> 地标（结构约定 2 保留）
       expect(container.querySelector('main')).not.toBeNull();
       expect(screen.getByRole('main')).toBeInTheDocument();
+      expect(document.querySelector('[aria-busy="true"]')).not.toBeNull();
+      // 落定后：自动跳登录页并带 next= 原路径，不再就地给出口
+      await waitFor(() => {
+        expect(window.location.pathname).toBe('/login');
+      });
+      expect(window.location.search).toBe(`?next=${encodeURIComponent('/mine')}`);
+      expect(screen.queryByRole('heading', { name: '我的' })).not.toBeInTheDocument();
+      expect(screen.queryByRole('link', { name: '去登录' })).toBeNull();
     } finally {
       mock.restore();
     }
@@ -178,6 +189,131 @@ describe('路由 Provider', () => {
     window.dispatchEvent(new PopStateEvent('popstate'));
     await waitFor(() => {
       expect(screen.getByTestId('name')).toHaveTextContent('notFound');
+    });
+  });
+});
+
+/**
+ * requireLogin 未登录自动跳转 —— 用户本轮裁决，**覆盖** 2026-09-27「不静默跳走」旧口径。
+ * 四条分支各自可断言：guest 跳 /unavailable 跳 /loading 不跳 /authed 不动；
+ * next 链路端到端 = 本文件断言跳转携带 next=原路径 + login-page.test 断言登录后带回。
+ */
+describe('requireLogin 自动跳转（用户本轮裁决，覆盖旧「不静默跳走」）', () => {
+  it('guest（401）访问 /settings：loading 保持骨架不提前跳，落定后自动跳 /login?next=原路径', async () => {
+    renderWithProviders(
+      <AppShell current="settings" requireLogin>
+        <h1>设置</h1>
+      </AppShell>,
+      { route: '/settings' },
+    );
+    // 会话 loading 首帧：闸门骨架在、children 未渲染、未提前跳
+    expect(screen.getByRole('main')).toBeInTheDocument();
+    expect(document.querySelector('[aria-busy="true"]'), 'loading 保持骨架').not.toBeNull();
+    expect(screen.queryByRole('heading', { name: '设置' })).toBeNull();
+    expect(window.location.pathname, 'loading 不提前跳').toBe('/settings');
+    // 落定（401 → guest）：自动跳登录页并带 next= 原路径
+    await waitFor(() => {
+      expect(window.location.pathname).toBe('/login');
+    });
+    expect(window.location.search).toBe(`?next=${encodeURIComponent('/settings')}`);
+    expect(screen.queryByText(/需要先登录/), '旧死端文案已清').toBeNull();
+    expect(screen.queryByRole('link', { name: '去登录' }), '旧手动出口已清').toBeNull();
+  });
+
+  it('guest 访问 /admin 同样自动跳（requireLogin 三页一视同仁）', async () => {
+    renderWithProviders(
+      <AppShell current="admin" requireLogin>
+        <h1>审核台</h1>
+      </AppShell>,
+      { route: '/admin' },
+    );
+    await waitFor(() => expect(window.location.pathname).toBe('/login'));
+    expect(window.location.search).toBe(`?next=${encodeURIComponent('/admin')}`);
+    expect(screen.queryByRole('heading', { name: '审核台' })).toBeNull();
+  });
+
+  it('读不到登录态（5xx unavailable）→ 同样自动跳，不再死端空态', async () => {
+    renderWithProviders(
+      <AppShell current="mine" requireLogin>
+        <h1>我的</h1>
+      </AppShell>,
+      {
+        route: '/me',
+        handlers: [
+          {
+            path: '/api/auth/me',
+            respond: () => ({
+              status: 503,
+              body: { error: { message: '服务器暂时没有回应。', violations: [] } },
+            }),
+          },
+        ],
+      },
+    );
+    await waitFor(() => expect(window.location.pathname).toBe('/login'));
+    expect(window.location.search).toBe(`?next=${encodeURIComponent('/me')}`);
+    expect(screen.queryByText(/读不到你的登录状态/), '死端空态已清').toBeNull();
+    expect(document.querySelector('[aria-busy="true"]'), '跳转帧给骨架不闪空态').not.toBeNull();
+  });
+
+  it('authed 用户访问不受影响：不跳转，children 正常渲染', async () => {
+    renderWithProviders(
+      <AppShell current="settings" requireLogin>
+        <h1>设置</h1>
+      </AppShell>,
+      {
+        route: '/settings',
+        handlers: [
+          {
+            path: '/api/auth/me',
+            respond: () => ({
+              body: {
+                user: { id: USER_A, handle: '午夜歌手', email: 'a@example.com', role: 'USER' },
+                expiresAt: '2030-01-01T00:00:00.000Z',
+              },
+            }),
+          },
+        ],
+      },
+    );
+    expect(await screen.findByRole('heading', { name: '设置' })).toBeInTheDocument();
+    expect(window.location.pathname).toBe('/settings');
+    expect(window.location.search).toBe('');
+    expect(screen.getByRole('navigation', { name: '站内导航' })).toBeInTheDocument();
+  });
+
+  it('next 链路端到端：guest 跳 /login?next=原路径 → 登录成功回跳该路径', async () => {
+    // ① 外壳：未登录自动跳并携带 next
+    renderWithProviders(
+      <AppShell current="settings" requireLogin>
+        <h1>设置</h1>
+      </AppShell>,
+      { route: '/settings' },
+    );
+    await waitFor(() => expect(window.location.pathname).toBe('/login'));
+    expect(window.location.search).toBe(`?next=${encodeURIComponent('/settings')}`);
+    // ② 登录页读 next，成功后把用户带回原路径（既有 login-page 行为，本用例把两半接成一条链）
+    renderWithProviders(<LoginPage />, {
+      route: '/login?next=%2Fsettings',
+      handlers: [
+        {
+          method: 'POST',
+          path: '/api/auth/login',
+          respond: () => ({
+            status: 200,
+            body: {
+              user: { id: USER_A, handle: '午夜歌手', email: 'a@example.com', role: 'USER' },
+              expiresAt: '2030-01-01T00:00:00.000Z',
+            },
+          }),
+        },
+      ],
+    });
+    fireEvent.change(screen.getByLabelText('账号'), { target: { value: '午夜歌手' } });
+    fireEvent.change(screen.getByLabelText('密码'), { target: { value: 'abcd1234' } });
+    fireEvent.click(screen.getByRole('button', { name: '登录' }));
+    await waitFor(() => {
+      expect(window.location.pathname).toBe('/settings');
     });
   });
 });

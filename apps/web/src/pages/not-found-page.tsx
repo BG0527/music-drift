@@ -62,7 +62,8 @@ const SCRATCH = 'absolute inset-y-0 bg-water-mid';
 
 export function NotFoundPage() {
   return (
-    <div className="enter-fade relative isolate flex flex-col gap-6 overflow-hidden">
+    // t5 一屏收敛：md+ 钉死视口高 + 裁切（判据同河道页 river-page.tsx 根元素）
+    <div className="enter-fade relative isolate flex flex-col gap-6 overflow-hidden md:h-[100dvh] md:overflow-hidden">
       {/* 世界的底与上方：盘面沟槽（划痕刻在一张盘上）+ 掠光 */}
       <Platter />
       <Glint />

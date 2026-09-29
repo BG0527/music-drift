@@ -10,6 +10,7 @@
 import { useCollect, useUncollect } from '../api/mutations';
 import { useMyCollections } from '../api/queries';
 import { Button, Icon } from '../../design-system';
+import { ConflictNotice } from './conflict-notice';
 
 export interface CollectButtonProps {
   bottleId: string;
@@ -28,7 +29,7 @@ export function CollectButton({ bottleId, className }: CollectButtonProps) {
   const busy = collect.isPending || uncollect.isPending;
 
   return (
-    <Button
+    <div className="flex flex-col gap-3"><Button
       variant="ghost"
       className={className}
       loading={busy}
@@ -44,5 +45,9 @@ export function CollectButton({ bottleId, className }: CollectButtonProps) {
     >
       {collected ? '取消收藏' : '收藏这支作品'}
     </Button>
+    {collect.error || uncollect.error ? <ConflictNotice
+      error={collect.error ?? uncollect.error}
+      onRetry={() => { collect.reset(); uncollect.reset(); }}
+    /> : null}</div>
   );
 }

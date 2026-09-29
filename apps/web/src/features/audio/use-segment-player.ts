@@ -15,7 +15,8 @@
  *    也就不会出现"上一段的收听被算进新段"的窗口；
  * 3. ref 只放**不参与渲染**的东西：`<audio>` 实例、追踪器、最新的 `onProgress` 回调。
  */
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
+import { GrooveStoreContext } from './groove-playback';
 import {
   createListenTracker,
   describeDislikeAvailability,
@@ -108,6 +109,7 @@ function createAudioElement(src: string): AudioElementLike {
 }
 
 export function useSegmentPlayer(options: UseSegmentPlayerOptions): UseSegmentPlayerResult {
+  const playbackStore = useContext(GrooveStoreContext);
   const { src, isOwnSegment } = options;
   const duration = useMemo(
     () =>
@@ -198,6 +200,7 @@ export function useSegmentPlayer(options: UseSegmentPlayerOptions): UseSegmentPl
     };
     // play / pause 也走同一条发布路径（isPlaying 从元素真实状态读取，不用本地推断）
     const onPlay = (): void => {
+      playbackStore?.claimAudio(element);
       hasPlayedRef.current = true;
       atEndRef.current = false; // 开播即不再是"播完"状态（含"重新播放"）
       publish();
@@ -219,10 +222,11 @@ export function useSegmentPlayer(options: UseSegmentPlayerOptions): UseSegmentPl
       element.removeEventListener('play', onPlay);
       element.removeEventListener('pause', onPlayStateChange);
       element.pause();
+      playbackStore?.releaseAudio(element);
       elementRef.current = null;
       trackerRef.current = null;
     };
-  }, [createElement, duration, publish, src]);
+  }, [createElement, duration, publish, src, playbackStore]);
 
   /**
    * 智能切换（用户在"播放按钮"上的直觉）：
@@ -242,11 +246,12 @@ export function useSegmentPlayer(options: UseSegmentPlayerOptions): UseSegmentPl
       element.currentTime = 0;
       trackerRef.current?.markSeek();
     }
+    playbackStore?.claimAudio(element);
     // 自动播放策略可能拒绝 play()：吞掉异常并保持"未播放"，不冒未捕获错误
     void Promise.resolve(element.play()).catch(() => {
       publish();
     });
-  }, [publish]);
+  }, [publish, playbackStore]);
 
   const seekTo = useCallback(
     (positionMs: number): void => {
@@ -264,10 +269,11 @@ export function useSegmentPlayer(options: UseSegmentPlayerOptions): UseSegmentPl
     seekTo(0);
     const element = elementRef.current;
     if (element === null) return;
+    playbackStore?.claimAudio(element);
     void Promise.resolve(element.play()).catch(() => {
       publish();
     });
-  }, [publish, seekTo]);
+  }, [publish, seekTo, playbackStore]);
 
   const dislike = useMemo(
     () =>

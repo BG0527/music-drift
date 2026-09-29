@@ -18,7 +18,6 @@
  * - 稿静态计数「共 5 支」→ 位留着，只填服务端真条数（加载中不填假数）。
  */
 import { useState, type ReactNode } from 'react';
-import { BadgesPanel } from '../features/bottle/badges-panel';
 import { CollectionsPanel } from '../features/bottle/collections-panel';
 import { MyBottles } from '../features/bottle/my-bottles';
 import { describeNotification } from '../features/bottle/notification-labels';
@@ -26,31 +25,21 @@ import { useMyBottles, useNotifications } from '../features/api/queries';
 import { useSession } from '../features/session/session-context';
 import { Button } from '../design-system';
 import { AsyncBoundary } from './shell/async-boundary';
-import { TEXT_LINK_STRONG } from './shell/link-styles';
 import { Link } from './shell/router';
 import './profile-page.css';
 
 type Tone = 'info' | 'success' | 'warning' | 'danger';
 
 /**
- * one-screen 门禁修复（页级收紧；基线 `profile-page.css` 照抄稿不动，本页压一份更紧的流体表达）：
- * ① 横向溢出：稿装饰层 `.waterlight` `left:-8% + width:118%` ⇒ 右沿 110% 视口
- *    （实测 scrollWidth 1440 档=1584、375 档=413，唯一 offenders 就是它）→ 主体水平裁剪；
- * ② 整页高：1440 实测 1031>900，按分段实测只收紧**流体表达**（页顶距 / 页头段距 / 柜上距 /
- *    窗口高 / 下区距 / 口袋内距）—— 四块构图、沉积柱、中心孔、回传 hero 一个不删。
+ * one-screen 门禁修复点（t5）+ t17 深度复刻：
+ * ① 横向溢出：稿装饰层 `.waterlight` `left:-8% + width:118%` ⇒ 右沿 110% 视口 → 主体水平裁剪；
+ * ② 纵向节奏（t17）已整体搬进 `profile-page.css` —— 按 `site/patches/me.css` 逐值：
+ *    三档空隙 `--gap-page/--gap-crate/--gap-bottom` + `--pad-msg-row`、`.window` 定高 260、
+ *    `.window li` 补 `max-width:none`（Tailwind 的 `li{max-width:72ch}` 会把卡片掐窄 ⇒ 右半窗空掉）、
+ *    `.bottom` 两列网格 + `margin-top:auto`。这里只留 TSX 级的一行裁剪。
  */
 const ME_FIX_CSS = `
 .p-record{overflow-x:clip}
-.p-record{padding:clamp(32px,2.8vw,40px) clamp(24px,5.28vw,76px) 0}
-.p-record h1{margin-top:8px}
-.p-record .sub{margin-top:10px}
-.p-record .crate{margin-top:clamp(24px,2.8vw,40px)}
-.p-record .window{height:clamp(176px,15.3vw,220px)}
-.p-record .bottom{margin-top:clamp(8px,0.6vw,9px)}
-.p-record .msgs ul{margin-top:8px}
-.p-record .pocket{padding:clamp(16px,1.5vw,22px) clamp(14px,1.4vw,20px) clamp(14px,1.3vw,18px)}
-.p-record .pocket p{margin-top:8px}
-.p-record .pocket button{margin-top:10px}
 `;
 
 /** 稿 .mrow 里的三枚 16px 图标（逐值照抄；danger 现无通知类型可达，复用警示三角）。 */
@@ -101,36 +90,26 @@ export function ProfilePage() {
   const session = useSession();
   const myBottles = useMyBottles();
   const notifications = useNotifications();
-  /** 收藏 / 徽章都是**声明式内容**（§46.2）⇒ 只做入口，内容进弹窗。 */
-  const [panel, setPanel] = useState<'collections' | 'badges' | null>(null);
+  const [panel, setPanel] = useState<'collections' | null>(null);
 
   /** 回传提示（W6）：任一条 awaitingMyAction=true 才出现；查询未到/失败时宁可不弹（安全降级）。 */
   const awaiting = myBottles.data?.items.find((bottle) => bottle.awaitingMyAction) ?? null;
 
   return (
-    <main className="p-record">
+    <main className="p-record md:h-[100dvh] md:overflow-hidden">
       <style>{ME_FIX_CSS}</style>
 
       {/* 水面光带：世界的「上方」，瓶子来的方向（稿 .waterlight） */}
       <div className="waterlight" aria-hidden="true" />
 
-      {/* 页头：eyebrow / h1 / lede 逐字照稿（§1.6-1 档案头入场 enter-rise） */}
+      {/* 页头：eyebrow / h1 / lede 逐字照稿（档案头入场 enter-rise）。
+          t17 深度复刻：**没有第二条导航** —— 参考页头只有这三件，去路由顶栏承担。 */}
       <header className="enter-rise">
         <div className="cat">ACCOUNT · 认领</div>
         <h1>我的</h1>
         <p className="sub">
-          账号只用来认领你自己的漂流瓶。别人在瓶子里看到的是匿名代号，看不到你的账号。
+          接唱时使用匿名代号；公开评论显示账号，私密留言送达后仅向双方显示账号。
         </p>
-        {/* flow-audit G7：常显横向出口 —— 任何数据状态下都渲染（空态出口在列表窗内，不同位不重复）
-            （mt-2：one-screen 1440 整页高收紧的一环，热区仍由 TEXT_LINK_STRONG 的 min-h-11 保证） */}
-        <nav aria-label="站内去路" className="mt-2 flex flex-wrap items-center gap-x-6 gap-y-2">
-          <Link to="/river" className={TEXT_LINK_STRONG}>
-            ← 去河道捞一个
-          </Link>
-          <Link to="/sea" className={TEXT_LINK_STRONG}>
-            公海听完成的作品
-          </Link>
-        </nav>
       </header>
 
       {/* 内袋：从柜里抽出来的内套，中心孔里那张标签盘还没印字 ——
@@ -147,8 +126,8 @@ export function ProfilePage() {
           </div>
           <div className="who">
             <p className="handle">{session.user?.handle}</p>
-            <p className="mail">{session.user?.email}</p>
-            <span className="stamp">{session.isAdmin ? '管理员账号' : '普通用户'}</span>
+            {/* 参考 page-me.js：徽章式的那枚「管理员账号」**只在真是管理员时出现**（普通用户不打角色徽） */}
+            {session.isAdmin ? <span className="stamp">管理员账号</span> : null}
           </div>
         </aside>
       </div>
@@ -259,30 +238,11 @@ export function ProfilePage() {
               我的收藏
             </Button>
           </section>
-          <section className="pocket">
-            <h3>我的徽章</h3>
-            <p>徽章是派生的（不落库）：服务端按你参与过的事件当场算出来，作品被撤下就跟着消失。</p>
-            <Button
-              variant="ghost"
-              className="whitespace-nowrap"
-              onClick={() => {
-                setPanel('badges');
-              }}
-            >
-              我的徽章
-            </Button>
-          </section>
         </div>
       </div>
 
       <CollectionsPanel
         open={panel === 'collections'}
-        onClose={() => {
-          setPanel(null);
-        }}
-      />
-      <BadgesPanel
-        open={panel === 'badges'}
         onClose={() => {
           setPanel(null);
         }}

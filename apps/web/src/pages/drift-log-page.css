@@ -1,0 +1,66 @@
+.drift-page [data-testid="drift-log"]:focus-visible {
+  outline: 2px solid var(--color-glass);
+  outline-offset: 4px;
+}
+
+@media (min-width: 1024px) and (min-height: 720px) {
+  .drift-page {
+    display: flex;
+    flex-direction: column;
+    padding-bottom: 24px;
+  }
+  .drift-page > header,
+  .drift-page [data-testid="log-legend"] {
+    flex-shrink: 0;
+  }
+  .drift-page .drift-body {
+    flex: 1;
+    min-height: 0;
+    display: grid;
+    grid-template-columns: minmax(0, 2fr) minmax(0, 3fr);
+    gap: clamp(24px, 4vw, 64px);
+  }
+  .drift-page [data-testid="log-scratch"] {
+    position: static;
+    width: 100%;
+    height: 100%;
+    min-height: 0;
+    max-height: 100%;
+  }
+  .drift-page [data-testid="drift-log"] {
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    scrollbar-gutter: stable;
+    margin: 0;
+    padding-inline: 14px 6px;
+  }
+  .drift-page [data-testid="drift-log"] > li {
+    grid-template-columns: 40px minmax(0, 1fr) 100px;
+    gap: 4px 8px;
+  }
+  .drift-page [data-testid="drift-log"] > li > span:last-child {
+    grid-column: 2 / -1;
+    text-align: left;
+  }
+}
+
+@media (max-width: 1023px), (max-height: 719px) {
+  .drift-page {
+    height: auto;
+    min-height: 100dvh;
+    overflow: visible;
+    padding-bottom: 32px;
+  }
+  .drift-page .drift-body {
+    display: flex;
+  }
+  .drift-page [data-testid="log-scratch"] {
+    position: static;
+    width: min(100%, 320px);
+    margin-inline: auto;
+  }
+  .drift-page [data-testid="drift-log"] {
+    margin-left: 0;
+  }
+}

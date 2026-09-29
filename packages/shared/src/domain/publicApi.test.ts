@@ -40,7 +40,6 @@ const REQUIRED_EXPORTS = [
   'attachPrivateMessage',
   'visibleMessagesFor',
   'applyTimeouts',
-  'evaluateBadges',
   'participants',
   'versionOf',
   'parentOf',

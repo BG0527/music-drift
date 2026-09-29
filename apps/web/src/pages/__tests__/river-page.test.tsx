@@ -272,8 +272,8 @@ describe('河道页 · 三件装置（S3）', () => {
       container.querySelector<HTMLElement>(`[data-anchor="river-${id}"]`);
     expect(wrap('draw')?.className, '捞取在稿画布 60,400').toContain('md:top-[44.444%]');
     expect(wrap('draw')?.className, '捞取贴画布左缘').toContain('md:left-[4.1667%]');
-    expect(wrap('drop')?.className, '投下在稿画布 380,580（较捞取下沉稿 180px）').toContain(
-      'md:top-[64.444%]',
+    expect(wrap('drop')?.className, '投下在稿画布 380,580（基准补丁裁到视口 60%）').toContain(
+      'md:top-[60%]',
     );
     expect(wrap('drop')?.className, '投下在捞取右下方').toContain('md:left-[26.389%]');
   });
@@ -521,34 +521,36 @@ describe('河道页 · f0 三段分镜（任务 E）', () => {
   });
 
   /**
-   * 一比一复刻 v2（用户 2026-09-27 看图打回后重裁）：泊位与 SVG 必须**同一坐标系** ——
-   * 场景 = cover 盒（art 宽=max(100vw,100dvh×1.6)、高=max(100dvh,100vw/1.6)，恒 1440:900 比例），
-   * 泊位 fixed 挂在同一个 art 盒上、坐标 = 稿画布百分比：
-   * draw 60,400 ⇒ 4.1667%,44.444%（190²）｜cast 380,580 ⇒ 26.389%,64.444%（150²）
-   * —— 任何视口宽度下都与 SVG 弧线逐像素咬合（旧实现：SVG xMaxYMax 裁切 + 泊位挂 river-body 局部 %，两套坐标必脱节）。
+   * t2 重裁（基准复刻修复，取代「cover 盒」口径）：泊位与外框锚**视口**——
+   * 基准 river.css 补丁：draw 4.17%,44.44%｜cast 26.39%,60%（补丁把稿 64.444% 裁到视口 60%）；
+   * cap 相对泊位 21%/110%（随半径缩放，不再固定 40/165px）。
+   * 旧 cover 盒（md:fixed + 盒 % + cap 固定 px）在宽扁视口比视口高 ⇒ 溢出下界（t1 审计③，用户报障）。
    */
-  it('泊位一比一 v2：cover 场景盒同坐标系（fixed + 稿画布百分比 + cap 下沉 40/165）', () => {
+  it('泊位 t2：锚视口坐标系（fixed cover 盒退场）+ cap 下沉随泊位缩放', () => {
     const src = readFileSync(
       resolve(process.cwd(), 'src', 'pages', 'river-page.tsx'),
       'utf8',
     );
     const draw = /<section[\s\S]{0,400}?data-anchor="river-draw"[\s\S]{0,300}?className=\{?"([^"]+)"/.exec(src)?.[1] ?? '';
     const cast = /<section[\s\S]{0,400}?data-anchor="river-drop"[\s\S]{0,300}?className=\{?"([^"]+)"/.exec(src)?.[1] ?? '';
-    expect(draw, '捞取：稿坐标 60,400 + 可点恢复').toContain(
+    expect(draw, '捞取：视口坐标 4.17%,44.44%（基准补丁）+ 可点恢复').toContain(
       'md:absolute md:left-[4.1667%] md:top-[44.444%]',
     );
-    expect(draw, '泊位在 pointer-none 场景盒里必须恢复可点').toContain('pointer-events-auto');
-    expect(cast, '投下：稿坐标 380,580（与 draw 垂直差=稿 180px）').toContain(
-      'md:absolute md:left-[26.389%] md:top-[64.444%]',
+    expect(draw, '泊位必须可点').toContain('pointer-events-auto');
+    expect(cast, '投下：视口坐标 26.39%,60%（基准补丁裁到 60%）').toContain(
+      'md:absolute md:left-[26.389%] md:top-[60%]',
     );
     expect(cast, '投下也要可点').toContain('pointer-events-auto');
-    expect(src, '泊位容器 md 下必须是 fixed cover 盒').toContain('md:fixed');
-    expect(src, 'cover 盒宽 = max(100vw, 100dvh×1.6)').toContain('max(100vw');
-    expect(src, 'cover 盒高 = max(100dvh, 100vw/1.6)').toContain('max(100dvh');
-    expect(src, '捞取 cap 对位：相对盘右侧 +40px、top 40 下沉').toContain('md:left-[calc(100%+40px)]');
-    expect(src, '捞取 cap top 40（稿）').toContain('md:top-[40px]');
-    expect(src, '投下 cap 对位：右缘在盘内 80% 处（稿 left:-180/宽300）').toContain('md:right-[20%]');
-    expect(src, '投下 cap top 165（稿，沉到盘下方偏左）').toContain('md:top-[165px]');
+    expect(src, 'cover 场景盒退场：泊位容器不再 md:fixed 挂视口').not.toContain('md:fixed');
+    expect(src, '泊位容器 md:contents（子节直接锚 river-body=视口）').toContain('md:contents');
+    expect(src, '捞取 cap 锚泊位：left 121% / top 21%（基准补丁，随半径缩放）').toContain(
+      'md:left-[121%]',
+    );
+    expect(src, '捞取 cap top 21%（基准补丁，替代固定 40px）').toContain('md:top-[21%]');
+    expect(src, '投下 cap 锚泊位：left -120%（稿 -180/150 同值）').toContain('md:left-[-120%]');
+    expect(src, '投下 cap top 110%（基准补丁，替代固定 165px ⇒ 不再溢出下界）').toContain(
+      'md:top-[110%]',
+    );
   });
 
   /**
@@ -570,6 +572,104 @@ describe('河道页 · f0 三段分镜（任务 E）', () => {
     expect(src, 'backdrop 必须是 cover 场景盒（art 恒 1440:900 比例）').toContain(
       'max(100%, calc(100dvh * 1.6))',
     );
+  });
+
+  /**
+   * t2 重裁（基准复刻修复）：cover 场景盒退场，**泊位/说明/外框全部锚视口** ——
+   * 基准 river.css 补丁口径：html/body 一屏 overflow:hidden；标题 top max(10.67%,顶栏高)、
+   * 页脚 bottom 3.33%、捞取 top 44.44%、投下 top 60%、cap 相对泊位 21%/110%（随半径缩放）。
+   * 旧 cover 盒（fixed 居中 + 盒 %）在宽扁视口比视口高，cap 固定 165px 不缩放 ⇒ 溢出下界（t1 审计③）。
+   */
+  /** t2 一屏锚法断言的取件器：main / header / footer / 两枚泊位 / 两个 cap。 */
+  const shell = () => {
+    const { container } = renderWithProviders(<RiverPage />, { handlers: [] });
+    const q = (sel: string): HTMLElement => {
+      const found = container.querySelector<HTMLElement>(sel);
+      expect(found, `缺少 ${sel}`).not.toBeNull();
+      return found as HTMLElement;
+    };
+    return {
+      container,
+      main: q('main'),
+      header: q('main > header'),
+      footer: q('main > footer'),
+      draw: q('[data-anchor="river-draw"]'),
+      cast: q('[data-anchor="river-drop"]'),
+      drawCap: q('[data-cap="draw"]'),
+      castCap: q('[data-cap="cast"]'),
+    };
+  };
+
+  it('一屏锚法（t2）：main 一屏裁切、header/页脚锚视口、cover 盒退场、泊位锚视口 60% 口径', () => {
+    const src = readFileSync(
+      resolve(process.cwd(), 'src', 'pages', 'river-page.tsx'),
+      'utf8',
+    );
+    const { main, header, footer, draw, cast } = shell();
+    expect(main, 'main 必须一屏（固定高 + 溢出裁切）').toHaveClass(
+      'md:h-[100dvh]',
+      'md:overflow-hidden',
+    );
+    expect(header, '标题区锚视口（基准 top:max(10.67%,顶栏高)）').toHaveClass(
+      'md:absolute',
+      'md:top-[max(10.67%,54px)]',
+    );
+    expect(footer, '页脚锚视口底部（基准 bottom 3.33%）').toHaveClass(
+      'md:absolute',
+      'md:bottom-[3.33%]',
+    );
+    expect(src, 'cover 场景盒退场：泊位容器不再 fixed 挂视口').not.toContain('md:fixed');
+    expect(src, '泊位容器 md:contents —— 泊位直接锚 river-body（= 视口）').toContain('md:contents');
+    expect(draw, '捞取锚视口（基准 44.44%）').toHaveClass(
+      'md:absolute',
+      'md:left-[4.1667%]',
+      'md:top-[44.444%]',
+    );
+    expect(cast, '投下锚视口（基准补丁裁到 60%）').toHaveClass(
+      'md:absolute',
+      'md:left-[26.389%]',
+      'md:top-[60%]',
+    );
+    expect(src, '投下不再带 mt-4（绝对定位下 margin 会二次下移）').not.toMatch(
+      /md:absolute md:left-\[26\.389%\][^"]*mt-4/,
+    );
+  });
+
+  it('cap 相对泊位缩放（基准 21%/110%）：不再用固定 px，宽扁视口不溢出下界', () => {
+    const src = readFileSync(
+      resolve(process.cwd(), 'src', 'pages', 'river-page.tsx'),
+      'utf8',
+    );
+    const { drawCap, castCap } = shell();
+    expect(drawCap, '捞取 cap 锚自己泊位（基准 left 121% / top 21%）').toHaveClass(
+      'md:left-[121%]',
+      'md:top-[21%]',
+    );
+    expect(castCap, '投下 cap 锚自己泊位（基准 left -120% / top 110%，随半径缩放）').toHaveClass(
+      'md:left-[-120%]',
+      'md:top-[110%]',
+    );
+    expect(src, 'cap 不得再用固定 px 下沉（165px 不随泊位缩放 = 溢出根因）').not.toContain(
+      'md:top-[165px]',
+    );
+  });
+
+  it('重复文案（t2）：sr-only 标题并入可见 cap 标题，「河道」只剩顶栏一处', () => {
+    const { container } = renderWithProviders(<RiverPage />, { handlers: [] });
+    // 「投下一支漂流瓶」「捞一个漂流瓶」= 可见 cap 标题升级为 h2（section aria-labelledby 指它）
+    expect(screen.getAllByText('投下一支漂流瓶')).toHaveLength(1);
+    expect(screen.getByRole('heading', { name: '投下一支漂流瓶' })).toBeInTheDocument();
+    expect(screen.getAllByText('捞一个漂流瓶')).toHaveLength(1);
+    expect(screen.getByRole('heading', { name: '捞一个漂流瓶' })).toBeInTheDocument();
+    // 「河道」：sr-only h2 已删（基准只有顶栏 1 处），水体区改挂 h1 做 accessible name
+    // （mood-chips 自己的 sr-only「心情标签」是无障碍标题，不属本页重复文案）
+    const srTexts = [...container.querySelectorAll('.sr-only')].map((el) => el.textContent ?? '');
+    expect(srTexts.join('|'), '河道页不得再有 sr-only「河道」/两枚泊位标题').not.toMatch(
+      /河道|捞一个漂流瓶|投下一支漂流瓶/,
+    );
+    expect(container.querySelector('section[aria-labelledby="river-title"]')).not.toBeNull();
+    // 「从河道捞一个漂流瓶」基准没有这个近似标题
+    expect(screen.queryByText('从河道捞一个漂流瓶')).toBeNull();
   });
 
   it('捞取失败：aria-live 补失败文案（动效不是唯一反馈），不播「收拢确认」、不跳转', async () => {

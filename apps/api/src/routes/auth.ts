@@ -97,7 +97,6 @@ export function registerAuthRoutes(app: FastifyInstance, options: AuthRouteOptio
         // 正名 = 账号；`handle` 是同一列的旧名，两者都返回（改名不掉字段）
         account: user.handle,
         handle: user.handle,
-        email: user.email,
         role: user.role,
       },
       expiresAt: expiresAt.toISOString(),
@@ -149,21 +148,17 @@ export function registerAuthRoutes(app: FastifyInstance, options: AuthRouteOptio
     if (!parsed.success) {
       return sendValidationError(reply, parsed.error.issues);
     }
-    // 正名 `account` 优先；旧的 `handle` 是等价别名（两者都给时以 account 为准）
-    const account = (parsed.data.account ?? parsed.data.handle ?? '').trim();
+    const account = parsed.data.account.trim();
     if (account.length < 2) {
       return sendValidationError(reply, [{ path: ['account'] }]);
     }
-    // 邮箱是可选的：账号注册没有邮箱（契约里为 null，库列可空，见迁移 0007）
-    const email = parsed.data.email === undefined ? null : parsed.data.email.trim().toLowerCase();
-    const weak = checkPassword(parsed.data.password, { handle: account, email });
+    const weak = checkPassword(parsed.data.password, { handle: account });
     if (weak !== null) {
       return sendAuthError(reply, weak);
     }
 
     const created = await repo.createUser({
       handle: account,
-      email,
       passwordHash: hashPassword(parsed.data.password, { params: options.passwordParams }),
     });
     if (!created.ok) {
@@ -184,12 +179,8 @@ export function registerAuthRoutes(app: FastifyInstance, options: AuthRouteOptio
      * 那种隐式回退会让「账号恰好长得像别人的邮箱」变成歧义，而且把两种语义混成一种，
      * 出问题时没人能说清是哪条路径命中的。
      */
-    const account = parsed.data.account?.trim();
-    const email = parsed.data.email?.trim().toLowerCase();
-    const user =
-      account !== undefined && account !== ''
-        ? await repo.findUserByHandle(account)
-        : await repo.findUserByEmail(email ?? '');
+    const account = parsed.data.account.trim();
+    const user = await repo.findUserByHandle(account);
     const matched = verifyPassword(parsed.data.password, user?.passwordHash ?? TIMING_DUMMY_HASH);
     if (user === null || !matched) {
       return sendAuthError(reply, 'INVALID_CREDENTIALS');

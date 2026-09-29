@@ -24,7 +24,9 @@ import {
   type Resolution,
   CollectionSchema,
   PrivateMessageSchema,
+  PublicCommentSchema,
   type PrivateMessage,
+  type PublicComment,
   type SessionResponse,
 } from '@music-drift/shared';
 import { apiFetch, apiPost, apiPostVoid } from './client';
@@ -215,6 +217,7 @@ export function useTakeTargetedSegment(): UseMutationResult<BottleSummary, unkno
     mutationFn: (bottleId: string) =>
       apiPost(`/api/sea/${bottleId}/targeted-segment`, {}, BottleSummarySchema),
     onSuccess: (summary) => {
+      void client.invalidateQueries({ queryKey: QUERY_KEYS.bottle(summary.id) });
       void client.invalidateQueries({ queryKey: QUERY_KEYS.seaList('COMPLETED') });
       void client.invalidateQueries({ queryKey: QUERY_KEYS.seaList('INCOMPLETE') });
       void client.invalidateQueries({ queryKey: QUERY_KEYS.seaBottle(summary.id) });
@@ -240,11 +243,37 @@ export function useAttachMessage(
   });
 }
 
+export function useCreatePublicComment(
+  bottleId: string,
+): UseMutationResult<PublicComment, unknown, { content: string }> {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (input) =>
+      apiPost(`/api/bottles/${bottleId}/comments`, input, PublicCommentSchema),
+    onSuccess: () => {
+      void client.invalidateQueries({ queryKey: QUERY_KEYS.comments(bottleId) });
+    },
+  });
+}
+
+export function useDeletePublicComment(
+  bottleId: string,
+): UseMutationResult<void, unknown, string> {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (commentId) =>
+      apiFetch<undefined>({ path: `/api/comments/${commentId}`, method: 'DELETE' }),
+    onSuccess: () => {
+      void client.invalidateQueries({ queryKey: QUERY_KEYS.comments(bottleId) });
+    },
+  });
+}
+
 /** 举报（全链路入口：瓶子 / 唱段 / 留言）→ 204，进人工队列。 */
 export function useCreateReport(): UseMutationResult<
   void,
   unknown,
-  { targetType: 'BOTTLE' | 'SEGMENT' | 'MESSAGE'; targetId: string; reason: string }
+  { targetType: 'BOTTLE' | 'SEGMENT' | 'MESSAGE' | 'COMMENT'; targetId: string; reason: string }
 > {
   return useMutation({
     mutationFn: (input) => apiPostVoid('/api/reports', input),

@@ -395,6 +395,7 @@ describe('Modal（去向三选一）', () => {
     const modalRoot = dialog.parentElement;
     expect(container.contains(dialog), '弹窗不得留在页面层叠上下文里').toBe(false);
     expect(modalRoot?.parentElement).toBe(document.body);
+    expect(modalRoot).toHaveClass('z-overlay');
 
     const backdrop = modalRoot?.querySelector('[data-modal-backdrop]');
     expect(backdrop).not.toBeNull();
@@ -577,7 +578,7 @@ describe('Modal（去向三选一）', () => {
         <p>内容</p>
       </Modal>,
     );
-    expect(document.querySelector('.z-overlay')?.className).toMatch(/bg-water-void/);
+    expect(document.querySelector('[data-modal-backdrop]')?.className).toMatch(/bg-water-void/);
     const dialog = screen.getByRole('dialog');
     expect(dialog.className).toMatch(/bg-ink/);
     expect(dialog.className).toMatch(/shadow-floating/);

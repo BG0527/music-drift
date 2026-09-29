@@ -10,14 +10,14 @@
  *  2. **非 2xx 用错误 schema 校验**：409/404 的响应体是错误信封，拿成功 schema 去校验也会误报。
  *  3. **校验 0 个元素不算通过**：空列表会"通过"任何单项 schema ⇒ 必须显式标成"未真正校验"。
  *
- * 用法（仓库根，需 API 已起在 8787）：
+ * 用法（仓库根，需 API 已起在 8788）：
  *   pnpm --filter @music-drift/api exec tsx ../../tools/contract-smoke.ts
  */
 /* eslint-disable no-console */
 // 本文件在 tools/（workspace 包之外），包名解析不到 ⇒ 用相对路径直接进 TS 契约入口（就是唯一真相那份）
 import * as contracts from '../packages/shared/src/contracts/index.ts';
 
-const BASE = process.env['API_BASE'] ?? 'http://127.0.0.1:8787';
+const BASE = process.env['API_BASE'] ?? 'http://127.0.0.1:8788';
 const stamp = String(Date.now()).slice(-7);
 
 type ZodLike = {
@@ -149,7 +149,7 @@ await run([
 
 // ── 2. 注册（顺带拿到会话 cookie）──────────────────────────────────
 // W6：注册只要「账号 + 密码」（账号不是邮箱，也没有用户名）—— 冒烟走**新契约**，
-// 旧写法（`{handle, email}`）由 `/api/auth/*` 的集成测试单独钉住（向后兼容）。
+// 旧邮箱形状由 `/api/auth/*` 集成测试钉住为 422（邮箱能力已退役）。
 const account = `smoke${stamp}`;
 await run([
   {
@@ -176,7 +176,6 @@ await run([
   // `/api/me/bottles` 故意不在这里查：它是空的（新用户还没参与过任何瓶子）⇒ 会被如实标成"未真正校验"。
   // 放到下面"投河之后"再查，那时至少有一项真数据可校验。
   { label: 'GET /api/me/collections', method: 'GET', path: '/api/me/collections', expect: [200], schemas: ['CollectionSchema'] },
-  { label: 'GET /api/me/badges', method: 'GET', path: '/api/me/badges', expect: [200], schemas: ['BadgeAwardSchema'] },
   { label: 'GET /api/me/anonymous-codes', method: 'GET', path: '/api/me/anonymous-codes', expect: [200], schemas: ['AnonymousCodeSchema'] },
   { label: 'GET /api/notifications', method: 'GET', path: '/api/notifications', expect: [200], schemas: ['NotificationSchema'] },
   { label: 'GET /api/sea', method: 'GET', path: '/api/sea', expect: [200], schemas: ['BottleSummarySchema'] },

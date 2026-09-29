@@ -2,7 +2,7 @@
  * 演示账号种子（W3）—— 让「我的」/me.html 与公海 `/sea.html` **有内容**。
  *
  * 为什么需要它（`docs/deploy-plan-html.md` §11.3）：接线全部通了，但演示库里 `notifications`
- * 是 0 行、演示账号也没有收藏/徽章 ⇒ 评委用一个新账号进来，「我的」页看起来像没做完。
+ * 是 0 行、演示账号也没有收藏/通知 ⇒ 评委用一个新账号进来，「我的」页看起来像没做完。
  *
  * 本脚本只走**公开 API**（`apps/api` 的 HTTP 端点），不写 SQL、不 import 后端代码：
  *   - 建号：`POST /api/auth/register`（201）/ `POST /api/auth/login`（200，已存在时）；
@@ -41,7 +41,6 @@ import { DEFAULT_FIXTURE } from './record-fixture.mjs';
 /** 演示账号（口令写进 `docs/site-runbook.md`；评委用它登录看「我的」页）。 */
 export const DEMO = Object.freeze({
   handle: 'demo',
-  email: 'demo@example.com',
   password: 'SeaDrift2026',
 });
 
@@ -50,9 +49,9 @@ export const DEMO = Object.freeze({
  * 所以"完整入海的作品"至少需要 4 个不同的人。它们没有别的用途，也不该被评委用。
  */
 export const RELAYS = Object.freeze([
-  Object.freeze({ handle: 'driftmate1', email: 'driftmate1@example.com', password: 'SeaDrift2026' }),
-  Object.freeze({ handle: 'driftmate2', email: 'driftmate2@example.com', password: 'SeaDrift2026' }),
-  Object.freeze({ handle: 'driftmate3', email: 'driftmate3@example.com', password: 'SeaDrift2026' }),
+  Object.freeze({ handle: 'driftmate1', password: 'SeaDrift2026' }),
+  Object.freeze({ handle: 'driftmate2', password: 'SeaDrift2026' }),
+  Object.freeze({ handle: 'driftmate3', password: 'SeaDrift2026' }),
 ]);
 
 export const DEFAULT_BASE = process.env['MDB_API_BASE'] ?? 'http://127.0.0.1:8788';
@@ -265,19 +264,19 @@ async function call(client, method, path, options, statuses, what) {
  */
 async function ensureSession(client, account) {
   const registered = await client.request('POST', '/api/auth/register', {
-    json: { handle: account.handle, email: account.email, password: account.password },
+    json: { account: account.handle, password: account.password },
   });
   if (registered.status === 201) return 'created';
   if (registered.status !== 409) {
     expect(registered, [201], `注册 ${account.handle}`);
   }
   const logged = await client.request('POST', '/api/auth/login', {
-    json: { email: account.email, password: account.password },
+    json: { account: account.handle, password: account.password },
   });
   if (logged.status !== 200) {
     throw new Error(
       `账号 ${account.handle} 已存在但登录失败（HTTP ${String(logged.status)}）。` +
-        `若它的口令被改过，请先删掉该账号（或换一个 handle/email 再跑）：` +
+        `若它的密码被改过，请先删掉该账号（或换一个 account 再跑）：` +
         `docker exec music-drift-postgres psql -U music_drift -d music_drift -c "delete from users where handle = '${account.handle}'"`,
     );
   }
@@ -380,7 +379,7 @@ async function detailOf(client, bottleId) {
  *   陪练1 建瓶 + 录第 1 段 → 入海（此刻未完成，落在公海未完成区）
  *   → 陪练2 / 演示账号 / 陪练3 依此「指定接唱 → 录下一段 → 入海」
  *   → 最后一位补齐第 4 段并选入海 ⇒ 内核判定完整 ⇒ 给**全部参与者**发 `BOTTLE_COMPLETED`
- *     （演示账号因此拿到未读通知），同时它作为接唱者拿到 `DRIFT_PARTICIPANT` 徽章。
+ *     （演示账号因此拿到未读通知），同时它作为接唱者留下漂流参与记录。
  *
  * @returns {Promise<string>} bottleId
  */
@@ -431,7 +430,7 @@ function countUnread(notifications) {
  *
  * @param {{ base?: string, fixture?: string, log?: (line: string) => void }} [options]
  * @returns {Promise<{ account: typeof DEMO, participated: number, completedSea: number,
- *                     inRiver: number, collections: number, badges: number,
+ *                     inRiver: number, collections: number,
  *                     notifications: number, unread: number, actions: string[] }>}
  */
 export async function ensureDemoData(options = {}) {
@@ -459,13 +458,12 @@ export async function ensureDemoData(options = {}) {
 
   const songs = await listSongs(demo);
 
-  /** 现状：我参与过的瓶子 / 通知 / 收藏 / 徽章。 */
+  /** 现状：我参与过的瓶子 / 通知 / 收藏。 */
   async function snapshot() {
     const bottles = await call(demo, 'GET', '/api/me/bottles', {}, [200], '读我的漂流瓶');
     const notifications = await call(demo, 'GET', '/api/notifications', {}, [200], '读通知');
     const collections = await call(demo, 'GET', '/api/me/collections', {}, [200], '读收藏');
-    const badges = await call(demo, 'GET', '/api/me/badges', {}, [200], '读徽章');
-    return { items: bottles.items ?? [], notifications: notifications.items ?? [], collections, badges };
+    return { items: bottles.items ?? [], notifications: notifications.items ?? [], collections };
   }
 
   let state = await snapshot();
@@ -478,7 +476,7 @@ export async function ensureDemoData(options = {}) {
       (item) => item.role === 'INITIATOR' && (item.status === 'IN_RIVER' || item.status === 'HELD'),
     ) ?? null;
 
-  // ① 至少一支「我参与过、已完整入海」的作品（= 徽章与通知的来源）
+  // ① 至少一支「我参与过、已完整入海」的作品（通知与参与记录的来源）
   let seaBottleId = completedSea()?.id ?? null;
   if (seaBottleId === null) {
     seaBottleId = await buildCompletedSeaBottle([relays[0], relays[1], demo, relays[2]], songs[0], log, fixture);
@@ -520,14 +518,13 @@ export async function ensureDemoData(options = {}) {
     completedSea: state.items.filter((item) => item.status === 'SEA' && item.seaZone === 'COMPLETED').length,
     inRiver: state.items.filter((item) => item.status === 'IN_RIVER' || item.status === 'HELD').length,
     collections: state.collections.length,
-    badges: state.badges.length,
     notifications: state.notifications.length,
     unread,
     actions,
     seaBottleId,
   };
 
-  if (result.completedSea < 1 || result.inRiver < 1 || result.collections < 1 || result.badges < 1) {
+  if (result.completedSea < 1 || result.inRiver < 1 || result.collections < 1) {
     throw new Error(`施种后仍未满足「我的」页非空：${JSON.stringify(result)}`);
   }
   if (unread < 1) {
@@ -565,11 +562,11 @@ if (isMain) {
       log: (line) => console.log(line),
     });
     console.log('');
-    console.log(`演示账号：${result.account.handle} / ${result.account.email} / ${result.account.password}`);
+    console.log(`演示账号：${result.account.handle} / ${result.account.password}`);
     console.log(
       `  「我的」页内容：参与过 ${String(result.participated)} 支` +
         `（完整入海 ${String(result.completedSea)} · 河道/持有中 ${String(result.inRiver)}）` +
-        ` · 收藏 ${String(result.collections)} · 徽章 ${String(result.badges)}` +
+        ` · 收藏 ${String(result.collections)}` +
         ` · 通知 ${String(result.notifications)}（未读 ${String(result.unread)}）`,
     );
     console.log(

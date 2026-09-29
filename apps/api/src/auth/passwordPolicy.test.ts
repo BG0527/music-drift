@@ -7,7 +7,7 @@
 import { describe, expect, it } from 'vitest';
 import { PASSWORD_MAX_LENGTH, PASSWORD_MIN_LENGTH, checkPassword } from './passwordPolicy';
 
-const identity = { handle: 'midnight-singer', email: 'someone@example.com' };
+const identity = { handle: 'midnight-singer' };
 
 describe('口令强度策略', () => {
   it('长度边界：7 位太弱、8 位可用、128 位可用、129 位太弱', () => {
@@ -29,9 +29,9 @@ describe('口令强度策略', () => {
     expect(checkPassword('abcd1234', identity)).not.toBe('WEAK_PASSWORD');
   });
 
-  it('不能包含自己的 handle 或邮箱名（大小写不敏感）', () => {
+  it('不能包含自己的账号（大小写不敏感），邮箱片段不再参与密码策略', () => {
     expect(checkPassword('Midnight-singer1', identity)).toBe('WEAK_PASSWORD');
-    expect(checkPassword('SOMEONE9x', identity)).toBe('WEAK_PASSWORD');
+    expect(checkPassword('SOMEONE9x', identity)).toBeNull();
   });
 
   it('常见弱口令黑名单：就算满足长度与字母数字也算弱', () => {
@@ -45,6 +45,6 @@ describe('口令强度策略', () => {
   });
 
   it('handle 极短（<3）时不参与包含判定，避免误伤正常口令', () => {
-    expect(checkPassword('ab-123456', { handle: 'ab', email: 'x@example.com' })).toBeNull();
+    expect(checkPassword('ab-123456', { handle: 'ab' })).toBeNull();
   });
 });

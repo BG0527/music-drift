@@ -1,0 +1,397 @@
+/*
+ * W22 Landing：一条河、一支瓶、一次完整航程。
+ * 仅作用于 .landing-v4；不改全局 token，不引入图片或运行时依赖。
+ * 动效只过渡 transform / opacity，时长与缓动引用现有 motion 契约。
+ */
+
+.landing-v4 {
+  background:
+    radial-gradient(circle at 20% 18%, color-mix(in srgb, var(--color-water-surface) 18%, transparent), transparent 34%),
+    radial-gradient(circle at 82% 72%, color-mix(in srgb, var(--color-glass) 10%, transparent), transparent 28%),
+    var(--color-ink);
+}
+
+.landing-v4::before {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  background-image: repeating-linear-gradient(
+    112deg,
+    transparent 0,
+    transparent var(--motif-texture-line-gap-alt),
+    color-mix(in srgb, var(--color-line) var(--motif-texture-alpha), transparent)
+      calc(var(--motif-texture-line-gap-alt) + 1px)
+  );
+  content: '';
+  pointer-events: none;
+}
+
+.landing-river-stage {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.landing-river-map {
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  transform: translateY(7rem);
+}
+
+.landing-river-shadow,
+.landing-river-water,
+.landing-river-thread {
+  fill: none;
+  stroke-linecap: round;
+}
+
+.landing-river-shadow {
+  stroke: color-mix(in srgb, var(--color-water-void) 84%, transparent);
+  stroke-width: 260;
+}
+
+.landing-river-water {
+  stroke: url('#landing-river-current');
+  stroke-width: 190;
+}
+
+.landing-river-thread {
+  stroke: color-mix(in srgb, var(--color-water-mid) 55%, transparent);
+  stroke-width: 2;
+  stroke-dasharray: var(--motif-wake-dash) var(--motif-wake-gap);
+}
+
+.landing-river-thread-b {
+  opacity: 0.48;
+}
+
+.landing-river-sea {
+  opacity: 0.16;
+  transform: scale(0.72);
+  transform-box: fill-box;
+  transform-origin: center;
+  transition-property: transform, opacity;
+  transition-duration: var(--motion-page-duration);
+  transition-timing-function: var(--motion-entry-easing);
+}
+
+.landing-v4[data-journey='5'] .landing-river-sea {
+  opacity: 0.34;
+  transform: scale(0.82);
+}
+
+.landing-v4[data-journey='6'] .landing-river-sea {
+  opacity: 0.58;
+  transform: scale(0.92);
+}
+
+.landing-v4[data-journey='7'] .landing-river-sea {
+  opacity: 0.9;
+  transform: scale(1);
+}
+
+.landing-track {
+  z-index: 2;
+}
+
+.landing-protagonist {
+  position: absolute;
+  top: auto;
+  bottom: clamp(2.25rem, 4vh, 3rem);
+  left: 50%;
+  z-index: 2;
+  display: grid;
+  place-items: center;
+  opacity: 0.98;
+  transform: translate3d(calc(-50% - 39vw), 0, 0) rotate(-12deg);
+  transform-origin: 50% 72%;
+  transition-property: transform, opacity;
+  transition-duration: var(--motion-page-duration);
+  transition-timing-function: var(--motion-entry-easing);
+}
+
+.landing-protagonist-halo {
+  position: absolute;
+  width: 118px;
+  height: 118px;
+  border: 1px solid color-mix(in srgb, var(--color-glass) 34%, transparent);
+  border-radius: 50%;
+  background: radial-gradient(circle, color-mix(in srgb, var(--color-glass) 16%, transparent), transparent 64%);
+  opacity: 0.76;
+}
+
+.landing-v4[data-journey='1'] .landing-protagonist {
+  transform: translate3d(calc(-50% - 28vw), -1rem, 0) rotate(7deg);
+}
+
+.landing-v4[data-journey='2'] .landing-protagonist {
+  transform: translate3d(calc(-50% - 16vw), 0.5rem, 0) rotate(-6deg);
+}
+
+.landing-v4[data-journey='3'] .landing-protagonist {
+  transform: translate3d(calc(-50% - 4vw), -1.25rem, 0) rotate(6deg);
+}
+
+.landing-v4[data-journey='4'] .landing-protagonist {
+  transform: translate3d(calc(-50% + 9vw), 0.75rem, 0) rotate(-5deg);
+}
+
+.landing-v4[data-journey='5'] .landing-protagonist {
+  transform: translate3d(calc(-50% + 21vw), -1rem, 0) rotate(9deg);
+}
+
+.landing-v4[data-journey='6'] .landing-protagonist {
+  transform: translate3d(calc(-50% + 32vw), 0.5rem, 0) rotate(-7deg);
+}
+
+.landing-v4[data-journey='7'] .landing-protagonist {
+  opacity: 0.96;
+  transform: translate3d(calc(-50% + 40vw), 1rem, 0) rotate(13deg) scale(0.94);
+}
+
+.landing-far-bottle {
+  position: absolute;
+  z-index: 0;
+  opacity: 0.22;
+  filter: saturate(0.68);
+}
+
+.landing-far-bottle-a {
+  top: 58%;
+  left: 22%;
+  transform: rotate(15deg) scale(0.86);
+}
+
+.landing-far-bottle-b {
+  top: 45%;
+  left: 61%;
+  transform: rotate(-17deg) scale(0.72);
+}
+
+.landing-far-bottle-c {
+  top: 67%;
+  right: 13%;
+  transform: rotate(9deg) scale(0.78);
+}
+
+.landing-screen-inner {
+  position: relative;
+  justify-content: flex-start;
+  padding-top: clamp(7.25rem, 14vh, 9rem);
+  padding-bottom: clamp(12rem, 25vh, 15rem);
+}
+
+.landing-screen-content {
+  width: min(100%, 64rem);
+  padding: clamp(1rem, 2vw, 1.75rem);
+  background: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--color-ink) 82%, transparent),
+    color-mix(in srgb, var(--color-ink) 54%, transparent) 72%,
+    transparent
+  );
+}
+
+.landing-screen:nth-child(even) .landing-screen-content {
+  margin-left: auto;
+  border-left: 3px solid color-mix(in srgb, var(--color-glass) 44%, transparent);
+}
+
+.landing-screen:nth-child(odd) .landing-screen-content {
+  margin-right: auto;
+  border-right: 3px solid color-mix(in srgb, var(--color-water-surface) 56%, transparent);
+}
+
+.landing-screen:first-child .landing-screen-content,
+.landing-screen:nth-child(4) .landing-screen-content {
+  width: min(100%, 68rem);
+}
+
+.landing-section-heading > span {
+  display: grid;
+  width: 2.25rem;
+  height: 2.25rem;
+  place-items: center;
+  border: 1px solid color-mix(in srgb, var(--color-coral) 60%, transparent);
+  border-radius: 50%;
+}
+
+.landing-section-heading h2 {
+  text-wrap: balance;
+}
+
+.landing-hero h1 {
+  max-width: 9ch;
+  font-size: clamp(2.6rem, 6.2vw, 5.6rem);
+  font-weight: 500;
+  line-height: 0.98;
+  text-wrap: balance;
+}
+
+.landing-hero-copy {
+  padding-top: clamp(0rem, 3vw, 2rem);
+}
+
+.landing-listen-deck {
+  position: relative;
+  overflow: hidden;
+  border-color: color-mix(in srgb, var(--color-glass) 32%, transparent);
+  background: color-mix(in srgb, var(--color-water-void) 92%, transparent);
+}
+
+.landing-listen-deck::after {
+  position: absolute;
+  right: -3rem;
+  bottom: -5rem;
+  width: 11rem;
+  height: 11rem;
+  border: 1px solid color-mix(in srgb, var(--color-glass) 18%, transparent);
+  border-radius: 50%;
+  content: '';
+  pointer-events: none;
+}
+
+.landing-glossary > div,
+.landing-steps > li {
+  background: color-mix(in srgb, var(--color-water-void) 72%, transparent);
+}
+
+.landing-comparison {
+  border-block: 1px solid color-mix(in srgb, var(--color-line) 16%, transparent);
+  background: color-mix(in srgb, var(--color-water-void) 72%, transparent);
+}
+
+.landing-comparison th,
+.landing-comparison td {
+  padding-inline: 0.75rem;
+}
+
+.landing-scene-card,
+.landing-info-card,
+.landing-step-card {
+  border-color: color-mix(in srgb, var(--color-line) 16%, transparent);
+  background: color-mix(in srgb, var(--color-water-void) 78%, transparent);
+}
+
+.landing-info-card:nth-child(2n),
+.landing-step-card:nth-child(2) {
+  transform: translateY(0.5rem);
+}
+
+.landing-indicator {
+  top: 5rem;
+  bottom: auto;
+  min-height: 2.75rem;
+  padding: 0.75rem 1rem;
+  border: 1px solid color-mix(in srgb, var(--color-line) 16%, transparent);
+  background: color-mix(in srgb, var(--color-ink) 90%, transparent);
+  backdrop-filter: blur(10px);
+}
+
+.landing-screen-nav {
+  padding-block: 0.5rem;
+  border: 1px solid color-mix(in srgb, var(--color-line) 14%, transparent);
+  background: color-mix(in srgb, var(--color-ink) 88%, transparent);
+  backdrop-filter: blur(10px);
+}
+
+@media (max-width: 760px) {
+  .landing-river-map {
+    width: 172%;
+    height: 44%;
+    transform: translateX(-38%) translateY(-4%);
+  }
+
+  .landing-screen-inner {
+    justify-content: flex-start;
+    padding-top: 22rem;
+    padding-right: 4.5rem;
+    padding-bottom: 3.5rem;
+  }
+
+  .landing-screen-content,
+  .landing-screen:first-child .landing-screen-content,
+  .landing-screen:nth-child(4) .landing-screen-content {
+    width: 100%;
+    padding: 1.25rem;
+    border-inline: 0;
+    background: linear-gradient(
+      90deg,
+      color-mix(in srgb, var(--color-ink) 92%, transparent),
+      color-mix(in srgb, var(--color-ink) 68%, transparent) 78%,
+      transparent
+    );
+  }
+
+  .landing-hero h1 {
+    max-width: none;
+    font-size: clamp(2.35rem, 11vw, 4rem);
+    text-wrap: wrap;
+  }
+
+  .landing-protagonist {
+    top: 8.75rem;
+    bottom: auto;
+    left: 50%;
+    transform: translate3d(calc(-50% - 34vw), 0, 0) rotate(-12deg) scale(0.82);
+  }
+
+  .landing-v4[data-journey='1'] .landing-protagonist {
+    transform: translate3d(calc(-50% - 25vw), -0.5rem, 0) rotate(7deg) scale(0.82);
+  }
+
+  .landing-v4[data-journey='2'] .landing-protagonist {
+    transform: translate3d(calc(-50% - 14vw), 0.5rem, 0) rotate(-6deg) scale(0.82);
+  }
+
+  .landing-v4[data-journey='3'] .landing-protagonist {
+    transform: translate3d(calc(-50% - 3vw), -0.5rem, 0) rotate(6deg) scale(0.82);
+  }
+
+  .landing-v4[data-journey='4'] .landing-protagonist {
+    transform: translate3d(calc(-50% + 9vw), 0.5rem, 0) rotate(-5deg) scale(0.82);
+  }
+
+  .landing-v4[data-journey='5'] .landing-protagonist {
+    transform: translate3d(calc(-50% + 18vw), -0.5rem, 0) rotate(9deg) scale(0.82);
+  }
+
+  .landing-v4[data-journey='6'] .landing-protagonist {
+    transform: translate3d(calc(-50% + 14vw), 0.5rem, 0) rotate(-7deg) scale(0.78);
+  }
+
+  .landing-v4[data-journey='7'] .landing-protagonist {
+    transform: translate3d(calc(-50% + 24vw), 0.75rem, 0) rotate(13deg) scale(0.74);
+  }
+
+  .landing-screen-nav {
+    top: 50%;
+    right: 0.5rem;
+    bottom: auto;
+    padding-block: 0.25rem;
+    transform: translateY(-50%);
+  }
+
+  .landing-indicator {
+    top: 4.75rem;
+    bottom: auto;
+    left: 1.5rem;
+    transform: none;
+    white-space: nowrap;
+  }
+
+  .landing-info-card:nth-child(2n),
+  .landing-step-card:nth-child(2) {
+    transform: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .landing-protagonist,
+  .landing-river-sea {
+    transition: none;
+  }
+}

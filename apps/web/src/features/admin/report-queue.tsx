@@ -27,6 +27,7 @@ const TARGET_LABEL: Record<Report['targetType'], string> = {
   BOTTLE: '瓶子',
   SEGMENT: '唱段',
   MESSAGE: '留言',
+  COMMENT: '评论',
 };
 
 const ACTION_LABEL: Record<ReportAction, string> = {
@@ -34,11 +35,18 @@ const ACTION_LABEL: Record<ReportAction, string> = {
   REMOVE_SEGMENT: '已删段',
   RESTORE_SEGMENT: '已恢复唱段',
   REMOVE_BOTTLE: '已删瓶下架',
+  REMOVE_COMMENT: '已删评论',
   BAN_USER: '已封禁作者',
 };
 
 /** 每条举报允许的动作（与服务端 `ACTION_TARGETS` 同口径；服务端仍是最终判定）。 */
 function actionsFor(targetType: Report['targetType']): { label: string; decision: ReportAction }[] {
+  if (targetType === 'COMMENT') {
+    return [
+      { label: '驳回', decision: 'NONE' },
+      { label: '删评论', decision: 'REMOVE_COMMENT' },
+    ];
+  }
   if (targetType === 'SEGMENT') {
     return [
       { label: '驳回', decision: 'NONE' },

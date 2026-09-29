@@ -84,6 +84,26 @@
   animation: river-float var(--motion-exit-duration) var(--motion-entry-easing) both;
 }
 
+/* ── ③.5 涟漪段（t6）：瓶子**留在水上**轻轻起伏 ──────────────────────────────
+   目的 = continuity：收拢涟漪在确认的 2.4s 里，主角不能突然变成一张静止贴纸；
+   幅度取契约 `--motion-entry-shift`（16px，一上一下一拍），时长取 `--motion-ripple-duration`
+   （与这一段等长、只播 1 次），缓动取唯一缓动 token —— 只动 transform（skill §3）。 */
+@keyframes river-vessel-hold {
+  0% {
+    transform: translate3d(0, 0, 0);
+  }
+  50% {
+    transform: translate3d(0, calc(-1 * var(--motion-entry-shift)), 0);
+  }
+  100% {
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+.river-vessel-hold {
+  animation: river-vessel-hold var(--motion-ripple-duration) var(--motion-entry-easing) 1 both;
+}
+
 /* 收拢涟漪（事件涟漪：feedback / confirmation，只播一次 —— iteration = 1）。 */
 @keyframes river-gather {
   from {
@@ -100,6 +120,18 @@
   animation: river-gather var(--motion-ripple-duration) var(--motion-entry-easing) 1 both;
 }
 
+/* ── ⑤ f1（t4 评审并入）：短视口收起页脚说明行 ──────────────────────────────
+   md+ 且视口高 <844px 时把 mood-chips 的「只作展示」说明行**视觉收起**（display:none）：
+   DOM 与文案保留（产品诚实说明不删，mood-chips.test 继续绿），页脚回落基准 44px 高，
+   与投下 cap 的碰撞阈值回落到实测 H≈772（基准同几何 H=738；差值来自 chips 触达热区
+   44px（DESIGN.md 必须）vs 基准行高 32px —— t5-f5 裁决：该残留按 parity 接受）。
+   纯静态布局规则，不是动画 —— 不动 cap/t2 锚法几何，也不引入任何时长/缓动/色值。 */
+@media (min-width: 768px) and (max-height: 844px) {
+  .mood-note {
+    display: none;
+  }
+}
+
 /* ── ④ reduced-motion：本页动效全部静止，只留 aria-live 文字状态 ─────────────
    状态机在 reduce 下根本不起动画、立即跳转（§103.3）；本块是样式层的逐项确认，
    与 motion.css 的全局 `animation: none !important` 兜底构成双保险。 */
@@ -109,7 +141,8 @@
   .river-vessel-enter-draw,
   .river-vessel-enter-cast,
   .river-vessel-exit-draw,
-  .river-vessel-exit-cast {
+  .river-vessel-exit-cast,
+  .river-vessel-hold {
     animation: none;
   }
 }

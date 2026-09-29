@@ -31,6 +31,7 @@
  */
 /* eslint-disable no-console */
 import { spawn, spawnSync } from 'node:child_process';
+import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { createServer } from 'node:net';
 import { fileURLToPath } from 'node:url';
@@ -150,29 +151,26 @@ function newSession(label) {
   return { label, cookie: null };
 }
 
-/** 构造一段"看起来是 webm"的字节（EBML 魔数），足够通过服务端魔数嗅探与体积校验。 */
-function webmBytes(size = 4_096) {
-  const bytes = new Uint8Array(size);
-  bytes.set([0x1a, 0x45, 0xdf, 0xa3], 0);
-  return bytes;
+/** MediaRecorder 录制的可解码 WebM/Opus；不以只有魔数的假容器充当音频证据。 */
+function webmBytes() {
+  return readFileSync(new URL('../../../tools/fixtures/demo-segment.webm', import.meta.url));
 }
 
 async function register(label) {
   const session = newSession(label);
-  // 每个账号必须有**唯一** handle/email：`stamp` 只在进程启动时算一次，所以同一 label 注册两次
+  // 每个账号必须唯一：`stamp` 只在进程启动时算一次，所以同一 label 注册两次
   // （第 27 步要造 10 个点踩者）会撞唯一索引 → 409，而 409 的注册会让后面所有断言连锁失败。
   registerSeq += 1;
   const unique = `${stamp}${registerSeq}`;
   const handle = `${label}${unique}`.slice(0, 30);
-  const email = `${label}.${unique}@example.com`;
   const password = 'drift2026';
   const created = await call(session, 'POST', '/api/auth/register', {
-    json: { handle, email, password },
+    json: { account: handle, password },
   });
   must(created.status === 201, `${label} 注册应为 201，实际 ${created.status}`);
   must(created.body?.user?.id !== undefined, `${label} 注册应返回 user.id`);
   must(created.cookie !== null, `${label} 注册应下发会话 cookie`);
-  return { session, handle, email, password, userId: created.body?.user?.id };
+  return { session, handle, password, userId: created.body?.user?.id };
 }
 
 async function recordSegment(session, bottleId, durationMs, note) {
@@ -473,7 +471,7 @@ const runChecks = async () => {
   must(first.body?.index === 1, `第 1 段 index 应为 1，实际 ${first.body?.index}`);
   must(first.body?.nextRecordIndex === 2, '录完第 1 段后 nextRecordIndex 应为 2');
   log(
-    'A 录第 1 段（原始二进制 4KB webm）',
+    'A 录第 1 段（可解码 WebM/Opus 录音素材）',
     `index=${first.body.index} · next=${first.body.nextRecordIndex}`,
   );
 
@@ -576,6 +574,16 @@ const runChecks = async () => {
     `isComplete=${afterComplete.body.isComplete} · 可选去向 ${JSON.stringify(afterComplete.body.availableResolutions)}`,
   );
 
+  const privateNote = await call(D.session, 'POST', `/api/bottles/${bottleId}/messages`, {
+    json: { targetSegmentIndex: 3, content: '第三段的朋友，谢谢你接住这首歌。' },
+  });
+  must(privateNote.status === 201, `私密留言应创建成功，实际 ${privateNote.status}`);
+  must(privateNote.body?.status === 'PENDING', '回传前留言必须待送达');
+  const beforeReceive = await call(C.session, 'GET', `/api/bottles/${bottleId}/messages`);
+  must(beforeReceive.body?.length === 0, '接收者在回传到手前不能读留言');
+  const intermediary = await call(B.session, 'GET', `/api/bottles/${bottleId}/messages`);
+  must(intermediary.body?.length === 0, '中间经手者不能知道留言存在');
+
   const returned = await call(D.session, 'POST', `/api/bottles/${bottleId}/resolution`, {
     json: { resolution: 'RETURN' },
   });
@@ -587,11 +595,45 @@ const runChecks = async () => {
   );
   log('D 回传', 'C（父链上游：投给 D 的人）isHolder=true');
 
+  const received = await call(C.session, 'GET', `/api/bottles/${bottleId}/messages`);
+  const receivedNote = received.body?.find((entry) => entry.id === privateNote.body?.id);
+  must(receivedNote?.status === 'DELIVERED', '回传到收件人手中应送达');
+  must(receivedNote?.sender?.displayName === D.handle && receivedNote?.recipient?.displayName === C.handle,
+    '送达后通信双方应显示账号名');
+  const notifications = await call(C.session, 'GET', '/api/notifications');
+  must(notifications.body?.items?.some((entry) => entry.type === 'MESSAGE_DELIVERED'), '接收者应收到私密留言通知');
+  log('私密留言真实回传', '未到手与中间人均不可见；送达后双方账号 + 接收通知');
+
   const toSea = await call(C.session, 'POST', `/api/bottles/${bottleId}/resolution`, {
     json: { resolution: 'SEA' },
   });
   must(toSea.status === 200 && toSea.body?.seaZone === 'COMPLETED', 'C 入海后应进入公海完整区');
   log('C 入海', `status=${toSea.body?.status} · seaZone=${toSea.body?.seaZone}`);
+  const hiddenMessages = await call(C.session, 'GET', `/api/bottles/${bottleId}/messages`);
+  must(hiddenMessages.body?.length === 0, '公海不显示私密留言');
+
+  const collected = await call(A.session, 'POST', `/api/collections/${bottleId}`, { json: {} });
+  must(collected.status === 201 || collected.status === 200, '完成公海作品可收藏');
+  const myCollections = await call(A.session, 'GET', '/api/me/collections');
+  must(myCollections.body?.some((item) => item.bottleId === bottleId), '收藏列表应含当前作品');
+  log('完成作品收藏', '写入成功，重读收藏列表可见');
+
+  const comment = await call(C.session, 'POST', `/api/bottles/${bottleId}/comments`, {
+    json: { content: '  四段合起来，像在河边遇见老朋友。  ' },
+  });
+  must(comment.status === 201, `评论应创建成功，实际 ${comment.status}`);
+  const comments = await call(anon, 'GET', `/api/bottles/${bottleId}/comments`);
+  must(comments.body?.items?.some((item) => item.id === comment.body?.id && item.authorAccount === C.handle),
+    '访客应能读公开评论与账号名');
+  const reportComment = await call(B.session, 'POST', '/api/reports', {
+    json: { targetType: 'COMMENT', targetId: comment.body?.id, reason: '演示评论举报' },
+  });
+  must(reportComment.status === 204, `公开评论举报应为 204，实际 ${reportComment.status}`);
+  const deletedComment = await call(C.session, 'DELETE', `/api/comments/${comment.body?.id}`);
+  must(deletedComment.status === 204, '作者应可删除自己的公开评论');
+  const afterDeletion = await call(anon, 'GET', `/api/bottles/${bottleId}/comments`);
+  must(afterDeletion.body?.items?.length === 0, '删除后公开评论列表不再显示正文');
+  log('公开评论真实闭环', '账号实名发布 → 访客读取 → 他人举报 → 作者删除');
 
   // ── 公海（前端「公海大厅」用的两个请求）────────────────────────
   const seaCompleted = await call(anon, 'GET', '/api/sea?zone=COMPLETED&limit=30');

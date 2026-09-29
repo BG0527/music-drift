@@ -1,0 +1,15 @@
+{
+  "cookies": [
+    {
+      "name": "mdb_session",
+      "value": "D-I6ZE87dVkTPXem4MWlp1X7-K0wI2zm5Y_ZsvmAa3U",
+      "domain": "t17.localhost",
+      "path": "/",
+      "expires": -1,
+      "httpOnly": true,
+      "sameSite": "Lax",
+      "secure": false
+    }
+  ],
+  "origins": []
+}

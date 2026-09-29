@@ -15,8 +15,8 @@
  *   （如 `aamud*` / `ccmud*` / `smoke*` / `layoutmud*`）造的合成段**不在**修复范围（任务书禁止动），
  *   它们只会被报成 WARN 并列出 id —— 那不是"本次没修好"，是"不在本次范围"。
  *
- * 前置：API 在 8787。站点服务器本脚本**自己起**（已在跑则复用）并**跑完杀掉**（deploy-plan §15）。
- * 用法：node tools/verify-demo-audio.mjs [--port=5188] [--api-port=8787] [--sample=8]
+ * 前置：API 在 8788。站点服务器本脚本**自己起**（已在跑则复用）并**跑完杀掉**（deploy-plan §15）。
+ * 用法：node tools/verify-demo-audio.mjs [--port=5188] [--api-port=8788] [--sample=8]
  * 退出码：0 = 判据 ①②③ 全过；1 = 有 FAIL。
  */
 /* eslint-disable no-console */
@@ -37,7 +37,7 @@ const args = new Map(
   }),
 );
 const PORT = Number(args.get('port') ?? 5188);
-const API_PORT = Number(args.get('api-port') ?? 8787);
+const API_PORT = Number(args.get('api-port') ?? 8788);
 const SAMPLE = Number(args.get('sample') ?? 8);
 const SITE = `http://127.0.0.1:${String(PORT)}`;
 const API = `http://127.0.0.1:${String(API_PORT)}`;
@@ -204,13 +204,13 @@ console.log(`站点：${SITE}（${siteServer.reused ? '复用已在跑的' : '�
 
 const api = createApiClient(API);
 const logged = await api.request('POST', '/api/auth/login', {
-  json: { email: DEMO.email, password: DEMO.password },
+  json: { account: DEMO.handle, password: DEMO.password },
 });
 if (logged.status !== 200) {
   console.error(`演示账号登录失败：HTTP ${String(logged.status)} ${logged.text.slice(0, 200)}`);
   process.exit(1);
 }
-console.log(`已用演示账号登录：${DEMO.handle} / ${DEMO.email}`);
+console.log(`已用演示账号登录：${DEMO.handle}`);
 
 const mine = await api.request('GET', '/api/me/bottles', {});
 const myItems = Array.isArray(mine.body?.items) ? mine.body.items : [];
@@ -241,7 +241,7 @@ try {
    * `context.request` 与页面共用 cookie 罐。
    */
   const login = await context.request.post(`${SITE}/api/auth/login`, {
-    data: { email: DEMO.email, password: DEMO.password },
+    data: { account: DEMO.handle, password: DEMO.password },
   });
   if (login.status() !== 200) {
     console.error(`浏览器上下文登录失败：HTTP ${String(login.status())}`);

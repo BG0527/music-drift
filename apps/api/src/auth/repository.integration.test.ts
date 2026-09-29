@@ -60,54 +60,36 @@ afterAll(async () => {
 describe('createUser', () => {
   it('写入用户行并返回（role 默认 USER）', async () => {
     const handle = `singer-${randomUUID().slice(0, 8)}`;
-    const email = `${randomUUID().slice(0, 8)}@test.local`;
 
-    const result = await repo.createUser({ handle, email, passwordHash: 'scrypt$hash' });
+    const result = await repo.createUser({ handle, passwordHash: 'scrypt$hash' });
 
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     expect(result.user.handle).toBe(handle);
-    expect(result.user.email).toBe(email);
     expect(result.user.role).toBe('USER');
     expect(result.user.createdAt).toBeInstanceOf(Date);
-  });
-
-  it('邮箱重复 → EMAIL_TAKEN（不是静默失败）', async () => {
-    const email = `${randomUUID().slice(0, 8)}@test.local`;
-    await repo.createUser({ handle: `a-${randomUUID().slice(0, 8)}`, email, passwordHash: 'h' });
-
-    const second = await repo.createUser({
-      handle: `b-${randomUUID().slice(0, 8)}`,
-      email,
-      passwordHash: 'h',
-    });
-
-    expect(second).toEqual({ ok: false, code: 'EMAIL_TAKEN' });
   });
 
   it('用户名重复 → HANDLE_TAKEN', async () => {
     const handle = `dup-${randomUUID().slice(0, 8)}`;
     await repo.createUser({
       handle,
-      email: `${randomUUID().slice(0, 8)}@test.local`,
       passwordHash: 'h',
     });
 
     const second = await repo.createUser({
       handle,
-      email: `${randomUUID().slice(0, 8)}@test.local`,
       passwordHash: 'h',
     });
 
     expect(second).toEqual({ ok: false, code: 'HANDLE_TAKEN' });
   });
 
-  it('意外冲突（主键重复）必须抛错，而不是被当成 EMAIL_TAKEN/HANDLE_TAKEN 吞掉', async () => {
+  it('意外冲突（主键重复）必须抛错，而不是被当成 HANDLE_TAKEN 吞掉', async () => {
     const id = randomUUID();
     await repo.createUser({
       id,
       handle: `k-${id.slice(0, 8)}`,
-      email: `${id.slice(0, 8)}@test.local`,
       passwordHash: 'h',
     });
 
@@ -115,7 +97,6 @@ describe('createUser', () => {
       repo.createUser({
         id,
         handle: `k2-${id.slice(0, 8)}`,
-        email: `k2-${id.slice(0, 8)}@test.local`,
         passwordHash: 'h',
       }),
     ).rejects.toThrow();
@@ -123,13 +104,12 @@ describe('createUser', () => {
 });
 
 describe('用户查询', () => {
-  it('按邮箱查到刚注册的用户；未注册邮箱返回 null', async () => {
-    const email = `${randomUUID().slice(0, 8)}@test.local`;
-    await repo.createUser({ handle: `f-${randomUUID().slice(0, 8)}`, email, passwordHash: 'h' });
+  it('按账号查到刚注册的用户；未注册账号返回 null', async () => {
+    const handle = `f-${randomUUID().slice(0, 8)}`;
+    await repo.createUser({ handle, passwordHash: 'h' });
 
-    const found = await repo.findUserByEmail(email);
-    expect(found?.email).toBe(email);
-    expect(await repo.findUserByEmail(`nobody-${randomUUID().slice(0, 8)}@test.local`)).toBeNull();
+    expect((await repo.findUserByHandle(handle))?.handle).toBe(handle);
+    expect(await repo.findUserByHandle(`nobody-${randomUUID().slice(0, 8)}`)).toBeNull();
   });
 });
 

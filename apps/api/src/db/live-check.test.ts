@@ -40,9 +40,10 @@ describe('live-check 的数据库隔离（hermetic）', () => {
     expect(script).toMatch(/healthz/);
   });
 
-  it('外部模式必须**显式**开启（不再默默用 8787 的 dev 服务，那正是运气来源）', () => {
-    // 旧写法是 `const API = process.env.API_BASE ?? 'http://localhost:8787'` —— 静默默认连 dev 服务
-    expect(script).not.toMatch(/process\.env\.API_BASE\s*\?\?\s*'http:\/\/localhost:8787'/);
+  it('外部模式必须**显式**开启（默认值随端口迁移仍需显式开启——守卫端口无关，那正是运气来源）', () => {
+    // 旧写法是 `const API = process.env.API_BASE ?? 'http://localhost:<旧默认端口>'`（端口已迁 8788）——
+    // 静默默认连 dev 服务。模式串必须**端口无关**：钉死具体端口会让迁移后的同类写法绕过守卫。
+    expect(script).not.toMatch(/API_BASE\s*\?\?\s*'http:\/\/localhost:\d+'/);
     expect(script).toContain('API_BASE');
   });
 });

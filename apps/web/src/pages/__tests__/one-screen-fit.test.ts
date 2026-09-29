@@ -22,6 +22,15 @@ import { describe, expect, it } from 'vitest';
 const PAGES_DIR = join(process.cwd(), 'src', 'pages');
 const source = (name: string): string => readFileSync(join(PAGES_DIR, name), 'utf8');
 
+describe('长漂流日志的桌面内部滚动', () => {
+  it('桌面事件卷有最小高度保护和内部滚动，而不是被整页裁掉', () => {
+    const css = source('drift-log-page.css');
+    expect(css).toMatch(/\.drift-page \[data-testid="drift-log"\][\s\S]*?overflow-y:\s*auto/);
+    expect(css).toContain('min-height: 0');
+    expect(css).toContain('(min-width: 1024px) and (min-height: 720px)');
+  });
+});
+
 /** 页面根元素（不含测试与 shell）：文件 → 必须携带一屏约束的标记。 */
 const PAGE_ROOTS: ReadonlyArray<readonly [file: string, marker: string]> = [
   ['river-page.tsx', 'md:h-[100dvh]'],
@@ -47,6 +56,13 @@ describe('t5 · 一屏约束（每个页面根元素 md+ 钉死视口高）', ()
 });
 
 describe('W18 · 真浏览器一屏门禁同时检查可见控件相交', () => {
+  it('覆盖完整四段真实音频播放、三去向待选与投递完成态', () => {
+    const guard = readFileSync(join(process.cwd(), 'tools', 'one-screen-check.mjs'), 'utf8');
+    expect(guard).toContain("scenario: 'playing-four'");
+    expect(guard).toContain("scenario: 'awaiting-destination'");
+    expect(guard).toContain("scenario: 'destination-completed'");
+    expect(guard).toContain('tools/fixtures/demo-segment.webm');
+  });
   it('one-screen-check 采集 visualOverlaps 并把非空结果判失败', () => {
     const guard = readFileSync(join(process.cwd(), 'tools', 'one-screen-check.mjs'), 'utf8');
     expect(guard).toContain('visualOverlaps');

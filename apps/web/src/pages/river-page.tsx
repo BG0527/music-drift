@@ -33,6 +33,7 @@
  */
 import { useCallback, useEffect, useRef, useState, type CSSProperties, type MouseEvent as ReactMouseEvent } from 'react';
 import {
+  BottleVessel,
   Ripple,
   RippleRing,
   cn,
@@ -129,29 +130,13 @@ const STAGE_DURATION: Record<FlowStage, number> = {
 };
 
 /**
- * 分镜里的那只瓶子（玻璃瓶身 rx7 + 木塞 + 一道纸条）。纯装饰（外层 `aria-hidden`）：
- * 色值一律 `var(--color-*)`，不写 hex。它**只在一次操作的动效里**出现（守卫③盯着）。
+ * 分镜里的那只瓶子（t6 重绘：`design-system/BottleVessel` —— 瓶体曲线 / 软木塞 /
+ * 卷纸与系绳 / 高光与发丝描边 / 接触辉光，取代原先 18×54 的占位矩形）。
+ * 纯装饰（外层 `aria-hidden`）：色值一律 rgba 或 `var(--color-*)`，不写 hex。
+ * 它**只在一次操作的动效里**出现（守卫③盯着），位移/淡入由 `river-motion.css` 承担。
  */
 function FlowVessel() {
-  return (
-    <svg width={40} height={120} viewBox="0 0 18 54" aria-hidden="true" focusable="false">
-      <rect
-        x="0"
-        y="8"
-        width="18"
-        height="46"
-        rx="7"
-        fill="var(--color-glass)"
-        fillOpacity={0.28}
-        stroke="var(--color-water-light)"
-        strokeOpacity={0.9}
-        strokeWidth={2}
-      />
-      {/* 木塞：coral = 被记下的那一下（record-v1 唯一强调色） */}
-      <rect x="4" y="1" width="10" height="8" rx="3" fill="var(--color-coral)" />
-      <path d="M0 30 h18" fill="none" stroke="var(--color-paper)" strokeOpacity={0.7} strokeWidth={1.6} />
-    </svg>
-  );
+  return <BottleVessel size={56} />;
 }
 
 export function RiverPage() {
@@ -268,7 +253,9 @@ export function RiverPage() {
     // 页面自带 <main>（外壳不渲染，且外壳不给 padding ⇒ main 贴视口宽全出血，
     // 不得再写负外边距：-mx-6/md:-mx-12 曾把 scrollWidth 撑成 1488>1440 / 399>375）。
     // 唱片出血由 backdrop 的 absolute inset-0 承担；正文边距是 header/section/footer 各自的 px-6。
-    <main className="relative isolate flex flex-col gap-6 md:min-h-[100dvh] md:gap-8">
+    // md+：一屏绝对定位（基准 river.css html/body overflow:hidden 同思路）——
+    // 固定视口高 + 溢出裁切，header/页脚/错误块/泊位全部锚视口，内容永不把页面撑高。
+    <main className="relative isolate flex min-h-[100dvh] flex-col gap-6 md:h-[100dvh] md:overflow-hidden">
       {/* ── B1 背景五层 + B2 唱片表面 SVG（稿 §5/§4）───────────────────────────
           一比一 v2：backdrop 与泊位共用**同一个 cover 场景几何**（art 恒 1440:900：
           宽=max(scene, H×1.6)、高=max(scene, W/1.6)，居中裁切）——
@@ -388,13 +375,17 @@ export function RiverPage() {
       </div>
 
       {/* ── B3/B4 岸（水线以上）：标题立在被压暗的盘面上 ─────────────────────── */}
-      <header className="relative z-10 flex flex-wrap items-start justify-between gap-x-6 gap-y-4 px-6 md:px-12">
-        {/* B3 左上：cat（带编号）→ h1（84px 档）→ 副标题两行（逐字照稿） */}
-        <div className="flex min-w-0 flex-col gap-2">
+      {/* md+：标题区锚视口一屏（基准 river.css .ov top:max(10.67%,--top-nav-h) 同思路；
+          54px = 顶栏 top-10px + min-h-11(44px)，矮窗时标题让位顶栏；<md 用 64px 顶避让同理） */}
+      <header className="relative z-10 flex flex-wrap items-start justify-between gap-x-6 gap-y-4 px-6 pt-[64px] md:absolute md:inset-x-0 md:top-[max(10.67%,54px)] md:px-12 md:pt-0">
+        {/* B3 左上：cat（带编号）→ h1（84px 档）→ 副标题两行（逐字照稿）
+            t3 入场编排（continuity/guidance）：标题块先落位，RPM 块错拍 1 档跟上；
+            参数全部经契约类（enter-rise / stagger-*，值在 motion.css 的 --motion-* token 上） */}
+        <div className="enter-rise flex min-w-0 flex-col gap-2">
           <p className="font-latin text-[0.6875rem] tracking-[0.24em] text-paper/50">
             音乐共创 · 匿名接力 · 0001
           </p>
-          <h1 className="text-[clamp(2.5rem,6vw,5.25rem)] font-bold leading-none text-paper">
+          <h1 id="river-title" className="text-[clamp(2.5rem,6vw,5.25rem)] font-bold leading-none text-paper">
             暖流河道
           </h1>
           <p className="text-[0.96875rem] leading-[1.9] text-muted">
@@ -404,7 +395,9 @@ export function RiverPage() {
           </p>
         </div>
         {/* B4 右上：33⅓ → RPM · 匿名接力 → 两行说明（稿右上没有「参与记录」链接） */}
-        <div className="flex flex-col items-start gap-2 md:items-end md:text-right">
+        {/* B4 右上：33⅓ → RPM · 匿名接力 → 两行说明（稿右上没有「参与记录」链接）。
+            md:mt-4 = 基准 RPM 落点 12.44% − 标题 10.67% ≈ 16px@900（两块同排的基准高差） */}
+        <div className="enter-rise stagger-1 flex flex-col items-start gap-2 md:mt-4 md:items-end md:text-right">
           {/* 26px = 字号阶梯的 h1 档（稿 .rpm 也是 26px，色 = --glass） */}
           <span className="font-latin text-[1.625rem] leading-none text-glass">33⅓</span>
           <p className="font-latin text-[0.6875rem] tracking-[0.24em] text-paper/50">
@@ -421,7 +414,11 @@ export function RiverPage() {
       {/* ── 水线以下：一整片水（水面光 / 水纹 / 水下光柱 / 常驻装饰）────────────
           两个泊位骑在这条河上 —— 它们**没有各自的背景、边框与阴影**，浮在同一片水上，
           这是"同一条河上的两个位置"的关键（`DESIGN.md` §Composition）。 */}
-      <section className="river-body relative isolate overflow-hidden bg-none px-6 pb-6 pt-16 md:px-12 md:pb-8 md:pt-24">
+      {/* md+：水体容器锚满视口（inset-0、无 padding）⇒ 泊位/说明的 % = 视口 %（基准补丁口径） */}
+      <section
+        aria-labelledby="river-title"
+        className="river-body relative isolate overflow-hidden bg-none px-6 pb-6 pt-16 md:absolute md:inset-0 md:p-0"
+      >
         {/* 一比一复刻 v2（用户看图打回）：稿的下半是**纯暗盘面** ⇒ 上一版保留的
             WaterSheen / WaterTexture / LightShafts 与 .river-body 自带的 gradient-river
             大色块全部退场（bg-none 盖掉 DS 里的底），水感只由 backdrop 五层承担。 */}
@@ -437,7 +434,6 @@ export function RiverPage() {
           </span>
         </div>
 
-        <h2 className="sr-only">河道</h2>
 
         {/* ── f0②③ 操作动效：瓶子**只在一次操作里出现**（常驻态没有它，守卫③盯着）。 */}
         {flow !== null ? (
@@ -452,8 +448,10 @@ export function RiverPage() {
                 className={cn(
                   'block',
                   flow.kind === 'draw' && flow.stage === 'enter' && 'river-vessel-enter-draw',
+                  flow.kind === 'draw' && flow.stage === 'ripple' && 'river-vessel-hold',
                   flow.kind === 'draw' && flow.stage === 'exit' && 'river-vessel-exit-draw',
                   flow.kind === 'cast' && flow.stage === 'enter' && 'river-vessel-enter-cast',
+                  flow.kind === 'cast' && flow.stage === 'ripple' && 'river-vessel-hold',
                   flow.kind === 'cast' && flow.stage === 'exit' && 'river-vessel-exit-cast',
                 )}
               >
@@ -474,19 +472,16 @@ export function RiverPage() {
           </div>
         ) : null}
 
-        {/* 一比一复刻 v2：泊位容器在 md+ 变成与 backdrop 同几何的 **cover 场景盒**
-            （fixed 挂视口、宽高 = art 覆盖式、居中），子节用稿画布百分比落位 ——
-            与 SVG 同一坐标系，任意宽度下泊位都骑在弧上；<md 维持流式单列（375 锚点判据靠流式）。 */}
-        <div className="relative z-10 grid gap-4 md:pointer-events-none md:fixed md:left-1/2 md:top-1/2 md:z-10 md:h-[max(100dvh,calc(100vw_/_1.6))] md:w-[max(100vw,calc(100dvh_*_1.6))] md:-translate-x-1/2 md:-translate-y-1/2">
+        {/* t2 锚视口（基准 river.css 补丁口径）：cover 场景盒退场 —— md:contents 让两枚泊位
+            直接以 river-body（md: absolute inset-0 = 视口）为 containing block，% 即视口 %，
+            宽扁视口不再有「盒高于视口」的溢出；<md 维持流式单列。 */}
+        <div className="relative z-10 grid gap-4 md:contents">
           {/* B5 · 下游 · 捞取（稿画布 60,400 → 4.1667%,44.444%；190×190） */}
           <section
             data-anchor="river-draw"
             aria-labelledby="draw-heading"
-            className="flex items-start gap-4 md:absolute md:left-[4.1667%] md:top-[44.444%] md:pointer-events-auto md:gap-6"
+            className="flex items-start gap-4 md:absolute md:left-[4.1667%] md:top-[44.444%] md:pointer-events-auto md:gap-6 enter-rise stagger-2"
           >
-            <h2 id="draw-heading" className="sr-only">
-              从河道捞一个漂流瓶
-            </h2>
             <div data-port="draw" className={cn(PORT_DRAW_SIZE, 'relative shrink-0')}>
               <PortRings />
               {/* 盘身用本地元素而不是设计系统的 `Button`：`Button` 的基类会填一层彩色底
@@ -519,9 +514,9 @@ export function RiverPage() {
               </button>
             </div>
 
-            {/* B5 cap（稿：相对盘 left:230=top+40px 间隙、top:40 下沉；md+ 绝对对位，<md 流式） */}
-            <div className="flex min-w-0 flex-col gap-[6px] md:absolute md:left-[calc(100%+40px)] md:top-[40px] md:w-[clamp(200px,16.667vw,240px)]">
-              <p className="block text-[0.9375rem] text-paper">捞一个漂流瓶</p>
+            {/* B5 cap（基准补丁：相对盘 left 121% / top 21%，随泊位半径缩放；标题即 section 的 h2） */}
+            <div data-cap="draw" className="flex min-w-0 flex-col gap-[6px] md:absolute md:left-[121%] md:top-[21%] md:w-[clamp(200px,16.667vw,240px)]">
+              <h2 id="draw-heading" className="block text-[0.9375rem] font-normal text-paper">捞一个漂流瓶</h2>
               <p className="text-[0.78125rem] leading-[1.75] text-muted">
                 捞到别人的半句，接下一句。捞到即持有：同一时刻只有你拿着它。
               </p>
@@ -535,15 +530,12 @@ export function RiverPage() {
             </div>
           </section>
 
-          {/* B6 · 上游 · 投下（稿画布 380,580 → 26.389%,64.444%；150²，较捞取右下、稿垂直差 180px） */}
+          {/* B6 · 上游 · 投下（基准补丁：视口 26.39%,60% —— 稿 64.444% 被补丁裁到 60%；150²） */}
           <section
             data-anchor="river-drop"
             aria-labelledby="cast-heading"
-            className="mt-4 flex flex-row-reverse items-start gap-4 md:absolute md:left-[26.389%] md:top-[64.444%] md:pointer-events-auto md:gap-6"
+            className="mt-4 md:mt-0 flex flex-row-reverse items-start gap-4 md:absolute md:left-[26.389%] md:top-[60%] md:pointer-events-auto md:gap-6 enter-rise stagger-3"
           >
-            <h2 id="cast-heading" className="sr-only">
-              投下一支漂流瓶
-            </h2>
             <div data-port="cast" className={cn(PORT_CAST_SIZE, 'relative shrink-0')}>
               <PortRings />
               <Link
@@ -570,9 +562,10 @@ export function RiverPage() {
               </Link>
             </div>
 
-            {/* B6 cap（稿：相对盘 left:-180/宽300 ⇒ 右缘在盘内 80% 处、top:165 沉到盘下方偏左；md+ 绝对对位） */}
-            <div className="flex min-w-0 flex-col gap-[6px] md:absolute md:right-[20%] md:top-[165px] md:w-[clamp(240px,20.833vw,300px)]">
-              <p className="block text-[0.9375rem] text-paper">投下一支漂流瓶</p>
+            {/* B6 cap（基准补丁：相对盘 left -120%（= 稿 -180/150）/ top 110%（= 稿 165/150），
+                随泊位半径缩放 ⇒ 宽扁视口下沿不越界；标题即 section 的 h2） */}
+            <div data-cap="cast" className="flex min-w-0 flex-col gap-[6px] md:absolute md:left-[-120%] md:top-[110%] md:w-[clamp(240px,20.833vw,300px)]">
+              <h2 id="cast-heading" className="block text-[0.9375rem] font-normal text-paper">投下一支漂流瓶</h2>
               <p className="text-[0.78125rem] leading-[1.75] text-muted">
                 选一首歌，录下第 1 段，投进河道，等一个陌生人接棒。
               </p>
@@ -590,15 +583,17 @@ export function RiverPage() {
       {errorView !== null ? (
         <div
           role="alert"
-          className="relative z-10 mx-6 flex max-w-[46rem] flex-col gap-1 rounded-base border border-warning-border bg-warning-tint px-4 py-4 text-warning md:mx-12"
+          className="enter-fade relative z-10 mx-6 flex max-w-[46rem] flex-col gap-1 rounded-base border border-warning-border bg-warning-tint px-4 py-4 text-warning md:absolute md:inset-x-0 md:bottom-[calc(3.33%_+_64px)] md:mx-12"
         >
           <p className="text-[0.9375rem] font-semibold">{errorView.title}</p>
           <p className="text-[0.875rem] leading-[1.6]">{errorView.detail}</p>
         </div>
       ) : null}
 
-      {/* B7 页脚：心情 chips 停在岸上；出口链接右挂（稿 left/right 76 → 现行流体内边距）。 */}
-      <footer className="relative z-10 flex flex-wrap items-start justify-between gap-x-8 gap-y-4 px-6 md:px-12">
+      {/* B7 页脚：心情 chips 停在岸上；出口链接右挂。
+          md+ 锚视口底部（基准 footer bottom 3.33%），一屏布局不参与文档流。
+          t3：enter-fade 只淡入不位移 —— 锚在视口底缘的元素零溢出风险（guidance：收尾落位）。 */}
+      <footer className="enter-fade relative z-10 flex flex-wrap items-start justify-between gap-x-8 gap-y-4 px-6 md:absolute md:inset-x-0 md:bottom-[3.33%] md:px-12">
         <MoodChips />
         <Link to="/sea" className={TEXT_LINK}>
           先去公海听听已经完成的作品

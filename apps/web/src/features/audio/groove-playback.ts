@@ -28,6 +28,16 @@ const IDLE_PLAYBACK: GroovePlaybackSnapshot = {
 };
 
 export class GroovePlaybackStore {
+  private activeAudio: { pause: () => void } | null = null;
+
+  claimAudio(audio: { pause: () => void }): void {
+    if (this.activeAudio !== audio) this.activeAudio?.pause();
+    this.activeAudio = audio;
+  }
+
+  releaseAudio(audio: { pause: () => void }): void {
+    if (this.activeAudio === audio) this.activeAudio = null;
+  }
   private snapshot: GroovePlaybackSnapshot = IDLE_PLAYBACK;
   private readonly listeners = new Set<() => void>();
 

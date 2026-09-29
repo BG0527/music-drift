@@ -34,7 +34,7 @@
  */
 /* eslint-disable no-console */
 /* global document, getComputedStyle, NodeFilter, requestAnimationFrame */
-import { existsSync, mkdirSync, readdirSync } from 'node:fs';
+import { existsSync, mkdirSync, readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { homedir } from 'node:os';
 import { spawn, spawnSync } from 'node:child_process';
@@ -238,7 +238,7 @@ async function register(name) {
   const registered = await fetch(`${API}/api/auth/register`, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ handle, email: `${handle}@example.com`, password: 'Drift-Bottle-2026' }),
+    body: JSON.stringify({ account: handle, password: 'Drift-Bottle-2026' }),
   });
   if (registered.status !== 201) {
     throw new Error(`注册 ${handle} 失败：${String(registered.status)} ${await registered.text()}`);
@@ -279,7 +279,8 @@ async function seedData() {
   }
 
   async function record(bottleId, note, as = cookie) {
-    const magic = Buffer.from([0x1a, 0x45, 0xdf, 0xa3]);
+    // Actual decodable recording, not an EBML magic prefix with random bytes.
+    const recording = readFileSync(new URL('../../../tools/fixtures/demo-segment.webm', import.meta.url));
     const response = await fetch(`${API}/api/bottles/${bottleId}/segments`, {
       method: 'POST',
       headers: {
@@ -288,7 +289,7 @@ async function seedData() {
         'x-audio-duration-ms': '20000',
         'x-segment-note': encodeURIComponent(note),
       },
-      body: Buffer.concat([magic, Buffer.alloc(2048 - magic.length, 0x42)]),
+      body: recording,
     });
     if (response.status !== 201) {
       throw new Error(`录段失败（${String(response.status)}）：${await response.text()}`);
@@ -312,10 +313,12 @@ async function seedData() {
    * 所以必须真的走一遍接力：4 个账号 → 捞取 → 各录一段 → 投河，最后一位入海。
    */
   const seaId = await createBottle();
+  const relayCookies = [];
   await record(seaId, '布局检查用的第一棒');
   await resolve(seaId, 'RIVER');
   for (let index = 2; index <= song.totalSegments; index += 1) {
     const relay = await register(`relay${stamp}${String(index)}`);
+    relayCookies.push(relay.cookie);
     const drawn = await drawUntil(relay.cookie, seaId);
     if (drawn !== seaId) {
       throw new Error(`第 ${String(index)} 棒没捞到目标瓶子（拿到 ${String(drawn)}）`);
@@ -323,11 +326,36 @@ async function seedData() {
     await record(seaId, `布局检查用的第 ${String(index)} 段`, relay.cookie);
     await resolve(seaId, index === song.totalSegments ? 'SEA' : 'RIVER', relay.cookie);
   }
+  // Twenty genuine completion notifications and bottle rows stress the profile's inner scrolling.
+  for (let sample = 1; sample < 20; sample += 1) {
+    const completedId = await createBottle();
+    await record(completedId, `长列表验证 ${sample}`);
+    await resolve(completedId, 'RIVER');
+    for (const [index, relayCookie] of relayCookies.entries()) {
+      if (await drawUntil(relayCookie, completedId) !== completedId) throw new Error('长列表接力打捞失败');
+      await record(completedId, `长列表第 ${index + 2} 段`, relayCookie);
+      await resolve(completedId, index === relayCookies.length - 1 ? 'SEA' : 'RIVER', relayCookie);
+    }
+  }
+  const comment = await fetch(`${API}/api/bottles/${seaId}/comments`, {
+    method: 'POST', headers: { cookie: relayCookies[0], 'content-type': 'application/json' },
+    body: JSON.stringify({ content: '几何验证公开评论' }),
+  });
+  if (comment.status !== 201) throw new Error(`公开评论种子失败 ${comment.status}`);
 
   // ② 投河（非持有者视角）
   const riverId = await createBottle();
   await record(riverId, '布局检查用的第一棒');
   await resolve(riverId, 'RIVER');
+  // 20+ public lifecycle events, with real draw/put-back commands and distinct handlers.
+  for (let index = 0; index < 10; index += 1) {
+    const passer = await register(`pass${stamp}${index}`);
+    if (await drawUntil(passer.cookie, riverId) !== riverId) throw new Error('日志长列表打捞失败');
+    const putBack = await fetch(`${API}/api/bottles/${riverId}/put-back`, {
+      method: 'POST', headers: { cookie: passer.cookie },
+    });
+    if (!putBack.ok) throw new Error('日志长列表放回失败');
+  }
 
   // ③ 已录 2 段，主测试账号作为第三位持有者（待录第 3 段）
   const heldCreator = await register(`heldcreator${stamp}`);
@@ -343,7 +371,8 @@ async function seedData() {
   // ④ **刚发起、什么都没录**（用户 2026-09-23 报的 P0：这一步曾显示"不在你手上"，录不了第 1 段）
   const freshId = await createBottle();
 
-  return { cookie, seaId, riverId, heldTwoSegmentsId, freshId };
+  return { cookie, seaId, riverId, heldTwoSegmentsId, freshId,
+    recordHeld: () => record(heldTwoSegmentsId, '几何检查·第三段等待去向') };
 }
 
 // ---------------------------------------------------------------- 判据
@@ -373,6 +402,9 @@ function routesFor(seed) {
     },
     // 刚发起的草稿：必须能看到「录第 1 段」（P0 回归守卫）
     { path: `/bottles/${seed.freshId}`, anchors: ['bottle-record'], needsAuth: true },
+    { path: `/bottles/${seed.seaId}`, anchors: ['bottle-play', 'bottle-action'], scenario: 'playing-four' },
+    { path: `/bottles/${seed.heldTwoSegmentsId}`, anchors: ['bottle-play', 'bottle-action'], scenario: 'awaiting-destination' },
+    { path: `/bottles/${seed.heldTwoSegmentsId}`, anchors: ['bottle-play', 'bottle-action'], scenario: 'destination-completed' },
     { path: `/bottles/${seed.riverId}/log`, anchors: [], needsAuth: true },
     { path: '/nope-does-not-exist', anchors: [] },
   ];
@@ -424,6 +456,19 @@ async function measure(page, selectors) {
           visualOverlaps.push(`${left.label} ↔ ${right.label}`);
         }
       }
+      const controls = [...bottlePage.querySelectorAll('button, a, audio[controls]')]
+        .filter((element) => element.checkVisibility())
+        .map((element) => ({ element, rect: element.getBoundingClientRect() }));
+      for (let leftIndex = 0; leftIndex < controls.length; leftIndex += 1) {
+        const left = controls[leftIndex];
+        for (const right of controls.slice(leftIndex + 1)) {
+          if (left.element.contains(right.element) || right.element.contains(left.element)) continue;
+          const overlapWidth = Math.min(left.rect.right, right.rect.right) - Math.max(left.rect.left, right.rect.left);
+          const overlapHeight = Math.min(left.rect.bottom, right.rect.bottom) - Math.max(left.rect.top, right.rect.top);
+          if (overlapWidth > 2 && overlapHeight > 2) visualOverlaps.push(`controls:${left.element.textContent?.trim()} ↔ ${right.element.textContent?.trim() || right.element.tagName}`);
+        }
+      }
+      if (bottlePage.scrollLeft !== 0) visualOverlaps.push(`页面内部横向滚动 ${bottlePage.scrollLeft}px`);
     }
     return {
       height: Math.max(document.documentElement.scrollHeight, document.body.scrollHeight),
@@ -494,8 +539,50 @@ console.log(
 
 let failures = 0;
 for (const route of routes) {
+  if (route.scenario === 'awaiting-destination') await seed.recordHeld();
   const page = await context.newPage();
   await page.goto(`${BASE}${route.path}`, { waitUntil: 'networkidle' });
+  if (route.scenario === 'playing-four' || route.scenario === 'awaiting-destination') {
+    if (route.scenario === 'awaiting-destination' && await page.locator('.destRow').count() !== 3) {
+      throw new Error('待去向场景没有三条真实去向');
+    }
+    await page.getByRole('button', { name: '听全部', exact: true }).click();
+    await page.waitForFunction(() => {
+      const audio = document.querySelector('[aria-label="全部接唱连续播放"]');
+      return audio !== null && !audio.paused && audio.currentTime > 0;
+    });
+    if (route.scenario === 'playing-four') {
+      await page.evaluate(() => {
+        const audio = document.querySelector('[aria-label="全部接唱连续播放"]');
+        audio.currentTime = audio.duration - 0.1;
+      });
+      await page.getByLabel('连续播放段落进度').filter({ hasText: '2/4' }).waitFor();
+      await page.getByRole('button', { name: '公开评论', exact: true }).click();
+      await page.getByText('几何验证公开评论', { exact: true }).waitFor();
+      const overlayAboveNav = await page.evaluate(() =>
+        document.elementFromPoint(innerWidth / 2, 30)?.closest('[data-modal-root]') !== null);
+      if (!overlayAboveNav) throw new Error('评论弹窗遮罩在顶栏下面');
+      await page.getByRole('button', { name: '举报这条评论' }).click();
+      await page.getByRole('dialog', { name: '举报这条评论' }).waitFor();
+      if (await page.locator('[data-modal-root]').count() !== 1) throw new Error('评论和举报弹窗重叠');
+      await page.getByRole('dialog').getByRole('textbox').fill('几何验证：焦点可以进入举报理由');
+      await page.getByRole('dialog').getByRole('button', { name: '取消', exact: true }).click();
+      await page.locator('[data-modal-root]').waitFor({ state: 'detached' });
+    }
+    await page.waitForTimeout(350);
+  }
+  if (route.scenario === 'destination-completed') {
+    await page.locator('.destRow').first().click();
+    const dialog = page.getByRole('dialog');
+    await dialog.getByRole('button', { name: /继续投河/ }).click();
+    await dialog.getByRole('button', { name: '确认投递' }).click();
+    await page.getByText('已投河：等下一位陌生人捞到它。').waitFor();
+    await page.getByRole('heading', { name: '沿着歌声听下去' }).waitFor();
+    await page.getByText('已投河：等下一位陌生人捞到它。').waitFor({ state: 'hidden', timeout: 5000 });
+    if (await page.getByRole('heading', { name: '选择去向', exact: true }).count() > 0) {
+      throw new Error('投递完成后仍有选择去向');
+    }
+  }
   /**
    * ⚠️ 这一步是**判据成立的前提**（captain 条件①）：必须等**异步数据真的落地**再测。
    *
@@ -527,10 +614,33 @@ for (const route of routes) {
   );
 
   const before = await measure(page, route.anchors);
+  if (route.path === '/me' || route.path.endsWith('/log')) {
+    const selector = route.path === '/me' ? '.msgs ul' : '[data-testid="drift-log"]';
+    const listCheck = await page.locator(selector).evaluate((element) => {
+      const children = [...element.querySelectorAll(':scope > li')];
+      const previous = element.scrollTop;
+      element.scrollTop = element.scrollHeight;
+      const last = children.at(-1)?.getBoundingClientRect();
+      const box = element.getBoundingClientRect();
+      const result = { count: children.length, scrollable: element.scrollTop > 0,
+        bottom: box.bottom, lastVisible: last !== undefined && last.bottom <= box.bottom + 2 };
+      element.scrollTop = previous;
+      return result;
+    });
+    console.log(`[long-list] ${route.path} ${JSON.stringify(listCheck)}`);
+    if (listCheck.count < 20) throw new Error('压力样本少于20条');
+    if (!mobile && (!listCheck.scrollable || !listCheck.lastVisible || listCheck.bottom > viewportHeight)) {
+      throw new Error(`长列表末项不可达 ${JSON.stringify(listCheck)}`);
+    }
+    if (!mobile && route.path === '/me') {
+      const collectBox = await page.getByRole('button', { name: '我的收藏', exact: true }).boundingBox();
+      if (collectBox === null || collectBox.y + collectBox.height > viewportHeight) throw new Error('我的收藏按钮不在首屏');
+    }
+  }
 
   if (shotDir !== null) {
     await page.screenshot({
-      path: join(shotDir, `${slugOf(route.path)}-${String(viewportWidth)}.png`),
+      path: join(shotDir, `${slugOf(route.path)}${route.scenario ? `-${route.scenario}` : ''}-${String(viewportWidth)}.png`),
       fullPage: true,
     });
   }

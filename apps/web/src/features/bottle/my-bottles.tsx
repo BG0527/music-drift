@@ -19,12 +19,11 @@
  */
 import type { CSSProperties } from 'react';
 import type { MyBottle } from '@music-drift/shared';
-import { EmptyState, cn } from '../../design-system';
+import { cn } from '../../design-system';
 import { useMyBottles } from '../api/queries';
 import { progressLabel } from './relay-status';
 import { AsyncBoundary } from '../../pages/shell/async-boundary';
 import { Link } from '../../pages/shell/router';
-import { TEXT_LINK_STRONG } from '../../pages/shell/link-styles';
 
 export interface MyBottlesProps {
   className?: string;
@@ -84,6 +83,9 @@ function FloatBottle(props: {
 
 export function MyBottles({ className }: MyBottlesProps) {
   const mine = useMyBottles();
+  /** t17 空态构图：确认为空时把说明写进 `.window`（参考 showEmpty target=windowBox）——
+      空 ≠ 错：加载/错误态仍走 AsyncBoundary 装在窗里。 */
+  const empty = mine.data !== undefined && mine.data.items.length === 0;
 
   return (
     <section className={cn('crate', className)} aria-labelledby="my-bottles-heading">
@@ -97,32 +99,35 @@ export function MyBottles({ className }: MyBottlesProps) {
         我发起的、以及我唱过一段的瓶子都会在这里（按最近活跃排序，时间线来自服务端）。
       </p>
 
-      {/* 稿 .window：定高 260、overflow:hidden 的固定列表窗；三态家具也装进窗里 */}
+      {/*
+        t17 深度复刻（参考 `site/me.html` + `page-me.js showEmpty({target: windowBox})`）：
+        **空态消息落在 `.window` 里** —— 窗是这一块的展示位，不在窗外套一张右卡
+        （参考没有独立空态卡；左半屏因此永远有内容）。加载/错误态仍由 AsyncBoundary 装进窗里。
+      */}
       <div className="window">
-        <AsyncBoundary
-          query={mine}
-          emptyWhen={(page) => page.items.length === 0}
-          empty={
-            <EmptyState
-              icon="Waves"
-              title="还没有参与过的漂流瓶"
-              description="去河道捞一个瓶子接唱，或者选一首歌投出第一棒 —— 之后它们会出现在这里。"
-              action={
-                <Link to="/river" className={TEXT_LINK_STRONG}>
-                  去河道捞一个
-                </Link>
-              }
-            />
-          }
-        >
-          {(page) => (
-            <ul>
-              {page.items.map((bottle, index) => (
-                <MyBottleRow key={bottle.id} bottle={bottle} index={index} />
-              ))}
-            </ul>
-          )}
-        </AsyncBoundary>
+        {empty ? (
+          <p className="window-empty">
+            你还没有参与过任何漂流瓶：
+            <Link to="/river" className="whitespace-nowrap">
+              去河道捞一个
+            </Link>
+            ，或者
+            <Link to="/new" className="whitespace-nowrap">
+              自己发起一支
+            </Link>
+            。
+          </p>
+        ) : (
+          <AsyncBoundary query={mine} emptyWhen={(page) => page.items.length === 0}>
+            {(page) => (
+              <ul>
+                {page.items.map((bottle, index) => (
+                  <MyBottleRow key={bottle.id} bottle={bottle} index={index} />
+                ))}
+              </ul>
+            )}
+          </AsyncBoundary>
+        )}
       </div>
     </section>
   );

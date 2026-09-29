@@ -25,7 +25,7 @@ function cssSource(): string {
 
 const songsHandler = { path: '/api/songs', respond: () => ({ body: [] }) };
 const SESSION_B = {
-  user: { id: USER_B, handle: '接棒的人', email: 'b@example.com', role: 'USER' },
+  user: { id: USER_B, handle: '接棒的人', account: '接棒的人', role: 'USER' },
   expiresAt: '2026-10-23T00:00:00.000Z',
 };
 const sessionHandler = { path: '/api/auth/me', respond: () => ({ body: SESSION_B }) };
@@ -92,6 +92,14 @@ describe('瓶身详情：三层场景（参考 bottle.html 结构）', () => {
 });
 
 describe('瓶身详情：仪器层（试听与投票 / 选择去向 / 底栏）', () => {
+  it('连续试听不得再绝对定位到标题上，进度不能在桌面隐藏', () => {
+    const css = cssSource();
+    expect(css).not.toMatch(/\.bf-full-preview\s*\{[^}]*position:\s*absolute/);
+    expect(css).not.toMatch(/\.bf-full-preview p\s*\{[^}]*display:\s*none/);
+  });
+  it('桌面装饰溢出不应形成可被焦点或播放控件滚动的内部画布', () => {
+    expect(cssSource()).toMatch(/@media \(min-width: 1024px\)\s*\{\s*\.bottle-page\s*\{[^}]*overflow:\s*clip/);
+  });
   it('试听与投票 = 参考的 transport 构图：唱片播放键 .play + 水道进度 .bar + 时长 .timecode', async () => {
     renderWithProviders(<BottlePage id={BOTTLE_ID} />, {
       route: `/bottles/${BOTTLE_ID}`,

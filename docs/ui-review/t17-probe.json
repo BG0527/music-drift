@@ -1,0 +1,1112 @@
+{
+  "viewport": {
+    "w": 1920,
+    "h": 1080
+  },
+  "states": {
+    "bottle3": {
+      "ref": {
+        "side": "ref",
+        "page": {
+          "url": "http://t17.localhost:50727/bottle.html?id=0c229fd3-20dd-4aaf-8286-be0e8116b7be",
+          "scrollW": 1920,
+          "scrollH": 1080,
+          "innerW": 1920,
+          "innerH": 1080
+        },
+        "vscroll": false,
+        "hscroll": false,
+        "rects": {
+          ".crumb": [
+            {
+              "x": 101,
+              "y": 44,
+              "w": 156,
+              "h": 26,
+              "fs": "16px",
+              "display": "flex",
+              "text": "回河道\n        \n        有人持",
+              "style": ""
+            }
+          ],
+          "h1": [
+            {
+              "x": 101,
+              "y": 89,
+              "w": 373,
+              "h": 75,
+              "fs": "74.688px",
+              "display": "block",
+              "text": "漂流瓶详情",
+              "style": ""
+            }
+          ],
+          ".work": [
+            {
+              "x": 101,
+              "y": 177,
+              "w": 115,
+              "h": 25,
+              "fs": "19px",
+              "display": "block",
+              "text": "占位曲目 · 一",
+              "style": ""
+            }
+          ],
+          ".metaRow": [
+            {
+              "x": 101,
+              "y": 217,
+              "w": 262,
+              "h": 18,
+              "fs": "14px",
+              "display": "flex",
+              "text": "已录 3 / 4 段\n        作品还不完",
+              "style": ""
+            }
+          ],
+          ".note": [
+            {
+              "x": 101,
+              "y": 255,
+              "w": 1067,
+              "h": 23,
+              "fs": "14.5px",
+              "display": "flex",
+              "text": "缺口是歌里固定的段位，不会被别人的段顶替。成品里",
+              "style": ""
+            }
+          ],
+          ".maker": [
+            {
+              "x": 1663,
+              "y": 92,
+              "w": 156,
+              "h": 52,
+              "fs": "16px",
+              "display": "flex",
+              "text": "发起者\n          雾港水手#891",
+              "style": ""
+            }
+          ],
+          ".heroLab": [
+            {
+              "x": 101,
+              "y": 363,
+              "w": 148,
+              "h": 14,
+              "fs": "11px",
+              "display": "block",
+              "text": "瓶身剖面 · 水只到第 3 段",
+              "style": ""
+            }
+          ],
+          ".segNum": [
+            {
+              "x": 101,
+              "y": 427,
+              "w": 308,
+              "h": 31,
+              "fs": "28px",
+              "display": "block",
+              "text": "1",
+              "style": "left: 5.27778%; width: 16.0417%;"
+            },
+            {
+              "x": 409,
+              "y": 427,
+              "w": 308,
+              "h": 31,
+              "fs": "28px",
+              "display": "block",
+              "text": "2",
+              "style": "left: 21.3194%; width: 16.0417%;"
+            },
+            {
+              "x": 717,
+              "y": 427,
+              "w": 308,
+              "h": 31,
+              "fs": "28px",
+              "display": "block",
+              "text": "3",
+              "style": "left: 37.3611%; width: 16.0417%;"
+            },
+            {
+              "x": 1025,
+              "y": 427,
+              "w": 308,
+              "h": 31,
+              "fs": "28px",
+              "display": "block",
+              "text": "4",
+              "style": "left: 53.4028%; width: 16.0417%;"
+            }
+          ],
+          ".segLab": [
+            {
+              "x": 101,
+              "y": 475,
+              "w": 308,
+              "h": 14,
+              "fs": "11px",
+              "display": "block",
+              "text": "第 1 段",
+              "style": "left: 5.27778%; width: 16.0417%;"
+            },
+            {
+              "x": 409,
+              "y": 475,
+              "w": 308,
+              "h": 14,
+              "fs": "11px",
+              "display": "block",
+              "text": "第 2 段",
+              "style": "left: 21.3194%; width: 16.0417%;"
+            },
+            {
+              "x": 717,
+              "y": 475,
+              "w": 308,
+              "h": 14,
+              "fs": "11px",
+              "display": "block",
+              "text": "第 3 段",
+              "style": "left: 37.3611%; width: 16.0417%;"
+            },
+            {
+              "x": 1025,
+              "y": 475,
+              "w": 308,
+              "h": 14,
+              "fs": "11px",
+              "display": "block",
+              "text": "第 4 段",
+              "style": "left: 53.4028%; width: 16.0417%;"
+            }
+          ],
+          ".cap": [
+            {
+              "x": 101,
+              "y": 611,
+              "w": 308,
+              "h": 66,
+              "fs": "16px",
+              "display": "block",
+              "text": "雾港水手#891\n        0:20赞 0",
+              "style": "left: 5.27778%; width: 16.0417%;"
+            },
+            {
+              "x": 409,
+              "y": 611,
+              "w": 308,
+              "h": 66,
+              "fs": "16px",
+              "display": "block",
+              "text": "沉船歌者#523\n        0:20赞 0",
+              "style": "left: 21.3194%; width: 16.0417%;"
+            },
+            {
+              "x": 717,
+              "y": 611,
+              "w": 308,
+              "h": 66,
+              "fs": "16px",
+              "display": "block",
+              "text": "浅滩回声#400\n        0:20赞 0",
+              "style": "left: 37.3611%; width: 16.0417%;"
+            }
+          ],
+          ".gapBox": [
+            {
+              "x": 1039,
+              "y": 536,
+              "w": 281,
+              "h": 132,
+              "fs": "16px",
+              "display": "block",
+              "text": "缺口\n        第 4 段还空着\n    ",
+              "style": "left: 54.0972%; width: 14.6528%;"
+            }
+          ],
+          ".gapSlot": [
+            {
+              "x": 1124,
+              "y": 536,
+              "w": 110,
+              "h": 46,
+              "fs": "16px",
+              "display": "block",
+              "text": "",
+              "style": ""
+            }
+          ],
+          ".cta": [
+            {
+              "x": 0,
+              "y": 0,
+              "w": 0,
+              "h": 0,
+              "fs": "15px",
+              "display": "none",
+              "text": "录第 4 段",
+              "style": ""
+            }
+          ],
+          ".gapNote": [
+            {
+              "x": 1039,
+              "y": 635,
+              "w": 281,
+              "h": 33,
+              "fs": "11px",
+              "display": "block",
+              "text": "这一段只有发起者（尚未投河时）或当前持有者能录：",
+              "style": ""
+            }
+          ],
+          ".callout": [
+            {
+              "x": 1488,
+              "y": 429,
+              "w": 52,
+              "h": 14,
+              "fs": "11px",
+              "display": "block",
+              "text": "河道水面",
+              "style": ""
+            }
+          ],
+          ".corkLab": [
+            {
+              "x": 1816,
+              "y": 624,
+              "w": 86,
+              "h": 14,
+              "fs": "11px",
+              "display": "block",
+              "text": "瓶塞 · 有人持有",
+              "style": ""
+            }
+          ],
+          ".w7-timeline": [
+            {
+              "x": 101,
+              "y": 280,
+              "w": 1232,
+              "h": 77,
+              "fs": "16px",
+              "display": "block",
+              "text": "播放时间轴 · 唱针在第 1 段这一段还没有人唱",
+              "style": ""
+            }
+          ],
+          ".listenCol": [
+            {
+              "x": 101,
+              "y": 756,
+              "w": 819,
+              "h": 218,
+              "fs": "16px",
+              "display": "block",
+              "text": "试听与投票第 1 段　雾港水手#891　在瓶身上",
+              "style": ""
+            }
+          ],
+          ".transport": [
+            {
+              "x": 101,
+              "y": 793,
+              "w": 819,
+              "h": 52,
+              "fs": "16px",
+              "display": "flex",
+              "text": "0:00 / 0:20",
+              "style": ""
+            }
+          ],
+          ".bar": [
+            {
+              "x": 169,
+              "y": 809,
+              "w": 400,
+              "h": 20,
+              "fs": "16px",
+              "display": "block",
+              "text": "",
+              "style": ""
+            }
+          ],
+          ".votes": [
+            {
+              "x": 101,
+              "y": 859,
+              "w": 819,
+              "h": 38,
+              "fs": "16px",
+              "display": "flex",
+              "text": "赞0\n          \n          ",
+              "style": ""
+            }
+          ],
+          ".voteBtn": [
+            {
+              "x": 101,
+              "y": 859,
+              "w": 85,
+              "h": 38,
+              "fs": "14px",
+              "display": "flex",
+              "text": "赞0",
+              "style": ""
+            },
+            {
+              "x": 199,
+              "y": 859,
+              "w": 85,
+              "h": 38,
+              "fs": "14px",
+              "display": "flex",
+              "text": "踩0",
+              "style": ""
+            },
+            {
+              "x": 296,
+              "y": 859,
+              "w": 88,
+              "h": 38,
+              "fs": "14px",
+              "display": "flex",
+              "text": "试听全部",
+              "style": ""
+            }
+          ],
+          ".votesNote": [
+            {
+              "x": 101,
+              "y": 907,
+              "w": 819,
+              "h": 17,
+              "fs": "12.5px",
+              "display": "block",
+              "text": "这一段音频取不到（可能还没录，或被撤下）。",
+              "style": ""
+            }
+          ],
+          ".putBack": [
+            {
+              "x": 101,
+              "y": 938,
+              "w": 819,
+              "h": 36,
+              "fs": "16px",
+              "display": "flex",
+              "text": "放回海中，继续漂流\n          \n   ",
+              "style": ""
+            }
+          ],
+          ".destCol": [
+            {
+              "x": 960,
+              "y": 756,
+              "w": 859,
+              "h": 211,
+              "fs": "16px",
+              "display": "block",
+              "text": "选择去向\n        你现在可选 3 条水路",
+              "style": ""
+            }
+          ],
+          ".destRow": [
+            {
+              "x": 960,
+              "y": 811,
+              "w": 859,
+              "h": 46,
+              "fs": "13.3333px",
+              "display": "flex",
+              "text": "继续投河\n            把当前版本重新",
+              "style": "cursor: pointer;"
+            },
+            {
+              "x": 960,
+              "y": 866,
+              "w": 859,
+              "h": 46,
+              "fs": "13.3333px",
+              "display": "flex",
+              "text": "回传\n            沿父链把当前版本交",
+              "style": "cursor: pointer;"
+            },
+            {
+              "x": 960,
+              "y": 921,
+              "w": 859,
+              "h": 46,
+              "fs": "13.3333px",
+              "display": "flex",
+              "text": "入海\n            把当下的版本送进公",
+              "style": "cursor: pointer;"
+            }
+          ],
+          ".bottomRule": [
+            {
+              "x": 101,
+              "y": 1021,
+              "w": 1717,
+              "h": 1,
+              "fs": "16px",
+              "display": "block",
+              "text": "",
+              "style": ""
+            }
+          ],
+          ".bottom": [
+            {
+              "x": 101,
+              "y": 1040,
+              "w": 1717,
+              "h": 17,
+              "fs": "13px",
+              "display": "flex",
+              "text": "看这只瓶子的漂流日志\n        捞取 / ",
+              "style": ""
+            }
+          ],
+          "svg.scene": [
+            {
+              "x": 0,
+              "y": 0,
+              "w": 1920,
+              "h": 1200,
+              "fs": "16px",
+              "display": "block",
+              "text": "",
+              "style": ""
+            }
+          ],
+          ".selMark": [
+            {
+              "x": 215,
+              "y": 601,
+              "w": 80,
+              "h": 3,
+              "fs": "16px",
+              "display": "block",
+              "text": "",
+              "style": "left: 11.2153%;"
+            }
+          ]
+        }
+      },
+      "web": {
+        "side": "web",
+        "page": {
+          "url": "http://t17.localhost:50732/bottles/0c229fd3-20dd-4aaf-8286-be0e8116b7be",
+          "scrollW": 1920,
+          "scrollH": 1080,
+          "innerW": 1920,
+          "innerH": 1080
+        },
+        "vscroll": false,
+        "hscroll": false,
+        "rects": {
+          "main": [
+            {
+              "x": 0,
+              "y": 0,
+              "w": 1920,
+              "h": 1080,
+              "fs": "16px",
+              "display": "flex",
+              "text": "回河道有人持有漂流瓶详情占位曲目 · 一已录 3",
+              "style": ""
+            }
+          ],
+          "nav[aria-label=\"面包屑\"]": [
+            {
+              "x": 101,
+              "y": 44,
+              "w": 1717,
+              "h": 26,
+              "fs": "16px",
+              "display": "flex",
+              "text": "回河道有人持有",
+              "style": ""
+            }
+          ],
+          "h1": [
+            {
+              "x": 101,
+              "y": 89,
+              "w": 280,
+              "h": 56,
+              "fs": "56px",
+              "display": "block",
+              "text": "漂流瓶详情",
+              "style": ""
+            }
+          ],
+          ".bf-title": [
+            {
+              "x": 101,
+              "y": 177,
+              "w": 115,
+              "h": 25,
+              "fs": "19px",
+              "display": "block",
+              "text": "占位曲目 · 一",
+              "style": ""
+            }
+          ],
+          ".bf-meta": [
+            {
+              "x": 101,
+              "y": 217,
+              "w": 262,
+              "h": 18,
+              "fs": "14px",
+              "display": "flex",
+              "text": "已录 3 / 4 段作品还不完整：缺第 4 段",
+              "style": ""
+            }
+          ],
+          ".bf-note": [
+            {
+              "x": 101,
+              "y": 255,
+              "w": 800,
+              "h": 23,
+              "fs": "14.5px",
+              "display": "flex",
+              "text": "缺口是歌里固定的段位，不会被别人的段顶替。成品里",
+              "style": ""
+            }
+          ],
+          ".maker": [
+            {
+              "x": 1660,
+              "y": 92,
+              "w": 159,
+              "h": 52,
+              "fs": "16px",
+              "display": "flex",
+              "text": "发起者雾港水手#891",
+              "style": ""
+            }
+          ],
+          ".bp-timeline": [
+            {
+              "x": 101,
+              "y": 280,
+              "w": 1232,
+              "h": 54,
+              "fs": "16px",
+              "display": "flex",
+              "text": "播放沟槽唱针跟着播放走；一格 = 一个段位，缺口",
+              "style": ""
+            }
+          ],
+          ".groove-rail": [
+            {
+              "x": 101,
+              "y": 296,
+              "w": 1232,
+              "h": 38,
+              "fs": "16px",
+              "display": "block",
+              "text": "这一段还没有人唱",
+              "style": ""
+            }
+          ],
+          "[data-testid=\"bottle-water-level\"]": [
+            {
+              "x": 101,
+              "y": 363,
+              "w": 148,
+              "h": 14,
+              "fs": "11px",
+              "display": "block",
+              "text": "瓶身剖面 · 水只到第 3 段",
+              "style": ""
+            }
+          ],
+          "[data-testid=\"bottle-body\"]": [
+            {
+              "x": 0,
+              "y": 0,
+              "w": 1920,
+              "h": 1080,
+              "fs": "16px",
+              "display": "block",
+              "text": "瓶身剖面 · 水只到第 3 段1第 1 段雾港水",
+              "style": ""
+            }
+          ],
+          "svg.scene": [
+            {
+              "x": 0,
+              "y": 0,
+              "w": 1920,
+              "h": 1200,
+              "fs": "16px",
+              "display": "block",
+              "text": "",
+              "style": ""
+            }
+          ],
+          "[data-testid=\"relay-timeline\"] li": [
+            {
+              "x": 101,
+              "y": 427,
+              "w": 308,
+              "h": 280,
+              "fs": "16px",
+              "display": "list-item",
+              "text": "1第 1 段雾港水手#89100:20赞 0踩 ",
+              "style": "--cell-left: 5.2778%; --cell-w: 16.0417%;"
+            },
+            {
+              "x": 409,
+              "y": 427,
+              "w": 308,
+              "h": 280,
+              "fs": "16px",
+              "display": "list-item",
+              "text": "2第 2 段沉船歌者#52300:20赞 0踩 ",
+              "style": "--cell-left: 21.3194%; --cell-w: 16.0417%;"
+            },
+            {
+              "x": 717,
+              "y": 427,
+              "w": 308,
+              "h": 280,
+              "fs": "16px",
+              "display": "list-item",
+              "text": "3第 3 段浅滩回声#40000:20赞 0踩 ",
+              "style": "--cell-left: 37.3611%; --cell-w: 16.0417%;"
+            },
+            {
+              "x": 1025,
+              "y": 427,
+              "w": 308,
+              "h": 280,
+              "fs": "16px",
+              "display": "list-item",
+              "text": "4第 4 段（缺口）",
+              "style": "--cell-left: 53.4028%; --cell-w: 16.0417%;"
+            }
+          ],
+          ".segNum": [
+            {
+              "x": 101,
+              "y": 427,
+              "w": 308,
+              "h": 31,
+              "fs": "28px",
+              "display": "block",
+              "text": "1",
+              "style": ""
+            },
+            {
+              "x": 409,
+              "y": 427,
+              "w": 308,
+              "h": 31,
+              "fs": "28px",
+              "display": "block",
+              "text": "2",
+              "style": ""
+            },
+            {
+              "x": 717,
+              "y": 427,
+              "w": 308,
+              "h": 31,
+              "fs": "28px",
+              "display": "block",
+              "text": "3",
+              "style": ""
+            },
+            {
+              "x": 1025,
+              "y": 427,
+              "w": 308,
+              "h": 31,
+              "fs": "28px",
+              "display": "block",
+              "text": "4",
+              "style": ""
+            }
+          ],
+          ".segLab": [
+            {
+              "x": 101,
+              "y": 475,
+              "w": 308,
+              "h": 14,
+              "fs": "11px",
+              "display": "block",
+              "text": "第 1 段",
+              "style": ""
+            },
+            {
+              "x": 409,
+              "y": 475,
+              "w": 308,
+              "h": 14,
+              "fs": "11px",
+              "display": "block",
+              "text": "第 2 段",
+              "style": ""
+            },
+            {
+              "x": 717,
+              "y": 475,
+              "w": 308,
+              "h": 14,
+              "fs": "11px",
+              "display": "block",
+              "text": "第 3 段",
+              "style": ""
+            },
+            {
+              "x": 1025,
+              "y": 475,
+              "w": 308,
+              "h": 14,
+              "fs": "11px",
+              "display": "block",
+              "text": "第 4 段（缺口）",
+              "style": ""
+            }
+          ],
+          ".cap": [
+            {
+              "x": 101,
+              "y": 611,
+              "w": 308,
+              "h": 72,
+              "fs": "16px",
+              "display": "block",
+              "text": "雾港水手#89100:20赞 0踩 0听",
+              "style": ""
+            },
+            {
+              "x": 409,
+              "y": 611,
+              "w": 308,
+              "h": 72,
+              "fs": "16px",
+              "display": "block",
+              "text": "沉船歌者#52300:20赞 0踩 0听",
+              "style": ""
+            },
+            {
+              "x": 717,
+              "y": 611,
+              "w": 308,
+              "h": 72,
+              "fs": "16px",
+              "display": "block",
+              "text": "浅滩回声#40000:20赞 0踩 0听",
+              "style": ""
+            }
+          ],
+          ".cap .code": [
+            {
+              "x": 101,
+              "y": 611,
+              "w": 308,
+              "h": 17,
+              "fs": "14.5px",
+              "display": "block",
+              "text": "雾港水手#891",
+              "style": ""
+            },
+            {
+              "x": 409,
+              "y": 611,
+              "w": 308,
+              "h": 17,
+              "fs": "14.5px",
+              "display": "block",
+              "text": "沉船歌者#523",
+              "style": ""
+            },
+            {
+              "x": 717,
+              "y": 611,
+              "w": 308,
+              "h": 17,
+              "fs": "14.5px",
+              "display": "block",
+              "text": "浅滩回声#400",
+              "style": ""
+            }
+          ],
+          ".gapBox": [
+            {
+              "x": 1039,
+              "y": 536,
+              "w": 281,
+              "h": 132,
+              "fs": "16px",
+              "display": "block",
+              "text": "缺口第 4 段还空着这一段只有发起者（尚未投河时",
+              "style": "--gap-col: 4; --gap-left: 54.0972%; --gap-width: 14.6528%;"
+            }
+          ],
+          ".gapSlot": [
+            {
+              "x": 1124,
+              "y": 536,
+              "w": 110,
+              "h": 46,
+              "fs": "16px",
+              "display": "block",
+              "text": "",
+              "style": ""
+            }
+          ],
+          ".gapNote": [
+            {
+              "x": 1039,
+              "y": 635,
+              "w": 281,
+              "h": 33,
+              "fs": "11px",
+              "display": "block",
+              "text": "这一段只有发起者（尚未投河时）或当前持有者能录：",
+              "style": ""
+            }
+          ],
+          ".callout": [
+            {
+              "x": 1488,
+              "y": 429,
+              "w": 52,
+              "h": 14,
+              "fs": "11px",
+              "display": "block",
+              "text": "河道水面",
+              "style": ""
+            }
+          ],
+          ".corkLab": [
+            {
+              "x": 1816,
+              "y": 624,
+              "w": 86,
+              "h": 14,
+              "fs": "11px",
+              "display": "block",
+              "text": "瓶塞 · 有人持有",
+              "style": ""
+            }
+          ],
+          ".selMark": [
+            {
+              "x": 831,
+              "y": 601,
+              "w": 80,
+              "h": 3,
+              "fs": "16px",
+              "display": "block",
+              "text": "",
+              "style": "--sel-col: 3; --sel-left: 43.2986%;"
+            }
+          ],
+          "[data-anchor=\"bottle-record\"]": [
+            {
+              "x": 1039,
+              "y": 536,
+              "w": 281,
+              "h": 132,
+              "fs": "16px",
+              "display": "block",
+              "text": "缺口第 4 段还空着这一段只有发起者（尚未投河时",
+              "style": "--gap-col: 4; --gap-left: 54.0972%; --gap-width: 14.6528%;"
+            }
+          ],
+          "[data-anchor=\"bottle-play\"]": [
+            {
+              "x": 101,
+              "y": 757,
+              "w": 819,
+              "h": 218,
+              "fs": "16px",
+              "display": "flex",
+              "text": "试听与投票第 3 段　浅滩回声#400　在瓶身上",
+              "style": ""
+            }
+          ],
+          "[data-anchor=\"bottle-action\"]": [
+            {
+              "x": 0,
+              "y": 756,
+              "w": 1920,
+              "h": 240,
+              "fs": "16px",
+              "display": "block",
+              "text": "试听与投票第 3 段　浅滩回声#400　在瓶身上",
+              "style": ""
+            }
+          ],
+          ".listenCol": [
+            {
+              "x": 101,
+              "y": 757,
+              "w": 819,
+              "h": 218,
+              "fs": "16px",
+              "display": "flex",
+              "text": "试听与投票第 3 段　浅滩回声#400　在瓶身上",
+              "style": ""
+            }
+          ],
+          ".transport": [
+            {
+              "x": 101,
+              "y": 794,
+              "w": 819,
+              "h": 52,
+              "fs": "16px",
+              "display": "flex",
+              "text": "00:00 / 00:20还没播放；已听 0.0",
+              "style": ""
+            }
+          ],
+          ".bar": [
+            {
+              "x": 169,
+              "y": 810,
+              "w": 400,
+              "h": 20,
+              "fs": "16px",
+              "display": "block",
+              "text": "",
+              "style": ""
+            }
+          ],
+          ".timecode": [
+            {
+              "x": 585,
+              "y": 809,
+              "w": 84,
+              "h": 21,
+              "fs": "13px",
+              "display": "block",
+              "text": "00:00 / 00:20",
+              "style": ""
+            }
+          ],
+          ".votes": [
+            {
+              "x": 101,
+              "y": 860,
+              "w": 819,
+              "h": 38,
+              "fs": "16px",
+              "display": "flex",
+              "text": "赞0踩0第 3 段：赞 0，踩 0",
+              "style": ""
+            }
+          ],
+          ".votesNote": [
+            {
+              "x": 101,
+              "y": 908,
+              "w": 540,
+              "h": 17,
+              "fs": "12.5px",
+              "display": "block",
+              "text": "还没有听满这一段，继续听一会儿再点踩吧。　｜ 本",
+              "style": ""
+            }
+          ],
+          ".putBack": [
+            {
+              "x": 101,
+              "y": 939,
+              "w": 819,
+              "h": 36,
+              "fs": "16px",
+              "display": "flex",
+              "text": "放回海中，继续漂流还没想好要不要唱？放回去不会记",
+              "style": ""
+            }
+          ],
+          ".destCol": [
+            {
+              "x": 960,
+              "y": 759,
+              "w": 859,
+              "h": 210,
+              "fs": "16px",
+              "display": "flex",
+              "text": "选择去向接下来决定它去哪。发起者的第一棒没有「回",
+              "style": ""
+            }
+          ],
+          ".destRow": [
+            {
+              "x": 960,
+              "y": 813,
+              "w": 859,
+              "h": 46,
+              "fs": "16px",
+              "display": "flex",
+              "text": "继续投河把当前版本重新投进河道，交给下一位陌生人",
+              "style": ""
+            },
+            {
+              "x": 960,
+              "y": 868,
+              "w": 859,
+              "h": 46,
+              "fs": "16px",
+              "display": "flex",
+              "text": "回传沿父链把当前版本交回投给你的那个人，由他决定",
+              "style": ""
+            },
+            {
+              "x": 960,
+              "y": 923,
+              "w": 859,
+              "h": 46,
+              "fs": "16px",
+              "display": "flex",
+              "text": "入海把当下的版本送进公海，成为所有人都能听到的公",
+              "style": ""
+            }
+          ],
+          ".bottomRule": [
+            {
+              "x": 101,
+              "y": 1021,
+              "w": 1717,
+              "h": 1,
+              "fs": "16px",
+              "display": "block",
+              "text": "",
+              "style": ""
+            }
+          ],
+          ".bottom": [
+            {
+              "x": 101,
+              "y": 1040,
+              "w": 1717,
+              "h": 17,
+              "fs": "13px",
+              "display": "flex",
+              "text": "看这只瓶子的漂流日志捞取 / 录音 / 投河 /",
+              "style": ""
+            }
+          ]
+        }
+      }
+    }
+  }
+}

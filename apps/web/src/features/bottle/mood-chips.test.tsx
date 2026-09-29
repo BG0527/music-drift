@@ -44,13 +44,31 @@ describe('心情标签', () => {
 
   it('动效参数引用契约 token（不内联新数值）', () => {
     render(<MoodChips />);
-    const chip = screen.getByRole('button', { name: '全部' });
-
-    expect(chip.className).toContain('duration-[var(--motion-hover-duration)]');
-    expect(chip.className).toContain('ease-[var(--motion-entry-easing)]');
-    expect(chip.className).toContain('scale-[var(--motion-hover-scale)]');
+    // 未选中档：hover 的缩放是**活着的**工具类 ⇒ 三个 token 断言打在它身上
+    const resting = screen.getByRole('button', { name: '深夜' });
+    expect(resting.className).toContain('duration-[var(--motion-hover-duration)]');
+    expect(resting.className).toContain('ease-[var(--motion-entry-easing)]');
+    expect(resting.className).toContain('scale-[var(--motion-hover-scale)]');
     // 只动 transform/opacity：不出现 width/height/top/left 之类的过渡
-    expect(chip.className).not.toMatch(/transition-(all|colors|shadow|width|height)/);
+    expect(resting.className).not.toMatch(/transition-(all|colors|shadow|width|height)/);
+  });
+
+  /**
+   * t16（t10 观察项 · 方案②）：选中态的静态 `scale-[var(--motion-hover-scale)]`
+   * 被 `.mood-pick` 的 `fill:both` 锁死成**死代码**（动画收尾恒等 `scale(1)`）⇒
+   * 删掉死工具类，**不动** `fill:both`（避免收尾从 scale(1) 跳回 1.03 的顿挫）；
+   * 选中态的非动效通道照旧：`aria-pressed` + 珊瑚底 + 字重。
+   */
+  it('选中态没有死缩放：scale 只留在未选中档（hover），选中靠 aria-pressed + 珊瑚底', () => {
+    render(<MoodChips />);
+    const active = screen.getByRole('button', { name: '全部' });
+
+    expect(active.getAttribute('aria-pressed'), '结构通道必须在').toBe('true');
+    expect(active.className, '非动效选中线索（珊瑚底 + 字重）必须在').toContain('bg-coral');
+    expect(active.className, '确认动效 mood-pick 必须在').toContain('mood-pick');
+    expect(active.className, '静态 scale 已被 fill:both 锁死 ⇒ 死代码应已删除').not.toContain(
+      'scale-[var(--motion-hover-scale)]',
+    );
   });
 
   it('点击不改 URL（它是展示件，不是筛选器）', () => {

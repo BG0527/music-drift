@@ -1,3 +1,4 @@
+import { useEffect, useRef, useState } from 'react';
 import { Icon, type IconName } from './icon';
 import { cn } from './utils';
 import type { SemanticTone } from './tokens';
@@ -6,6 +7,7 @@ export interface ToastProps {
   tone?: SemanticTone;
   message: string;
   className?: string;
+  onDismiss?: () => void;
 }
 
 /**
@@ -31,7 +33,20 @@ const toneIcon: Record<SemanticTone, IconName> = {
  * 它是浮层 ⇒ 允许阴影（L2）；颜色只是**第二**信号，图标 + 文案是第一信号
  * （success 与 info 同属冷色相，只靠颜色分不出来）。
  */
-export function Toast({ tone = 'info', message, className }: ToastProps) {
+export function Toast({ tone = 'info', message, className, onDismiss }: ToastProps) {
+  const [dismissed, setDismissed] = useState(false);
+  const onDismissRef = useRef(onDismiss);
+  useEffect(() => { onDismissRef.current = onDismiss; }, [onDismiss]);
+  useEffect(() => {
+    setDismissed(false);
+    if (tone !== 'success') return;
+    const timer = window.setTimeout(() => {
+      setDismissed(true);
+      onDismissRef.current?.();
+    }, 3000);
+    return () => window.clearTimeout(timer);
+  }, [message, tone]);
+  if (dismissed) return null;
   return (
     <div
       role="status"

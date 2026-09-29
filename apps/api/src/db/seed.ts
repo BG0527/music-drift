@@ -4,13 +4,39 @@
  * - 只提供分段元数据，**不含音频**：曲库音频等用户交付后再接（CONTEXT §14 / D-07 / §18）。
  * - 幂等：固定 UUID + upsert，重复执行结果不变（可安全纳入 CI 与本地重跑）。
  * - `licensed_source = 'placeholder'` 便于与将来用户提供的曲库区分，且 seed 只动这一类。
+ *
+ * t10（用户裁决）：幂等创建管理员账号 `admin/admin123` —— 用 auth/password.ts 的
+ * hashPassword（scrypt）生成哈希**直插 users 表**，绕开注册接口的弱口令黑名单
+ * （admin123 ∈ COMMON_WEAK_PASSWORDS）。登录只验哈希不受影响；**不得**为此改 passwordPolicy。
  */
+import { createHash } from 'node:crypto';
+import { hashPassword } from '../auth/password.js';
 import { createDb, type Db } from './client.js';
 
 export const PLACEHOLDER_SOURCE = 'placeholder';
 
 /** 每段 20 秒、4 段共 80 秒，落在 CONTEXT §14.1「每段 15–30s、总 60–120s」区间内。 */
 const SEGMENT_DURATION_MS = 20_000;
+
+/** t10（用户裁决）：管理员种子账号。口令 admin123 的明文是裁决的一部分（演示账号，不承担保密性）。 */
+export const SEED_ADMIN = {
+  handle: 'admin',
+  password: 'admin123',
+  role: 'ADMIN',
+} as const;
+
+/**
+ * 管理员口令哈希（**固定 salt** = sha256('music-drift/seed/admin')）。
+ *
+ * 为什么不能用随机 salt：seed 的硬要求是「跑两次结果一致」（字节级幂等）——
+ * 随机 salt 会让第二次 upsert 改写 password_hash，同一份种子跑出不同的行。
+ * 固定 salt 走的是 password.ts 既有的「显式 salt（可复现）」入口；登录只走
+ * verifyPassword（解析哈希自带的参数与 salt），校验逻辑零特判。
+ */
+function adminPasswordHash(): string {
+  const salt = createHash('sha256').update('music-drift/seed/admin').digest();
+  return hashPassword(SEED_ADMIN.password, { salt });
+}
 
 interface PlaceholderSong {
   /** 曲目序号：用于派生固定的段落 id（**不能**用 songId 切片派生，会撞车）。 */
@@ -47,7 +73,9 @@ export function segmentId(ordinal: number, index: number): string {
   return `00000000-0000-4000-900${ordinal}-${String(index).padStart(12, '0')}`;
 }
 
-export async function runSeed(db: Db): Promise<{ songs: number; segments: number }> {
+export async function runSeed(
+  db: Db,
+): Promise<{ songs: number; segments: number; admin: string }> {
   let segments = 0;
   const songIds = PLACEHOLDER_SONGS.map((song) => song.id);
   const segmentIds = PLACEHOLDER_SONGS.flatMap((song) =>
@@ -90,14 +118,25 @@ export async function runSeed(db: Db): Promise<{ songs: number; segments: number
       segments += 1;
     }
   }
-  return { songs: PLACEHOLDER_SONGS.length, segments };
+  // t10：管理员账号 upsert（幂等；handle 唯一键冲突时收敛 role 与口令哈希）。
+  // 直插 users 绕开注册弱口令黑名单（admin123 ∈ COMMON_WEAK_PASSWORDS）——
+  // 登录只验哈希，passwordPolicy 不需要改、也不允许为此改（注册 admin123 仍必须被拒）。
+  await db.query(
+    `insert into users (handle, password_hash, role)
+     values ($1, $2, $3)
+     on conflict (handle) do update set password_hash = excluded.password_hash, role = excluded.role`,
+    [SEED_ADMIN.handle, adminPasswordHash(), SEED_ADMIN.role],
+  );
+  return { songs: PLACEHOLDER_SONGS.length, segments, admin: SEED_ADMIN.handle };
 }
 
 if (process.argv[1]?.includes('seed')) {
   const db = await createDb(process.env['DATABASE_URL'] ?? '');
   try {
     const result = await runSeed(db);
-    process.stdout.write(`seed ok: ${result.songs} songs / ${result.segments} segments\n`);
+    process.stdout.write(
+      `seed ok: ${result.songs} songs / ${result.segments} segments / admin=${result.admin}\n`,
+    );
   } finally {
     await db.close();
   }

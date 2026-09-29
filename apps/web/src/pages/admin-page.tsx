@@ -84,7 +84,7 @@ export function AdminPage() {
   }
 
   return (
-    <div className="relative isolate flex flex-col">
+    <div className="relative isolate flex flex-col md:h-[100dvh] md:overflow-hidden">
       {/* 稿 `.platter` / `.glint` / 光带：世界的"上方"。宿主必须 isolate */}
       <Platter />
       <WaterSheen />
@@ -92,7 +92,8 @@ export function AdminPage() {
 
       {/* 稿 `main { padding:46px 76px 0; z-index:2 }` → 流体：顶 46 固定、左右断点 */}
       <main className="relative z-[2] px-6 pt-[46px] md:px-[76px]">
-        <header>
+        {/* t3：页头 enter-fade 淡入（次角色 —— 队列面板的 enter-rise 才是本页主角） */}
+        <header className="enter-fade">
           {/* G4/P1 语义出口：管理员视图此前页内零站内出口。样式照 bottle-page crumb 模板 */}
           <Link
             to="/river"

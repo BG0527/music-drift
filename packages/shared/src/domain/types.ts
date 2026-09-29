@@ -16,7 +16,6 @@ export type VoteValue = 'LIKE' | 'DISLIKE';
 
 export type MessageStatus = 'PENDING' | 'DELIVERED' | 'UNDELIVERED';
 
-export type BadgeKind = 'RETURN_COMPLETED' | 'DRIFT_PARTICIPANT';
 
 export type ParticipantRole = 'INITIATOR' | 'SINGER';
 
@@ -94,9 +93,3 @@ export interface ParticipantRecord {
   segmentIndex: number;
 }
 
-export interface BadgeAward {
-  userId: string;
-  kind: BadgeKind;
-  bottleId: string;
-  grantedAt: number;
-}

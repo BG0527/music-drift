@@ -19,6 +19,7 @@ export const TABLES = [
   'events',
   'notifications',
   'collections',
+  'public_comments',
   'messages',
   'reports',
   'votes',

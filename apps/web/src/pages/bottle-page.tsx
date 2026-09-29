@@ -24,12 +24,14 @@ import {
   usePutBack,
 } from '../features/api/mutations';
 import { useBottle, segmentAudioUrl } from '../features/api/queries';
-import { ApiError } from '../features/api/client';
 import { ConflictNotice } from '../features/bottle/conflict-notice';
 import { RecordStep } from '../features/bottle/record-step';
 import { ReportDialog } from '../features/bottle/report-dialog';
 import { RelayTimeline } from '../features/bottle/relay-timeline';
 import { PrivateMessages } from '../features/bottle/private-messages';
+import { CollectButton } from '../features/bottle/collect-button';
+import { TargetedSegmentButton } from '../features/bottle/targeted-segment-button';
+import { PublicComments } from '../features/bottle/public-comments';
 import { VotableSegment } from '../features/bottle/votable-segment';
 import type { MyVote } from '../features/bottle/vote-controls';
 import { ResolutionModal } from '../features/bottle/resolution-modal';
@@ -53,7 +55,7 @@ import { AsyncBoundary } from './shell/async-boundary';
 import { Link } from './shell/router';
 import { useNavigate } from './shell/router-context';
 import { buildPath } from './shell/routes';
-import { TEXT_LINK, TEXT_LINK_STRONG } from './shell/link-styles';
+import { TEXT_LINK } from './shell/link-styles';
 import './bottle-page.css';
 
 export interface BottlePageProps {
@@ -135,6 +137,8 @@ function BottleView({ bottle, seams }: { bottle: BottleDetail; seams?: BottlePag
   const destinationReadyRef = useRef(false);
   /** 私密留言（§5）：声明式内容 + 表单 → 弹窗。 */
   const [messagesOpen, setMessagesOpen] = useState(false);
+  const [commentsOpen, setCommentsOpen] = useState(false);
+  const pendingCommentReport = useRef<string | null>(null);
   /** 投票失败（409 冲突 / 网络层）→ 交给 ConflictNotice 给出口，不静默。 */
   const [voteError, setVoteError] = useState<unknown>(null);
   /** 服务端说"没听满"（422 门槛类）→ 弹提醒（不是禁用按钮）。 */
@@ -144,7 +148,7 @@ function BottleView({ bottle, seams }: { bottle: BottleDetail; seams?: BottlePag
   /** G2（flow-audit P0）：三选一确认成功后的去向 —— 播报之外在正文留「语义下一步键」，不让流程死在 aria-live 里。 */
   const [resolutionNext, setResolutionNext] = useState<Resolution | null>(null);
   const [reportTarget, setReportTarget] = useState<{
-    type: 'BOTTLE' | 'SEGMENT';
+    type: 'BOTTLE' | 'SEGMENT' | 'COMMENT';
     id: string;
   } | null>(null);
   const liveSegments = bottle.segments.filter((segment) => segment.deletedAt === null);
@@ -179,6 +183,14 @@ function BottleView({ bottle, seams }: { bottle: BottleDetail; seams?: BottlePag
     choice,
     copy: resolutionCopy(choice),
   }));
+  const fullPreview = (
+    <section className="bf-full-preview" aria-label="全部接唱试听">
+      <h3 className="sr-only">听全部已有录音</h3>
+      <SequentialSegmentPlayer segments={liveSegments.map((segment) => ({
+        index: segment.index, src: segmentAudioUrl(segment.id),
+      }))} />
+    </section>
+  );
 
   const openDestinationWhenRecorderIsGone = (): void => {
     if (!recorderPortalExitedRef.current || !destinationReadyRef.current) return;
@@ -261,7 +273,7 @@ function BottleView({ bottle, seams }: { bottle: BottleDetail; seams?: BottlePag
       {/* 层外提示（触发才出现，非稿块）：成功播报 + 投后下一步键（G2）/ 没听满提醒 / 投票冲突 */}
       {announcement === null ? null : (
         <div role="status" className="bp-status-item flex flex-col">
-          <Toast tone="success" message={announcement} />
+          <Toast tone="success" message={announcement} onDismiss={() => setAnnouncement(null)} />
           {/* G2：三选一成功后留在正文的语义下一步（播报保留，键不只活在 aria-live 里） */}
           {resolutionNext === null ? null : (
             <div className="flex flex-wrap items-center gap-x-[20px]">
@@ -386,16 +398,6 @@ function BottleView({ bottle, seams }: { bottle: BottleDetail; seams?: BottlePag
             </span>
           </h2>
 
-          <section className="bf-full-preview mt-[4px] flex flex-col gap-[4px]">
-            <h3 className="sr-only">听全部已有录音</h3>
-            <SequentialSegmentPlayer
-              segments={liveSegments.map((segment) => ({
-                index: segment.index,
-                src: segmentAudioUrl(segment.id),
-              }))}
-            />
-          </section>
-
           {selectedSegment === null ? (
             /*
              * 参考 renderListenColumn：没有可试听的段时 **transport 仍在位**（0:00 / 0:00），
@@ -456,6 +458,7 @@ function BottleView({ bottle, seams }: { bottle: BottleDetail; seams?: BottlePag
             />
           )}
 
+          {showDestinationRows ? fullPreview : null}
           <p className="bf-hint votesNote mt-[4px] text-[0.8125rem] text-muted">
             {selectedSegment === null
               ? '还没有可试听的段，也就没有可投票的段。'
@@ -468,7 +471,7 @@ function BottleView({ bottle, seams }: { bottle: BottleDetail; seams?: BottlePag
 
         </section>
 
-        <section className="destCol enter-rise stagger-3 flex flex-col">
+        {showDestinationRows ? <section className="destCol enter-rise stagger-3 flex flex-col">
           <h2 className="text-[1.0625rem] font-bold leading-none text-paper">选择去向</h2>
           <p className="sub mt-[4px] text-[0.8125rem] text-muted">
             接下来决定它去哪。发起者的第一棒没有「回传」，可选去向由服务端给。
@@ -497,31 +500,19 @@ function BottleView({ bottle, seams }: { bottle: BottleDetail; seams?: BottlePag
                 </button>
               ))
             : null}
-        </section>
+        </section> : <section className="destCol enter-rise stagger-3 flex flex-col">
+          <h2 className="text-[1.0625rem] font-bold leading-none text-paper">沿着歌声听下去</h2>
+          {fullPreview}
+          {bottle.status === 'SEA' && session.status === 'authed' ? (
+            <div className="bp-sea-actions mt-3 flex flex-wrap gap-3">
+              {bottle.isComplete ? <CollectButton bottleId={bottle.id} /> :
+                !mySegmentRecorded ? <TargetedSegmentButton bottleId={bottle.id} /> : null}
+            </div>
+          ) : null}
+        </section>}
       </div>
 
       {/* 守卫出口（稿无此块，保留服务端事实与登录出口）：未登录 / 不在你手上 */}
-      {session.status === 'guest' ? (
-        <ConflictNotice
-          error={
-            new ApiError({
-              status: 401,
-              code: null,
-              message: '请先登录再继续：登录之后就能接这一棒。',
-            })
-          }
-          className="bp-status-item max-w-[46rem] order-2 lg:order-none"
-        />
-      ) : null}
-      {!canActOnBottle ? (
-        <p className="bf-notice bp-status-item order-2 lg:order-none flex flex-wrap items-center gap-x-[12px] gap-y-[2px] rounded-base border border-line/15 bg-ink px-4 py-[2px] text-[0.9375rem] leading-[1.6] text-muted">
-          <Icon name="Waves" size={18} />
-          <span>这个瓶子现在不在你手上（同一条河道同一时刻只有一个人拿着它）。</span>
-          <Link to="/river" className={TEXT_LINK_STRONG}>
-            去河道捞一个
-          </Link>
-        </p>
-      ) : null}
       {putBack.isError ? (
         <ConflictNotice
           error={putBack.error}
@@ -548,6 +539,8 @@ function BottleView({ bottle, seams }: { bottle: BottleDetail; seams?: BottlePag
         </Link>
         <span>捞取 / 录音 / 投河 / 回传 / 入海 全部记在服务端。</span>
         <span className="flex flex-wrap items-center gap-[26px] md:ml-auto">
+          {bottle.status === 'SEA' ? <button type="button" className={TEXT_LINK}
+            onClick={() => setCommentsOpen(true)}><Icon name="ScrollText" size={16} />公开评论</button> : null}
           {bottle.status === 'SEA' ? null : (
             <button
               type="button"
@@ -647,6 +640,16 @@ function BottleView({ bottle, seams }: { bottle: BottleDetail; seams?: BottlePag
             .catch(() => undefined);
         }}
       />
+
+      <Modal open={commentsOpen} title="公海评论" onClose={() => setCommentsOpen(false)}
+        onExited={() => {
+          if (pendingCommentReport.current === null) return;
+          setReportTarget({ type: 'COMMENT', id: pendingCommentReport.current });
+          pendingCommentReport.current = null;
+        }}>
+        <PublicComments bottleId={bottle.id} canComment={session.status === 'authed'}
+          onReport={(commentId) => { pendingCommentReport.current = commentId; setCommentsOpen(false); }} />
+      </Modal>
 
       <PrivateMessages
         open={messagesOpen && bottle.status !== 'SEA'}

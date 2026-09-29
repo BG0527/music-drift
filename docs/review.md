@@ -64,6 +64,44 @@ git diff --check
 exit 0（仅 CRLF 转 LF 提示，无 whitespace error）
 ```
 
+## 2026-09-29 连续交付 W18 follow-up–W22（进行中）
+
+用户已覆盖逐切片验收暂停；本节记录实现证据，不表示全轮已通过。旧 W18 几何门禁漏掉了裁切内容：真实 1024×720 截图 `docs/ui-review/w20-stress-1024/me-1024.png` 显示身份卡挤占空间，消息/收藏落到视口外。现要求检查关键控件可见性、播放中状态和长列表，而非仅文档高度。
+
+### W20 / W21 主线程红绿证据
+
+```text
+pnpm --filter @music-drift/web exec vitest run src/pages/__tests__/profile-page-reference.test.tsx
+Red: 1 failed | 10 passed（发现“我的徽章”按钮仍存在）
+Green: 11 passed（删除入口与徽章面板；收藏占完整口袋）
+邮箱展示 Red: .who .mail expected null，实际 a@example.com
+Green: profile-page-reference + profile-and-settings: 30 passed
+
+pnpm --filter @music-drift/web exec vitest run src/pages/__tests__/drift-log-page.test.tsx -t '长日志'
+Red: tabindex expected 0 / received null
+Green: drift-log-page: 6 passed
+one-screen-fit 长日志样式门禁 Red: ENOENT drift-log-page.css
+Green: one-screen-fit + drift-log-page: 28 passed
+
+pnpm --filter @music-drift/web exec vitest run src/pages/__tests__/profile-and-settings-page.test.tsx -t '准确说明'
+Red: 邮箱文案 expected length 0 / received 2
+Green: 1 passed | 19 skipped
+
+pnpm --filter @music-drift/web exec vitest run src/features/bottle/notification-labels.test.ts
+Red: 留言送达/未送达文案错误限定“发起者”
+Green: 7 passed（接收者、送达双方身份，以及终止原因更正）
+
+pnpm --filter @music-drift/web exec vitest run src/pages/__tests__/retired-reference-features.test.ts
+Red: app/page-me.js still /api/me/badges / user.email
+Green: 1 passed（同步参考我的/设置 HTML 与接线）
+
+pnpm --filter @music-drift/web exec vitest run src/pages/__tests__/settings-attribution.test.tsx src/pages/__tests__/profile-and-settings-page.test.tsx src/pages/__tests__/profile-page-reference.test.tsx src/pages/__tests__/drift-log-page.test.tsx src/features/bottle/notification-labels.test.ts src/pages/__tests__/retired-reference-features.test.ts
+Test Files 6 passed (6)
+Tests 70 passed (70)
+```
+
+删除的旧徽章 UI 与测试可从 Git 恢复；不删除用户素材、既有截图或无关脏文件。数据库邮箱列退役由新迁移处理（用户已明确授权），历史迁移保留。
+
 ## 2026-09-29 验收返修（用户裁决覆盖旧音频揭晓规则）
 
 本节覆盖上文“锁定段 / 暂未解锁”的旧结论。用户最终裁决：任何观看者均可试听瓶中当前全部已录段；“解锁”只指私密留言送达后，且只向该留言的发送者与接收者揭晓双方账号名。

@@ -25,4 +25,3 @@ export * from './river';
 export * from './moderation';
 export * from './messages';
 export * from './timeouts';
-export * from './badges';

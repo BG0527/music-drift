@@ -45,7 +45,7 @@ async function register(prefix: string): Promise<{ cookie: string; userId: strin
   const response = await app.inject({
     method: 'POST',
     url: '/api/auth/register',
-    payload: { handle, email: handle + '@example.com', password: PASSWORD },
+    payload: { account: handle, password: PASSWORD },
   });
   expect(response.statusCode).toBe(201);
   const cookie = response.cookies.find((entry) => entry.name === 'mdb_session');
@@ -624,7 +624,7 @@ describe('举报与人工审核队列（CONTEXT §8）：非管理员拿不到�
   });
 });
 
-describe('通知与徽章（CONTEXT §10.1 / ADR-014）：只读自己的，徽章现算不落库', () => {
+describe('通知只读自己的；徽章 API 已退役', () => {
   let cookie = '';
   let userId = '';
   let otherCookie = '';
@@ -639,7 +639,7 @@ describe('通知与徽章（CONTEXT §10.1 / ADR-014）：只读自己的，徽�
 
   it('未登录 → 401', async () => {
     expect((await app.inject({ method: 'GET', url: '/api/notifications' })).statusCode).toBe(401);
-    expect((await app.inject({ method: 'GET', url: '/api/me/badges' })).statusCode).toBe(401);
+    expect((await app.inject({ method: 'GET', url: '/api/me/badges' })).statusCode).toBe(404);
   });
 
   it('通知列表只含自己的；标记已读幂等 → 204；别人的通知 → 404（不泄露存在性）', async () => {
@@ -695,22 +695,4 @@ describe('通知与徽章（CONTEXT §10.1 / ADR-014）：只读自己的，徽�
     expect(stolen.statusCode).toBe(404); // 别人的通知：既不能读也不能标记
   });
 
-  it('徽章是派生结果：只返回本人的、重复请求完全一致（没有徽章表）', async () => {
-    const first = await app.inject({ method: 'GET', url: '/api/me/badges', headers: { cookie } });
-    expect(first.statusCode).toBe(200);
-    const awards = first.json() as { userId: string; kind: string; bottleId: string }[];
-    expect(Array.isArray(awards)).toBe(true);
-    for (const award of awards) {
-      expect(award.userId).toBe(userId);
-    }
-
-    const second = await app.inject({ method: 'GET', url: '/api/me/badges', headers: { cookie } });
-    expect(second.json()).toEqual(awards);
-
-    const tables = await db.query<{ count: string }>(
-      `select count(*)::text as count from information_schema.tables
-       where table_schema = 'public' and table_name = 'badges'`,
-    );
-    expect(tables[0]?.count).toBe('0'); // ADR-014 #1：徽章不落库
-  });
 });

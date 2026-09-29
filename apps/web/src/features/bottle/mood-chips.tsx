@@ -49,7 +49,11 @@ export function MoodChips({ className }: MoodChipsProps) {
                   'duration-[var(--motion-hover-duration)] ease-[var(--motion-entry-easing)]',
                   'motion-safe:active:translate-y-[-1px]',
                   active
-                    ? 'scale-[var(--motion-hover-scale)] bg-coral font-semibold text-ink'
+                    // t6 选中确认（feedback）：挂类即播一次 `bottle-pick`（design-system/motion.css）。
+                    // t16（t10 观察项 · 方案②）：**不再写静态 scale** —— `fill:both` 收尾恒等
+                    // `scale(1)`，会把它锁成死代码；选中线索由 `aria-pressed`（结构）+ 珊瑚底/字重
+                    // （视觉）承担，缩放只留在未选中档的 hover（那里没有动画，工具类真的生效）。
+                    ? 'mood-pick bg-coral font-semibold text-ink'
                     : 'border border-line/25 bg-transparent text-coral hover:scale-[var(--motion-hover-scale)]',
                 )}
               >
@@ -59,7 +63,9 @@ export function MoodChips({ className }: MoodChipsProps) {
           );
         })}
       </ul>
-      <p className="text-[0.8125rem] leading-[1.5] text-muted">
+      {/* 短视口收起钩子（f1 / t4 评审并入）：md+ 矮窗时 CSS 视觉隐藏这一行（river-motion.css），
+          DOM 与文案保留 —— 产品诚实说明不删，mood-chips.test 的 getByText 继续绿。 */}
+      <p className="mood-note text-[0.8125rem] leading-[1.5] text-muted">
         心情标签这一版只作展示：点它只是换个心情，不会筛选下面的作品。
       </p>
     </section>

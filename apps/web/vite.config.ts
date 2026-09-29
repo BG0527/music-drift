@@ -11,11 +11,12 @@ export default defineConfig({
     port: 5173,
     strictPort: true,
     proxy: {
-      // 默认仍是契约里的 8787；`MDB_API_TARGET` 只给 hermetic 量测脚本用
+      // 默认仍是契约里的 8788（用户裁决：原回环端口被本机外部工具占用 ⇒ 代理全 404，迁移解冲突）；
+      // `MDB_API_TARGET` 只给 hermetic 量测脚本用
       // （`one-screen-check.mjs` 自起一次性库 + 自起 API，再把 proxy 指过去。
       //  否则"量真实高度"这件事会反过来往共享开发库里灌数据，甚至用库里的脏数据决定判据）。
       '/api': {
-        target: process.env['MDB_API_TARGET'] ?? 'http://localhost:8787',
+        target: process.env['MDB_API_TARGET'] ?? 'http://localhost:8788',
         changeOrigin: true,
       },
     },

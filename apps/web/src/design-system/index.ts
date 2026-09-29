@@ -35,6 +35,8 @@ export {
   Ripple,
   type DecorProps,
 } from './wave';
+// t6：捞起/抛下分镜的漂流瓶本体（重绘件；纯静态物件，动效由宿主 CSS 承担）
+export { BottleVessel, type BottleVesselProps } from './bottle-vessel';
 export { Icon, type IconName, type IconProps } from './icon';
 export { cn } from './utils';
 export * from './tokens';

@@ -43,10 +43,7 @@ async function renderIdentity() {
     // 契约里的 role 是 `USER`/`ADMIN` 枚举：原值照显，后面补一个中文读法。
     const label = ROLE_LABEL[user.role];
     const role = label === undefined ? user.role : `${user.role}（${label}）`;
-    // W6 起 email 是**可空**的（账号注册的用户根本没有邮箱）：没有就不显示这一段，
-    // 不能把 `null` 直接印在界面上（`（null）` 是"接真没接干净"的典型痕迹）。
-    const mail = typeof user.email === 'string' && user.email !== '' ? `（${user.email}）` : '';
-    alt.textContent = `已登录：${user.handle}${mail} · 角色 ${role}`;
+    alt.textContent = `已登录：${user.handle} · 角色 ${role}`;
   }
 }
 

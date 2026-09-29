@@ -15,7 +15,7 @@ describe('loadEnv：开发/测试环境', () => {
 
     expect(env.NODE_ENV).toBe('development');
     expect(env.DATABASE_URL).toBe('');
-    expect(env.PORT).toBe(8787);
+    expect(env.PORT).toBe(8788);
     expect(env.HOST).toBe('0.0.0.0');
   });
 

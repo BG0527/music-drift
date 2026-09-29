@@ -1,8 +1,52 @@
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { SequentialSegmentPlayer } from './sequential-segment-player';
+import { SegmentPlayer } from './segment-player';
+import { GroovePlaybackProvider, GrooveTimeline } from './groove-timeline';
 
 describe('SequentialSegmentPlayer', () => {
+  it('原生暂停明确播报暂停，沟槽跟随真实全播时间', async () => {
+    render(<GroovePlaybackProvider>
+      <GrooveTimeline segments={[{ index: 1, durationMs: 20000 }]} totalSegments={4} missingSegmentIndexes={[2, 3, 4]} />
+      <SequentialSegmentPlayer segments={[{ index: 1, src: '/a' }]} />
+    </GroovePlaybackProvider>);
+    fireEvent.click(screen.getByRole('button', { name: '听全部' }));
+    await screen.findByText(/正在播放第 1 段/);
+    const audio = screen.getByLabelText('全部接唱连续播放') as HTMLAudioElement;
+    Object.defineProperty(audio, 'duration', { value: 20 });
+    audio.currentTime = 10;
+    fireEvent.timeUpdate(audio);
+    expect(screen.getByTestId('groove-playhead').style.left).toBe('12.5%');
+    fireEvent.pause(audio);
+    expect(screen.getByText(/已暂停第 1 段/)).toBeInTheDocument();
+  });
+  it('单段与听全部互斥：启动另一播放器时暂停前一个', async () => {
+    const singleAudio = document.createElement('audio');
+    const pauseSingle = vi.spyOn(singleAudio, 'pause');
+    render(<GroovePlaybackProvider>
+      <SegmentPlayer layout="transport" segmentIndex={1} src="/single" durationMs={20000} createElement={() => singleAudio} />
+      <SequentialSegmentPlayer segments={[{ index: 1, src: '/all' }]} />
+    </GroovePlaybackProvider>);
+    fireEvent.click(screen.getByRole('button', { name: '播放第 1 段' }));
+    fireEvent.click(screen.getByRole('button', { name: '听全部' }));
+    await screen.findByText(/正在播放第 1 段/);
+    expect(pauseSingle).toHaveBeenCalled();
+    const allAudio = screen.getByLabelText('全部接唱连续播放') as HTMLAudioElement;
+    const pauseAll = vi.spyOn(allAudio, 'pause');
+    fireEvent.click(screen.getByRole('button', { name: '播放第 1 段' }));
+    expect(pauseAll).toHaveBeenCalled();
+  });
+  it('父层刷新同样的段列表不重新播放，再点听全部明确从头重播', async () => {
+    const view = render(<SequentialSegmentPlayer segments={[{ index: 1, src: '/a' }]} />);
+    fireEvent.click(screen.getByRole('button', { name: '听全部' }));
+    await screen.findByText(/正在播放第 1 段/);
+    const play = vi.spyOn(HTMLMediaElement.prototype, 'play');
+    const calls = play.mock.calls.length;
+    view.rerender(<SequentialSegmentPlayer segments={[{ index: 1, src: '/a' }]} />);
+    expect(play).toHaveBeenCalledTimes(calls);
+    fireEvent.click(screen.getByRole('button', { name: '听全部' }));
+    await waitFor(() => expect(play).toHaveBeenCalledTimes(calls + 1));
+  });
   beforeEach(() => {
     vi.spyOn(HTMLMediaElement.prototype, 'play').mockResolvedValue();
     vi.spyOn(HTMLMediaElement.prototype, 'pause').mockImplementation(() => undefined);
@@ -23,12 +67,14 @@ describe('SequentialSegmentPlayer', () => {
     fireEvent.click(screen.getByRole('button', { name: '听全部' }));
     const audio = screen.getByLabelText('全部接唱连续播放');
     expect(audio.getAttribute('src')).toBe('/api/segments/a/audio');
+    expect(screen.getByLabelText('连续播放段落进度')).toHaveTextContent('1/3');
     await waitFor(() => {
       expect(play).toHaveBeenCalledTimes(1);
     });
 
     fireEvent.ended(audio);
     expect(audio.getAttribute('src')).toBe('/api/segments/b/audio');
+    expect(screen.getByLabelText('连续播放段落进度')).toHaveTextContent('2/3');
     await waitFor(() => {
       expect(play).toHaveBeenCalledTimes(2);
     });

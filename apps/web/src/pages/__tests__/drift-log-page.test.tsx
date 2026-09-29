@@ -6,6 +6,21 @@ import { DriftLogPage } from '../drift-log-page';
 
 /** 漂流日志（CONTEXT §9）：**只给时间线**，按 seq 升序；客户端不本地推算时间线。 */
 describe('漂流日志页', () => {
+  it('长日志保留全部事件，并可通过键盘聚焦内部滚动区域', async () => {
+    const events = Array.from({ length: 30 }, (_, index) =>
+      bottleEvent({ seq: index + 1, type: 'BOTTLE_DRAWN', actorCode: '午夜歌手#042' }),
+    );
+    renderWithProviders(<DriftLogPage id={BOTTLE_ID} />, {
+      handlers: [
+        { path: `/api/bottles/${BOTTLE_ID}/events`, respond: () => ({ body: events }) },
+        { path: `/api/bottles/${BOTTLE_ID}`, respond: () => ({ body: bottleDetail() }) },
+      ],
+    });
+    const list = await screen.findByTestId('drift-log');
+    expect(within(list).getAllByRole('listitem')).toHaveLength(30);
+    expect(list).toHaveAttribute('tabindex', '0');
+    expect(list).toHaveAccessibleName('漂流事件记录');
+  });
   it('按 seq 升序展示中文事件说明，系统行为显示成「系统」', async () => {
     renderWithProviders(<DriftLogPage id={BOTTLE_ID} />, {
       route: `/bottles/${BOTTLE_ID}/log`,

@@ -14,10 +14,10 @@ import {
 import {
   AnonymousCodeSchema,
   MyBottleListSchema,
-  BadgeAwardSchema,
   CollectionSchema,
   NotificationSchema,
   PrivateMessageSchema,
+  PublicCommentPageSchema,
   ReportSchema,
   BottleDetailSchema,
   BottleEventSchema,
@@ -26,9 +26,9 @@ import {
   SongSchema,
   type BottleDetail,
   type MyBottle,
-  type BadgeAward,
   type Notification,
   type PrivateMessage,
+  type PublicCommentPage,
   type Report,
   type BottleEvent,
   type BottleSummary,
@@ -159,20 +159,6 @@ export function useMyCollections(enabled = true): UseQueryResult<Collection[]> {
 }
 
 /**
- * 我的徽章（CONTEXT §10 / ADR-014 裁决 #1）：**派生不落库** —— 每次都是服务端按事件现算，
- * 作品被撤下徽章就消失。所以这里既不落缓存策略也不写本地存储。
- */
-export function useMyBadges(enabled = true): UseQueryResult<BadgeAward[]> {
-  return useQuery({
-    queryKey: QUERY_KEYS.myBadges,
-    queryFn: () => apiGet('/api/me/badges', arrayOf(BadgeAwardSchema)),
-    enabled,
-    // 派生结果不参与 staleTime 优化：每次打开弹窗都要看到当下的真相
-    staleTime: 0,
-  });
-}
-
-/**
  * 私密留言（CONTEXT §5）：**服务端按可见性过滤后再返回**（发起者只看已送达 / 发送者看自己的 /
  * 中间传递者拿不到）。所以前端直接渲染即可，不再筛一遍。
  */
@@ -184,6 +170,24 @@ export function useBottleMessages(
     queryKey: ['bottle', bottleId, 'messages'],
     queryFn: () => apiGet(`/api/bottles/${bottleId}/messages`, arrayOf(PrivateMessageSchema)),
     enabled,
+  });
+}
+
+/** 公海公开评论：匿名可读，服务端固定每页最多 20 条并给不透明游标。 */
+export function usePublicComments(
+  bottleId: string,
+): UseInfiniteQueryResult<{ pages: PublicCommentPage[] }, unknown> {
+  return useInfiniteQuery({
+    queryKey: QUERY_KEYS.comments(bottleId),
+    initialPageParam: null as string | null,
+    queryFn: ({ pageParam }) => {
+      const cursor = pageParam === null ? '' : `&cursor=${encodeURIComponent(pageParam)}`;
+      return apiGet(
+        `/api/bottles/${bottleId}/comments?limit=20${cursor}`,
+        PublicCommentPageSchema,
+      );
+    },
+    getNextPageParam: (lastPage) => lastPage.nextCursor,
   });
 }
 

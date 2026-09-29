@@ -11,10 +11,9 @@ import type { Db } from './client.js';
 
 export async function insertUser(db: Db): Promise<string> {
   const userId = randomUUID();
-  await db.query(`insert into users (id, handle, email, password_hash) values ($1, $2, $3, $4)`, [
+  await db.query(`insert into users (id, handle, password_hash) values ($1, $2, $3)`, [
     userId,
     `u-${userId.slice(0, 8)}`,
-    `${userId.slice(0, 8)}@test.local`,
     'x',
   ]);
   return userId;

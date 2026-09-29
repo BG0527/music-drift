@@ -324,7 +324,7 @@ describe('登录页 · 照稿结构（review-login-blocks）', () => {
   it('誓词逐字在页（稿 §4.6）', () => {
     renderWithProviders(<LoginPage />);
     expect(
-      screen.getByText(/不用真名，不用露脸，只要一段声音。同一个瓶子里，不同的人看到的是不同的匿名代号。/),
+      screen.getByText(/不用真名，不用露脸，只要一段声音。同一支瓶子里的接唱代号保持不变。/),
     ).toBeInTheDocument();
   });
 });

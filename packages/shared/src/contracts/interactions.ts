@@ -103,7 +103,41 @@ export const PrivateMessageSchema = z.object({
   createdAt: IsoDateTimeSchema,
 });
 
-export const ReportTargetTypeSchema = z.enum(['BOTTLE', 'SEGMENT', 'MESSAGE']);
+export const PublicCommentContentSchema = z
+  .string()
+  .transform((content) => content.trim())
+  .pipe(
+    z
+      .string()
+      .min(1)
+      .refine((content) => [...content].length <= 200, '评论最多 200 个 Unicode 字符'),
+  );
+
+export const CreatePublicCommentRequestSchema = z
+  .object({ content: PublicCommentContentSchema })
+  .strict();
+
+export const PublicCommentSchema = z.object({
+  id: UuidSchema,
+  bottleId: UuidSchema,
+  content: z.string().min(1),
+  authorAccount: z.string().min(1).max(32),
+  isMine: z.boolean(),
+  createdAt: IsoDateTimeSchema,
+});
+
+export const PublicCommentPageSchema = z.object({
+  items: z.array(PublicCommentSchema).max(20),
+  nextCursor: z.string().min(1).nullable(),
+});
+
+export const AdminCommentEvidenceSchema = z.object({
+  content: z.string().min(1),
+  authorAccount: z.string().min(1).max(32),
+  deletedAt: IsoDateTimeSchema.nullable(),
+});
+
+export const ReportTargetTypeSchema = z.enum(['BOTTLE', 'SEGMENT', 'MESSAGE', 'COMMENT']);
 
 export const ReportStatusSchema = z.enum(['PENDING', 'REVIEWED']);
 
@@ -119,6 +153,7 @@ export const ReportActionSchema = z.enum([
   'REMOVE_SEGMENT',
   'RESTORE_SEGMENT',
   'REMOVE_BOTTLE',
+  'REMOVE_COMMENT',
   'BAN_USER',
 ]);
 
@@ -132,6 +167,8 @@ export const ReportSchema = z.object({
   action: ReportActionSchema.nullable(),
   createdAt: IsoDateTimeSchema,
   reviewedAt: IsoDateTimeSchema.nullable(),
+  /** COMMENT 举报的审核证据；普通举报省略。软删后仍保留正文与作者账号。 */
+  commentEvidence: AdminCommentEvidenceSchema.nullable().optional(),
 });
 
 /** 裁决请求：`decision` 就是"要实施的结论"（驳回 = `NONE`）。 */
@@ -152,16 +189,6 @@ export const CollectionSchema = z.object({
   createdAt: IsoDateTimeSchema,
 });
 
-/** 徽章是**派生**的（ADR-014 裁决 #1：不落库，作品被撤下即消失），因此只在响应里出现。 */
-export const BadgeKindSchema = z.enum(['RETURN_COMPLETED', 'DRIFT_PARTICIPANT']);
-
-export const BadgeAwardSchema = z.object({
-  userId: UuidSchema,
-  kind: BadgeKindSchema,
-  bottleId: UuidSchema,
-  grantedAt: IsoDateTimeSchema,
-});
-
 export const NotificationSchema = z.object({
   id: UuidSchema,
   type: z.string().min(1),
@@ -176,9 +203,10 @@ export type SubmitListenProgressRequest = z.infer<typeof SubmitListenProgressReq
 export type ListenProgressResponse = z.infer<typeof ListenProgressResponseSchema>;
 export type CastVoteResponse = z.infer<typeof CastVoteResponseSchema>;
 export type PrivateMessage = z.infer<typeof PrivateMessageSchema>;
+export type PublicComment = z.infer<typeof PublicCommentSchema>;
+export type PublicCommentPage = z.infer<typeof PublicCommentPageSchema>;
 export type ReportStatus = z.infer<typeof ReportStatusSchema>;
 export type ReportAction = z.infer<typeof ReportActionSchema>;
 export type Report = z.infer<typeof ReportSchema>;
 export type ReviewDecisionRequest = z.infer<typeof ReviewDecisionRequestSchema>;
-export type BadgeAward = z.infer<typeof BadgeAwardSchema>;
 export type Notification = z.infer<typeof NotificationSchema>;

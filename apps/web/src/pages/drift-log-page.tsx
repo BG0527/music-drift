@@ -24,6 +24,7 @@ import { actorSourceOf, eventTimeline, type DriftLogEntry } from '../features/bo
 import { ConflictNotice } from '../features/bottle/conflict-notice';
 import { BottleMark, Skeleton, WakeLine, cn } from '../design-system';
 import { Link } from './shell/router';
+import './drift-log-page.css';
 
 /* ── 刻痕语法（长度＝权重、色＝归处；照稿 .key 语法表逐值）───────────────────── */
 interface CutSpec {
@@ -169,7 +170,7 @@ export function DriftLogPage({ id }: { id: string }) {
   const spillDy = wet === null ? 0 : wet.end.y - DRAFT_WET_END.y;
 
   return (
-    <main className="relative z-[2] px-[max(1.5rem,5.278vw)] pt-[max(2.5rem,4.444vw)] pb-0 text-paper md:h-[100dvh] md:overflow-hidden">
+    <main className="drift-page relative z-[2] px-[max(1.5rem,5.278vw)] pt-[max(2.5rem,4.444vw)] pb-0 text-paper md:h-[100dvh] md:overflow-hidden">
       {/* 背景三层（稿 .clip：世界是这台机器，正文浮在它上面） */}
       <div aria-hidden="true" className="pointer-events-none absolute inset-0 -z-10 overflow-hidden">
         <div className="platter absolute inset-0" style={{ background: PLATTER_BG }} />
@@ -294,7 +295,7 @@ export function DriftLogPage({ id }: { id: string }) {
       </div>
 
       {/* ── 主体（稿 .body：左刻痕盘 / 右时间线；稿定高 562 → 流内定位）──────── */}
-      <div className="relative mt-[24px] flex flex-col gap-6 lg:block">
+      <div className="drift-body relative mt-[24px] flex flex-col gap-6 lg:block">
         {/* 半沉螺旋刻痕（一笔一条日志，只有最新一笔是湿的；稿 480×540 逐值） */}
         <svg
           data-testid="log-scratch"
@@ -408,6 +409,8 @@ export function DriftLogPage({ id }: { id: string }) {
         {/* 时间线：一条**有格线的卷**（不是一摞卡片）；最新一笔在左侧留一道珊瑚刻痕边 */}
         <ol
           data-testid="drift-log"
+          tabIndex={0}
+          aria-label="漂流事件记录"
           className="w-full list-none border-t border-line/13 lg:ml-[43.8%] lg:mt-[4px] lg:w-auto"
         >
           {timeline.map((entry, index) => {

@@ -5,7 +5,7 @@
  * 文本一律 `textContent`（`el({ text })`）。
  *
  * 端点（§7.3）：`GET /api/auth/me`、`/api/me/bottles`、`/api/notifications`、
- * `POST /api/notifications/:id/read`、`/api/me/collections`、`/api/me/badges`；
+ * `POST /api/notifications/:id/read`、`/api/me/collections`；
  * 另外用 `GET /api/bottles/:id` 把收藏/徽章里的 `bottleId` 补成曲名（契约里收藏与徽章只给 id，不给曲名）。
  *
  * W15（用户第 4 轮 #7）：**本页不再显示匿名代号**。内袋里那格「匿名代号 + 30px 框」整块收掉 ——
@@ -61,11 +61,6 @@ const STATUS_LABEL = {
   DAMAGED: '已损坏',
 };
 
-const BADGE_LABEL = {
-  RETURN_COMPLETED: '回传完成',
-  DRIFT_PARTICIPANT: '漂流参与者',
-};
-
 function pad2(value) {
   return String(value).padStart(2, '0');
 }
@@ -116,7 +111,6 @@ function layerKinds(item) {
 
 async function start() {
   const handle = q('.sleeve .who .handle');
-  const mail = q('.sleeve .who .mail');
   const stamp = q('.sleeve .who .stamp');
   const crateCount = q('.crate .chead .cat');
   const windowBox = q('.window');
@@ -125,7 +119,6 @@ async function start() {
   const messageList = q('.msgs ul');
   const pockets = qa('.pockets .pocket');
   const collectionPocket = pockets[0] ?? null;
-  const badgePocket = pockets[1] ?? null;
 
   const cardNodes = windowList === null ? [] : qa(':scope > li', windowList);
   // 结构模板取第 4 格（只有四层沉积、没有水腔/浮瓶/暖牌），浮瓶 svg 从有水腔的那几格里抄一份。
@@ -149,7 +142,6 @@ async function start() {
 
   // 先同步抹掉稿子里的假数据（网络没回来之前页面上不能留"午夜的听众"这类演示内容）。
   if (handle !== null) handle.textContent = '载入中…';
-  if (mail !== null) mail.textContent = '';
   if (stamp !== null) hide(stamp);
   if (crateCount !== null) crateCount.textContent = '';
   windowList?.replaceChildren();
@@ -158,7 +150,6 @@ async function start() {
   const user = await requireUser();
   if (user === null) return; // 已跳登录页
   if (handle !== null) handle.textContent = user.handle;
-  if (mail !== null) mail.textContent = user.email;
   if (stamp !== null) {
     // 徽章式的那枚「管理员账号」只在真是管理员时出现（稿子里它是演示数据）。
     if (user.role === 'ADMIN') show(stamp);
@@ -167,11 +158,10 @@ async function start() {
 
   showLoading('正在取回你的漂流记录…');
 
-  const [bottles, notifications, collections, badges] = await Promise.all([
+  const [bottles, notifications, collections] = await Promise.all([
     get('/api/me/bottles').catch((error) => error),
     get('/api/notifications').catch((error) => error),
     get('/api/me/collections').catch((error) => error),
-    get('/api/me/badges').catch((error) => error),
   ]);
   if (bottles instanceof Error) {
     showRequestFailure(bottles, { onRetry: () => location.reload() });
@@ -503,37 +493,6 @@ async function start() {
     }
   }
 
-  if (badgePocket !== null) {
-    const rows = Array.isArray(badges) ? badges : [];
-    if (rows.length === 0) {
-      showEmpty('还没有徽章。', { target: badgePocket });
-    } else {
-      q(':scope > p', badgePocket)?.remove();
-      const shown = rows.slice(0, MAX_POCKET_ROWS);
-      for (const row of shown) {
-        const title = await titleOf(row.bottleId);
-        const go = el('span', { class: 'go', text: '去听' });
-        badgePocket.append(
-          el('div', { class: 'mrow' }, [
-            el('span', { class: 'lab', text: BADGE_LABEL[row.kind] ?? row.kind }),
-            el('span', {
-              class: 'read',
-              text: `${title === null ? row.bottleId.slice(0, 8) : `《${title}》`} · ${fmtDate(row.grantedAt)}`,
-            }),
-            go,
-          ]),
-        );
-        linkify(go, `/bottle.html?id=${encodeURIComponent(row.bottleId)}`);
-      }
-      if (rows.length > shown.length) {
-        badgePocket.append(
-          el('div', { class: 'mrow' }, [
-            el('span', { class: 'read', text: `另有 ${rows.length - shown.length} 枚徽章` }),
-          ]),
-        );
-      }
-    }
-  }
 }
 
 export const { init } = definePage({
@@ -545,7 +504,6 @@ export const { init } = definePage({
     'GET /api/notifications',
     'POST /api/notifications/:id/read',
     'GET /api/me/collections',
-    'GET /api/me/badges',
     'GET /api/bottles/:id',
   ],
   init: start,

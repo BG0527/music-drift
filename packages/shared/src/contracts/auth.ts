@@ -1,4 +1,4 @@
-/** 账号契约（t6 落地；W6 改为「账号 + 密码」，账号不是邮箱）。 */
+/** W21 账号契约：唯一身份是账号（数据库 `users.handle`），邮箱能力已退役。 */
 import { z } from 'zod';
 import { UuidSchema } from './common';
 
@@ -22,12 +22,11 @@ export const AuthUserSchema = z
     id: UuidSchema,
     /** @deprecated 旧名；等价关系由下方 `transform` 兜底（缺 `account` 时取它）。 */
     handle: z.string().min(1).max(32),
-    /** 正名：账号（= `users.handle`）。服务端**总是**返回；旧载荷可以没有。 */
-    account: z.string().min(1).max(32).optional(),
-    email: z.email().nullable(),
+    /** 正名：账号（= `users.handle`）。 */
+    account: z.string().min(1).max(32),
     role: RoleSchema,
   })
-  .transform((user) => ({ ...user, account: user.account ?? user.handle }));
+  .strict();
 
 /**
  * 注册请求（W6）：**只要「账号 + 密码」**（没有用户名，账号不是邮箱）。
@@ -39,18 +38,11 @@ export const AuthUserSchema = z
 export const RegisterRequestSchema = z
   .object({
     /** 正名：账号（2–32 字符，非邮箱；大小写敏感）。 */
-    account: z.string().min(2).max(32).optional(),
-    /** @deprecated 旧名，等价于 `account`。 */
-    handle: z.string().min(2).max(32).optional(),
-    /** @deprecated 邮箱不再是身份，可省略；给了就照旧存进 `email` 列。 */
-    email: z.email().optional(),
+    account: z.string().min(2).max(32),
     /** 口令只在这一层出现：响应体与日志中禁止回显（ADR-008）。 */
     password: z.string().min(8).max(128),
   })
-  .refine((body) => body.account !== undefined || body.handle !== undefined, {
-    path: ['account'],
-    message: '注册需要账号（account）',
-  });
+  .strict();
 
 /**
  * 登录请求（W6）：`{ account, password }`（按账号 = `handle` 查用户）。
@@ -62,15 +54,10 @@ export const RegisterRequestSchema = z
 export const LoginRequestSchema = z
   .object({
     /** 正名：账号（= `users.handle`；大小写敏感，与 `users_handle_uniq` 口径一致）。 */
-    account: z.string().min(1).max(32).optional(),
-    /** @deprecated 旧写法，按 `email` 查用户。 */
-    email: z.email().optional(),
+    account: z.string().min(1).max(32),
     password: z.string().min(1).max(128),
   })
-  .refine((body) => body.account !== undefined || body.email !== undefined, {
-    path: ['account'],
-    message: '登录需要账号（account）或邮箱（email）',
-  });
+  .strict();
 
 export const SessionResponseSchema = z.object({
   user: AuthUserSchema,
@@ -102,8 +89,6 @@ export type SessionResponse = z.infer<typeof SessionResponseSchema>;
  * （auth 路由取后者）。**envelope 形状与 `ErrorResponseSchema` 完全一致**，客户端只有一种解析方式。
  */
 export const AUTH_ERROR_CODES = [
-  /** 注册邮箱已被占用（409）。 */
-  'EMAIL_TAKEN',
   /** 注册用户名已被占用（409）。 */
   'HANDLE_TAKEN',
   /** 凭证错误（401）：**不区分**「邮箱不存在」与「密码错误」，防账号枚举。 */
@@ -120,7 +105,6 @@ export type AuthErrorCode = (typeof AUTH_ERROR_CODES)[number];
 
 /** 码给程序，中文文案给人（与领域 `RULE_MESSAGES` 同一纪律）。 */
 export const AUTH_ERROR_MESSAGES: Record<AuthErrorCode, string> = {
-  EMAIL_TAKEN: '这个邮箱已经注册过了，直接登录试试？',
   HANDLE_TAKEN: '这个名字已经有人用了，换一个吧。',
   INVALID_CREDENTIALS: '账号或密码不正确。',
   UNAUTHENTICATED: '请先登录。',
@@ -130,7 +114,6 @@ export const AUTH_ERROR_MESSAGES: Record<AuthErrorCode, string> = {
 
 /** 状态映射与领域 `RULE_HTTP_STATUS` 同构（码 → 默认 HTTP 状态）。 */
 export const AUTH_ERROR_HTTP_STATUS: Record<AuthErrorCode, 401 | 409 | 422> = {
-  EMAIL_TAKEN: 409,
   HANDLE_TAKEN: 409,
   INVALID_CREDENTIALS: 401,
   UNAUTHENTICATED: 401,

@@ -28,7 +28,7 @@ const libraryHandler = {
 };
 
 const SESSION_B = {
-  user: { id: USER_B, handle: '接棒的人', email: 'b@example.com', role: 'USER' },
+  user: { id: USER_B, handle: '接棒的人', account: '接棒的人', role: 'USER' },
   expiresAt: '2026-10-23T00:00:00.000Z',
 };
 
@@ -38,6 +38,47 @@ const SESSION_B = {
  * `missingSegmentIndexes[0]` 决定"这一棒录第几段"，`availableResolutions` 决定可选去向。
  */
 describe('漂流瓶接唱页', () => {
+  it('公开评论先退出再开举报窗口，两个portal不共存且举报理由可输入', async () => {
+    renderWithProviders(<BottlePage id={BOTTLE_ID} />, { handlers: [
+      { path: '/api/auth/me', respond: () => ({ body: SESSION_B }) },
+      { path: '/api/me/collections', respond: () => ({ body: [] }) },
+      { path: `/api/bottles/${BOTTLE_ID}`, respond: () => ({ body: bottleDetail({
+        status: 'SEA', isHolder: false, availableResolutions: [],
+      }) }) },
+      { path: `/api/bottles/${BOTTLE_ID}/comments?limit=20`, respond: () => ({ body: {
+        items: [{ id: SEGMENT_2, bottleId: BOTTLE_ID, content: '听见你的声音', authorAccount: 'listener',
+          isMine: false, createdAt: '2026-09-29T00:00:00.000Z' }], nextCursor: null,
+      } }) },
+    ] });
+    fireEvent.click(await screen.findByRole('button', { name: '公开评论' }));
+    fireEvent.click(await screen.findByRole('button', { name: '举报这条评论' }));
+    expect(document.querySelectorAll('[data-modal-root]')).toHaveLength(1);
+    const report = await screen.findByRole('dialog', { name: '举报这条评论' });
+    expect(document.querySelectorAll('[data-modal-root]')).toHaveLength(1);
+    const input = within(report).getByRole('textbox');
+    fireEvent.change(input, { target: { value: '需要人工审核' } });
+    expect(input).toHaveValue('需要人工审核');
+  });
+  it('已登录访客可收藏完整公海作品，等待接力作品提供接唱入口', async () => {
+    const handlers = [
+      { path: '/api/auth/me', respond: () => ({ body: SESSION_B }) },
+      { path: '/api/me/collections', respond: () => ({ body: [] }) },
+      { path: `/api/bottles/${BOTTLE_ID}`, respond: () => ({ body: bottleDetail({
+        status: 'SEA', seaZone: 'COMPLETED', isComplete: true,
+        isHolder: false, availableResolutions: [], missingSegmentIndexes: [],
+      }) }) },
+    ];
+    const view = renderWithProviders(<BottlePage id={BOTTLE_ID} />, { handlers });
+    expect(await screen.findByRole('button', { name: '收藏这支作品' })).toBeInTheDocument();
+    view.unmount();
+    renderWithProviders(<BottlePage id={BOTTLE_ID} />, { handlers: [
+      ...handlers.slice(0, 2),
+      { path: `/api/bottles/${BOTTLE_ID}`, respond: () => ({ body: bottleDetail({
+        status: 'SEA', seaZone: 'INCOMPLETE', isHolder: false, availableResolutions: [],
+      }) }) },
+    ] });
+    expect(await screen.findByRole('button', { name: '我来接这一段' })).toBeInTheDocument();
+  });
   it('左上「回河道」是唯一放回入口：持有者先 put-back 成功再导航', async () => {
     renderWithProviders(<BottlePage id={BOTTLE_ID} />, {
       route: `/bottles/${BOTTLE_ID}`,
@@ -202,7 +243,8 @@ describe('漂流瓶接唱页', () => {
         },
       ],
     });
-    expect(await screen.findByText(/需要先登录/)).toBeInTheDocument();
+    await screen.findByText('漂流瓶详情');
+    expect(screen.queryByText(/需要先登录/)).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: '录第 2 段' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /放回海中/ })).not.toBeInTheDocument();
   });
@@ -445,7 +487,7 @@ describe('漂流瓶接唱页', () => {
 
     expect(await screen.findByRole('button', { name: '录第 3 段' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: '听全部' })).toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: '选择去向' })).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: '选择去向' })).not.toBeInTheDocument();
     expect(screen.getByRole('link', { name: /看这只瓶子的漂流日志/ })).toBeInTheDocument();
     expect(document.querySelector('.putBack')).toBeNull();
   });
@@ -619,7 +661,7 @@ describe('漂流瓶接唱页', () => {
     expect(screen.queryByText(/现在不在你手上/)).not.toBeInTheDocument();
   });
 
-  it('别人的瓶子（既不持有也无去向可选）：仍然说"不在你手上"，且不出现录制/去向入口', async () => {
+  it('别人的瓶子可正常试听，不显示无关的去向标题或不在手上警告', async () => {
     renderWithProviders(<BottlePage id={BOTTLE_ID} />, {
       route: `/bottles/${BOTTLE_ID}`,
       handlers: [
@@ -637,13 +679,15 @@ describe('漂流瓶接唱页', () => {
       ],
     });
 
-    expect(await screen.findByText(/现在不在你手上/)).toBeInTheDocument();
+    await screen.findByText('漂流瓶详情');
+    expect(screen.queryByText(/现在不在你手上/)).not.toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: '选择去向' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /录第 \d 段/ })).not.toBeInTheDocument();
     // availableResolutions 为空 ⇒ 稿上的三条水路一条都不画
     expect(screen.queryByRole('button', { name: /继续投河|回传|入海/ })).not.toBeInTheDocument();
   });
 
-  it('非持有者：不出现录制区，说明"不在你手上"并给去河道的出口', async () => {
+  it('非持有者：不出现录制区，保留试听与回河道出口', async () => {
     renderWithProviders(<BottlePage id={BOTTLE_ID} />, {
       route: `/bottles/${BOTTLE_ID}`,
       handlers: [
@@ -653,9 +697,9 @@ describe('漂流瓶接唱页', () => {
         },
       ],
     });
-    expect(await screen.findByText(/现在不在你手上/)).toBeInTheDocument();
+    await screen.findByText('漂流瓶详情');
     expect(screen.queryByRole('button', { name: '录第 2 段' })).not.toBeInTheDocument();
-    expect(screen.getByRole('link', { name: /去河道捞一个/ })).toHaveAttribute('href', '/river');
+    expect(screen.getByRole('button', { name: '回河道' })).toBeInTheDocument();
   });
 
   it('作品已完整：不再提供录制，改为直接摆出去向行（稿上没有"已经录满"提示行）', async () => {
@@ -869,7 +913,7 @@ describe('瓶子详情：播放沟槽 + 唱针', () => {
       ],
     });
 
-    expect(await screen.findByText(/现在不在你手上/)).toBeInTheDocument();
+    await screen.findByText('漂流瓶详情');
     const anchor = document.querySelector('[data-anchor="groove-timeline"]');
     expect(anchor, '瓶子详情上部缺少播放沟槽').not.toBeNull();
 
@@ -946,7 +990,7 @@ describe('瓶子详情：播放沟槽 + 唱针', () => {
       ],
     });
 
-    expect(await screen.findByText(/现在不在你手上/)).toBeInTheDocument();
+    await screen.findByText('漂流瓶详情');
     const groove = document.querySelector('[data-anchor="groove-timeline"]');
     const play = document.querySelector('[data-anchor="bottle-play"]');
     const device = document.querySelector('[data-testid="bottle-water-level"]');
@@ -1047,9 +1091,7 @@ describe('逐块照抄 p-bottle-record.html', () => {
     expect(screen.queryByRole('button', { name: /放回海中，继续漂流/ })).not.toBeInTheDocument();
 
     // 选择去向（稿 .destCol）
-    expect(
-      screen.getByText('接下来决定它去哪。发起者的第一棒没有「回传」，可选去向由服务端给。'),
-    ).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: '选择去向' })).not.toBeInTheDocument();
 
     // 底栏（稿 .bottom）
     expect(screen.getByText('捞取 / 录音 / 投河 / 回传 / 入海 全部记在服务端。')).toBeInTheDocument();
@@ -1108,7 +1150,7 @@ describe('逐块照抄 p-bottle-record.html', () => {
       ['.gapBox 录制入口', screen.getByText('第 2 段由你开第一句')],
       ['.listenCol 标题', screen.getByRole('heading', { name: /试听与投票/ })],
       ['.votesNote', screen.getByText('还没有听满这一段，继续听一会儿再点踩吧。')],
-      ['.destCol 标题', screen.getByRole('heading', { name: '选择去向' })],
+      ['.destCol 试听标题', screen.getByRole('heading', { name: '沿着歌声听下去' })],
       ['.bottom 漂流日志', screen.getByRole('link', { name: /看这只瓶子的漂流日志/ })],
       ['.bottom 举报', screen.getByRole('button', { name: /举报（进人工队列，不是自动删除）/ })],
     ];
@@ -1192,7 +1234,8 @@ describe('门禁锚点与窄屏 order 让位', () => {
       action!.querySelector('[data-anchor="bottle-play"]'),
       'bottle-play 必须保留在动作区容器内',
     ).not.toBeNull();
-    expect(action!.textContent).toContain('选择去向');
+    expect(action!.textContent).toContain('听全部');
+    expect(action!.textContent).not.toContain('选择去向');
   });
 
   it('非持有者态（录制入口、去向行都不画）：bottle-action 仍在，守卫提示让位到播放区之后', async () => {
@@ -1206,14 +1249,12 @@ describe('门禁锚点与窄屏 order 让位', () => {
         },
       ],
     });
-    await screen.findByText(/现在不在你手上/);
+    await screen.findByText('漂流瓶详情');
 
     const action = document.querySelector('[data-anchor="bottle-action"]');
     expect(action, '非持有者态也不许丢 bottle-action').not.toBeNull();
     expect(action!.querySelector('[data-anchor="bottle-play"]')).not.toBeNull();
-    const guard = screen.getByText(/现在不在你手上/).closest('p');
-    expect(orderOf(guard!), '守卫排在播放/动作区（1）之后').toBe(2);
-    expect(cls(guard), '守卫在 lg 归位稿序').toContain('lg:order-none');
+    expect(screen.queryByText(/现在不在你手上/)).not.toBeInTheDocument();
     expect(orderOf(action!), '播放/动作区最先让位').toBe(1);
   });
 

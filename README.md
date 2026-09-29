@@ -10,14 +10,14 @@
 
 ```bash
 pnpm install
-pnpm -r dev        # web: http://localhost:5173   api: http://localhost:8787
+pnpm -r dev        # web: http://localhost:5173   api: http://localhost:8788
 pnpm -r test       # 全量单测
 pnpm -r typecheck  # 全量类型检查
 pnpm lint          # ESLint
 pnpm format        # Prettier
 ```
 
-健康检查：`curl http://localhost:8787/healthz`
+健康检查：`curl http://localhost:8788/healthz`
 
 ## 本地起库与迁移（跑集成测试前必做）
 
@@ -38,8 +38,8 @@ pnpm test:integration   # 集成测试：先在可抛弃的 music_drift_test 库
 ## 目录结构
 
 ```text
-apps/web              React 19 + Vite + TS（SPA，dev 端口 5173，/api 代理到 8787）
-apps/api              Fastify + TS（dev 端口 8787；src/auth 账号体系、src/audio 音频、src/db 数据层）
+apps/web              React 19 + Vite + TS（SPA，dev 端口 5173，/api 代理到 8788）
+apps/api              Fastify + TS（dev 端口 8788；src/auth 账号体系、src/audio 音频、src/db 数据层）
 apps/web/src/features/audio   录音面板 / 播放条 / 点踩门槛 / 上传客户端（t7；页面只 import 不改）
 packages/shared       zod 契约（src/contracts）+ 领域内核（src/domain，纯函数无 IO）+ 音频纯逻辑（src/audio）
 docs/api.md           API 端点与错误语义（手写派生；契约形状以 contracts 的 zod schema 为准）

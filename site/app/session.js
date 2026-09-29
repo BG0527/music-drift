@@ -13,7 +13,7 @@
  *   q('#handle').textContent = user.handle;
  *
  *   // 登录页（W1-d）：
- *   try { await login(email, password); location.assign(nextTarget()); }
+ *   try { await login(account, password); location.assign(nextTarget()); }
  *   catch (error) { showError(error); }            // 401 INVALID_CREDENTIALS 的文案已在 error.message 里
  *
  * 失败语义：`currentUser()` **只有两种**结局 —— 拿到 user 或得到 `null`（未登录/会话过期，都是 401）。
@@ -22,7 +22,7 @@
 
 import { get, post, redirectToLogin, sanitizeNextPath } from './api.js';
 
-/** @typedef {{ id: string, handle: string, email: string, role: 'USER'|'ADMIN' }} AuthUser */
+/** @typedef {{ id: string, handle: string, account: string, role: 'USER'|'ADMIN' }} AuthUser */
 
 /** @type {AuthUser|null} */
 let cached = null;
@@ -87,20 +87,16 @@ export async function requireUser(options = {}) {
 }
 
 /** `POST /api/auth/login`（**不**在 401 时跳转：那是"口令错了"，要留在表单上显示文案）。 */
-export async function login(email, password) {
-  const session = await post('/api/auth/login', { email, password }, { redirectOn401: false });
+export async function login(account, password) {
+  const session = await post('/api/auth/login', { account, password }, { redirectOn401: false });
   cached = session?.user ?? null;
   loaded = true;
   return cached;
 }
 
 /** `POST /api/auth/register`（成功 201，响应体与登录同形 ⇒ 注册即登录）。 */
-export async function register(handle, email, password) {
-  const session = await post(
-    '/api/auth/register',
-    { handle, email, password },
-    { redirectOn401: false },
-  );
+export async function register(account, password) {
+  const session = await post('/api/auth/register', { account, password }, { redirectOn401: false });
   cached = session?.user ?? null;
   loaded = true;
   return cached;

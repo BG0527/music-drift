@@ -44,7 +44,7 @@ describe('业务 API：主流程 + 错误语义 + 幂等', () => {
     const response = await app.inject({
       method: 'POST',
       url: '/api/auth/register',
-      payload: { handle, email: handle + '@example.com', password: PASSWORD },
+      payload: { account: handle, password: PASSWORD },
     });
     expect(response.statusCode).toBe(201);
     const cookie = response.cookies.find((entry) => entry.name === 'mdb_session');

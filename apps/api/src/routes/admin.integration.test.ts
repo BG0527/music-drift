@@ -43,13 +43,12 @@ function uniqueHandle(prefix: string): string {
 async function register(
   prefix: string,
   role: 'USER' | 'ADMIN' = 'USER',
-): Promise<{ cookie: string; userId: string; email: string }> {
+): Promise<{ cookie: string; userId: string; account: string }> {
   const handle = uniqueHandle(prefix);
-  const email = handle + '@example.com';
   const response = await app.inject({
     method: 'POST',
     url: '/api/auth/register',
-    payload: { handle, email, password: PASSWORD },
+    payload: { account: handle, password: PASSWORD },
   });
   expect(response.statusCode).toBe(201);
   const cookie = response.cookies.find((entry) => entry.name === 'mdb_session');
@@ -60,7 +59,7 @@ async function register(
   return {
     cookie: cookie === undefined ? '' : cookie.name + '=' + cookie.value,
     userId: user.id,
-    email,
+    account: handle,
   };
 }
 
@@ -387,7 +386,6 @@ describe('审核台 · 删瓶与封禁', () => {
   it('封禁（BAN_USER）：封的是对象的**所有者**，且该用户随即失去访问（401）', async () => {
     const admin = await register('ha', 'ADMIN');
     const offender = await register('hb');
-    const offenderEmail = offender.email;
     const bottleId = await createBottle(offender.cookie);
     const segmentId = await record(offender.cookie, bottleId);
 
@@ -413,7 +411,7 @@ describe('审核台 · 删瓶与封禁', () => {
     const login = await app.inject({
       method: 'POST',
       url: '/api/auth/login',
-      payload: { email: offenderEmail, password: PASSWORD },
+      payload: { account: offender.account, password: PASSWORD },
     });
     expect(login.statusCode).toBe(403);
     expect(login.body).toContain('封禁');

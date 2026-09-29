@@ -1,5 +1,4 @@
 import { describe, expect, it } from 'vitest';
-import { evaluateBadges } from './badges';
 import { drawBottle } from './bottle';
 import { publicSegments } from './moderation';
 import { isComplete, liveSegmentByIndex, liveSegments, participants } from './queries';
@@ -247,7 +246,6 @@ describe('ADR-015 §16.3 — 斩浪后的流转（GAP_TRIGGER：系统自动重�
     expect(pulled.seaAt).toBe(null);
     expect(pulled.holder).toBe(null);
     expect(pulled.currentCasterId).toBe('SYSTEM');
-    expect(evaluateBadges(pulled).filter((award) => award.kind === 'RETURN_COMPLETED')).toEqual([]);
   });
 
   it('16.3：作品被斩空（一段不剩）→ 降级为 DAMAGED', () => {

@@ -49,11 +49,6 @@ export const users = pgTable(
      * 这一列本来就满足「2–32 字符、非邮箱」，加列会同时带来回填、双写、旧数据兜底三件事。
      */
     handle: text('handle').notNull(),
-    /**
-     * 邮箱（W6 起**可空**）：账号注册的用户没有邮箱；旧的 `{handle, email, password}`
-     * 注册写法仍会把邮箱存进来（迁移 0007 只 DROP NOT NULL，旧数据原样保留）。
-     */
-    email: text('email'),
     passwordHash: text('password_hash').notNull(),
     role: text('role').notNull().default('USER'),
     /**
@@ -65,8 +60,6 @@ export const users = pgTable(
   },
   (table) => [
     uniqueIndex('users_handle_uniq').on(table.handle),
-    // 唯一索引保留：PG 里多个 NULL 互不冲突，因此"没有邮箱"的账号可以有很多个。
-    uniqueIndex('users_email_uniq').on(table.email),
     check('users_role_check', sql`${table.role} in ('USER', 'ADMIN')`),
   ],
 );
@@ -295,14 +288,14 @@ export const reports = pgTable(
   (table) => [
     check(
       'reports_target_type_check',
-      sql`${table.targetType} in ('BOTTLE', 'SEGMENT', 'MESSAGE')`,
+      sql`${table.targetType} in ('BOTTLE', 'SEGMENT', 'MESSAGE', 'COMMENT')`,
     ),
     check('reports_status_check', sql`${table.status} in ('PENDING', 'REVIEWED')`),
     check(
       'reports_action_check',
       // `RESTORE_SEGMENT`（t12）：审核台必须能**覆盖自动斩杀** —— 只列"删"的动作会让
       // 「人工恢复」在 DB 层就被拒绝（本仓真实踩过：裁决时报 reports_action_check 违规）。
-      sql`${table.action} is null or ${table.action} in ('NONE', 'REMOVE_SEGMENT', 'RESTORE_SEGMENT', 'REMOVE_BOTTLE', 'BAN_USER')`,
+      sql`${table.action} is null or ${table.action} in ('NONE', 'REMOVE_SEGMENT', 'RESTORE_SEGMENT', 'REMOVE_BOTTLE', 'REMOVE_COMMENT', 'BAN_USER')`,
     ),
     index('reports_status_idx').on(table.status),
   ],
@@ -332,6 +325,35 @@ export const messages = pgTable(
     check('messages_status_check', sql`${table.status} in ('PENDING', 'DELIVERED', 'UNDELIVERED')`),
     index('messages_bottle_idx').on(table.bottleId),
     index('messages_to_user_idx').on(table.toUserId),
+  ],
+);
+
+/** 公海公开评论：离海只隐藏；作者/管理员删除均软删，审核证据保留。 */
+export const publicComments = pgTable(
+  'public_comments',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    bottleId: uuid('bottle_id')
+      .notNull()
+      .references(() => bottles.id, { onDelete: 'cascade' }),
+    authorId: uuid('author_id')
+      .notNull()
+      .references(() => users.id),
+    content: text('content').notNull(),
+    deletedAt: timestamp('deleted_at', { withTimezone: true }),
+    createdAt: createdAt(),
+  },
+  (table) => [
+    check(
+      'public_comments_content_check',
+      sql`char_length(btrim(${table.content})) between 1 and 200`,
+    ),
+    index('public_comments_bottle_created_idx').on(
+      table.bottleId,
+      table.createdAt,
+      table.id,
+    ),
+    index('public_comments_author_idx').on(table.authorId),
   ],
 );
 

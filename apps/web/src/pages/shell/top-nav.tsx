@@ -34,7 +34,7 @@ export function TopNav({ items, current }: TopNavProps) {
         className="pointer-events-auto flex items-stretch"
       >
         <ul className="flex items-center gap-1 md:gap-3">
-          {items.map((item) => {
+          {items.map((item, index) => {
             const active = item.key === current;
             return (
               <li key={item.key}>
@@ -49,6 +49,10 @@ export function TopNav({ items, current }: TopNavProps) {
                     // transition-property 显式列举（v4 的 translate/scale 是独立属性，不含在 transform 里）
                     'transition-[transform,translate,scale,color] duration-[var(--motion-hover-duration)] ease-[var(--motion-entry-easing)]',
                     'hover:-translate-y-px',
+                    // continuity（t3）：应用落位时入口逐个淡入一次（AppShell 跨路由常驻 ⇒ 换页不重播）；
+                    // 参数只经契约类 enter-fade / stagger-*（值在 motion.css 的 --motion-* token），封顶 4 档
+                    'enter-fade',
+                    index > 0 ? `stagger-${Math.min(index, 4)}` : '',
                     active
                       ? 'font-medium text-coral'
                       : 'text-muted hover:text-paper',

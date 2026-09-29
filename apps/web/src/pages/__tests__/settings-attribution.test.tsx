@@ -21,7 +21,7 @@ const METADATA = JSON.parse(
 ) as { tracks: Array<{ title: string }> };
 
 const SESSION = {
-  user: { id: USER_A, handle: '午夜歌手', email: 'a@example.com', role: 'USER' },
+  user: { id: USER_A, handle: '午夜歌手', account: '午夜歌手', role: 'USER' },
   expiresAt: '2026-10-23T00:00:00.000Z',
 };
 
@@ -145,8 +145,8 @@ describe('设置页 · 折页 + 水线切开「匿名的边界」', () => {
   it('三条边界的原文都在（不许为了排版删掉哪一条）', async () => {
     await renderSettings();
     expect(screen.getByText(/每支瓶子一个独立代号/)).toBeInTheDocument();
-    expect(screen.getByText(/别人拿不到你的账号/)).toBeInTheDocument();
-    expect(screen.getByText(/账号只用于认领你自己的漂流瓶与漂流日志/)).toBeInTheDocument();
+    expect(screen.getByText(/公开评论显示账号/)).toBeInTheDocument();
+    expect(screen.getByText(/私密留言送达后/)).toBeInTheDocument();
   });
 });
 
@@ -213,7 +213,7 @@ describe('设置页 · 逐值对齐 p-settings-record.html', () => {
     });
     await screen.findByRole('heading', { name: '匿名的边界' });
     expect(screen.getByText('已登录态')).toBeInTheDocument();
-    expect(screen.getByText('已登录：代号（邮箱）')).toBeInTheDocument();
+    expect(screen.getByText('用账号认领你的接唱与收藏')).toBeInTheDocument();
     expect(screen.getByText('已登录态')).toHaveClass('text-paper/[0.42]');
   });
 
@@ -320,5 +320,12 @@ describe('设置页 · 照稿结构（review-settings-blocks）', () => {
       container.querySelectorAll('[data-part="wline-dash"]').length,
       '反光短划 6 条',
     ).toBe(6);
+  });
+});
+
+describe('设置页 · SVG 属性合法性（t7：t6 发现的非法 rx 回归守卫）', () => {
+  it('rect 的 rx 只允许单值（CSS 四角语法 "2 2 4 4" 是非法 SVG —— 控制台报错、圆角静默失效）', () => {
+    const src = readFileSync(join(process.cwd(), 'src', 'pages', 'settings-page.tsx'), 'utf8');
+    expect(src, '出现含空白的非法多值 rx').not.toMatch(/rx="[^"]*\s[^"]*"/);
   });
 });

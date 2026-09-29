@@ -32,10 +32,6 @@ let db: Db;
 let clock: ManualClock;
 let app: ReturnType<typeof buildApp>;
 
-function uniqueEmail(): string {
-  return `${randomUUID().slice(0, 8)}@test.local`;
-}
-
 function uniqueHandle(): string {
   return `singer-${randomUUID().slice(0, 8)}`;
 }
@@ -58,10 +54,12 @@ function tokenFrom(response: { headers: Record<string, unknown> }): string {
 }
 
 async function register(overrides: Record<string, unknown> = {}) {
+  const account = String(overrides['account'] ?? overrides['handle'] ?? uniqueHandle());
+  const password = String(overrides['password'] ?? PASSWORD);
   return app.inject({
     method: 'POST',
     url: '/api/auth/register',
-    payload: { handle: uniqueHandle(), email: uniqueEmail(), password: PASSWORD, ...overrides },
+    payload: { account, password },
   });
 }
 
@@ -108,15 +106,14 @@ afterAll(async () => {
 describe('POST /api/auth/register', () => {
   it('注册成功：201 + SessionResponseSchema + httpOnly/SameSite=Lax cookie（本地不加 Secure）', async () => {
     const handle = uniqueHandle();
-    const email = uniqueEmail();
 
-    const response = await register({ handle, email });
+    const response = await register({ account: handle });
 
     expect(response.statusCode).toBe(201);
     const parsed = SessionResponseSchema.safeParse(response.json());
     expect(parsed.success).toBe(true);
     expect(response.json().user.handle).toBe(handle);
-    expect(response.json().user.email).toBe(email);
+    expect(response.body).not.toContain('email');
 
     const cookie = cookieFrom(response);
     expect(cookie).toContain(`${SESSION_COOKIE_NAME}=`);
@@ -135,34 +132,32 @@ describe('POST /api/auth/register', () => {
   });
 
   it('库内存哈希不存明文口令', async () => {
-    const email = uniqueEmail();
-    await register({ email });
+    const account = uniqueHandle();
+    await register({ account });
 
     const rows = await db.query<{ password_hash: string }>(
-      `select password_hash from users where email = $1`,
-      [email],
+      `select password_hash from users where handle = $1`,
+      [account],
     );
 
     expect(rows[0]?.password_hash).not.toBe(PASSWORD);
     expect(rows[0]?.password_hash.startsWith('scrypt$')).toBe(true);
   });
 
-  it('邮箱重复（大小写不同也算同一邮箱）→ 409 + EMAIL_TAKEN', async () => {
-    const email = uniqueEmail();
-    await register({ email });
-
-    const response = await register({ email: email.toUpperCase() });
-
-    expect(response.statusCode).toBe(409);
-    const parsed = AuthErrorResponseSchema.parse(response.json());
-    expect(parsed.error.violations[0]?.code).toBe('EMAIL_TAKEN');
+  it('旧邮箱注册形状被严格拒绝', async () => {
+    const response = await app.inject({
+      method: 'POST',
+      url: '/api/auth/register',
+      payload: { handle: uniqueHandle(), email: 'retired@example.com', password: PASSWORD },
+    });
+    expect(response.statusCode).toBe(422);
   });
 
   it('用户名重复 → 409 + HANDLE_TAKEN', async () => {
     const handle = uniqueHandle();
-    await register({ handle });
+    await register({ account: handle });
 
-    const response = await register({ handle });
+    const response = await register({ account: handle });
 
     expect(response.statusCode).toBe(409);
     expect(response.json().error.violations[0].code).toBe('HANDLE_TAKEN');
@@ -176,8 +171,12 @@ describe('POST /api/auth/register', () => {
     expect(response.body).not.toContain('password1');
   });
 
-  it('请求体结构非法（邮箱不合法）→ 422，且 violations 可为空（结构错误无 auth 码）', async () => {
-    const response = await register({ email: 'not-an-email' });
+  it('请求体额外携带 email → 422，且 violations 可为空（结构错误无 auth 码）', async () => {
+    const response = await app.inject({
+      method: 'POST',
+      url: '/api/auth/register',
+      payload: { account: uniqueHandle(), email: 'retired@example.com', password: PASSWORD },
+    });
 
     expect(response.statusCode).toBe(422);
     expect(AuthErrorResponseSchema.safeParse(response.json()).success).toBe(true);
@@ -187,64 +186,62 @@ describe('POST /api/auth/register', () => {
 
 describe('POST /api/auth/login', () => {
   it('凭证正确：200 + 新会话 cookie，且可访问 /me', async () => {
-    const email = uniqueEmail();
-    await register({ email });
+    const account = uniqueHandle();
+    await register({ account });
 
     const response = await app.inject({
       method: 'POST',
       url: '/api/auth/login',
-      payload: { email, password: PASSWORD },
+      payload: { account, password: PASSWORD },
     });
 
     expect(response.statusCode).toBe(200);
     expect(SessionResponseSchema.safeParse(response.json()).success).toBe(true);
     const meResponse = await me(cookieFrom(response));
     expect(meResponse.statusCode).toBe(200);
-    expect(meResponse.json().user.email).toBe(email);
+    expect(meResponse.json().user.account).toBe(account);
   });
 
-  it('邮箱大小写不敏感（注册后可用大写邮箱登录）', async () => {
-    const email = uniqueEmail();
-    await register({ email });
+  it('旧邮箱登录形状被严格拒绝', async () => {
 
     const response = await app.inject({
       method: 'POST',
       url: '/api/auth/login',
-      payload: { email: email.toUpperCase(), password: PASSWORD },
+      payload: { email: 'retired@example.com', password: PASSWORD },
     });
 
-    expect(response.statusCode).toBe(200);
+    expect(response.statusCode).toBe(422);
   });
 
   it('口令错误与账号不存在返回**完全相同**的 401（防账号枚举）', async () => {
-    const email = uniqueEmail();
-    await register({ email });
+    const account = uniqueHandle();
+    await register({ account });
 
     const wrongPassword = await app.inject({
       method: 'POST',
       url: '/api/auth/login',
-      payload: { email, password: 'wrong-passw0rd' },
+      payload: { account, password: 'wrong-passw0rd' },
     });
-    const unknownEmail = await app.inject({
+    const unknownAccount = await app.inject({
       method: 'POST',
       url: '/api/auth/login',
-      payload: { email: uniqueEmail(), password: PASSWORD },
+      payload: { account: uniqueHandle(), password: PASSWORD },
     });
 
     expect(wrongPassword.statusCode).toBe(401);
-    expect(unknownEmail.statusCode).toBe(401);
-    expect(wrongPassword.json()).toEqual(unknownEmail.json());
+    expect(unknownAccount.statusCode).toBe(401);
+    expect(wrongPassword.json()).toEqual(unknownAccount.json());
     expect(wrongPassword.json().error.violations[0].code).toBe('INVALID_CREDENTIALS');
   });
 
   it('响应体不含口令', async () => {
-    const email = uniqueEmail();
-    await register({ email });
+    const account = uniqueHandle();
+    await register({ account });
 
     const response = await app.inject({
       method: 'POST',
       url: '/api/auth/login',
-      payload: { email, password: PASSWORD },
+      payload: { account, password: PASSWORD },
     });
 
     expect(response.body).not.toContain(PASSWORD);
@@ -267,12 +264,12 @@ describe('GET /api/auth/me 与多账号并行', () => {
   it('A 再次登录不会踢掉 B 的会话（同一用户可并存多会话）', async () => {
     const a = await register();
     const b = await register();
-    const email = a.json().user.email;
+    const account = a.json().user.account;
 
     const relogin = await app.inject({
       method: 'POST',
       url: '/api/auth/login',
-      payload: { email, password: PASSWORD },
+      payload: { account, password: PASSWORD },
     });
 
     expect(relogin.statusCode).toBe(200);
@@ -410,7 +407,7 @@ describe('W6 账号 + 密码（账号 = handle，不是邮箱）', () => {
     });
   }
 
-  it('注册只要「账号 + 密码」：201 + 会话，且没有邮箱时 user.email 为 null、user.account 有值', async () => {
+  it('注册只要「账号 + 密码」：201 + 会话，且响应完全没有 email', async () => {
     const account = uniqueHandle();
 
     const response = await registerWithAccount(account);
@@ -419,7 +416,7 @@ describe('W6 账号 + 密码（账号 = handle，不是邮箱）', () => {
     expect(SessionResponseSchema.safeParse(response.json()).success).toBe(true);
     expect(response.json().user.account).toBe(account);
     expect(response.json().user.handle).toBe(account);
-    expect(response.json().user.email).toBeNull();
+    expect(response.body).not.toContain('email');
     // 没有邮箱的用户照样能被 /me 认出来（会话链路不依赖 email）
     const meResponse = await me(cookieFrom(response));
     expect(meResponse.statusCode).toBe(200);
@@ -434,7 +431,7 @@ describe('W6 账号 + 密码（账号 = handle，不是邮箱）', () => {
 
     expect(response.statusCode).toBe(200);
     expect(response.json().user.account).toBe(account);
-    expect(response.json().user.email).toBeNull();
+    expect(response.body).not.toContain('email');
   });
 
   it('账号重复 → 409 HANDLE_TAKEN（账号才是身份；EMAIL_TAKEN 在新流程下不再触发）', async () => {
@@ -464,13 +461,16 @@ describe('W6 账号 + 密码（账号 = handle，不是邮箱）', () => {
     expect((await loginWithAccount(account.toUpperCase())).statusCode).toBe(401);
   });
 
-  it('旧的 { handle, email, password } 注册与 { email, password } 登录**依然可用**（向后兼容）', async () => {
+  it('旧的 { handle, email, password } 注册与 { email, password } 登录均被拒绝', async () => {
     const handle = uniqueHandle();
-    const email = uniqueEmail();
+    const email = 'retired-' + randomUUID().slice(0, 8) + '@test.local';
 
-    const registered = await register({ handle, email });
-    expect(registered.statusCode).toBe(201);
-    expect(registered.json().user.email).toBe(email);
+    const registered = await app.inject({
+      method: 'POST',
+      url: '/api/auth/register',
+      payload: { handle, email, password: PASSWORD },
+    });
+    expect(registered.statusCode).toBe(422);
 
     // 旧登录写法：按 email 查
     const byEmail = await app.inject({
@@ -478,10 +478,7 @@ describe('W6 账号 + 密码（账号 = handle，不是邮箱）', () => {
       url: '/api/auth/login',
       payload: { email: email.toUpperCase(), password: PASSWORD },
     });
-    expect(byEmail.statusCode).toBe(200);
-
-    // 新写法也能登进**旧账号**（handle 就是它的账号）
-    expect((await loginWithAccount(handle)).statusCode).toBe(200);
+    expect(byEmail.statusCode).toBe(422);
   });
 
   it('结构错误：账号字段缺失 → 422（violations 为空，靠 message 点名字段）', async () => {

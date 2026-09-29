@@ -8,7 +8,7 @@ import { ProfilePage } from '../profile-page';
 import { SettingsPage } from '../settings-page';
 
 const SESSION = {
-  user: { id: USER_A, handle: '午夜歌手', email: 'a@example.com', role: 'USER' },
+  user: { id: USER_A, handle: '午夜歌手', account: '午夜歌手', role: 'USER' },
   expiresAt: '2026-10-23T00:00:00.000Z',
 };
 
@@ -26,7 +26,7 @@ describe('个人中心', () => {
   it('显示账号身份，但**不显示任何匿名代号**（用户裁决：系统里不存在"你的代号"）', async () => {
     renderWithProviders(<ProfilePage />, { route: '/me', handlers: authedHandlers() });
     expect(await screen.findByText('午夜歌手')).toBeInTheDocument();
-    expect(screen.getByText('a@example.com')).toBeInTheDocument();
+    expect(screen.queryByText('a@example.com')).not.toBeInTheDocument();
     // 代号是"每瓶一个"（CONTEXT §12.1），个人中心不该出现这一块
     expect(screen.queryByText('你的匿名代号')).not.toBeInTheDocument();
     expect(screen.queryByText('午夜歌手#042')).not.toBeInTheDocument();
@@ -201,6 +201,13 @@ describe('我的：横向出口（参考结构：页头无第二导航，出口�
 });
 
 describe('设置页（Figma 无此帧，captain 裁决必须补最简版）', () => {
+  it('准确说明社交身份边界，不再宣传绝对匿名或邮箱', async () => {
+    renderWithProviders(<SettingsPage />, { route: '/settings', handlers: authedHandlers() });
+    await screen.findByRole('heading', { name: '设置' });
+    expect(screen.queryAllByText(/邮箱/)).toHaveLength(0);
+    expect(screen.getByText(/公开评论显示账号/)).toBeInTheDocument();
+    expect(screen.getByText(/私密留言送达后/)).toBeInTheDocument();
+  });
   it('展示匿名原则、契约版本与登出入口', async () => {
     renderWithProviders(<SettingsPage />, { route: '/settings', handlers: authedHandlers() });
     expect(await screen.findByRole('heading', { name: '设置' })).toBeInTheDocument();
@@ -230,8 +237,8 @@ describe('设置页（Figma 无此帧，captain 裁决必须补最简版）', ()
 /**
  * 收藏 / 徽章的入口在「我的」里（§46.2：属于声明式/次要内容 ⇒ 入口 + 弹窗，不摊在首屏）。
  */
-describe('我的：收藏与徽章入口', () => {
-  it('两个入口都在，点开各自弹出对应面板', async () => {
+describe('我的：收藏入口', () => {
+  it('收藏入口打开对应面板，退役徽章入口不出现', async () => {
     renderWithProviders(<ProfilePage />, {
       handlers: [
         ...authedHandlers(),
@@ -253,10 +260,7 @@ describe('我的：收藏与徽章入口', () => {
       expect(collections).not.toBeInTheDocument();
     });
 
-    // Portal 卸载与背景 inert 清理分属提交/effect 两步；等待入口重新变为可访问再操作。
-    fireEvent.click(await screen.findByRole('button', { name: '我的徽章' }));
-    const badges = await screen.findByRole('dialog');
-    expect(within(badges).getByRole('heading', { name: '我的徽章' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '我的徽章' })).not.toBeInTheDocument();
   });
 });
 
@@ -282,7 +286,7 @@ describe('我的：内袋身份卡（record-v1 装置）', () => {
     expect(sleeve, '内袋身份卡（data-anchor=me-identity）必须在').not.toBeNull();
     expect(sleeve?.textContent).toContain('内袋');
     expect(sleeve?.textContent).toContain('午夜歌手');
-    expect(sleeve?.textContent).toContain('a@example.com');
+    expect(sleeve?.textContent).not.toContain('a@example.com');
     // 参考 page-me.js：角色徽「管理员账号」只在真是管理员时出现，普通用户不打（稿里那枚是演示数据）
     expect(sleeve?.textContent).not.toContain('普通用户');
     expect(sleeve?.querySelector('.who .stamp')).toBeNull();
@@ -361,7 +365,7 @@ describe('我的：p-profile-record.html 逐块照稿（返工）', () => {
     expect(header?.querySelector('.cat')?.textContent).toBe('ACCOUNT · 认领');
     expect(header?.querySelector('h1')?.textContent).toBe('我的');
     expect(header?.querySelector('.sub')?.textContent).toBe(
-      '账号只用来认领你自己的漂流瓶。别人在瓶子里看到的是匿名代号，看不到你的账号。',
+      '接唱时使用匿名代号；公开评论显示账号，私密留言送达后仅向双方显示账号。',
     );
 
     // 稿 DOM 顺序：waterlight → header → .bleed(内袋) → .crate(柜) → .bottom
@@ -391,7 +395,7 @@ describe('我的：p-profile-record.html 逐块照稿（返工）', () => {
     expect(label?.querySelector(':scope > i.r2')).not.toBeNull();
     expect(label?.querySelector(':scope > i.hub')).not.toBeNull();
     expect(sleeve?.querySelector('.who .handle')?.textContent).toBe('午夜歌手');
-    expect(sleeve?.querySelector('.who .mail')?.textContent).toBe('a@example.com');
+    expect(sleeve?.querySelector('.who .mail')).toBeNull();
     // 参考 page-me.js：stamp 只在 ADMIN 出现（普通用户为 null，稿里那枚是演示数据）
     expect(sleeve?.querySelector('.who .stamp')).toBeNull();
     // 用户裁决：匿名代号行不出现 —— 稿的 .codeslot 不移植
@@ -459,17 +463,12 @@ describe('我的：p-profile-record.html 逐块照稿（返工）', () => {
     expect(row?.querySelector('.mdet')?.textContent).toContain('留言已送达');
 
     const pockets = bottom?.querySelectorAll('.pockets > .pocket') ?? [];
-    expect(pockets).toHaveLength(2);
+    expect(pockets).toHaveLength(1);
     expect(pockets[0]?.querySelector('h3')?.textContent).toBe('我的收藏');
     expect(pockets[0]?.querySelector('p')?.textContent).toBe(
       '收藏只对已完成并进入公海的作品开放：听到想再听的，把它收起来。',
     );
     expect(pockets[0]?.querySelector('button')?.textContent).toBe('我的收藏');
-    expect(pockets[1]?.querySelector('h3')?.textContent).toBe('我的徽章');
-    expect(pockets[1]?.querySelector('p')?.textContent).toBe(
-      '徽章是派生的（不落库）：服务端按你参与过的事件当场算出来，作品被撤下就跟着消失。',
-    );
-    expect(pockets[1]?.querySelector('button')?.textContent).toBe('我的徽章');
   });
 });
 

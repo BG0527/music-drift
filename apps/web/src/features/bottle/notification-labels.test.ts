@@ -9,10 +9,12 @@ import { describeNotification } from './notification-labels';
 describe('通知 → 中文文案', () => {
   const base = { id: 'n1', payload: { bottleId: 'b1', songTitle: '深海鲸落' }, readAt: null };
 
-  it('留言送达：通知发起者「有人留了话」', () => {
+  it('留言送达：通知实际接收者，不错误限定为瓶子发起者', () => {
     const view = describeNotification({ ...base, type: 'MESSAGE_DELIVERED' });
     expect(view.label).toContain('私密留言');
     expect(view.detail).toContain('深海鲸落');
+    expect(view.detail).not.toContain('发起者');
+    expect(view.detail).toContain('双方');
     expect(view.href).toBe('/bottles/b1');
     expect(view.tone).toBe('info');
   });
@@ -21,6 +23,8 @@ describe('通知 → 中文文案', () => {
     const view = describeNotification({ ...base, type: 'MESSAGE_UNDELIVERED' });
     expect(view.label).toContain('未送达');
     expect(view.detail).toContain('公海');
+    expect(view.detail).not.toContain('发起者');
+    expect(view.detail).toContain('回传链');
     expect(view.tone).toBe('warning');
   });
 

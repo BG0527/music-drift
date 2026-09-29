@@ -1,0 +1,41 @@
+{
+  "api": "http://127.0.0.1:50711",
+  "ref": "http://127.0.0.1:50727",
+  "web": "http://127.0.0.1:50732",
+  "refPort": 50727,
+  "webPort": 50732,
+  "apiPort": 50711,
+  "databaseName": "music_drift_test_1790593257_22328_ff6fz4",
+  "song": {
+    "id": "00000000-0000-4000-8000-000000000001",
+    "totalSegments": 4
+  },
+  "bottles": {
+    "bottle3": "0c229fd3-20dd-4aaf-8286-be0e8116b7be",
+    "draft0": "620fb406-0cf8-4061-9a73-5a5e2f41ea9a"
+  },
+  "accounts": {
+    "a": {
+      "handle": "t17maker",
+      "email": "t17maker@example.com",
+      "cookie": "mdb_session=hQ1wwFfgHziX4gM9ebBBGuKrmO_HArYjcYiQafws_5A"
+    },
+    "b": {
+      "handle": "t17relayb",
+      "email": "t17relayb@example.com",
+      "cookie": "mdb_session=41dzAK1Y3bopvwLbKRq9iVjDpw7qoo0RiLh9UUjOftg"
+    },
+    "c": {
+      "handle": "t17relayc",
+      "email": "t17relayc@example.com",
+      "cookie": "mdb_session=1on6604-mJRkEIfVyeC7uI1Um8Z2h1ZeZpj4ZAx57cQ"
+    },
+    "d": {
+      "handle": "t17empty",
+      "email": "t17empty@example.com",
+      "cookie": "mdb_session=D-I6ZE87dVkTPXem4MWlp1X7-K0wI2zm5Y_ZsvmAa3U"
+    }
+  },
+  "password": "Drift-Bottle-2026",
+  "startedAt": "2026-09-28T11:01:03.035Z"
+}
