@@ -54,6 +54,8 @@ export interface UseSegmentPlayerOptions {
   createElement?: (src: string) => AudioElementLike;
   /** 进度回调（每次观察到进度推进时调用）。 */
   onProgress?: (snapshot: PlayerProgressSnapshot) => void;
+  /** 本段播完（`ended` 事件）时回调一次：「听全部」用它换下一段接着播。 */
+  onEnded?: (() => void) | undefined;
 }
 
 export interface UseSegmentPlayerResult {
@@ -123,6 +125,11 @@ export function useSegmentPlayer(options: UseSegmentPlayerOptions): UseSegmentPl
   useEffect(() => {
     onProgressRef.current = options.onProgress;
   }, [options.onProgress]);
+  // onEnded 走 ref：它的身份变化不应重建音频元素
+  const onEndedRef = useRef(options.onEnded);
+  useEffect(() => {
+    onEndedRef.current = options.onEnded;
+  }, [options.onEnded]);
 
   const key = `${src}|${duration}`;
   const [state, setState] = useState<ProgressState>({ key, ...EMPTY_PROGRESS });
@@ -197,6 +204,8 @@ export function useSegmentPlayer(options: UseSegmentPlayerOptions): UseSegmentPl
       trackerRef.current?.markEnded();
       atEndRef.current = true; // 播到结尾：位置留在结尾，状态由 derivePlaybackState 判为 `ended`
       publish();
+      // 「听全部」串段：一段播完 → 通知上层换下一段（换 src 会重建元素并自动起播）
+      onEndedRef.current?.();
     };
     // play / pause 也走同一条发布路径（isPlaying 从元素真实状态读取，不用本地推断）
     const onPlay = (): void => {

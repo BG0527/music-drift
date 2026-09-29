@@ -46,8 +46,8 @@ import { useSession } from '../features/session/session-context';
 import { GroovePlaybackProvider, GrooveTimeline } from '../features/audio/groove-timeline';
 import {
   type AudioElementLike,
-  SequentialSegmentPlayer,
   type RecorderEnvironment,
+  type SegmentPlayerHandle,
   type UploadTransport,
 } from '../features/audio';
 import { Icon, Modal, Toast } from '../design-system';
@@ -150,6 +150,17 @@ function BottleView({ bottle, seams }: { bottle: BottleDetail; seams?: BottlePag
   const [listenShortReason, setListenShortReason] = useState<string | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
   const [announcement, setAnnouncement] = useState<string | null>(null);
+  /**
+   * 「听全部」的连播游标（用户裁决：点「听全部」= 从第 1 段起按段号顺序连着听）。
+   * `null` = 不在连播；数字 = 当前该播的段在 `liveSegments` 里的下标。
+   * 与 `selectedSegmentId` 分开：连播会**自动改**当前段（所以它要驱动 selected），
+   * 但用户单独点某段的「听」时它是 null（只听那一段，不接着往下播）。
+   */
+  const [listenAllIndex, setListenAllIndex] = useState<number | null>(null);
+  /** 播放器的命令柄：「听全部」要驱动**同一个**播放器，不能另起一个（否则声音打架）。 */
+  const playerHandleRef = useRef<SegmentPlayerHandle | null>(null);
+  /** 连播是否正在播（按钮图标/文案；与播放器内部状态解耦，避免频繁重渲染）。 */
+  const [listenAllPlaying, setListenAllPlaying] = useState(false);
   /** G2（flow-audit P0）：三选一确认成功后的去向 —— 播报之外在正文留「语义下一步键」，不让流程死在 aria-live 里。 */
   const [resolutionNext, setResolutionNext] = useState<Resolution | null>(null);
   const [reportTarget, setReportTarget] = useState<{
@@ -165,6 +176,79 @@ function BottleView({ bottle, seams }: { bottle: BottleDetail; seams?: BottlePag
     liveSegments.find((segment) => segment.id === preferredSegmentId) ??
     null;
   const nextIndex = bottle.missingSegmentIndexes[0];
+
+  /* ── 「听全部」连播（用户裁决：点它 = 从第 1 段起按段号顺序连着听） ──────────
+   *
+   * 只有**一个**播放器：`selectedSegment` 那颗。点「听全部」把游标拨到第 1 段并起播；
+   * 该段播完（SegmentPlayer 的 onEnded）→ 游标 +1 并切到下一段，新挂载的播放器
+   * 因 `autoplayToken` 变化自动起播 ⇒ 声音连续、不叠两个播放器。
+   * 用户点某段的「听」⇒ 退出连播（`listenAllIndex = null`），只播那一段。
+   */
+  const [autoplayToken, setAutoplayToken] = useState(0);
+  const startListenAll = (): void => {
+    const first = liveSegments[0];
+    if (first === undefined) return;
+    setListenAllIndex(0);
+    setSelectedSegmentId(first.id);
+    setAutoplayToken((token) => token + 1);
+    setAnnouncement(`从第 ${String(first.index)} 段开始连续试听，共 ${String(liveSegments.length)} 段。`);
+  };
+  const onSelectedSegmentEnded = (): void => {
+    if (listenAllIndex === null) return; // 单段试听：播完就停
+    const next = listenAllIndex + 1;
+    const nextSegment = liveSegments[next];
+    if (nextSegment === undefined) {
+      setListenAllIndex(null);
+      setAutoplayToken(0);
+      setListenAllPlaying(false);
+      setAnnouncement('全部已有录音播放完毕。');
+      return;
+    }
+    setListenAllIndex(next);
+    setSelectedSegmentId(nextSegment.id);
+    setAutoplayToken((token) => token + 1);
+    setAnnouncement(`正在播放第 ${String(nextSegment.index)} 段（${String(next + 1)} / ${String(liveSegments.length)}）。`);
+  };
+  /** 点瓶身上某一段的「听」：只听这一段（并退出连播）。 */
+  const selectAndPlaySegment = (segmentId: string): void => {
+    setListenAllIndex(null);
+    setListenAllPlaying(false);
+    setSelectedSegmentId(segmentId);
+    setAutoplayToken((token) => token + 1);
+  };
+
+  /**
+   * 「听全部」按钮（排在「踩」右侧、与赞/踩同一行；用户裁决）。
+   * 点击语义：如果不在连播/没在播 ⇒ 从头连播；已在连播播放中 ⇒ 暂停当前段。
+   * 用 `playerHandleRef` 命令**同一个**播放器，不另起实例。
+   */
+  const listenAllButton = (
+    <button
+      type="button"
+      className="listenAllBtn"
+      disabled={liveSegments.length === 0}
+      aria-label={listenAllPlaying ? '暂停' : '听全部'}
+      title={listenAllPlaying ? '暂停连续试听' : '从第 1 段按顺序播放所有已有录音'}
+      onClick={() => {
+        if (listenAllPlaying) {
+          playerHandleRef.current?.toggle(); // 暂停当前这一段
+          setListenAllPlaying(false);
+          return;
+        }
+        if (listenAllIndex !== null) {
+          // 已在连播中途（暂停了）⇒ 从当前段继续
+          playerHandleRef.current?.toggle();
+          setListenAllPlaying(true);
+          return;
+        }
+        startListenAll();
+        setListenAllPlaying(true);
+      }}
+    >
+      <Icon name={listenAllPlaying ? 'Pause' : 'Play'} size={16} />
+      <span className="whitespace-nowrap">听全部</span>
+    </button>
+  );
   /**
    * 我能不能动手：不能只看 `isHolder` —— DRAFT 瓶子的 holder 是 null（内核 BOTTLE_CREATED
    * 不改 holder），发起者也是 isHolder false，所以判据用服务端给的观看者维度事实
@@ -188,14 +272,6 @@ function BottleView({ bottle, seams }: { bottle: BottleDetail; seams?: BottlePag
     choice,
     copy: resolutionCopy(choice),
   }));
-  const fullPreview = (
-    <section className="bf-full-preview" aria-label="全部接唱试听">
-      <h3 className="sr-only">听全部已有录音</h3>
-      <SequentialSegmentPlayer segments={liveSegments.map((segment) => ({
-        index: segment.index, src: segmentAudioUrl(segment.id),
-      }))} />
-    </section>
-  );
 
   const openDestinationWhenRecorderIsGone = (): void => {
     if (!recorderPortalExitedRef.current || !destinationReadyRef.current) return;
@@ -356,7 +432,7 @@ function BottleView({ bottle, seams }: { bottle: BottleDetail; seams?: BottlePag
         missingSegmentIndexes={bottle.missingSegmentIndexes}
         status={bottle.status}
         selectedSegmentId={selectedSegment?.id ?? null}
-        onSelectSegment={setSelectedSegmentId}
+        onSelectSegment={selectAndPlaySegment}
         onReportSegment={(segmentId) => {
           setReportTarget({ type: 'SEGMENT', id: segmentId });
         }}
@@ -371,7 +447,7 @@ function BottleView({ bottle, seams }: { bottle: BottleDetail; seams?: BottlePag
           !canRecord || nextIndex === undefined ? null : (
             <button
               type="button"
-              className="cta whitespace-nowrap"
+              className="cta bp-record-cta whitespace-nowrap"
               onClick={() => {
                 setRecorderSegmentIndex(nextIndex);
                 setRecorderPhase('open');
@@ -465,13 +541,17 @@ function BottleView({ bottle, seams }: { bottle: BottleDetail; seams?: BottlePag
                 setListenShortReason(message ?? '还没有听满这一段，继续听一会儿再点踩吧。');
               }}
               onFailed={setVoteError}
+              onEnded={onSelectedSegmentEnded}
+              playerHandleRef={playerHandleRef}
+              autoPlayToken={autoplayToken}
+              showPlayButton={false}
+              listenAllControl={listenAllButton}
               {...(seams?.segmentElementFactory === undefined
                 ? {}
                 : { createElement: seams.segmentElementFactory })}
             />
           )}
 
-          {showDestinationRows ? fullPreview : null}
           <p className="bf-hint votesNote mt-[4px] text-[0.8125rem] text-muted">
             {selectedSegment === null
               ? '还没有可试听的段，也就没有可投票的段。'
@@ -515,11 +595,28 @@ function BottleView({ bottle, seams }: { bottle: BottleDetail; seams?: BottlePag
             : null}
         </section> : <section className="destCol enter-rise stagger-3 flex flex-col">
           <h2 className="text-[1.0625rem] font-bold leading-none text-paper">沿着歌声听下去</h2>
-          {fullPreview}
+          <p className="sub mt-[4px] text-[0.8125rem] text-muted">
+            左边「听全部」按段号顺序连着听；点瓶身上某一段的「听」只听那一段。
+          </p>
           {bottle.status === 'SEA' && session.status === 'authed' ? (
             <div className="bp-sea-actions mt-3 flex flex-wrap gap-3">
-              {bottle.isComplete ? <CollectButton bottleId={bottle.id} /> :
-                !mySegmentRecorded ? <TargetedSegmentButton bottleId={bottle.id} /> : null}
+              {!bottle.isComplete && !mySegmentRecorded && nextIndex !== undefined ? (
+                // 用户裁决：公海等待接力的瓶子统一成「从河道捞起来」的样子 ——
+                // 同一个「录第 N 段」措辞与外观，且点下去"抢占持有权 → 直接开录"一步到底，
+                // 不再让用户自己再找一遍录入口。段号取服务端 missingSegmentIndexes[0]。
+                // （收藏不在这里了：已完成的公海作品，收藏按钮在底栏右侧、举报正上方。）
+                <TargetedSegmentButton
+                  bottleId={bottle.id}
+                  segmentIndex={nextIndex}
+                  onClaimed={(summary) => {
+                    // 抢占成功后服务端才认我们持有；用返回的缺口开录，别拿旧数据猜
+                    const claimedNext = summary.missingSegmentIndexes[0];
+                    if (claimedNext === undefined) return;
+                    setRecorderSegmentIndex(claimedNext);
+                    setRecorderPhase('open');
+                  }}
+                />
+              ) : null}
             </div>
           ) : null}
         </section>}
@@ -551,31 +648,41 @@ function BottleView({ bottle, seams }: { bottle: BottleDetail; seams?: BottlePag
           看这只瓶子的漂流日志
         </Link>
         <span>捞取 / 录音 / 投河 / 回传 / 入海 全部记在服务端。</span>
-        <span className="flex flex-wrap items-center gap-[26px] md:ml-auto">
-          {bottle.status === 'SEA' ? <button type="button" className={TEXT_LINK}
-            onClick={() => setCommentsOpen(true)}><Icon name="ScrollText" size={16} />公开评论</button> : null}
-          {bottle.status === 'SEA' ? null : (
+        {/*
+          守卫/去留出口竖排（用户裁决）：右侧一列 —— 收藏在上、举报在下，同宽左对齐。
+          收藏只对"已完成且在公海"的作品存在（服务端 COLLECTION_REQUIRES_FINISHED_WORK），
+          所以这里按 `isComplete && status==='SEA'` 摆；其余出口（评论/留言）保持原行内顺序。
+        */}
+        <span className="flex flex-col items-start gap-[10px] md:ml-auto">
+          {bottle.status === 'SEA' && bottle.isComplete ? (
+            <CollectButton bottleId={bottle.id} />
+          ) : null}
+          <span className="flex flex-wrap items-center gap-[26px]">
+            {bottle.status === 'SEA' ? <button type="button" className={TEXT_LINK}
+              onClick={() => setCommentsOpen(true)}><Icon name="ScrollText" size={16} />公开评论</button> : null}
+            {bottle.status === 'SEA' ? null : (
+              <button
+                type="button"
+                className="inline-flex min-h-11 items-center gap-[7px] whitespace-nowrap text-muted underline underline-offset-[4px] transition-colors duration-[var(--motion-hover-duration)] ease-[var(--motion-entry-easing)] hover:text-paper"
+                onClick={() => {
+                  setMessagesOpen(true);
+                }}
+              >
+                <Icon name="ScrollText" size={16} />
+                私密留言
+              </button>
+            )}
             <button
               type="button"
               className="inline-flex min-h-11 items-center gap-[7px] whitespace-nowrap text-muted underline underline-offset-[4px] transition-colors duration-[var(--motion-hover-duration)] ease-[var(--motion-entry-easing)] hover:text-paper"
               onClick={() => {
-                setMessagesOpen(true);
+                setReportTarget({ type: 'BOTTLE', id: bottle.id });
               }}
             >
-              <Icon name="ScrollText" size={16} />
-              私密留言
+              <Icon name="Flag" size={16} />
+              举报（进人工队列，不是自动删除）
             </button>
-          )}
-          <button
-            type="button"
-            className="inline-flex min-h-11 items-center gap-[7px] whitespace-nowrap text-muted underline underline-offset-[4px] transition-colors duration-[var(--motion-hover-duration)] ease-[var(--motion-entry-easing)] hover:text-paper"
-            onClick={() => {
-              setReportTarget({ type: 'BOTTLE', id: bottle.id });
-            }}
-          >
-            <Icon name="Flag" size={16} />
-            举报（进人工队列，不是自动删除）
-          </button>
+          </span>
         </span>
       </div>
 

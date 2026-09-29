@@ -100,15 +100,21 @@ describe('瓶身详情：仪器层（试听与投票 / 选择去向 / 底栏）'
   it('桌面装饰溢出不应形成可被焦点或播放控件滚动的内部画布', () => {
     expect(cssSource()).toMatch(/@media \(min-width: 1024px\)\s*\{\s*\.bottle-page\s*\{[^}]*overflow:\s*clip/);
   });
-  it('试听与投票 = 参考的 transport 构图：唱片播放键 .play + 水道进度 .bar + 时长 .timecode', async () => {
+  it('试听与投票 = transport 的水道进度 .bar + 时长 .timecode；播放键已搬去赞/踩行变「听全部」', async () => {
     renderWithProviders(<BottlePage id={BOTTLE_ID} />, {
       route: `/bottles/${BOTTLE_ID}`,
       handlers: handlersOneOfFour(),
     });
-    const play = await screen.findByRole('button', { name: /^播放第 \d+ 段$/ });
-    expect(play.closest('.transport'), '播放键不在 .transport 里').not.toBeNull();
+    // 先等异步瓶数据到位（原来靠等播放键顺带等到了数据）
+    await screen.findByRole('button', { name: /听全部/ });
+    // 用户裁决：圆盘播放键不再在 transport 里（搬去与赞/踩同一行、变成「听全部」）。
+    // transport 现在只留水道进度与时长。
     expect(document.querySelector('.transport .bar'), '缺水道进度条 .bar').not.toBeNull();
     expect(document.querySelector('.transport .timecode'), '缺时长 .timecode').not.toBeNull();
+    expect(document.querySelector('.transport .play'), '播放键不应再留在 transport 里').toBeNull();
+    // 「听全部」在投票行里、与赞/踩同行
+    const listenAll = await screen.findByRole('button', { name: /听全部/ });
+    expect(listenAll.closest('.votes'), '「听全部」不在 .votes 投票行里').not.toBeNull();
     expect(document.querySelector('.listenCol .votes'), '缺投票行 .votes').not.toBeNull();
     expect(document.querySelector('.listenCol .votesNote'), '缺门槛说明 .votesNote').not.toBeNull();
     expect(document.querySelector('.listenCol .putBack'), '放回只能从左上「回河道」进入').toBeNull();

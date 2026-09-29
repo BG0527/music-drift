@@ -77,7 +77,9 @@ describe('漂流瓶接唱页', () => {
         status: 'SEA', seaZone: 'INCOMPLETE', isHolder: false, availableResolutions: [],
       }) }) },
     ] });
-    expect(await screen.findByRole('button', { name: '我来接这一段' })).toBeInTheDocument();
+    // 用户裁决：公海等待接力的瓶子统一成「录第 N 段」（与河道捞起来同形同义），
+    // 不再是「我来接这一段」。
+    expect(await screen.findByRole('button', { name: /录第 \d+ 段/ })).toBeInTheDocument();
   });
   it('左上「回河道」是唯一放回入口：持有者先 put-back 成功再导航', async () => {
     renderWithProviders(<BottlePage id={BOTTLE_ID} />, {
@@ -200,12 +202,11 @@ describe('漂流瓶接唱页', () => {
       ],
     });
 
-    const heading = await screen.findByRole('heading', { name: '听全部已有录音' });
-    const region = heading.closest('section');
-    expect(region).not.toBeNull();
-    expect(within(region!).getByText(/按段号顺序/)).toBeInTheDocument();
-    expect(within(region!).getByRole('button', { name: '听全部' })).toBeEnabled();
-    expect(within(region!).queryByText(/生成|导出|下载/)).toBeNull();
+    // 用户裁决：「听全部」不再是独立区块里的独立播放器，而是「试听与投票」区
+    // 赞/踩右侧那颗键（驱动同一个播放器连播）。这里断言它存在、可用、不涉生成/导出。
+    const listenAll = await screen.findByRole('button', { name: /听全部/ });
+    expect(listenAll).toBeEnabled();
+    expect(screen.queryByText(/生成|导出|下载/)).toBeNull();
   });
 
   it('公海详情完全不显示私密留言入口', async () => {
@@ -561,8 +562,9 @@ describe('漂流瓶接唱页', () => {
     );
 
     // 锚到播放器挂载（代号文本现在出现在发起者徽记与瓶身格两处，不能再当唯一锚点）
-    // t17：播放键是参考的唱片键，aria-label = 「播放第 N 段」
-    await screen.findByRole('button', { name: /^播放第 \d+ 段$/ });
+    // 用户裁决：圆盘播放键已搬去赞/踩行并变成「听全部」；这里锚「听全部」——
+    // 它驱动的就是当前段那个播放器（覆盖率上报走同一条路径）。
+    await screen.findByRole('button', { name: /听全部/ });
     // 逐秒推进（每步 <1500ms，否则会被判成"拖动不计"）；段长 20s → 覆盖率 100%
     for (let second = 0; second <= 20; second += 1) {
       element.currentTime = second;

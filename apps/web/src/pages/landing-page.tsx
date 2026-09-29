@@ -900,7 +900,7 @@ export function LandingPage() {
 
       {/* 翻页轨道：只动 transform；时长/缓动全部来自 --motion-* 契约 token */}
       <div
-        className="flex flex-col transition-[transform] duration-[var(--motion-page-duration)] ease-[var(--motion-entry-easing)]"
+        className="landing-track relative z-base flex flex-col transition-[transform] duration-[var(--motion-page-duration)] ease-[var(--motion-entry-easing)]"
         style={{ transform: `translateY(calc(${-index} * 100dvh))` }}
       >
         {SCREENS.map((screen, screenIndex) => (

@@ -8,7 +8,7 @@
  *   不依赖颜色表达进度（DESIGN.md §Accessibility 媒体条款）；
  * - 只给**结构性提示**（第几段 / 时长），不显示歌词正文（版权约束，CONTEXT §3.2 的 Demo 口径）。
  */
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import type { AudioElementLike } from './use-segment-player';
 import { useSegmentPlayer, type PlaybackState } from './use-segment-player';
 import { useGrooveReporter } from './groove-playback';
@@ -70,6 +70,46 @@ export interface SegmentPlayerProps {
    */
   layout?: 'card' | 'transport';
   className?: string;
+  /**
+   * 本段播完（`playbackState === 'ended'`）时回调一次。
+   *
+   * 「听全部」用它串段：一段播完 → 换下一段继续播（用户裁决：点瓶身上每段的
+   * 「听」= 听这一段；点「听全部」= 从头按段号顺序连着听）。**只报状态，不改播放**。
+   */
+  onEnded?: (() => void) | undefined;
+  /**
+   * 交出播放器的命令柄（`toggle` / `replay` / `isPlaying`）。
+   *
+   * 页面要把「播放键」搬去与赞/踩同一行、并让它变成「听全部」时，需要**从外面**
+   * 命令同一个播放器（起播 / 暂停 / 重播），否则就得渲染两个播放器、声音打架。
+   * 用 ref 传递而不是 props 回调，是为了不让"命令柄"进入渲染数据流。
+   */
+  playerHandleRef?: React.MutableRefObject<SegmentPlayerHandle | null> | undefined;
+  /**
+   * 自动起播令牌：每次外部请求"起播"就 +1（页面在点「听全部」/ 点某段「听」时递增）。
+   *
+   * 为什么用令牌而不是布尔：换段会**卸载并重挂**这个播放器（`key = 段 id`），
+   * 新挂载的实例必须是 idle，起播意图靠 prop 传不进来 —— 令牌让"新实例"在
+   * 挂载后看到"有一个新的起播请求"从而自动播。令牌为 0 = 没人请求，静默等待用户点。
+   */
+  autoPlayToken?: number | undefined;
+  /**
+   * `transport` 外观下是否渲染内置的圆盘播放键，默认 `true`。
+   *
+   * 用户裁决把播放键搬去与赞/踩同一行、并让它变成「听全部」——那时由**页面**
+   * 渲染那颗键（用 `playerHandleRef` 驱动同一个播放器），这里就只留水道与时长。
+   */
+  showPlayButton?: boolean | undefined;
+}
+
+/** `playerHandleRef` 收到的命令柄（页面用它驱动「听全部」）。 */
+export interface SegmentPlayerHandle {
+  /** 起播 / 暂停 / 播完重播（与 UI 播放键同一语义）。 */
+  toggle: () => void;
+  /** 从头重播这一段。 */
+  replay: () => void;
+  /** 当前是否在播（读 ref，不触发渲染；仅供命令方判断）。 */
+  isPlaying: () => boolean;
 }
 
 /**
@@ -105,6 +145,10 @@ export function SegmentPlayer({
   createElement,
   layout = 'card',
   className,
+  onEnded,
+  playerHandleRef,
+  autoPlayToken,
+  showPlayButton = true,
 }: SegmentPlayerProps) {
   const player = useSegmentPlayer({
     src,
@@ -120,8 +164,32 @@ export function SegmentPlayer({
         dislikeUnlocked: progress.dislikeUnlocked,
       });
     },
+    ...(onEnded === undefined ? {} : { onEnded }),
     ...(createElement === undefined ? {} : { createElement }),
   });
+
+  // 把命令柄交给页面（「听全部」要驱动的是**这个**播放器，而不是另起一个）
+  useEffect(() => {
+    if (playerHandleRef === undefined) return;
+    playerHandleRef.current = {
+      toggle: player.toggle,
+      replay: player.replay,
+      isPlaying: () => player.isPlaying,
+    };
+  }, [playerHandleRef, player.isPlaying, player.replay, player.toggle]);
+
+  /**
+   * 自动起播：令牌每 +1 就播一次（且只播一次 —— `handledTokenRef` 记住本实例已响应的值）。
+   * 换段重挂载后新实例从 0 开始，令牌必然更大 ⇒ 新段自动接着播（连播不断声）。
+   * 令牌为 0 = 没人请求过，绝不擅自出声（尊重浏览器自动播放策略与用户意图）。
+   */
+  const handledTokenRef = useRef(0);
+  useEffect(() => {
+    if (autoPlayToken === undefined || autoPlayToken === 0) return;
+    if (autoPlayToken === handledTokenRef.current) return;
+    handledTokenRef.current = autoPlayToken;
+    player.replay();
+  }, [autoPlayToken, player.replay]);
   const percent = Math.round(player.ratio * 100);
   const listenedSeconds = formatSeconds(player.coveredMs);
   const totalSeconds = formatSeconds(typeof durationMs === 'number' ? durationMs : 0);
@@ -166,25 +234,27 @@ export function SegmentPlayer({
     const playing = player.playbackState === 'playing';
     return (
       <div className={cn('transport', className)}>
-        <button
-          type="button"
-          className="play"
-          aria-label={`${PLAYBACK_UI[player.playbackState].label}第 ${String(segmentIndex)} 段`}
-          onClick={player.toggle}
-        >
-          <svg viewBox="0 0 34 34" fill="none" aria-hidden="true">
-            <circle cx="17" cy="17" r="16" stroke="var(--color-water-mid)" strokeOpacity=".45" />
-            <circle cx="17" cy="17" r="11.5" stroke="var(--color-water-mid)" strokeOpacity=".2" />
-            {playing ? (
-              <>
-                <rect x="13.4" y="11.6" width="3.2" height="10.8" rx="1" fill="var(--color-coral)" />
-                <rect x="17.8" y="11.6" width="3.2" height="10.8" rx="1" fill="var(--color-coral)" />
-              </>
-            ) : (
-              <path d="M14 11.8l9.4 5.2-9.4 5.2z" fill="var(--color-coral)" />
-            )}
-          </svg>
-        </button>
+        {showPlayButton ? (
+          <button
+            type="button"
+            className="play"
+            aria-label={`${PLAYBACK_UI[player.playbackState].label}第 ${String(segmentIndex)} 段`}
+            onClick={player.toggle}
+          >
+            <svg viewBox="0 0 34 34" fill="none" aria-hidden="true">
+              <circle cx="17" cy="17" r="16" stroke="var(--color-water-mid)" strokeOpacity=".45" />
+              <circle cx="17" cy="17" r="11.5" stroke="var(--color-water-mid)" strokeOpacity=".2" />
+              {playing ? (
+                <>
+                  <rect x="13.4" y="11.6" width="3.2" height="10.8" rx="1" fill="var(--color-coral)" />
+                  <rect x="17.8" y="11.6" width="3.2" height="10.8" rx="1" fill="var(--color-coral)" />
+                </>
+              ) : (
+                <path d="M14 11.8l9.4 5.2-9.4 5.2z" fill="var(--color-coral)" />
+              )}
+            </svg>
+          </button>
+        ) : null}
 
         <div
           className="bar"

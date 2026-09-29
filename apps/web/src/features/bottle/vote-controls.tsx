@@ -13,7 +13,7 @@
  * 计数变化由 `aria-live="polite"` 播报（动效不是唯一反馈）；
  * **禁用必有可见文字原因**（DESIGN.md），原因不写在 `title` 里。
  */
-import { useEffect, useRef, type MouseEvent as ReactMouseEvent } from 'react';
+import { useEffect, useRef, type MouseEvent as ReactMouseEvent, type ReactNode } from 'react';
 import { TapRippleLayer, hapticTap, useOnline, useTapRipple } from '../../design-system';
 import { Icon, cn, motion, prefersReducedMotion } from '../../design-system';
 
@@ -36,6 +36,11 @@ export interface VoteControlsProps {
    */
   onDislike: () => void;
   className?: string;
+  /**
+   * 排在「踩」右侧、与赞/踩同一行的附加控件（用户裁决：把「试听与投票」那个
+   * 圆盘播放键搬到这里，并让它变成「听全部」）。传 null / 不传 = 不渲染。
+   */
+  trailing?: ReactNode;
 }
 
 export function VoteControls({
@@ -48,6 +53,7 @@ export function VoteControls({
   onLike,
   onDislike,
   className,
+  trailing,
 }: VoteControlsProps) {
   const liked = myVote === 'LIKE';
   const disliked = myVote === 'DISLIKE';
@@ -90,6 +96,7 @@ export function VoteControls({
         // 还没听满：按钮**不禁用**（用户要的是"点踩后再判定"），只标注悬停提示
         title={disliked || !listenShort ? undefined : '还没听满 80%，点了会提示'}
       />
+      {trailing}
       <span className="sr-only" aria-live="polite">
         第 {segmentIndex} 段：赞 {likeCount}，踩 {dislikeCount}
       </span>

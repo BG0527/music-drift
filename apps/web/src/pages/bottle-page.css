@@ -280,6 +280,44 @@
   font-size: 0.9375rem;
 }
 
+/*
+ * 「录第 N 段」录入口的**唯一外观**（用户裁决：公海等待接力的瓶子统一成
+ * 「从河道捞起来」的样子 —— 此前公海摆的是「我来接这一段」，两处形态不一、
+ * 让人以为是两种不同的动作）。
+ * 河道缺口（.gapBox .cta）与公海接唱（.bp-record-cta）现在共用这一套形与色，
+ * 改这里两处一起变；差别只剩**文案里的段号**（都来自服务端 missingSegmentIndexes）。
+ */
+.bottle-page .bp-record-cta {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 0 17px;
+  border: 0;
+  border-radius: 2px;
+  background: var(--coral);
+  color: var(--ink);
+  font-size: 0.9375rem;
+  white-space: nowrap;
+  cursor: pointer;
+  transition:
+    transform var(--motion-hover-duration) var(--motion-entry-easing),
+    filter var(--motion-hover-duration) var(--motion-entry-easing);
+}
+
+.bottle-page .bp-record-cta:hover {
+  filter: brightness(1.06);
+}
+
+.bottle-page .bp-record-cta:active {
+  transform: translateY(-1px);
+}
+
+.bottle-page .bp-record-cta:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
 .bottle-page .gapBox .gapNote {
   margin: 4px 0 0;
   font-size: 0.6875rem;
@@ -801,6 +839,13 @@
     content: '';
     position: absolute;
     inset: -16px -8px;
+  }
+
+  /* 「听全部」：与赞/踩同行同高（继承上面的 .votes button），但用 coral 描边+字色
+     区分它是"放声音"的传输键，不是投票。图标（播放/暂停）随状态换。 */
+  .bottle-page .votes button.listenAllBtn {
+    border-color: var(--coral);
+    color: var(--coral);
   }
 
   .bottle-page .votesNote {

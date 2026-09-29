@@ -15,9 +15,10 @@
  *    （页面按 `describeApiError` 渲染冲突/错误态，含 409 接力冲突）。
  */
 import { ApiError } from '../api/client';
+import type { ReactNode } from 'react';
 import { useCastVote } from '../api/mutations';
 import { useSegmentListen, type AudioElementLike, type ListenReportTransport } from '../audio';
-import { SegmentPlayer } from '../audio';
+import { SegmentPlayer, type SegmentPlayerHandle } from '../audio';
 import { VoteControls, type MyVote } from './vote-controls';
 
 /** 本组件只需要段上这些字段（`SegmentSchema` 的子集，避免把整份 DTO 传进来）。 */
@@ -49,6 +50,21 @@ export interface VotableSegmentProps {
   /** 测试注入：音频元素工厂。 */
   createElement?: ((src: string) => AudioElementLike) | undefined;
   className?: string;
+  /**
+   * 本段播完时通知页面（「听全部」串段用；只报状态、不改播放）。
+   */
+  onEnded?: (() => void) | undefined;
+  /**
+   * 交出播放器的命令柄 —— 页面把「播放键」搬去与赞/踩同一行、并让它变成
+   * 「听全部」时，要命令的是**同一个**播放器（否则两个播放器声音打架）。
+   */
+  playerHandleRef?: React.MutableRefObject<SegmentPlayerHandle | null> | undefined;
+  /** 自动起播令牌（页面点「听全部」/ 点某段「听」时递增；见 SegmentPlayer）。 */
+  autoPlayToken?: number | undefined;
+  /** `transport` 外观下是否渲染内置圆盘播放键，默认 `true`（页面接管时传 false）。 */
+  showPlayButton?: boolean | undefined;
+  /** 排在「踩」右侧、与赞/踩同一行的「听全部」按钮（由页面渲染，驱动 playerHandleRef）。 */
+  listenAllControl?: ReactNode;
 }
 
 /**
@@ -73,6 +89,11 @@ export function VotableSegment({
   transport,
   createElement,
   className,
+  onEnded,
+  playerHandleRef,
+  autoPlayToken,
+  showPlayButton,
+  listenAllControl,
 }: VotableSegmentProps) {
   const like = useCastVote();
   const listen = useSegmentListen({
@@ -111,6 +132,10 @@ export function VotableSegment({
         // t17 深度复刻：瓶身详情页用参考的 transport 构图（唱片键 + 水道 + 时长）
         layout="transport"
         onProgress={listen.observe}
+        {...(onEnded === undefined ? {} : { onEnded })}
+        {...(playerHandleRef === undefined ? {} : { playerHandleRef })}
+        {...(autoPlayToken === undefined ? {} : { autoPlayToken })}
+        {...(showPlayButton === undefined ? {} : { showPlayButton })}
         {...(createElement === undefined ? {} : { createElement })}
       />
       {/* 参考 .votes：赞/踩一对小按钮一行（t12 用户裁决的交互原样保留） */}
@@ -138,6 +163,7 @@ export function VotableSegment({
           }}
           // 唯一的踩路径：先 flush 覆盖率再投 /votes（服务端按持久化覆盖率判 80%）
           onDislike={listen.castDislike}
+          {...(listenAllControl === undefined ? {} : { trailing: listenAllControl })}
         />
       </div>
     </div>

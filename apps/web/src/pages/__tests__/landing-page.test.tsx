@@ -488,6 +488,49 @@ describe('底部河流与主瓶横向漂移（用户裁决：推翻 9/29 的「�
     expect(source).not.toMatch(/transitionDuration:\s*['"]?\d/);
     expect(source).not.toMatch(/transition:\s*['"][^'"]*\d+ms/);
   });
+
+  it('css 头注释 = a19a4ea 原文（动画来源可追溯、无编码损坏）', () => {
+    const css = readFileSync(resolve(process.cwd(), 'src', 'pages', 'landing-page.css'), 'utf8');
+    expect(
+      css.startsWith(
+        '/*\n * W22 Landing：一条河、一支瓶、一次完整航程。\n * 仅作用于 .landing-v4；不改全局 token，不引入图片或运行时依赖。\n * 动效只过渡 transform / opacity，时长与缓动引用现有 motion 契约。\n */',
+      ),
+      'landing-page.css 头注释必须与 git show a19a4ea:apps/web/src/pages/landing-page.css 逐字一致',
+    ).toBe(true);
+    expect(css, '不存在双重编码损坏字符（€）').not.toContain('€');
+  });
+
+  it('实测层级：河道装饰层不压内容（轨道定位且 z-index 高于河道层）', async () => {
+    renderLanding();
+    await screen.findByRole('heading', { level: 1, name: HOOK });
+    // jsdom 不加载被 import 的 css：把 landing-page.css 原文注入文档后测 computed style；
+    // Tailwind 也不生成样式，补一条它对 `.relative` 的生成物（position: relative），否则轨道恒为 static。
+    const css = readFileSync(resolve(process.cwd(), 'src', 'pages', 'landing-page.css'), 'utf8');
+    const style = document.createElement('style');
+    style.textContent = '.relative { position: relative; }\n' + css;
+    document.head.append(style);
+    try {
+      const stage = document.querySelector<HTMLElement>('.landing-river-stage');
+      const track = document.querySelector<HTMLElement>('[data-landing-screen]')?.parentElement;
+      expect(stage, '河道装饰层缺失').not.toBeNull();
+      expect(track, '翻页轨道缺失').not.toBeNull();
+      const stageStyle = window.getComputedStyle(stage as HTMLElement);
+      const trackStyle = window.getComputedStyle(track as HTMLElement);
+      expect(stageStyle.position, '河道层是定位装饰层').toBe('absolute');
+      expect(stageStyle.zIndex, '河道层 z-index 应为 1').toBe('1');
+      // 轨道必须自身定位且 z 高于河道层：否则按 CSS 绘制顺序（定位正 z 晚于静态内容）
+      // 河道 SVG 与主瓶会盖在文字上（可读性回归）
+      expect(trackStyle.position, '内容轨道需定位才能参与 z 排序（a19a4ea 用 landing-track relative）').toBe(
+        'relative',
+      );
+      expect(
+        Number(trackStyle.zIndex || '0'),
+        '内容轨道 z-index 必须高于河道装饰层（.landing-track z-index:2 > 1）',
+      ).toBeGreaterThan(Number(stageStyle.zIndex || '0'));
+    } finally {
+      style.remove();
+    }
+  });
 });
 
 /* ─────────────── 9. 末屏入海意向（用户 9/29 裁决） ─────────────── */

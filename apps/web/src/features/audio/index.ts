@@ -30,7 +30,11 @@
  * ```
  */
 export { RecorderPanel, type RecorderPanelProps, type RecorderUploadView } from './recorder-panel';
-export { SegmentPlayer, type SegmentPlayerProps } from './segment-player';
+export {
+  SegmentPlayer,
+  type SegmentPlayerProps,
+  type SegmentPlayerHandle,
+} from './segment-player';
 export {
   SequentialSegmentPlayer,
   type SequentialSegment,
