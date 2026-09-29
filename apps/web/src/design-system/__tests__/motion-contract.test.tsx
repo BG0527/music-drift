@@ -133,8 +133,15 @@ function keyRemountViolations(src: string): JsxTag[] {
   );
 }
 
-/** 已登记为「已知违规、但修复被排到后续切片」的位置（只允许这里列出的条目）。 */
-const KEY_REMOUNT_ALLOWLIST = ['pages/route-view.tsx'] as const;
+/**
+ * 已登记为「已知违规、但修复被排到后续切片」的位置（只允许这里列出的条目）。
+ *
+ * W18.5 · B1：`pages/route-view.tsx` 的后门**已关闭** —— 换页改成显式两阶段
+ * （`exit-fade` 退场 → `enter-rise` 入场，由 `motion.exitDuration` 计时切换），
+ * 不再靠 `key={match.path}` 整树重挂。现在全站没有任何已知违例，白名单为空。
+ * （`route-transition.test.ts` 有一条守卫专门钉住"后门不得被重新打开"。）
+ */
+const KEY_REMOUNT_ALLOWLIST: readonly string[] = [];
 
 describe('§3 属性白名单：只允许动 transform / opacity', () => {
   it('.hover-lift 的过渡只含 transform，不含 box-shadow（box-shadow 的尺寸/位置是明文禁止）', () => {

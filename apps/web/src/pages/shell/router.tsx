@@ -10,6 +10,7 @@
  */
 import { useEffect, useMemo, useState, type AnchorHTMLAttributes, type ReactNode } from 'react';
 import { interceptTarget, safeNextPath, type RouteName } from './routes';
+import { prefersReducedMotion } from '../../design-system/tokens';
 import {
   APP_NAME,
   RouterContext,
@@ -72,7 +73,16 @@ export function RouterProvider({
 
   useEffect(() => {
     document.title = `${TITLES[value.match.name]} · ${APP_NAME}`;
-    window.scrollTo({ top: 0 });
+    // W18.5 · B1：滚动复位改为**可平滚动**。
+    // 此前是 `window.scrollTo({ top: 0 })`（无 behavior）＝ 瞬跳：换页的同一帧里
+    // 视口从底部"弹"到顶，与旧页淡出撞在一起，观感是"弹一下"而不是"翻过去"。
+    // 现在让滚动与退场阶段（约 240ms）并行，滚完正好新页上浮。
+    // reduced-motion 下必须瞬时（平滑滚动本身就是被这条规则禁止的运动），
+    // 所以这里读 `prefersReducedMotion()`，而不是无条件平滑。
+    window.scrollTo({
+      top: 0,
+      behavior: prefersReducedMotion() ? 'auto' : 'smooth',
+    });
   }, [value.match.name, value.match.path]);
 
   return <RouterContext.Provider value={value}>{children}</RouterContext.Provider>;

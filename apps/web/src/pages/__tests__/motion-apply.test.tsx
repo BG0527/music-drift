@@ -52,9 +52,11 @@ const PAGES2: ReadonlyArray<readonly [string, string]> = [
 ];
 
 describe('① 每页动效类存在（方案 §1.6 / §1.7 / §1.9 / §2.4-1）', () => {
-  it('route-view：路由容器 enter-fade + key 换页重触发（§2.4-1，进出场配对见 §2.1 豁免）', () => {
-    expect(routeView).toMatch(/className="enter-fade/);
-    expect(routeView).toContain('key={match.path}');
+  it('route-view：路由容器换页两阶段（§2.4-1）。W18.5 · B1 起改为「退场 exit-fade → 入场 enter-rise」的显式状态机，不再靠 key 整树重挂（t37 登记缺陷，本轮已修）', () => {
+    expect(routeView).toMatch(/exit-fade/);
+    expect(routeView).toMatch(/enter-rise/);
+    // 旧机制（key 重播）已关闭：守卫的 KEY_REMOUNT_ALLOWLIST 同时清空（见 motion-contract.test.tsx）
+    expect(routeView).not.toContain('key={match.path}');
   });
 
   it('settings：设置分组 enter-fade 入场（§1.7-1，仅 opacity，不做位移）+ 状态文字 enter-fade（§1.7-3）', () => {
