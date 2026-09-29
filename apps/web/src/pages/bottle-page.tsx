@@ -668,14 +668,15 @@ function BottleView({ bottle, seams }: { bottle: BottleDetail; seams?: BottlePag
               ))
             : null}
         </section> : <section className="destCol enter-rise stagger-3 flex flex-col">
-          <h2 className="text-[1.0625rem] font-bold leading-none text-paper">沿着歌声听下去</h2>
-          <p className="sub mt-[4px] text-[0.8125rem] text-muted">
-            左边「听全部」按段号顺序连着听；点瓶身上某一段的「听」只听那一段。
-          </p>
-          {/* 进度条投递位（用户裁决）：与左列赞/踩/听全部水平对齐。transport 通过 portal
-              投递到这里（共用同一个播放器，只搬 DOM 位置）。无可试听段时不占位。 */}
+          {/*
+            用户裁决（2026-09-30）：右列原来摆着「沿着歌声听下去」标题 +
+            「左边「听全部」按段号顺序连着听；点瓶身上某一段的「听」只听那一段。」说明，
+            **整段删除** —— 那是解释性文案，瓶子本身已经把这套操作演示一遍了。
+            右列现在只留进度条本体（transport 通过 portal 投递到这里，共用一个播放器）。
+            垂直位置由 CSS 决定：与左列的赞/踩/听全部同一水平线（见 bottle-page.css）。
+          */}
           {selectedSegment === null ? null : (
-            <div ref={setTransportDock} className="bp-transport-dock mt-[10px]" />
+            <div ref={setTransportDock} className="bp-transport-dock" />
           )}
         </section>}
       </div>

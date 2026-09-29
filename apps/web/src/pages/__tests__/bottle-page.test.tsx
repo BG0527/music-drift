@@ -1153,7 +1153,6 @@ describe('逐块照抄 p-bottle-record.html', () => {
       ['.gapBox 录制入口', screen.getByText('第 2 段由你开第一句')],
       ['.listenCol 标题', screen.getByRole('heading', { name: /试听与投票/ })],
       ['.votesNote', screen.getByText('还没有听满这一段，继续听一会儿再点踩吧。')],
-      ['.destCol 试听标题', screen.getByRole('heading', { name: '沿着歌声听下去' })],
       ['.bottom 漂流日志', screen.getByRole('link', { name: /看这只瓶子的漂流日志/ })],
       ['.bottom 举报', screen.getByRole('button', { name: /举报（进人工队列，不是自动删除）/ })],
     ];
@@ -1601,5 +1600,48 @@ describe('听全部主键 + 分段直播 + 布局对齐（t2）', () => {
       css,
       '听全部键必须 margin-left:auto 推到 .votes 行右端',
     ).toMatch(/\.bottle-page \.votes button\.listenAllBtn \{[^}]*margin-left:\s*auto/);
+  });
+
+  /**
+   * 用户裁决（2026-09-30）：右列「沿着歌声听下去」标题 + 「左边「听全部」按段号顺序
+   * 连着听；点瓶身上某一段的「听」只听那一段。」说明**整段删除** —— 解释性文案，
+   * 瓶子本身已把这套操作演示一遍。右列现在只留进度条本体。
+   * 顺带把"标题下移 32px / 进度条与赞踩同轴"钉成契约（真实浏览器实测：
+   * 标题 630→662，transportMid 718 == votesMid 718）。
+   */
+  it('右列只留进度条：那段标题与说明已删除，且左列标题下移 32px、进度条与赞踩同轴', async () => {
+    renderWithProviders(<BottlePage id={BOTTLE_ID} />, {
+      route: `/bottles/${BOTTLE_ID}`,
+      handlers: [
+        { path: `/api/bottles/${BOTTLE_ID}`, respond: () => ({ body: bottleDetail() }) },
+      ],
+    });
+    await screen.findByRole('button', { name: /听全部/ });
+
+    expect(
+      screen.queryByRole('heading', { name: '沿着歌声听下去' }),
+      '右列标题「沿着歌声听下去」应已删除',
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByText(/左边「听全部」按段号顺序连着听/),
+      '右列说明「左边「听全部」按段号顺序连着听……」应已删除',
+    ).not.toBeInTheDocument();
+
+    // 右列仍有进度条投递位（本体留着）
+    expect(document.querySelector('.destCol .bp-transport-dock'), '右列仍保留进度条投递位').not.toBeNull();
+
+    const css = readFileSync(join(process.cwd(), 'src', 'pages', 'bottle-page.css'), 'utf8');
+    expect(
+      css,
+      '「试听与投票」标题须在稿两列下整体下移 32px（脱离瓶身剖面、留呼吸）',
+    ).toMatch(/\.listenCol > h2 \{\s*margin-top:\s*32px/);
+    expect(
+      css,
+      '右列进度条投递位须留 48px 上距，与左列赞/踩/听全部同一水平线',
+    ).toMatch(/\.bp-transport-dock \{\s*margin-top:\s*48px/);
+    expect(
+      css,
+      '赞/踩/听全部的上距回到 14px（原先为对齐右列文字用的 53px 已随该文字删除而撤销）',
+    ).not.toMatch(/\.bottle-page \.votes \{\s*margin-top:\s*53px/);
   });
 });
