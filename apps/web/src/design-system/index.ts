@@ -9,6 +9,7 @@ export { Button, type ButtonProps, type ButtonVariant } from './button';
 export { Card, type CardProps } from './card';
 export { Input, type InputProps } from './input';
 export { Skeleton, type SkeletonProps } from './skeleton';
+export { TapRippleLayer, useTapRipple } from './tap-ripple';
 export { EmptyState, type EmptyStateProps } from './empty-state';
 export { Toast, type ToastProps } from './toast';
 export { Modal, type ModalProps } from './modal';

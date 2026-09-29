@@ -317,6 +317,71 @@ describe('A6 按下反馈：触屏也要有即时回应（DESIGN §Interaction S
   });
 });
 
+describe('C1 落点涟漪：与场景涟漪是两个角色，参数来自契约', () => {
+  /**
+   * 关键区分（DESIGN「Ripples — 两个角色，不可混为一谈」）：
+   *   场景涟漪 `.ripple-ring`  = 常驻母题、infinite、不进内容区；
+   *   落点涟漪 `.tap-ripple`  = 事件驱动、**播一次即停**、回答"这一下落到哪"。
+   * 两者参数必须不同（2400ms/infinite vs 700ms/once），复用同一个类就等于
+   * 把「刚刚发生过的事」和「世界的底」混成一样的东西。
+   */
+  const motionCss = read('design-system/motion.css');
+  const themeCss = read('design-system/theme.css');
+
+  it('落点涟漪是独立类，不复用场景涟漪', () => {
+    expect(motionCss, '缺 .tap-ripple（落点涟漪）').toMatch(/\.tap-ripple\s*\{/);
+    expect(motionCss, '场景涟漪应保持 infinite 常驻').toMatch(
+      /\.ripple-ring\s*\{[^}]*infinite/,
+    );
+    expect(motionCss, '落点涟漪不得是 infinite（它播一次即停）').not.toMatch(
+      /\.tap-ripple\s*\{[^}]*infinite/,
+    );
+  });
+
+  it('落点涟漪的时长与峰值引契约 token，不写数值', () => {
+    const block = /\.tap-ripple\s*\{[^}]*\}/.exec(motionCss)?.[0] ?? '';
+    expect(block).toMatch(/var\(--tap-ripple-duration\)/);
+    expect(block, '不得写时间字面量').not.toMatch(/\d+(?:\.\d+)?ms\b/);
+    const keyframes = /@keyframes ocean-tap-ripple \{[\s\S]*?\n\}/.exec(motionCss)?.[0] ?? '';
+    expect(keyframes, 'peak 必须引 var(--tap-ripple-peak)').toMatch(
+      /var\(--tap-ripple-peak\)/,
+    );
+    // 只动 transform + opacity（§Elevation 性能纪律）
+    expect(keyframes).not.toMatch(/(width|height|top|left|margin|box-shadow)\s*:/);
+  });
+
+  it('契约三处同源：DESIGN / theme.css / motion.css 都有', () => {
+    const design = readFileSync(join(here, '..', '..', '..', '..', '..', 'DESIGN.md'), 'utf8');
+    expect(design, 'DESIGN.md 缺 tapRippleDuration').toMatch(/tapRippleDuration:\s*700ms/);
+    expect(design, 'DESIGN.md 缺 tapRipplePeak').toMatch(/tapRipplePeak:\s*1\.6/);
+    expect(themeCss, 'theme.css 未暴露 --motion-tap-ripple-duration').toContain(
+      '--motion-tap-ripple-duration: 700ms',
+    );
+    expect(motionCss, 'motion.css 未定义 --tap-ripple-duration').toContain(
+      '--tap-ripple-duration: 700ms',
+    );
+  });
+
+  it('涟漪是纯装饰：读屏隐藏 + 不可点（DESIGN 装饰三约束）', () => {
+    const src = read('design-system/tap-ripple.tsx');
+    expect(src, '涟漪必须 aria-hidden').toMatch(/aria-hidden/);
+    expect(src, '涟漪必须 pointer-events-none').toMatch(/pointer-events-none/);
+    expect(src, '涟漪必须绝对定位（不参与布局）').toMatch(/absolute/);
+  });
+
+  it('就地操作确实接上了（投票按钮是最典型的落点反馈点）', () => {
+    const src = read('features/bottle/vote-controls.tsx');
+    expect(src, '投票按钮未接落点涟漪').toMatch(/TapRippleLayer|onRippleAt/);
+  });
+
+  it('不靠改 key 重播（motion-web §5：新元素自然从头播）', () => {
+    const src = read('design-system/tap-ripple.tsx');
+    expect(src, '不得用 key 变化强制重播（那会让整棵子树重挂）').not.toMatch(
+      /key=\{counter\}|key=\{Date\.now\(\)\}/,
+    );
+  });
+});
+
 describe('B7 母题缓动也是契约值（补 water.css 的守卫盲区）', () => {
   /**
    * 缺陷：守卫一直只扫**时间**字面量（`\d+ms`），**缓动**字面量是盲区 ——

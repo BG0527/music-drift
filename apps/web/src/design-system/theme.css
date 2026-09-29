@@ -179,6 +179,14 @@
      ease-out 只在末端收，回程会"弹一下"。 */
   --motion-drift-easing: ease-in-out;
 
+  /* ── W18.5 · C1：就地操作（tap）的落点涟漪 ──────────────────────────────────
+     与 `.ripple-ring`（场景涟漪，infinite 常驻）**不是同一件事**：
+       场景涟漪 = 常驻母题，不进内容区、不承载信息；
+       落点涟漪 = 事件驱动、播一次即停，回答"这一下落到哪了"。
+     契约在 DESIGN.md 的 motion 块（tapRippleDuration / tapRipplePeak）。 */
+  --motion-tap-ripple-duration: 700ms;
+  --motion-tap-ripple-peak: 1.6;
+
   /* ── W18.5 · B8：顶栏让位 ──────────────────────────────────────────────────
      站点顶栏是 `position: fixed`（top-nav.tsx：`fixed top-[10px]` + 每项
      `min-h-11`）⇒ 它占据视口顶部 10..54px 这一条带，且**不占文档流**。

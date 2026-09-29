@@ -1,4 +1,4 @@
-﻿/**
+/**
  * 赞 / 踩读数（用户裁决的最新交互）。
  *
  * 用户原话拆成可执行规格：
@@ -13,7 +13,8 @@
  * 计数变化由 `aria-live="polite"` 播报（动效不是唯一反馈）；
  * **禁用必有可见文字原因**（DESIGN.md），原因不写在 `title` 里。
  */
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, type MouseEvent as ReactMouseEvent } from 'react';
+import { TapRippleLayer, useTapRipple } from '../../design-system';
 import { Icon, cn, motion, prefersReducedMotion } from '../../design-system';
 
 export type MyVote = 'LIKE' | 'DISLIKE' | null;
@@ -50,8 +51,15 @@ export function VoteControls({
 }: VoteControlsProps) {
   const liked = myVote === 'LIKE';
   const disliked = myVote === 'DISLIKE';
+  // W18.5 路 C1：落点涟漪（就地操作反馈）。容器 relative + 截断，涟漪从触点扩散。
+  const { taps, rippleAt, setContainer } = useTapRipple();
+
   return (
-    <div className={cn('flex flex-wrap items-center gap-[8px]', className)}>
+    <div
+      ref={setContainer}
+      className={cn('relative flex flex-wrap items-center gap-[8px] overflow-hidden', className)}
+    >
+      <TapRippleLayer taps={taps} />
       <VoteButton
         label="赞"
         ariaLabel={`给第 ${String(segmentIndex)} 段点赞`}
@@ -62,6 +70,7 @@ export function VoteControls({
         disabledReason="你已经赞过这一段"
         busy={busy}
         onClick={onLike}
+        onRippleAt={rippleAt}
         icon="ThumbsUp"
       />
       <VoteButton
@@ -73,6 +82,7 @@ export function VoteControls({
         disabledReason="你已经踩过这一段"
         busy={busy}
         onClick={onDislike}
+        onRippleAt={rippleAt}
         icon="ThumbsDown"
         // 还没听满：按钮**不禁用**（用户要的是"点踩后再判定"），只标注悬停提示
         title={disliked || !listenShort ? undefined : '还没听满 80%，点了会提示'}
@@ -95,6 +105,7 @@ function VoteButton({
   busy,
   icon,
   onClick,
+  onRippleAt,
 }: {
   label: string;
   ariaLabel: string;
@@ -105,7 +116,10 @@ function VoteButton({
   title?: string | undefined;
   busy: boolean;
   icon: 'ThumbsUp' | 'ThumbsDown';
-  onClick: () => void;
+  /** C1：带上点击坐标，用来在落点处播一次涟漪（不传也能用，保持旧调用点兼容）。 */
+  onClick: (event?: ReactMouseEvent<HTMLButtonElement>) => void;
+  /** C1：落点涟漪的触发器（由父级容器提供，见 VoteControls）。 */
+  onRippleAt?: (clientX: number, clientY: number) => void;
 }) {
   // 计数变化的一次性反馈（motion-web §1 把「投票后的确认」列为 feedback 的典型例）。
   // 用 Web Animations API 而不是改 key 重播动画：§5 明令禁止靠改 key 造成子树重建，
@@ -146,7 +160,15 @@ function VoteButton({
             ? 'border-coral bg-coral/10 font-medium text-danger'
             : 'border-line/25 text-muted hover:text-paper',
         )}
-        onClick={onClick}
+        onClick={(event) => {
+          // W18.5 · C1：落点涟漪。播一次即停（`both` 停在末帧 = 完全透明），
+          // 所以「下一次点击能不能再看见」取决于这枚是否已被卸载 ——
+          // 投票按钮一次交互内是幂等的（已投过就 disabled），不需要连播。
+          if (event !== undefined && onRippleAt !== undefined) {
+            onRippleAt(event.clientX, event.clientY);
+          }
+          onClick(event);
+        }}
       >
         <Icon name={icon} size={16} />
         <span className="whitespace-nowrap">{label}</span>

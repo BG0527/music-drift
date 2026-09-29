@@ -17,6 +17,8 @@
   --exit-duration: 240ms;
   --reduced-duration: 150ms;
   --drift-duration: 24000ms;
+  --tap-ripple-duration: 700ms;
+  --tap-ripple-peak: 1.6;
   --drift-shift: 10px;
   --passage-duration: 46000ms;
   --passage-shift: 160px;
@@ -170,6 +172,27 @@
 
   .segment-pick {
     animation: bottle-pick var(--entry-duration) var(--entry-easing) both;
+  }
+
+  /* ── W18.5 · C1：落点涟漪（就地操作，播一次即停）────────────────────────────
+     与上面的 `.ripple-ring` 是**两个角色**（DESIGN「Ripples — 两个角色，不可混为一谈」）：
+       场景涟漪 = 常驻母题、infinite、不进内容区；
+       落点涟漪 = 事件驱动、播一次、回答"这一下落到哪了"。
+     时长 700ms + 峰值 1.6 都来自契约 token（DESIGN tapRippleDuration / tapRipplePeak），
+     理由写在 token 旁：不阻塞下一步 + 看得见但不喧哗。 */
+  .tap-ripple {
+    animation: ocean-tap-ripple var(--tap-ripple-duration) var(--entry-easing) both;
+  }
+}
+
+@keyframes ocean-tap-ripple {
+  from {
+    opacity: var(--motif-ripple-ring-alpha);
+    transform: scale(0.35);
+  }
+  to {
+    opacity: 0;
+    transform: scale(var(--tap-ripple-peak));
   }
 }
 
