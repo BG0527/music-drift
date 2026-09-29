@@ -807,11 +807,38 @@
     white-space: nowrap;
   }
 
+  /*
+    赞/踩/听全部这一行的上边距。
+
+    桌面（≥1024，稿两列 614/644）下多给 39px：进度条被 portal 搬去了右列
+    「沿着歌声听下去」说明下方（见 bottle-page.tsx 的 transportDock），而右列那段的
+    正文比左列的标题高，所以**右列的进度条比这一行低**。实测（真实浏览器 1440×900，
+    捞到一瓶、两列都渲染时）：
+
+        transport  顶 699 / 高 52  → 中线 725
+        votes      顶 667 / 高 38  → 中线 686     差 39px
+
+    用户要求"进度条与赞/踩/听全部水平对齐"，所以把这一行**下移 39px** 与进度条同轴。
+    为什么不反过来把进度条上移：右列说明文字的下沿就在进度条上方（子元素实测底 ~675），
+    再上移就压到文字上 —— 宁可留白，不许重叠。
+    <1024 单列时进度条回到左列原位，不需要这段留白，故只在 lg+ 生效。
+
+    为什么写在 CSS 而不是 Tailwind 类：`.bottle-page .votes` 本身是**未分层**规则
+    （specificity 0,2,0），而 Tailwind 工具类在 `@layer utilities` 里 ——
+    未分层样式永远赢过分层样式（与权重无关），所以 `lg:[&_.votes]:mt-[39px]`
+    实测完全无效（votes 仍在 667）。只能改这条规则。
+  */
   .bottle-page .votes {
     margin-top: 14px;
     display: flex;
     align-items: center;
     gap: 12px;
+  }
+
+  @media (min-width: 1024px) {
+    .bottle-page .votes {
+      margin-top: 53px; /* 14 + 39：与右列 transport 同轴 */
+    }
   }
 
   .bottle-page .votes > div {
