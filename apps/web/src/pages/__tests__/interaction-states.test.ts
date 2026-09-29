@@ -419,6 +419,52 @@ describe('A8 放回失败必须让用户看见（不许静默吞掉）', () => {
   });
 });
 
+describe('B4 状态变化必须可听：五个页面的播报通道（DESIGN §Accessibility）', () => {
+  /**
+   * 缺陷：`DESIGN.md` §Accessibility 要求「接力状态用 aria-live="polite" 播报」，
+   * 且 motion-web §7 明确「动效不得是唯一反馈，必须配文字/结构/aria-live」。
+   * 现状是**按页分布不均**：river 7 处、login/bottle 各 3 处，而
+   * sea / song-picker / drift-log / profile / admin 五页**一处都没有** ——
+   * 也就是说这五页的「切分区、翻页、发起、长列表加载、审核切换」全靠视觉，
+   * 读屏用户什么都听不到。
+   *
+   * 判据：凡是有 `aria-busy`（即有异步加载）的页面，必须同时有播报通道。
+   * 这条因果关系是本守卫的核心 —— 它不是"每个页面的固定配额"，
+   * 而是"有异步就必须能听"。
+   */
+  const ASYNC_PAGES: ReadonlyArray<readonly [string, string]> = [
+    ['pages/sea-page.tsx', read('pages/sea-page.tsx')],
+    ['pages/song-picker-page.tsx', read('pages/song-picker-page.tsx')],
+    ['pages/drift-log-page.tsx', read('pages/drift-log-page.tsx')],
+    ['pages/admin-page.tsx', read('pages/admin-page.tsx')],
+  ];
+
+  it.each(ASYNC_PAGES)('%s 有异步加载（aria-busy）就必须有播报通道', (_name, src) => {
+    expect(src, '该页没有 aria-busy，本条不适用？—— 若无异步请从本表移除').toMatch(/aria-busy/);
+    expect(
+      src,
+      '有异步加载却没有 aria-live / role="status" —— 读屏用户听不到任何状态变化',
+    ).toMatch(/aria-live="polite"|role="status"/);
+  });
+
+  it.each(ASYNC_PAGES)('%s 的播报通道是 polite 而不是 assertive', (_name, src) => {
+    // assertive 会打断读屏当前朗读；本项目全是加载/切换提示，不该抢话
+    expect(src, '不应使用 aria-live="assertive"（会打断读屏）').not.toMatch(
+      /aria-live="assertive"/,
+    );
+  });
+
+  it('公海：切分区与翻页都有播报（这两件事此前只有视觉变化）', () => {
+    const src = read('pages/sea-page.tsx');
+    expect(src, '公海缺少播报容器').toMatch(/aria-live="polite"|role="status"/);
+  });
+
+  it('审核台：视图切换（待处理 / 历史裁决）有播报', () => {
+    const src = read('pages/admin-page.tsx');
+    expect(src, '审核台缺少播报容器').toMatch(/aria-live="polite"|role="status"/);
+  });
+});
+
 describe('A9 河道的两个泊位对称：未登录时「捞取」也有登录出口', () => {
   /**
    * 缺陷：投下侧有 `newHref`（未登录 → `/login?next=/new`），捞取侧**没有**对应物 ——

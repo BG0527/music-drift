@@ -171,6 +171,13 @@ export function DriftLogPage({ id }: { id: string }) {
 
   return (
     <main className="drift-page relative z-[2] px-[max(1.5rem,5.278vw)] pt-[max(2.5rem,4.444vw)] pb-0 text-paper md:h-[100dvh] md:overflow-hidden">
+      {/* W18.5 · B4：加载/条数播报。此前本页零 aria-live ——
+          长日志（可达数百条）加载完成、切段查看都只有视觉变化，读屏什么都听不到。 */}
+      <p role="status" aria-live="polite" className="sr-only">
+        {events.data === undefined
+          ? '正在读这支瓶子的漂流日志'
+          : `漂流日志共 ${String(events.data.length)} 条记录`}
+      </p>
       {/* 背景三层（稿 .clip：世界是这台机器，正文浮在它上面） */}
       <div aria-hidden="true" className="pointer-events-none absolute inset-0 -z-10 overflow-hidden">
         <div className="platter absolute inset-0" style={{ background: PLATTER_BG }} />

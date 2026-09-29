@@ -187,9 +187,33 @@ const SEA_HALL_CSS = `
 export function SeaPage() {
   const [zone, setZone] = useState<Zone>('COMPLETED');
 
+  /**
+   * W18.5 · B4：同位播报（DESIGN §Accessibility「状态变化必须同时有文案或图标」）。
+   * 此前公海切分区 / 翻页**只有视觉变化**（瓶子换了一批），读屏完全听不到 ——
+   * 而这两个动作正是这一页的主要交互。文本走 `aria-live` 挂在装饰层之后，
+   * 不占布局（`sr-only`），不影响一屏门禁。
+   */
+  const [announcement, setAnnouncement] = useState('');
+
+  /**
+   * 切分区并播报。四个调用点（两个 li 的 click + 两个 keydown）都走它 ——
+   * 分区名要人听得懂（"已完成的顺流而下 / 还在等人接的"），而不是把枚举值念出来。
+   * 翻页播报在子组件 `SeaZoneList` 内（它才有页码状态）。
+   */
+  const switchZone = (next: Zone): void => {
+    if (next === zone) return;
+    setZone(next);
+    setAnnouncement(next === 'COMPLETED' ? '已切到：已完成的顺流而下' : '已切到：还在等人接的');
+  };
+
   return (
     <div className="sea-hall relative isolate md:h-[100dvh] md:overflow-hidden">
       <style>{SEA_HALL_CSS}</style>
+
+      {/* 播报通道：切分区 / 翻页的结果（动效与视觉都不是唯一反馈） */}
+      <p role="status" aria-live="polite" className="sr-only">
+        {announcement}
+      </p>
 
       {/* 页级底图 + 水线 + 涟漪：稿的 .clip，位置照稿（main 之前、z-0、装饰 ⇒ 整块隐藏） */}
       <div className="clip" aria-hidden="true">
@@ -371,12 +395,12 @@ export function SeaPage() {
                 aria-selected={zone === 'COMPLETED'}
                 tabIndex={0}
                 onClick={() => {
-                  setZone('COMPLETED');
+                  switchZone('COMPLETED');
                 }}
                 onKeyDown={(event) => {
                   if (event.key === 'Enter' || event.key === ' ') {
                     event.preventDefault();
-                    setZone('COMPLETED');
+                    switchZone('COMPLETED');
                   }
                 }}
               >
@@ -387,12 +411,12 @@ export function SeaPage() {
                 aria-selected={zone === 'INCOMPLETE'}
                 tabIndex={0}
                 onClick={() => {
-                  setZone('INCOMPLETE');
+                  switchZone('INCOMPLETE');
                 }}
                 onKeyDown={(event) => {
                   if (event.key === 'Enter' || event.key === ' ') {
                     event.preventDefault();
-                    setZone('INCOMPLETE');
+                    switchZone('INCOMPLETE');
                   }
                 }}
               >
@@ -441,6 +465,8 @@ function foldPages(pageCount: number, current: number): (number | '…')[] {
 function SeaZoneList({ zone }: { zone: Zone }) {
   const sea = useSeaPages(zone, SEA_PAGE_SIZE);
   const [page, setPage] = useState(1);
+  /** W18.5 · B4：翻页播报放在本组件（页码状态在这里；父级只管分区）。 */
+  const [pageAnnouncement, setPageAnnouncement] = useState('');
   const fetchedPages = sea.data?.pages.length ?? 0;
   /** 服务端给的该 zone 总条数（每页同值）；缺省 = 没给，回退旧口径。 */
   const total = sea.data?.pages[0]?.total;
@@ -452,6 +478,8 @@ function SeaZoneList({ zone }: { zone: Zone }) {
   /** 去第 N 页：已取到的页用缓存；没取到的在点击里逐页推进游标（页数不涨就停）。 */
   const goToPage = (target: number): void => {
     if (target === page) return;
+    // W18.5 · B4：翻页结果播报（此前只有瓶子换了一批，读屏听不到）
+    setPageAnnouncement(`第 ${String(target)} 页，共 ${String(pageCount)} 页`);
     if (target <= fetchedPages) {
       setPage(target);
       return;
@@ -517,7 +545,12 @@ function SeaZoneList({ zone }: { zone: Zone }) {
   );
 
   return (
-    <AsyncBoundary
+    <>
+      {/* W18.5 · B4：翻页播报（页码状态在本组件；父级只管分区播报） */}
+      <p role="status" aria-live="polite" className="sr-only">
+        {pageAnnouncement}
+      </p>
+      <AsyncBoundary
       query={{
         isPending: sea.isPending,
         isError: sea.isError,
@@ -591,6 +624,7 @@ function SeaZoneList({ zone }: { zone: Zone }) {
         </>
       )}
     </AsyncBoundary>
+    </>
   );
 }
 

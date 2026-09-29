@@ -1,4 +1,4 @@
-﻿/**
+/**
  * 审核台（`/admin`，`CONTEXT.md` §8.3）—— **逐块照抄
  * `docs/ui-review/design-explore/s2-admin-record.html`**（约 340 行分 2 段读完即写）。
  *
@@ -37,6 +37,12 @@ type ViewKey = 'PENDING' | 'REVIEWED';
 export function AdminPage() {
   const session = useSession();
   const [view, setView] = useState<ViewKey>('PENDING');
+  /**
+   * W18.5 · B4：视图切换与队列条数播报。此前本页零 aria-live ——
+   * 切「待处理 / 历史裁决」只换了列表内容（视觉上是一次淡入），读屏听不到；
+   * 而"现在有几条要我看"是这一页最该被听见的信息。
+   */
+  const [announcement, setAnnouncement] = useState('');
   /** 计数（稿 `.view .n` 与 `footer .cat`「待处理 3 · 历史 41」）：两队列都来自真接口。
       只在管理员态启用（非管理员/加载中 enabled=false ⇒ 一个请求都不发）；
       与队列组件用同一 queryKey ⇒ 已拉过的那份不会重复请求。 */
@@ -52,8 +58,18 @@ export function AdminPage() {
     if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return;
     event.preventDefault();
     const next: ViewKey = view === 'PENDING' ? 'REVIEWED' : 'PENDING';
-    setView(next);
+    switchView(next);
     tabRefs.current[next]?.focus();
+  };
+
+  /** 切视图并播报（click 与键盘共用，W18.5 · B4）。 */
+  const switchView = (next: ViewKey): void => {
+    setView(next);
+    setAnnouncement(
+      next === 'PENDING'
+        ? `已切到待处理，共 ${String(pendingTotal.data?.length ?? 0)} 条`
+        : `已切到历史裁决，共 ${String(reviewedTotal.data?.length ?? 0)} 条`,
+    );
   };
 
   if (session.status === 'loading') {
@@ -87,6 +103,10 @@ export function AdminPage() {
 
   return (
     <div className="relative isolate flex flex-col md:h-[100dvh] md:overflow-hidden">
+      {/* W18.5 · B4：视图切换与队列条数播报（此前本页零 aria-live） */}
+      <p role="status" aria-live="polite" className="sr-only">
+        {announcement}
+      </p>
       {/* 稿 `.platter` / `.glint` / 光带：世界的"上方"。宿主必须 isolate */}
       <Platter />
       <WaterSheen />
@@ -128,7 +148,7 @@ export function AdminPage() {
             aria-controls="admin-queue-panel"
             tabIndex={view === 'PENDING' ? 0 : -1}
             onClick={() => {
-              setView('PENDING');
+              switchView('PENDING');
             }}
             onKeyDown={onTabKeyDown}
             className={cn(
@@ -152,7 +172,7 @@ export function AdminPage() {
             aria-controls="admin-queue-panel"
             tabIndex={view === 'REVIEWED' ? 0 : -1}
             onClick={() => {
-              setView('REVIEWED');
+              switchView('REVIEWED');
             }}
             onKeyDown={onTabKeyDown}
             className={cn(

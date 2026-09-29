@@ -270,6 +270,17 @@ export function SongPickerPage() {
 
   return (
     <div className="relative isolate flex flex-col gap-6 px-[5.28%] md:h-[100dvh] md:gap-4 md:overflow-hidden md:pb-3">
+      {/* W18.5 · B4：发起结果播报。此前本页零 aria-live ——
+          「正在发瓶 / 已投河」只有按钮 shimmer 与跳转，读屏用户听不到任何结果。 */}
+      <p role="status" aria-live="polite" className="sr-only">
+        {create.isPending
+          ? '正在把这支漂流瓶投进河里'
+          : create.isSuccess
+            ? '已投河，正在漂流'
+            : songs.isLoading
+              ? '正在读曲库'
+              : `曲库共 ${String(rawCount)} 首可选`}
+      </p>
       {/* 稿 §8 背景三层：platter →（盆体在内容层）→ deep → glint；装饰零布局、token 驱动（本页守卫禁 rgba/hex） */}
       <span
         aria-hidden="true"
