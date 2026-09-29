@@ -16,6 +16,7 @@
  */
 import { ApiError } from '../api/client';
 import type { ReactNode } from 'react';
+import { createPortal } from 'react-dom';
 import { useCastVote } from '../api/mutations';
 import { useSegmentListen, type AudioElementLike, type ListenReportTransport } from '../audio';
 import { SegmentPlayer, type SegmentPlayerHandle } from '../audio';
@@ -67,6 +68,16 @@ export interface VotableSegmentProps {
   showPlayButton?: boolean | undefined;
   /** 排在「踩」右侧、与赞/踩同一行的「听全部」按钮（由页面渲染，驱动 playerHandleRef）。 */
   listenAllControl?: ReactNode;
+  /**
+   * 把 transport（进度条）**投递**到这个 DOM 节点渲染（用户裁决：进度条挪到右列、
+   * 与赞/踩/听全部水平对齐）。
+   *
+   * 为什么用 portal 而不是把播放器拆成两半：进度条与赞/踩**共用同一个播放器**
+   * （一个 audio 元素）。拆成两个组件会出现两个播放器、声音打架。portal 只搬 DOM
+   * 位置、不动状态归属，所以仍是"一个播放器、两处显示"。
+   * 不传 = 照旧原地渲染（其它调用点不受影响）。
+   */
+  transportPortalTarget?: HTMLElement | null | undefined;
 }
 
 /**
@@ -97,6 +108,7 @@ export function VotableSegment({
   autoPlayToken,
   showPlayButton,
   listenAllControl,
+  transportPortalTarget,
 }: VotableSegmentProps) {
   const like = useCastVote();
   const listen = useSegmentListen({
@@ -124,24 +136,47 @@ export function VotableSegment({
 
   return (
     <div className={className ?? 'flex flex-col'}>
-      <SegmentPlayer
-        src={src}
-        segmentIndex={segment.index}
-        durationMs={segment.durationMs}
-        ownerCode={segment.ownerCode}
-        isOwnSegment={isOwnSegment}
-        // 收起播放器自带的踩：踩由下面这一对控件唯一承担（否则同一段出现两个踩）
-        showDislike={false}
-        // t17 深度复刻：瓶身详情页用参考的 transport 构图（唱片键 + 水道 + 时长）
-        layout="transport"
-        onProgress={listen.observe}
-        {...(onEnded === undefined ? {} : { onEnded })}
-        {...(onPlayingChange === undefined ? {} : { onPlayingChange })}
-        {...(playerHandleRef === undefined ? {} : { playerHandleRef })}
-        {...(autoPlayToken === undefined ? {} : { autoPlayToken })}
-        {...(showPlayButton === undefined ? {} : { showPlayButton })}
-        {...(createElement === undefined ? {} : { createElement })}
-      />
+      {transportPortalTarget == null ? (
+        <SegmentPlayer
+          src={src}
+          segmentIndex={segment.index}
+          durationMs={segment.durationMs}
+          ownerCode={segment.ownerCode}
+          isOwnSegment={isOwnSegment}
+          // 收起播放器自带的踩：踩由下面这一对控件唯一承担（否则同一段出现两个踩）
+          showDislike={false}
+          // t17 深度复刻：瓶身详情页用参考的 transport 构图（唱片键 + 水道 + 时长）
+          layout="transport"
+          onProgress={listen.observe}
+          {...(onEnded === undefined ? {} : { onEnded })}
+          {...(onPlayingChange === undefined ? {} : { onPlayingChange })}
+          {...(playerHandleRef === undefined ? {} : { playerHandleRef })}
+          {...(autoPlayToken === undefined ? {} : { autoPlayToken })}
+          {...(showPlayButton === undefined ? {} : { showPlayButton })}
+          {...(createElement === undefined ? {} : { createElement })}
+        />
+      ) : (
+        // 进度条被页面投递到右列（DOM 位置变了，播放器仍是这一个 —— 见 props 注释）
+        createPortal(
+          <SegmentPlayer
+            src={src}
+            segmentIndex={segment.index}
+            durationMs={segment.durationMs}
+            ownerCode={segment.ownerCode}
+            isOwnSegment={isOwnSegment}
+            showDislike={false}
+            layout="transport"
+            onProgress={listen.observe}
+            {...(onEnded === undefined ? {} : { onEnded })}
+            {...(onPlayingChange === undefined ? {} : { onPlayingChange })}
+            {...(playerHandleRef === undefined ? {} : { playerHandleRef })}
+            {...(autoPlayToken === undefined ? {} : { autoPlayToken })}
+            {...(showPlayButton === undefined ? {} : { showPlayButton })}
+            {...(createElement === undefined ? {} : { createElement })}
+          />,
+          transportPortalTarget,
+        )
+      )}
       {/* 参考 .votes：赞/踩一对小按钮一行（t12 用户裁决的交互原样保留） */}
       <div className="votes">
         <VoteControls

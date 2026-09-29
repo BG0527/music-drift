@@ -18,6 +18,7 @@ import {
   AccompanimentPlayer,
   createBrowserRecorderEnvironment,
   uploadSegmentAudio,
+  type AccompanimentPlayHandle,
   type RecorderEnvironment,
   type SegmentRecording,
   type UploadPhase,
@@ -84,6 +85,12 @@ export function RecordStep({
    */
   const [recordingActive, setRecordingActive] = useState(false);
   const [recordStartToken, setRecordStartToken] = useState(0);
+  /**
+   * 伴奏的同步起播命令柄（用户手势任务里用）。
+   * 「开始录制」的点击处理函数**同步**调 `play()` —— 浏览器自动播放策略只放行
+   * 手势任务内的 `play()`，等权限/效果再播会被静默拒绝。
+   */
+  const accompanimentHandleRef = useRef<AccompanimentPlayHandle | null>(null);
   const [failure, setFailure] = useState<{ message: string; retryable: boolean } | null>(null);
   const [pending, setPending] = useState<SegmentRecording | null>(null);
   const [localUrl, setLocalUrl] = useState<string | null>(null);
@@ -202,6 +209,10 @@ export function RecordStep({
           track={accompanimentTrack}
           segmentIndex={segmentIndex}
           autoPlaySignal={accompanimentSignal}
+          playHandleRef={accompanimentHandleRef}
+          // 用户裁决：录制界面只留一个「开始录制」—— 伴奏不另给一套按钮，
+          // 它跟着开录自动播（见上），这里只作"正在放"的伴随显示。
+          autoOnly
         />
       )}
 
@@ -235,6 +246,11 @@ export function RecordStep({
               presetDurationMs={preset}
               environment={environment}
               {...(phase === 'validating' ? {} : { upload: uploadView })}
+              onRecordButtonClick={() => {
+                // 用户手势任务里**同步**起播伴奏（自动播放策略只放行这里），从而
+                // "点开始录制 ⇒ 伴奏响起 + 开始录音"真正同时发生。
+                accompanimentHandleRef.current?.play();
+              }}
               onRecordingStateChange={(isRecording) => {
                 // 开录 ⇒ 让本段伴奏同时起播（token +1 让它从头来）；停录 ⇒ 伴奏停下。
                 setRecordingActive(isRecording);

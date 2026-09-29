@@ -91,6 +91,14 @@ export interface RecorderPanelProps {
    * 只在**跨越**录制态时触发（进入 true / 离开 false），不随每帧进度重复上报。
    */
   onRecordingStateChange?: (isRecording: boolean) => void;
+  /**
+   * 点「开始录制」时**同步**触发（在用户手势的那个任务里，早于 `recorder.start()` 的 await）。
+   *
+   * 存在的唯一理由是浏览器自动播放策略：`play()` 必须在用户手势任务里同步调用才被放行；
+   * 放进 effect 或等 `getUserMedia` 权限回来再播，都可能被判"无手势"静默拒绝
+   * （"点了没声，再点一次"）。上层（RecordStep）在这里同步起播伴奏。
+   */
+  onRecordButtonClick?: (() => void) | undefined;
   /** 丢弃本地录音后通知上层关闭录音窗口。 */
   onCancel?: () => void;
   /** 重录前通知上层清理上一次上传失败的本地状态。 */
@@ -111,6 +119,7 @@ export function RecorderPanel({
   bars = 48,
   onRecorded,
   onRecordingStateChange,
+  onRecordButtonClick,
   onCancel,
   onRetryRecording,
   upload,
@@ -138,6 +147,11 @@ export function RecorderPanel({
   useEffect(() => {
     onRecordingStateChangeRef.current = onRecordingStateChange;
   }, [onRecordingStateChange]);
+  // 「开始录制」点击的同步回调（起播伴奏）：同样走 ref，身份变化不重渲染。
+  const onRecordButtonClickRef = useRef(onRecordButtonClick);
+  useEffect(() => {
+    onRecordButtonClickRef.current = onRecordButtonClick;
+  }, [onRecordButtonClick]);
   const wasRecordingRef = useRef(false);
   useEffect(() => {
     const isRecording = status === 'recording';
@@ -395,6 +409,8 @@ export function RecorderPanel({
             disabled={!canRecord}
             {...(presetMissing ? { 'aria-describedby': presetNoticeId } : {})}
             onClick={() => {
+              // 同步起播伴奏（用户手势任务内，见 onRecordButtonClick 注释），再开录
+              onRecordButtonClickRef.current?.();
               void recorder.start();
             }}
             icon={<Icon name="Mic" size={18} />}

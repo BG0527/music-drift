@@ -35,11 +35,6 @@ export {
   type SegmentPlayerProps,
   type SegmentPlayerHandle,
 } from './segment-player';
-export {
-  SequentialSegmentPlayer,
-  type SequentialSegment,
-  type SequentialSegmentPlayerProps,
-} from './sequential-segment-player';
 export { DislikeButton, type DislikeButtonProps } from './dislike-button';
 export {
   SegmentTimeline,
@@ -116,7 +111,11 @@ export {
   type PcmClipInput,
 } from './mix-render';
 
-export { AccompanimentPlayer, type AccompanimentPlayerProps } from './accompaniment-player';
+export {
+  AccompanimentPlayer,
+  type AccompanimentPlayerProps,
+  type AccompanimentPlayHandle,
+} from './accompaniment-player';
 export { LibraryAttribution, type LibraryAttributionProps } from './library-attribution';
 export {
   useAccompaniment,

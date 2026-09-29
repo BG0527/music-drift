@@ -28,7 +28,31 @@ export interface AccompanimentPlayerProps {
    * 或再传 `paused` 停下）。默认 undefined = 不自动播（保留手动按钮的独立用法）。
    */
   autoPlaySignal?: { play: boolean; token: number } | undefined;
+  /**
+   * 只做"跟着录音自动播"的**伴随显示**（用户裁决：录制界面只留一个「开始录制」）。
+   * true 时隐藏"播放本段伴奏 / 重听本段"两颗独立按钮（它们是"分开的功能"），
+   * 只保留曲目信息 + 进度 + 歌词，让你看到伴奏在放、但不另给一套控制。
+   * 伴奏本身照旧随开录自动起播（见 autoPlaySignal）。
+   */
+  autoOnly?: boolean | undefined;
+  /**
+   * 交出"立刻起播"命令柄（同步调用）。
+   *
+   * 浏览器自动播放策略要求 `play()` 在**用户手势的那个任务里**同步调用；
+   * 等 `getUserMedia` 权限回来（effect 里）再播会被判"无手势"静默拒绝。
+   * 上层（RecorderPanel 的「开始录制」点击）据此在点击处理函数里同步起播，
+   * 伴奏与录音就真正**同时**进行。
+   */
+  playHandleRef?: React.MutableRefObject<AccompanimentPlayHandle | null> | undefined;
   className?: string;
+}
+
+/** `playHandleRef` 收到的命令柄。 */
+export interface AccompanimentPlayHandle {
+  /** 从本段开头起播。 */
+  play: () => void;
+  /** 停下并回到段首。 */
+  stop: () => void;
 }
 
 export function AccompanimentPlayer({
@@ -37,6 +61,8 @@ export function AccompanimentPlayer({
   environment,
   onSegmentEnded,
   autoPlaySignal,
+  autoOnly = false,
+  playHandleRef,
   className,
 }: AccompanimentPlayerProps) {
   const view = useAccompaniment({
@@ -53,6 +79,11 @@ export function AccompanimentPlayer({
    * 用 token 区分"同一状态下重复触发"（重录一次 = 一次新的 play 边沿）。
    */
   const { play, stop } = view;
+  // 同步起播命令柄（用户手势任务里由「开始录制」调用，见 props 注释）
+  useEffect(() => {
+    if (playHandleRef === undefined) return;
+    playHandleRef.current = { play, stop };
+  }, [playHandleRef, play, stop]);
   const handledTokenRef = useRef(0);
   const lastPlayRef = useRef(false);
   useEffect(() => {
@@ -92,7 +123,9 @@ export function AccompanimentPlayer({
       </header>
 
       <p className="text-[0.875rem] leading-[1.6] text-muted">
-        只播当前段的伴奏，不会连着往下放 —— 这样你听到的和成品里的时间槽一致。
+        {autoOnly
+          ? '点「开始录制」会同时放这一段的伴奏，你对着它唱；停录就停。只放当前段，不连着往下放 —— 这样你听到的和成品里的时间槽一致。'
+          : '只播当前段的伴奏，不会连着往下放 —— 这样你听到的和成品里的时间槽一致。'}
       </p>
 
       {view.segment === null ? (
@@ -101,22 +134,29 @@ export function AccompanimentPlayer({
         </p>
       ) : (
         <>
-          <div className="flex flex-wrap items-center gap-3">
-            <Button
-              aria-label={view.isPlaying ? '暂停' : '播放本段伴奏'}
-              onClick={view.isPlaying ? view.pause : view.play}
-              icon={<Icon name={view.isPlaying ? 'Pause' : 'Play'} size={18} />}
-            >
-              {view.isPlaying ? '暂停' : '播放本段伴奏'}
-            </Button>
-            <Button
-              variant="ghost"
-              onClick={view.replaySegment}
-              icon={<Icon name="RotateCcw" size={18} />}
-            >
-              重听本段
-            </Button>
-          </div>
+          {/*
+            `autoOnly` = 录制流程里**不摆**这两颗"分开的功能"按钮（用户裁决：
+            录制界面只留一个「开始录制」，伴奏跟着录音走）。进度/歌词仍留着，
+            让你看得到伴奏正在放。
+          */}
+          {autoOnly ? null : (
+            <div className="flex flex-wrap items-center gap-3">
+              <Button
+                aria-label={view.isPlaying ? '暂停' : '播放本段伴奏'}
+                onClick={view.isPlaying ? view.pause : view.play}
+                icon={<Icon name={view.isPlaying ? 'Pause' : 'Play'} size={18} />}
+              >
+                {view.isPlaying ? '暂停' : '播放本段伴奏'}
+              </Button>
+              <Button
+                variant="ghost"
+                onClick={view.replaySegment}
+                icon={<Icon name="RotateCcw" size={18} />}
+              >
+                重听本段
+              </Button>
+            </div>
+          )}
 
           <p aria-live="polite" className="text-[0.9375rem] text-paper">
             第 {segmentIndex} 段 · 本段 {formatClock(view.segmentPositionMs)} /{' '}

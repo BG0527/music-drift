@@ -159,6 +159,15 @@ function BottleView({ bottle, seams }: { bottle: BottleDetail; seams?: BottlePag
   const [listenAllIndex, setListenAllIndex] = useState<number | null>(null);
   /** 播放器的命令柄：「听全部」要驱动**同一个**播放器，不能另起一个（否则声音打架）。 */
   const playerHandleRef = useRef<SegmentPlayerHandle | null>(null);
+  /**
+   * 进度条的投递目标（右列「沿着歌声听下去」下方的空位）。
+   * 用户裁决：进度条挪到右列、与赞/踩/听全部水平对齐。进度条与投票**共用一个播放器**，
+   * 所以只搬 DOM 位置（portal），不拆播放器 —— 见 VotableSegment 的 props 注释。
+   *
+   * 用 state 而非 ref：投递目标要在**挂载后**才拿得到，存进 state 才能让
+   * VotableSegment 在目标就绪后重渲染并把 transport portal 过去（ref 不会触发渲染）。
+   */
+  const [transportDock, setTransportDock] = useState<HTMLDivElement | null>(null);
   /** G2（flow-audit P0）：三选一确认成功后的去向 —— 播报之外在正文留「语义下一步键」，不让流程死在 aria-live 里。 */
   const [resolutionNext, setResolutionNext] = useState<Resolution | null>(null);
   const [reportTarget, setReportTarget] = useState<{
@@ -610,6 +619,7 @@ function BottleView({ bottle, seams }: { bottle: BottleDetail; seams?: BottlePag
               autoPlayToken={autoplayToken}
               showPlayButton={false}
               listenAllControl={listenAllButton}
+              {...(transportDock === null ? {} : { transportPortalTarget: transportDock })}
               {...(seams?.segmentElementFactory === undefined
                 ? {}
                 : { createElement: seams.segmentElementFactory })}
@@ -662,6 +672,11 @@ function BottleView({ bottle, seams }: { bottle: BottleDetail; seams?: BottlePag
           <p className="sub mt-[4px] text-[0.8125rem] text-muted">
             左边「听全部」按段号顺序连着听；点瓶身上某一段的「听」只听那一段。
           </p>
+          {/* 进度条投递位（用户裁决）：与左列赞/踩/听全部水平对齐。transport 通过 portal
+              投递到这里（共用同一个播放器，只搬 DOM 位置）。无可试听段时不占位。 */}
+          {selectedSegment === null ? null : (
+            <div ref={setTransportDock} className="bp-transport-dock mt-[10px]" />
+          )}
         </section>}
       </div>
 

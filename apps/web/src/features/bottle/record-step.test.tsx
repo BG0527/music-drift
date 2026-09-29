@@ -290,7 +290,7 @@ describe('录制步骤', () => {
  * 两条断言分别钉住"接对了"与"真没预设时要说清楚为什么"。
  */
 describe('录制步骤：本段固定时长（presetDurationMs）的接线', () => {
-  it('songId 匹配静态曲库时，在录音控件前显示本段伴奏与同步歌词', async () => {
+  it('songId 匹配静态曲库时，在录音控件前显示本段伴奏与同步歌词（录制流程只留「开始录制」）', async () => {
     renderWithProviders(
       <RecordStep
         bottleId={BOTTLE}
@@ -303,10 +303,16 @@ describe('录制步骤：本段固定时长（presetDurationMs）的接线', () 
       { handlers: [songsWithLibraryTrack, libraryMetadataHandler] },
     );
 
-    expect(await screen.findByRole('button', { name: '播放本段伴奏' })).toBeInTheDocument();
-    expect(screen.getByLabelText('同步歌词')).toBeInTheDocument();
+    // 用户裁决：伴奏不另给一套"分开的功能"按钮 —— 录制界面只有一个「开始录制」，
+    // 点它时伴奏同步起播（见 accompaniment-player 的 autoOnly / playHandleRef）。
+    // 等「开始录制」出现 = 曲库已到、伴奏面板已渲染，再断言。
+    expect(await screen.findByRole('button', { name: /开始录制/ })).toBeEnabled();
+    expect(
+      screen.queryByRole('button', { name: '播放本段伴奏' }),
+      '录制流程不应再有独立的「播放本段伴奏」按钮',
+    ).not.toBeInTheDocument();
+    expect(await screen.findByLabelText('同步歌词')).toBeInTheDocument();
     expect(screen.getByText('风从旧码头带来回响')).toHaveAttribute('aria-current', 'true');
-    expect(screen.getByRole('button', { name: /开始录制/ })).toBeEnabled();
   });
 
   it('静态曲库加载失败只给可读提示，不阻断真实录音主流程', async () => {
