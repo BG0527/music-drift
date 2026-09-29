@@ -269,7 +269,7 @@ export function SongPickerPage() {
   const rawCount = catalog.length - cutCount;
 
   return (
-    <div className="relative isolate flex flex-col gap-6 px-[5.28%] pt-[max(1rem,1.389vw,var(--top-nav-reserve-min))] md:h-[100dvh] md:gap-4 md:overflow-hidden md:pb-3">
+    <div className="relative isolate flex flex-col gap-6 px-[5.28%] pt-[max(1rem,var(--top-nav-reserve-min))] md:h-[100dvh] md:gap-4 md:overflow-hidden md:pb-3">
       {/* W18.5 · B4：发起结果播报。此前本页零 aria-live ——
           「正在发瓶 / 已投河」只有按钮 shimmer 与跳转，读屏用户听不到任何结果。 */}
       <p role="status" aria-live="polite" className="sr-only">

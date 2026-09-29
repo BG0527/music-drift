@@ -173,7 +173,7 @@ export function DriftLogPage({ id }: { id: string }) {
     /* W18.5 · B8：顶栏让位放在**外层包裹**上，`<main>` 的 `pt-[max(2.5rem,4.444vw)]`
        原样保留 —— 那是参考稿逐值照抄的一部分（既有测试按精确字符串钉着它），
        改它就等于放弃照稿。让位只保证"首行不被 fixed 顶栏压住"这一件事。 */
-    <div className="pt-[var(--top-nav-reserve-min)]">
+    <div className="pt-[var(--top-nav-reserve-min)] md:pt-0">
     <main className="drift-page relative z-[2] px-[max(1.5rem,5.278vw)] pt-[max(2.5rem,4.444vw)] pb-0 text-paper md:h-[100dvh] md:overflow-hidden">
       {/* W18.5 · B4：加载/条数播报。此前本页零 aria-live ——
           长日志（可达数百条）加载完成、切段查看都只有视觉变化，读屏什么都听不到。 */}

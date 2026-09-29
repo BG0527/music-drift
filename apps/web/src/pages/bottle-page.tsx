@@ -100,7 +100,7 @@ export function BottlePage({ id, seams }: BottlePageProps) {
       {/* W18.5 · B8：顶栏让位放在这一层（`pt-[max(1.5rem,2.083vw)]` 是参考稿逐值照抄的
           一部分，既有测试按精确字符串钉着它，改它等于放弃照稿）。
           让位只保证"首行不被 fixed 顶栏压住"这一件事。 */}
-      <div className="pt-[var(--top-nav-reserve-min)]">
+      <div className="pt-[var(--top-nav-reserve-min)] md:pt-0">
       <main className="bottle-page flex min-w-0 flex-col px-[max(1.5rem,5.278vw)] pt-[max(1.5rem,2.083vw)] pb-[max(1rem,1.111vw)] text-paper md:h-[100dvh] md:overflow-hidden">
         {/* 场景层（稿 .clip：platter / air / glint / deep / current）——纯装饰、零高度 */}
         <div className="bp-scene" aria-hidden="true">
