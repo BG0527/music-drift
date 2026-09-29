@@ -266,6 +266,30 @@ async function seedData() {
   const stamp = Date.now().toString(36);
   const { cookie } = await register(`layout${stamp}`);
 
+  /**
+   * W18.5 · B3：管理员会话。
+   * `/admin` 此前根本不在 `routesFor()` 里，所以这一页**从来没被量过** ——
+   * 门禁也就从未发现「非管理员分支没有 `<main>`/h1」这类问题。
+   * 种子里有固定管理员账号（`apps/api/src/db/seed.ts` 的 `SEED_ADMIN`），
+   * 这里登一次拿 cookie，只给 `/admin` 那一条路由用。
+   */
+  let adminCookie = null;
+  {
+    const response = await fetch(`${API}/api/auth/login`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ account: 'admin', password: 'admin123' }),
+    });
+    if (response.ok) {
+      const setCookies = response.headers.getSetCookie?.() ?? [];
+      const header = setCookies.find((c) => c.startsWith('mdb_session='));
+      if (header !== undefined) adminCookie = header.split(';')[0];
+    }
+    if (adminCookie === null) {
+      console.warn('[gate] 管理员登录失败：/admin 这一行会按未登录视图量（结果不可信）');
+    }
+  }
+
   const songs = await (await fetch(`${API}/api/songs`)).json();
   const song = songs.find((item) => item.segments.length === item.totalSegments) ?? songs[0];
 
@@ -371,7 +395,7 @@ async function seedData() {
   // ④ **刚发起、什么都没录**（用户 2026-09-23 报的 P0：这一步曾显示"不在你手上"，录不了第 1 段）
   const freshId = await createBottle();
 
-  return { cookie, seaId, riverId, heldTwoSegmentsId, freshId,
+  return { cookie, adminCookie, seaId, riverId, heldTwoSegmentsId, freshId,
     recordHeld: () => record(heldTwoSegmentsId, '几何检查·第三段等待去向') };
 }
 
@@ -406,6 +430,10 @@ function routesFor(seed) {
     { path: `/bottles/${seed.heldTwoSegmentsId}`, anchors: ['bottle-play', 'bottle-action'], scenario: 'awaiting-destination' },
     { path: `/bottles/${seed.heldTwoSegmentsId}`, anchors: ['bottle-play', 'bottle-action'], scenario: 'destination-completed' },
     { path: `/bottles/${seed.riverId}/log`, anchors: [], needsAuth: true },
+    // W18.5 · B3：这两页此前**不在**门禁里，等于从来没被量过。
+    // /login：匿名可达（登出态量），锚点取登录卡；/admin：需要管理员会话。
+    { path: '/login', anchors: ['login-card'], guest: true },
+    { path: '/admin', anchors: ['admin-queue'], needsAdmin: true },
     { path: '/nope-does-not-exist', anchors: [] },
   ];
 }
@@ -470,11 +498,83 @@ async function measure(page, selectors) {
       }
       if (bottlePage.scrollLeft !== 0) visualOverlaps.push(`页面内部横向滚动 ${bottlePage.scrollLeft}px`);
     }
+
+    /**
+     * W18.5 · B3：顶栏（fixed）压首屏内容的检测。
+     *
+     * 为什么必须单列一条：此前 mobile 分支只查「锚点下沿 ≤ 812」+「无横向溢出」，
+     * 而 fixed 顶栏压住页面首行时锚点下沿完全可能只有 200px（"在视口内"）——
+     * 于是「/sea 375 六列压叠」「选歌/设置/瓶子/公海/日志首行被顶栏压住」这些
+     * 真实缺陷全部能全绿通过。判据必须量**几何相交**，不能只量位置。
+     *
+     * 做法：取顶栏矩形，再取首屏里"最靠上的一批可见文字/控件"矩形，
+     * 任何与顶栏相交面积 > 2px² 的都算缺陷。
+     */
+    const navRect = (() => {
+      const nav = document.querySelector('[data-testid="top-nav"]');
+      if (nav === null) return null;
+      const rect = nav.getBoundingClientRect();
+      // 顶栏自身可能带透明区域；只取它实际占据的高度
+      if (rect.width < 4 || rect.height < 4) return null;
+      return { left: rect.left, top: rect.top, right: rect.right, bottom: rect.bottom };
+    })();
+
+    const navOverlaps = [];
+    if (navRect !== null) {
+      const navBottom = navRect.bottom;
+      /**
+       * 只看**叶子节点**（有文字或本身就是可点/表单件）。
+       * 排除 `section/ul/nav` 这类容器：整屏容器（例如 landing 的 `.landing-screen`，
+       * top=0 / height=100dvh）必然与顶栏相交，但它的**文字**在内部 padding 里并没有被压 ——
+       * 拿容器判重叠会把"整屏"恒判成失败（第一版就踩了这个坑，见 .tmp-w185/probe-nav-overlap.mjs）。
+       */
+      const nodes = [
+        ...document.querySelectorAll(
+          'h1, h2, h3, p, a, button, label, li > span, li > div, input, textarea, select, [data-anchor]',
+        ),
+      ];
+      for (const node of nodes) {
+        // 顶栏自己内部的元素不算（顶栏是 fixed 容器，里面还有一个 <nav aria-label="站内导航">）
+        if (node.closest('[data-testid="top-nav"]') !== null) continue;
+        // 另一个 fixed 浮层（Landing 的圆点导航等）不算"被压住的内容" ——
+        // 自己**或任一祖先**是 fixed 都算（Landing 圆点按钮自己是 static，祖先 nav 才是 fixed，
+        // 只判自己会漏掉它与顶栏边缘的 5px 擦碰）。
+        let insideOtherFixed = false;
+        for (let el = node; el !== null && el !== document.body; el = el.parentElement) {
+          if (getComputedStyle(el).position === 'fixed') {
+            insideOtherFixed = true;
+            break;
+          }
+        }
+        if (insideOtherFixed) continue;
+        const style = getComputedStyle(node);
+        if (style.visibility === 'hidden' || style.display === 'none' || Number(style.opacity) === 0) {
+          continue;
+        }
+        const rect = node.getBoundingClientRect();
+        if (rect.width < 4 || rect.height < 4) continue;
+        // 整屏级容器不算（Landing 的 `.landing-screen` / `intro-hero` 锚点都挂在 section 上，
+        // 它们 top=0、height=100dvh，必然与顶栏相交，但里面的文字并没有被压）
+        if (rect.height > window.innerHeight * 0.6) continue;
+        // 只看落在视口上缘一带的内容（顶栏压的正是"首屏最上面"那一批）
+        if (rect.top > navBottom + 2) continue;
+        const overlapHeight = Math.min(rect.bottom, navBottom) - Math.max(rect.top, navRect.top);
+        const overlapWidth = Math.min(rect.right, navRect.right) - Math.max(rect.left, navRect.left);
+        if (overlapWidth > 2 && overlapHeight > 2) {
+          const label = (node.textContent ?? '').trim().slice(0, 18) || node.tagName;
+          navOverlaps.push(`顶栏压住首屏内容「${label}」（交叠 ${String(Math.round(overlapHeight))}px）`);
+          if (navOverlaps.length >= 4) break;
+        }
+      }
+    }
+
     return {
       height: Math.max(document.documentElement.scrollHeight, document.body.scrollHeight),
       scrollWidth: document.documentElement.scrollWidth,
       anchors,
       visualOverlaps,
+      navOverlaps,
+      navRect,
     };
   }, selectors);
 }
@@ -499,16 +599,19 @@ const browser = await chromium.launch();
 const context = await browser.newContext({
   viewport: { width: viewportWidth, height: viewportHeight },
 });
-await context.addCookies([
-  {
+/** 会话 cookie（`mdb_session=…` → Playwright cookie 对象）。W18.5 · B3 抽出，供逐路由切换身份复用。 */
+function sessionCookie(cookieHeader) {
+  return {
     name: 'mdb_session',
-    value: seed.cookie.slice('mdb_session='.length),
+    value: cookieHeader.slice('mdb_session='.length),
     domain: '127.0.0.1',
     path: '/',
     httpOnly: true,
     sameSite: 'Lax',
-  },
-]);
+  };
+}
+
+await context.addCookies([sessionCookie(seed.cookie)]);
 
 // 前置检查：**自建环境 + 真实会话**必须成立。否则浏览器看到的是"未登录视图"，
 // 每个页面都短、每个断言都绿 —— 这类假绿必须在这里被挡住。
@@ -540,6 +643,20 @@ console.log(
 let failures = 0;
 for (const route of routes) {
   if (route.scenario === 'awaiting-destination') await seed.recordHeld();
+  // W18.5 · B3：每条路由可以指定会话身份 ——
+  //   needsAdmin：换成管理员 cookie（/admin 否则只会量到"非管理员"那一支）；
+  //   guest：清掉 cookie（/login 必须按登出态量，登录态下它会直接给"你已登录"的出口）。
+  // 换 cookie 走 context 层，因为 cookie 是 context 级的。
+  if (route.needsAdmin === true) {
+    if (seed.adminCookie === null) throw new Error('/admin 需要管理员会话，但管理员登录失败');
+    await context.clearCookies();
+    await context.addCookies([sessionCookie(seed.adminCookie)]);
+  } else if (route.guest === true) {
+    await context.clearCookies();
+  } else {
+    await context.clearCookies();
+    await context.addCookies([sessionCookie(seed.cookie)]);
+  }
   const page = await context.newPage();
   await page.goto(`${BASE}${route.path}`, { waitUntil: 'networkidle' });
   if (route.scenario === 'playing-four' || route.scenario === 'awaiting-destination') {
@@ -681,6 +798,12 @@ for (const route of routes) {
   }
   if (!mobile && after.height > heightThreshold) {
     problems.push(`整页高 ${String(after.height)} > ${String(heightThreshold)}`);
+  }
+  // W18.5 · B3：顶栏压首屏内容 —— 桌面与窄屏**都**查。
+  // 桌面此前靠"整页高度"间接兜住，但那是巧合（压住时高度不变），不是判据；
+  // 窄屏则是彻底盲区（锚点下沿可以是 200px，照样"在视口内"）。
+  if (mobile && after.navOverlaps.length > 0) {
+    problems.push(after.navOverlaps.slice(0, 3).join('；'));
   }
   if (after.visualOverlaps.length === 0) {
     // 明确保留这个分支：静态守卫据此确认真浏览器门禁不是只测高度。

@@ -106,7 +106,12 @@ export function LoginPage() {
    * 两种模式共用同一份状态，切换档位不丢输入。
    */
   const form = (
-    <form className="enter-rise flex max-w-[452px] flex-col" onSubmit={submit} noValidate>
+      <form
+        data-anchor="login-card"
+        className="enter-rise flex max-w-[452px] flex-col"
+        onSubmit={submit}
+        noValidate
+      >
       {/* §4.2 图注（稿 12.5px/1.8，rgba(.54) → paper/55） */}
       <p className="mt-5 max-w-[452px] text-[0.78125rem] leading-[1.8] text-paper/55">
         登录和注册都只用这两项：账号、密码。
