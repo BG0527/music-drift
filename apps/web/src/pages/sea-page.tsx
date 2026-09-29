@@ -117,6 +117,11 @@ const SEA_HALL_CSS = `
 .sea-hall .zones li .n{margin-left:6px;font-size:12px;color:rgba(243,249,250,.42)}
 .sea-hall .zones li[aria-selected='true']{color:var(--color-paper);border-bottom-color:var(--color-coral);animation:sea-tab-pick var(--motion-entry-duration) var(--motion-entry-easing) both}
 .sea-hall .zones li[aria-selected='true'] .n{color:var(--color-glass)}
+/* 交互态（DESIGN §Interaction States；守卫：__tests__/interaction-states.test.ts）：
+   悬停只提亮文字 + 让下框线显形（分区未选中时下框是 transparent 底线，选中才是 coral 实线），
+   按下给 translateY(-1px)。关进 @media (hover: hover) 避免触屏粘滞；不改 :116 的默认几何。 */
+@media (hover: hover){.sea-hall .zones li:hover{color:rgba(243,249,250,.78);border-bottom-color:rgba(216,243,246,.28)}.sea-hall .zones li:hover .n{color:rgba(203,238,246,.6)}}
+.sea-hall .zones li:active{transform:translateY(-1px)}
 /* t6 分区切换的确认动效（guidance：现在看的是哪个分区）。一次性「起-落」，
    幅度取契约 hoverScale、时长/缓动取 --motion-* token；只动 transform，静止态 = 基态。 */
 @keyframes sea-tab-pick{0%{transform:scale(1)}50%{transform:scale(var(--motion-hover-scale))}100%{transform:scale(1)}}

@@ -132,3 +132,30 @@ describe('A1 瓶详情页：过渡纪律（只动 transform/opacity，禁布局�
     expect(transitionDecls).not.toMatch(/\d+(?:\.\d+)?ms\b/);
   });
 });
+
+describe('A2 公海大厅：分区 tab 的交互态', () => {
+  const src = read('pages/sea-page.tsx');
+  const TAB = '.sea-hall .zones li';
+
+  it('tab 悬停有回应（提亮文字 + 显形下框线），且关在 hover-capable 媒体查询里', () => {
+    expect(src, 'hover 规则必须包在 @media (hover: hover) 里').toMatch(
+      /@media[^{]*\(hover:\s*hover\)/,
+    );
+    const hover = stateRulesOf(src, TAB, ':hover');
+    expect(hover, '分区 tab:hover 缺失（cursor:pointer 承诺了交互，悬停却无回应）').not.toBe('');
+    expect(hover, 'tab:hover 必须提亮 color').toMatch(/color:/);
+    expect(hover, 'tab:hover 必须让下框线显形（border-bottom-color）').toMatch(/border-bottom-color:/);
+  });
+
+  it('tab 按下有 translateY(-1px) 回应', () => {
+    expect(stateRulesOf(src, TAB, ':active'), '分区 tab:active 缺失').toMatch(
+      /translateY\(-1px\)/,
+    );
+  });
+
+  it('hover 规则不写时间字面量/缓动（参数只来自 --motion-* token）', () => {
+    const hover = stateRulesOf(src, TAB, ':hover');
+    expect(hover).not.toMatch(/\d+(?:\.\d+)?ms\b/);
+    expect(hover).not.toMatch(/cubic-bezier|ease-(?:linear|in|out|in-out)/);
+  });
+});
