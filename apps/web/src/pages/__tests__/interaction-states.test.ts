@@ -216,3 +216,63 @@ describe('A3 文字链接：6 个变体的悬停/按下反馈（DESIGN §Interac
     }
   });
 });
+
+describe('A4 我的 / 漂流日志 / 设置：可点元素的反馈完整性', () => {
+  const driftLogPage = read('pages/drift-log-page.tsx');
+  const settingsPage = read('pages/settings-page.tsx');
+
+  it('我的：.go 出口（两处）自带 token 化过渡 + 悬停/按下/焦点反馈', () => {
+    // .go 是本页自建的出口文字链（glass 色），不走 link-styles 的 TEXT_LINK 变体，
+    // 所以它必须自己声明全套反馈 —— 否则「查看/接唱」这类唯一出口点了没反应。
+    const css = read('pages/profile-page.css');
+    const go = rulesOf(css, '.p-record .mrow .go');
+    expect(go, '.go 没有 transition').toMatch(/transition:/);
+    expect(go, '.go 的过渡必须引 var(--motion-hover-duration)').toMatch(
+      /var\(--motion-hover-duration\)/,
+    );
+    expect(go, '.go 不得写时间字面量').not.toMatch(/\d+(?:\.\d+)?ms\b/);
+
+    expect(stateRulesOf(css, '.p-record .mrow .go', ':hover'), '.go:hover 缺失').toMatch(
+      /color:/,
+    );
+    expect(stateRulesOf(css, '.p-record .mrow .go', ':active'), '.go:active 缺失').toMatch(
+      /translateY\(-1px\)/,
+    );
+  });
+
+  it('设置：可点控件走设计系统 Button（反馈由 DS 统一提供，不自造）', () => {
+    const buttons = settingsPage.match(/<Button/g)?.length ?? 0;
+    expect(buttons, '设置页应使用 DS Button').toBeGreaterThanOrEqual(2);
+    expect(settingsPage, '不得自造裸 <button> 绕过 DS 反馈').not.toMatch(/<button(?![^>]*type=)/);
+  });
+
+  it('漂流日志：页头「回漂流瓶」是唯一可点出口，它必须自带悬停/按下/焦点反馈', () => {
+    const crumb = /<Link\s+to=\{`\/bottles\/\$\{id\}`\}\s+className="([^"]+)"/s.exec(
+      driftLogPage,
+    )?.[1];
+    expect(crumb, '没找到「回漂流瓶」链接的 className').toBeTruthy();
+    const cls = crumb ?? '';
+    expect(cls, '面包屑链缺 token 化过渡').toMatch(
+      /duration-\[var\(--motion-hover-duration\)\]/,
+    );
+    expect(cls, '面包屑链缺悬停信号').toMatch(/hover:/);
+    expect(cls, '面包屑链缺 focus-visible 焦点环').toMatch(/focus-visible:ring-2/);
+    expect(cls, '面包屑链缺按下回应').toMatch(/active:/);
+    expect(cls, '不得 transition-all').not.toMatch(/transition-all/);
+  });
+
+  it('三页的 CSS 都不出现布局属性过渡（禁 width/height/top/left 动画）', () => {
+    for (const rel of [
+      'pages/profile-page.css',
+      'pages/settings-page.css',
+      'pages/drift-log-page.css',
+    ]) {
+      const css = read(rel);
+      const decls = (css.match(/transition:[^;}]+/g) ?? []).join('\n');
+      expect(decls, `${rel} 不得动画布局属性`).not.toMatch(
+        /transition:[^;}]*\b(width|height|top|left|right|bottom|margin|padding|box-shadow)\b/,
+      );
+      expect(decls, `${rel} 不得 transition-all`).not.toMatch(/transition:\s*all/);
+    }
+  });
+});

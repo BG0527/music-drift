@@ -655,6 +655,27 @@
   margin-left: auto;
   font-size: 12.5px;
   color: var(--glass);
+  /* 交互态（W18.5 · A4；守卫 __tests__/interaction-states.test.ts）：
+     .go 是每行唯一的出口（「查看」「去接唱」），点了没反应等于死路。
+     文字链不放大（与行内相邻文字压边），只提亮到 paper + 按下 1px；时长只引契约 token。 */
+  transition:
+    color var(--motion-hover-duration) var(--motion-entry-easing),
+    transform var(--motion-hover-duration) var(--motion-entry-easing);
+}
+
+@media (hover: hover) {
+  .p-record .mrow .go:hover {
+    color: var(--paper);
+  }
+}
+
+.p-record .mrow .go:active {
+  transform: translateY(-1px);
+}
+
+.p-record .mrow .go:focus-visible {
+  outline: 2px solid var(--coral);
+  outline-offset: 2px;
 }
 .p-record .mdet {
   font-size: 12.5px;

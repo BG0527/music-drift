@@ -192,7 +192,7 @@ export function DriftLogPage({ id }: { id: string }) {
       <header className="enter-rise relative">
         <Link
           to={`/bottles/${id}`}
-          className="inline-flex min-h-11 items-center gap-[7px] rounded-[2px] border border-[rgba(243,249,250,0.16)] px-[12px] text-[12.5px] text-muted"
+          className="inline-flex min-h-11 items-center gap-[7px] rounded-[2px] border border-[rgba(243,249,250,0.16)] px-[12px] text-[12.5px] text-muted transition-[transform,color,border-color] duration-[var(--motion-hover-duration)] ease-[var(--motion-entry-easing)] hover:border-[rgba(216,243,246,0.4)] hover:text-glass focus-visible:ring-2 focus-visible:ring-coral focus-visible:ring-offset-2 focus-visible:ring-offset-ink active:translate-y-px"
         >
           <svg width="8" height="12" viewBox="0 0 8 12" aria-hidden="true">
             <path
