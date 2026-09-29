@@ -74,3 +74,69 @@ describe('B3-3 门禁必须保留反向控制（否则"全绿"可能只是"没�
     expect(gate).toMatch(/provedRed\s*=/);
   });
 });
+
+describe('B8 顶栏让位是契约值，且各页都引用它（不再各写各的）', () => {
+  /**
+   * 缺陷：站点顶栏是 `position: fixed`（`top-[10px]` + 每项 `min-h-11`），
+   * 占据视口顶 10..54px 这条带且不占文档流。各页首行的让位却各写各的：
+   * song-picker 0、bottle 24px、drift-log 40px、settings 45px、login 32px ——
+   * 结果在 375 下有 4 个页面的首行被顶栏压住（B3 门禁补盲后实测会红）。
+   *
+   * 修法不是"逐页把数字调大"，而是把让位收成一个契约 token
+   * （`--top-nav-reserve-min`），页面一律 `max(自己的设计顶距, var(--top-nav-reserve-min))`。
+   * 这样顶栏高度将来一改，全站一起让位，不会再漏掉某一页。
+   */
+  const themeCss = readFileSync(join(webRoot, 'src', 'design-system', 'theme.css'), 'utf8');
+  const readPage = (name: string): string =>
+    readFileSync(join(webRoot, 'src', 'pages', name), 'utf8');
+
+  it('theme.css 定义了顶栏几何四元组与让位底线', () => {
+    for (const token of [
+      '--top-nav-offset',
+      '--top-nav-height',
+      '--top-nav-bottom',
+      '--top-nav-clearance',
+      '--top-nav-reserve-min',
+    ]) {
+      expect(themeCss, `theme.css 缺 ${token}`).toContain(`${token}:`);
+    }
+  });
+
+  it('让位底线的算法是「顶栏底边 + 呼吸位」，不是写死的数字', () => {
+    expect(themeCss).toMatch(
+      /--top-nav-bottom:\s*calc\(var\(--top-nav-offset\)\s*\+\s*var\(--top-nav-height\)\)/,
+    );
+    expect(themeCss).toMatch(
+      /--top-nav-reserve-min:\s*calc\(var\(--top-nav-bottom\)\s*\+\s*var\(--top-nav-clearance\)\)/,
+    );
+  });
+
+  const PAGES: ReadonlyArray<readonly [string, string]> = [
+    ['song-picker-page.tsx', readPage('song-picker-page.tsx')],
+    ['drift-log-page.tsx', readPage('drift-log-page.tsx')],
+    ['bottle-page.tsx', readPage('bottle-page.tsx')],
+    ['settings-page.css', readFileSync(join(webRoot, 'src', 'pages', 'settings-page.css'), 'utf8')],
+  ];
+
+  it.each(PAGES)('%s 的首行让位引 --top-nav-reserve-min', (_name, src) => {
+    expect(src, '页面首行没有引用顶栏让位 token').toMatch(/var\(--top-nav-reserve-min\)/);
+  });
+
+  it.each(PAGES)('%s 的根级顶距不小于让位底线', (_name, src) => {
+    /**
+     * 只查**根容器**的顶距（页面根元素 / 主容器），不查元素内部的盒内间距 ——
+     * 内部 1px/1.5px 的 padding 是排版细节，与"顶栏让位"无关。
+     * 判据取「根级 pt-[...] 的第一个数字」：那才是页面自己的设计顶距。
+     */
+    const code = src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\{\/\*[\s\S]*?\*\/\}/g, '{}');
+    const rootPadding = [...code.matchAll(/pt-\[max\(\s*([\d.]+)(?:px|rem)/g)].map((m) => Number(m[1]));
+    // 底线 = 10 + 44 + 8 = 62px；根级设计顶距低于它且没引 token，就是漏网之鱼
+    const needsToken = rootPadding.filter((px) => px > 0 && px < 62);
+    for (const px of needsToken) {
+      expect(
+        code.includes('var(--top-nav-reserve-min)'),
+        `根级设计顶距 ${String(px)}px < 让位底线 62px，却没引 var(--top-nav-reserve-min)`,
+      ).toBe(true);
+    }
+  });
+});

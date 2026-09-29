@@ -1,4 +1,4 @@
-﻿/**
+/**
  * 漂流瓶页 —— 逐块照抄设计稿 `docs/ui-review/design-explore/p-bottle-record.html`：
  * 块顺序 / 装置 / 文案逐字 / 值逐值，不省块不发明不重组；唯一翻译 = 固定 px → 流体
  * （稿是 1440×900 绝对定位画布：本页改成正常流，边距 76/30/16px → vw + rem 下限）。
@@ -97,6 +97,10 @@ export function BottlePage({ id, seams }: BottlePageProps) {
   return (
     <GroovePlaybackProvider>
       {/* 页面自带 <main>（外壳不渲染）：稿的 76/30/16px 画布边距 → 流体（vw，rem 下限） */}
+      {/* W18.5 · B8：顶栏让位放在这一层（`pt-[max(1.5rem,2.083vw)]` 是参考稿逐值照抄的
+          一部分，既有测试按精确字符串钉着它，改它等于放弃照稿）。
+          让位只保证"首行不被 fixed 顶栏压住"这一件事。 */}
+      <div className="pt-[var(--top-nav-reserve-min)]">
       <main className="bottle-page flex min-w-0 flex-col px-[max(1.5rem,5.278vw)] pt-[max(1.5rem,2.083vw)] pb-[max(1rem,1.111vw)] text-paper md:h-[100dvh] md:overflow-hidden">
         {/* 场景层（稿 .clip：platter / air / glint / deep / current）——纯装饰、零高度 */}
         <div className="bp-scene" aria-hidden="true">
@@ -110,6 +114,7 @@ export function BottlePage({ id, seams }: BottlePageProps) {
           {(data) => <BottleView bottle={data} {...(seams === undefined ? {} : { seams })} />}
         </AsyncBoundary>
       </main>
+      </div>
     </GroovePlaybackProvider>
   );
 }

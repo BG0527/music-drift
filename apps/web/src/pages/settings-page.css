@@ -37,7 +37,9 @@
   display: flex;
   flex-direction: column;
   gap: 20px;
-  padding: 24px 16px 32px;
+  /* W18.5 · B8：让位顶栏（fixed，占视口顶 10..54px 且不占文档流）。
+     公式 = max(本页设计顶距 24px, var(--top-nav-reserve-min) = 10+44+8 = 62px)。 */
+  padding: max(24px, var(--top-nav-reserve-min)) 16px 32px;
 }
 
 /* 正文层永远在装饰层之上（装饰 z0、正文 z1） */

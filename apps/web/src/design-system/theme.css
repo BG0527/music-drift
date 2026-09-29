@@ -179,6 +179,23 @@
      ease-out 只在末端收，回程会"弹一下"。 */
   --motion-drift-easing: ease-in-out;
 
+  /* ── W18.5 · B8：顶栏让位 ──────────────────────────────────────────────────
+     站点顶栏是 `position: fixed`（top-nav.tsx：`fixed top-[10px]` + 每项
+     `min-h-11`）⇒ 它占据视口顶部 10..54px 这一条带，且**不占文档流**。
+     页面根元素必须自己留出这条带，否则首行会被顶栏压住。
+     此前各页各写各的（24px / 40px / 0 / 45px…），在 375 下有 4 个页面被压 ——
+     而门禁当时只查「锚点下沿 ≤ 812」，压住时锚点下沿只有 200px，照样全绿
+     （B3 已把这个盲区补上，实测会红）。
+
+     公式 = max(页面自己的设计顶距, 顶栏底边 + 呼吸位)。
+     顶栏底边 = 10px(偏移) + 44px(最小高) = 54px；呼吸位 8px ⇒ 62px 底线。
+     桌面端同样生效：顶栏是 fixed 的，不分断点。 */
+  --top-nav-offset: 10px;
+  --top-nav-height: 44px;
+  --top-nav-bottom: calc(var(--top-nav-offset) + var(--top-nav-height));
+  --top-nav-clearance: 8px; /* 顶栏底边到首行内容的呼吸位（避免"贴着"） */
+  --top-nav-reserve-min: calc(var(--top-nav-bottom) + var(--top-nav-clearance));
+
   /* ── 水域母题层（2026-09-24 amend · t43）：装饰强度与纹理周期 ──────────────
      契约在 DESIGN.md 的 `motif:` 块。组件/样式只能引用这里的 --motif-*，
      禁止在 water.css 或页面里内联 alpha / px（守卫：__tests__/water-motif.test.tsx）。 */
