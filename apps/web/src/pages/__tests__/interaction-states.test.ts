@@ -317,6 +317,76 @@ describe('A6 按下反馈：触屏也要有即时回应（DESIGN §Interaction S
   });
 });
 
+describe('C5 CSS 文件也在守卫范围内（补长期盲区）', () => {
+  /**
+   * 盲区由来：既有守卫全部扫 **TSX**（`motion-apply.test.tsx` 的两组页面清单、
+   * `motion-contract.test.tsx` 的 `motion.css`），而**页面级 CSS**
+   * （`bottle-page.css` / `profile-page.css` / `settings-page.css` /
+   *  `drift-log-page.css` / `landing-page.css` / 各页内联 `SEA_HALL_CSS`）
+   * 从来没被扫过 —— 于是：
+   *   · 在 CSS 里写 `transition: width` 不会红；
+   *   · 在 CSS 里写 `ease-in-out` 字面量不会红（water.css 的那两条直到 B7 才被收编）；
+   *   · 在 CSS 里写 `300ms` 时间字面量不会红。
+   *
+   * 本组把 CSS 纳入同一口径。需要放行的只有一类：
+   *   **转场/进度/骨架这三类"物理上必须动尺寸"的东西**
+   *   （`transition: width` 的进度槽、`transform` 之外的骨架 shimmer 背景位移），
+   *   它们必须逐个显式登记，不许"整文件豁免"。
+   */
+  const CSS_FILES: ReadonlyArray<readonly [string, string]> = [
+    ['pages/bottle-page.css', read('pages/bottle-page.css')],
+    ['pages/profile-page.css', read('pages/profile-page.css')],
+    ['pages/settings-page.css', read('pages/settings-page.css')],
+    ['pages/drift-log-page.css', read('pages/drift-log-page.css')],
+    ['pages/sea-page.tsx（内联 CSS）', read('pages/sea-page.tsx')],
+    ['pages/landing-page.tsx（内联 CSS）', read('pages/landing-page.tsx')],
+  ];
+
+  /** 逐个登记的合法例外（选择器 + 原因）。新增例外必须在这里加一行 + 写理由。 */
+  const ALLOWED: ReadonlyArray<readonly [string, string]> = [
+    ['skeleton-shimmer', '骨架掠光：必须动 background-position 才能"扫过"，transform 做不到'],
+  ];
+
+  it.each(CSS_FILES)('%s 不写时间字面量（时长一律来自 --motion-* token）', (_name, src) => {
+    const code = src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\n]*/g, '');
+    const literals = [...code.matchAll(/(?:animation|transition)[^;{}]*?(\d+(?:\.\d+)?)ms/g)].map(
+      (m) => m[0].trim(),
+    );
+    expect(
+      literals.join(' | '),
+      `${_name} 的动效声明里出现时间字面量（应引 var(--motion-*)）`,
+    ).toBe('');
+  });
+
+  it.each(CSS_FILES)('%s 不写缓动字面量', (_name, src) => {
+    const code = src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\n]*/g, '');
+    const decls = (code.match(/(?:animation|transition)[^;{}]+/g) ?? []).join('\n');
+    const offenders = decls
+      .split('\n')
+      .filter((line) => ALLOWED.every(([sel]) => !line.includes(sel)))
+      .filter((line) => /\bease-(?:linear|in|out|in-out)\b/.test(line));
+    expect(offenders.join(' | '), `${_name} 仍有缓动字面量`).toBe('');
+  });
+
+  it.each(CSS_FILES)('%s 不动画布局属性（width/height/top/left/margin/padding/box-shadow）', (_name, src) => {
+    const code = src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\n]*/g, '');
+    const decls = (code.match(/transition(?:-[a-z-]+)?\s*:[^;{}]+/g) ?? []).join('\n');
+    const offenders = decls
+      .split('\n')
+      .filter((line) => ALLOWED.every(([sel]) => !line.includes(sel)))
+      .filter((line) => /\b(width|height|top|left|right|bottom|margin|padding|box-shadow)\s*:/.test(line));
+    expect(offenders.join(' | '), `${_name} 仍动画布局属性`).toBe('');
+  });
+
+  it('例外是逐条登记的，不是整文件放行', () => {
+    // 守卫本身的形状：例外表必须存在且非空（否则上面几条就是"整文件豁免"）
+    expect(ALLOWED.length, '例外表为空 ⇒ 等于整文件豁免，盲区没补上').toBeGreaterThan(0);
+    for (const [selector, reason] of ALLOWED) {
+      expect(reason.length, `例外 ${selector} 没写理由`).toBeGreaterThan(10);
+    }
+  });
+});
+
 describe('C4 离线态：预告而不是静默失败（横幅 + 禁危险操作，录音继续）', () => {
   /**
    * 缺口：全站此前**零** `navigator.onLine` 处理（grep = 0 命中），
