@@ -48,3 +48,6 @@ _tmp*
 
 # 一屏适配的探针截图（可用 tools/probe-fit.mjs 重新生成，不入库）
 docs/ui-review/fit/
+
+# 一次性会话归档解压产物（t8 恢复 landing 页用；会话内容不进仓）
+.agents/landing-revert/

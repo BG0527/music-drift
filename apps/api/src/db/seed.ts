@@ -5,11 +5,16 @@
  * - 幂等：固定 UUID + upsert，重复执行结果不变（可安全纳入 CI 与本地重跑）。
  * - `licensed_source = 'placeholder'` 便于与将来用户提供的曲库区分，且 seed 只动这一类。
  *
- * t10（用户裁决）：幂等创建管理员账号 `admin/admin123` —— 用 auth/password.ts 的
+ * t10（用户裁决）：幂等创建管理员账号（handle=admin）—— 用 auth/password.ts 的
  * hashPassword（scrypt）生成哈希**直插 users 表**，绕开注册接口的弱口令黑名单
- * （admin123 ∈ COMMON_WEAK_PASSWORDS）。登录只验哈希不受影响；**不得**为此改 passwordPolicy。
+ * （演示口令 ∈ COMMON_WEAK_PASSWORDS）。登录只验哈希不受影响；**不得**为此改 passwordPolicy。
+ *
+ * t32（用户裁决·脱敏）：管理员口令**不再写进源码**，只从 `SEED_ADMIN_PASSWORD`
+ * （进程环境 / 仓根 .env，均已 gitignore 或占位说明）读取；读不到就跳过管理员种子并告警，
+ * 其余种子照常（无 .env 的 CI 环境不会因此炸掉整条种子链）。
  */
 import { createHash } from 'node:crypto';
+import { readFileSync } from 'node:fs';
 import { hashPassword } from '../auth/password.js';
 import { createDb, type Db } from './client.js';
 
@@ -18,12 +23,30 @@ export const PLACEHOLDER_SOURCE = 'placeholder';
 /** 每段 20 秒、4 段共 80 秒，落在 CONTEXT §14.1「每段 15–30s、总 60–120s」区间内。 */
 const SEGMENT_DURATION_MS = 20_000;
 
-/** t10（用户裁决）：管理员种子账号。口令 admin123 的明文是裁决的一部分（演示账号，不承担保密性）。 */
+/** t10（用户裁决）：管理员种子账号（口令见 .env 的 SEED_ADMIN_PASSWORD，t32 起不落源码）。 */
 export const SEED_ADMIN = {
   handle: 'admin',
-  password: 'admin123',
   role: 'ADMIN',
 } as const;
+
+/**
+ * 管理员口令只来自环境：① 进程环境变量（--env-file-if-exists 已注入时）；
+ * ② 兜底读仓根 .env（vitest 等未走 env-file 的入口 —— 集成测试因此拿到同一份口令）。
+ * 都读不到 ⇒ 返回 null（调用方跳过管理员种子，不抛错、不伪造默认口令）。
+ */
+function adminSeedPassword(): string | null {
+  const fromEnv = process.env['SEED_ADMIN_PASSWORD'];
+  if (fromEnv !== undefined && fromEnv !== '') return fromEnv;
+  try {
+    const text = readFileSync(new URL('../../../../.env', import.meta.url), 'utf8');
+    const matched = /^SEED_ADMIN_PASSWORD=(.+)$/m.exec(text);
+    if (matched?.[1] === undefined) return null;
+    const value = matched[1].trim();
+    return value === '' ? null : value;
+  } catch {
+    return null;
+  }
+}
 
 /**
  * 管理员口令哈希（**固定 salt** = sha256('music-drift/seed/admin')）。
@@ -33,9 +56,9 @@ export const SEED_ADMIN = {
  * 固定 salt 走的是 password.ts 既有的「显式 salt（可复现）」入口；登录只走
  * verifyPassword（解析哈希自带的参数与 salt），校验逻辑零特判。
  */
-function adminPasswordHash(): string {
+function adminPasswordHash(password: string): string {
   const salt = createHash('sha256').update('music-drift/seed/admin').digest();
-  return hashPassword(SEED_ADMIN.password, { salt });
+  return hashPassword(password, { salt });
 }
 
 interface PlaceholderSong {
@@ -121,16 +144,28 @@ export async function runSeed(
       segments += 1;
     }
   }
-  // t10：管理员账号 upsert（幂等；handle 唯一键冲突时收敛 role 与口令哈希）。
-  // 直插 users 绕开注册弱口令黑名单（admin123 ∈ COMMON_WEAK_PASSWORDS）——
-  // 登录只验哈希，passwordPolicy 不需要改、也不允许为此改（注册 admin123 仍必须被拒）。
-  await db.query(
-    `insert into users (handle, password_hash, role)
-     values ($1, $2, $3)
-     on conflict (handle) do update set password_hash = excluded.password_hash, role = excluded.role`,
-    [SEED_ADMIN.handle, adminPasswordHash(), SEED_ADMIN.role],
-  );
-  return { songs: PLACEHOLDER_SONGS.length, segments, admin: SEED_ADMIN.handle };
+  // t10/t32：管理员账号 upsert（幂等；handle 唯一键冲突时收敛 role 与口令哈希）。
+  // 直插 users 绕开注册接口的弱口令黑名单（演示口令在黑名单内）——登录只验哈希，
+  // passwordPolicy 不需要改、也不允许为此改（注册该弱口令仍必须被拒）。
+  // 口令来源：SEED_ADMIN_PASSWORD（进程环境 / 仓根 .env）；缺失则跳过并告警，不伪造默认值。
+  const adminPassword = adminSeedPassword();
+  if (adminPassword === null) {
+    process.stderr.write(
+      '[seed] SEED_ADMIN_PASSWORD 未配置（进程环境或仓根 .env），跳过管理员账号种子\n',
+    );
+  } else {
+    await db.query(
+      `insert into users (handle, password_hash, role)
+       values ($1, $2, $3)
+       on conflict (handle) do update set password_hash = excluded.password_hash, role = excluded.role`,
+      [SEED_ADMIN.handle, adminPasswordHash(adminPassword), SEED_ADMIN.role],
+    );
+  }
+  return {
+    songs: PLACEHOLDER_SONGS.length,
+    segments,
+    admin: adminPassword === null ? '(skipped)' : SEED_ADMIN.handle,
+  };
 }
 
 if (process.argv[1]?.includes('seed')) {

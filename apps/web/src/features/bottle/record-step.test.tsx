@@ -16,6 +16,7 @@ const LIBRARY_SONG_ID = libraryMetadata.tracks[0]!.songId;
 
 afterEach(() => {
   vi.restoreAllMocks();
+  vi.unstubAllGlobals();
 });
 
 /**
@@ -390,5 +391,115 @@ describe('录制步骤：本段固定时长（presetDurationMs）的接线', () 
 
     expect(await screen.findByTestId('preset-missing')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /开始录制/ })).toBeDisabled();
+  });
+});
+
+/* ───────── t16 用户裁决：录前只有「开始录制」，点它 = 伴奏与录音同启（接线层） ───────── */
+/** 只需观测 play/pause 的最小 Audio 替身（与 accompaniment-player.test 的 FakeAudio 同形）。 */
+class FakeAudio {
+  src = '';
+  preload = '';
+  currentTime = 0;
+  paused = true;
+  private listeners = new Map<string, Set<() => void>>();
+  play = vi.fn(async () => {
+    this.paused = false;
+    this.emit('play');
+  });
+  pause = vi.fn(() => {
+    this.paused = true;
+    this.emit('pause');
+  });
+
+  addEventListener(type: string, handler: () => void): void {
+    const listeners = this.listeners.get(type) ?? new Set();
+    listeners.add(handler);
+    this.listeners.set(type, listeners);
+  }
+
+  removeEventListener(type: string, handler: () => void): void {
+    this.listeners.get(type)?.delete(handler);
+  }
+
+  emit(type: string): void {
+    this.listeners.get(type)?.forEach((handler) => handler());
+  }
+}
+
+describe('录制步骤 t16：「开始录制」一键同启伴奏（RecordStep 接线）', () => {
+  it('单击开始录制在同一次点击栈内同步起播伴奏（命令柄先于异步开录），随后进入录制态；录前无独立伴奏键', async () => {
+    const instances: FakeAudio[] = [];
+    vi.stubGlobal(
+      'Audio',
+      function AudioStub() {
+        const instance = new FakeAudio();
+        instances.push(instance);
+        return instance;
+      } as unknown as { new (): FakeAudio },
+    );
+
+    renderWithProviders(
+      <RecordStep
+        bottleId={BOTTLE}
+        songId={LIBRARY_SONG_ID}
+        segmentIndex={2}
+        totalSegments={4}
+        onUploaded={() => undefined}
+        recorderEnvironment={fakeRecorderEnvironment().environment}
+      />,
+      { handlers: [songsWithLibraryTrack, libraryMetadataHandler] },
+    );
+
+    const start = await screen.findByRole('button', { name: /开始录制/ });
+    expect(start).toBeEnabled();
+    expect(
+      screen.queryByRole('button', { name: '播放本段伴奏' }),
+      '录制流程不应有独立的「播放本段伴奏」按钮（用户裁决：只留一个开始录制）',
+    ).not.toBeInTheDocument();
+
+    fireEvent.click(start);
+    // 关键断言：点击返回后**立刻**（未 await、未 flush）伴奏已 play ——
+    // 与 recorder.start() 同处 onClick 同步段 = 同一个用户手势任务（自动播放策略放行的窗口）。
+    const played = instances.filter((instance) => instance.play.mock.calls.length > 0);
+    expect(played.length, '伴奏必须在点击栈内同步起播').toBeGreaterThan(0);
+    expect(played[0]!.paused, '伴奏元素应处于播放中').toBe(false);
+
+    await waitFor(() => expect(screen.getByRole('button', { name: /停止录制/ })).toBeInTheDocument());
+  });
+});
+
+/* ── t21：录制弹窗四档桌面一屏 —— 两栏结构（先红后绿） ── */
+describe('录制步骤 t21：弹窗一屏的两栏结构', () => {
+  it('桌面两栏：伴奏/状态与录音面板 md+ 并排，窄屏单列（仅断点前缀 ⇒ 允许弹窗内滚）', async () => {
+    const recorder = fakeRecorderEnvironment();
+    renderWithProviders(
+      <RecordStep
+        bottleId={BOTTLE}
+        songId={SONG_ID}
+        segmentIndex={2}
+        totalSegments={4}
+        onUploaded={() => undefined}
+        recorderEnvironment={recorder.environment}
+      />,
+      { handlers: [songsWithPreset] },
+    );
+
+    const heading = await screen.findByRole('heading', { name: /第 2 段 · 共 4 段/ });
+    const section = heading.closest('section');
+    expect(section, 'RecorderPanel section').not.toBeNull();
+    const gridRoot = section?.parentElement?.closest('[class*="md:grid-cols-["]') ?? null;
+    expect(
+      gridRoot,
+      '桌面必须两栏（伴奏/状态与录音面板并排）：单列时复核态高度（实测 1034px）装不进 720 视口',
+    ).not.toBeNull();
+    const className = gridRoot?.className ?? '';
+    // 非等宽（面板更宽）：真机最坏复核态（时长告警+静音告警+五键三行）实测 825px，等宽列装不下
+    expect(className, '多列必须带断点前缀：768 以下仍单列').toMatch(/md:grid-cols-\[[^\]]+\]/);
+    expect(className, '不允许无前缀 grid-cols（窄屏会被挤爆）').not.toMatch(/(^|\s)grid-cols-/);
+    expect(className, '不许 overflow-hidden 裁切兜底').not.toMatch(/overflow-hidden/);
+
+    // 上传失败区跨两列（该态在本用例不易触发 ⇒ 源码级钉住）
+    const source = readFileSync(resolve(process.cwd(), 'src', 'features', 'bottle', 'record-step.tsx'), 'utf8');
+    expect(source, '上传失败区跨两列').toContain('md:col-span-2');
   });
 });

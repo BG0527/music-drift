@@ -16,7 +16,7 @@ import { useEffect, type ReactNode } from 'react';
 import { OfflineBanner, Skeleton, useOnline } from '../../design-system';
 import { useSession } from '../../features/session/session-context';
 import { useInternalLinkHandler, useRouter } from './router-context';
-import { ADMIN_NAV_ITEM, INTRO_NAV_ITEM, NAV_ITEMS, type AppNavItem } from './routes';
+import { ADMIN_NAV_ITEM, NAV_ITEMS, type AppNavItem } from './routes';
 import { TopNav } from './top-nav';
 
 export interface AppShellProps {
@@ -40,10 +40,10 @@ export function AppShell({ current, requireLogin = false, children }: AppShellPr
     }
   }, [blocked, session.status, href, navigate]);
 
-  // 审核台入口只对管理员显示（**服务端**才是权限判定；这里避免普通用户看到死入口）
-  // 「介绍」（项目 landing）是站内元入口，排在最前；产品四入口的顺序由 NAV_ITEMS 自己钉住
-  const base = [INTRO_NAV_ITEM, ...NAV_ITEMS];
-  const items = session.isAdmin ? [...base, ADMIN_NAV_ITEM] : base;
+  // 审核台入口只对管理员显示（**服务端**才是权限判定；这里避免普通用户看到死入口）。
+  // 产品四入口的顺序由 NAV_ITEMS 自己钉住；t28 用户裁决：landing 独立出导航栏 ——
+  // 顶栏不再追加「介绍」（`/` 依旧渲染 landing，只是它不进导航）。
+  const items = session.isAdmin ? [...NAV_ITEMS, ADMIN_NAV_ITEM] : NAV_ITEMS;
 
   return (
     // 外壳层拦截站内锚点点击 → 设计系统的导航无需感知路由

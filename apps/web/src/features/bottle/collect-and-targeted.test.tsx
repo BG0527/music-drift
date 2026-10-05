@@ -7,6 +7,8 @@
  * - 指定接唱只对**未完成**的公海作品开放（已完成 → `422 BOTTLE_ALREADY_COMPLETE`）⇒ 完成品不渲染它。
  * 两者互斥地出现在同一个位置上，判据都来自页面已经拿到的 `seaZone`（服务端给的）。
  */
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { fireEvent, screen, waitFor } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import { CollectButton } from './collect-button';
@@ -83,34 +85,44 @@ describe('收藏按钮', () => {
 });
 
 describe('指定接唱按钮', () => {
-  it('点一下抢占持有权：POST /api/sea/:id/targeted-segment，成功后进瓶详情录制', async () => {
-    const { fetchMock } = renderWithProviders(<TargetedSegmentButton bottleId={BOTTLE_ID} />, {
-      handlers: [
-        {
-          method: 'POST',
-          path: `/api/sea/${BOTTLE_ID}/targeted-segment`,
-          respond: () => ({
-            body: {
-              id: BOTTLE_ID,
-              songId: '33333333-3333-4333-8333-333333333333',
-              songTitle: '长夜回声',
-              status: 'HELD',
-              totalSegments: 4,
-              recordedCount: 2,
-              missingSegmentIndexes: [3, 4],
-              isComplete: false,
-              seaZone: 'INCOMPLETE',
-              revision: 5,
-              createdAt: '2026-09-23T02:00:00.000Z',
-              updatedAt: '2026-09-23T05:00:00.000Z',
-            },
-          }),
-        },
-        { path: `/api/bottles/${BOTTLE_ID}`, respond: () => ({ status: 500, body: {} }) },
-      ],
-    });
+  it('与河道缺口同形：录第 N 段 + cta 共用外观 + Mic；POST 接管成功后按默认出口进瓶详情', async () => {
+    const { fetchMock } = renderWithProviders(
+      <TargetedSegmentButton bottleId={BOTTLE_ID} segmentIndex={3} />,
+      {
+        handlers: [
+          {
+            method: 'POST',
+            path: `/api/sea/${BOTTLE_ID}/targeted-segment`,
+            respond: () => ({
+              body: {
+                id: BOTTLE_ID,
+                songId: '33333333-3333-4333-8333-333333333333',
+                songTitle: '长夜回声',
+                status: 'HELD',
+                totalSegments: 4,
+                recordedCount: 2,
+                missingSegmentIndexes: [3, 4],
+                isComplete: false,
+                seaZone: 'INCOMPLETE',
+                revision: 5,
+                createdAt: '2026-09-23T02:00:00.000Z',
+                updatedAt: '2026-09-23T05:00:00.000Z',
+              },
+            }),
+          },
+          { path: `/api/bottles/${BOTTLE_ID}`, respond: () => ({ status: 500, body: {} }) },
+        ],
+      },
+    );
 
-    fireEvent.click(await screen.findByRole('button', { name: /我来接这一段/ }));
+    const cta = await screen.findByRole('button', { name: /录第 3 段/ });
+    // 形态与河道 gapAction 的 cta 按钮一致（含 Mic 图标）
+    expect(cta.classList.contains('cta'), 'cta 共用外观类（token 级判定）').toBe(true);
+    expect(cta.classList.contains('bp-record-cta')).toBe(true);
+    expect(cta.classList.contains('whitespace-nowrap')).toBe(true);
+    expect(cta.querySelector('svg.lucide-mic'), 'Mic 图标').not.toBeNull();
+
+    fireEvent.click(cta);
 
     await waitFor(() => {
       expect(fetchMock.calls.some((call) => call.url.includes('targeted-segment'))).toBe(true);
@@ -118,6 +130,16 @@ describe('指定接唱按钮', () => {
     await waitFor(() => {
       expect(window.location.pathname).toBe(`/bottles/${BOTTLE_ID}`);
     });
+  });
+
+  it('源码不再保留「我来接这一段」旧措辞（统一成录第 N 段）', () => {
+    const source = readFileSync(
+      join(process.cwd(), 'src', 'features', 'bottle', 'targeted-segment-button.tsx'),
+      'utf8',
+    );
+    expect(source).not.toContain('我来接这一段');
+    // 段号必选：不再有 segmentIndex === undefined 的旧措辞分支
+    expect(source).not.toContain('segmentIndex === undefined');
   });
 });
 
@@ -127,7 +149,7 @@ describe('指定接唱按钮', () => {
  */
 describe('指定接唱：被拒的时候有可见出口', () => {
   it('服务端 422（已完成）：显示中文原因，且给回公海的出口（不是点了没反应）', async () => {
-    renderWithProviders(<TargetedSegmentButton bottleId={BOTTLE_ID} />, {
+    renderWithProviders(<TargetedSegmentButton bottleId={BOTTLE_ID} segmentIndex={3} />, {
       handlers: [
         {
           method: 'POST',
@@ -147,7 +169,7 @@ describe('指定接唱：被拒的时候有可见出口', () => {
       ],
     });
 
-    fireEvent.click(await screen.findByRole('button', { name: /我来接这一段/ }));
+    fireEvent.click(await screen.findByRole('button', { name: /录第 3 段/ }));
 
     expect(await screen.findByRole('alert')).toHaveTextContent(/已经完成/);
   });

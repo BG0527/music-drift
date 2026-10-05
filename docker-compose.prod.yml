@@ -1,0 +1,66 @@
+# 生产/演示部署（t33 · 单服务同源；步骤与理由见 docs/deploy-runbook.md）
+#
+# 本地一键（内置 Postgres，评委前的完整彩排）：
+#   docker compose -f docker-compose.prod.yml up -d --build
+#   → http://127.0.0.1:8080
+#
+# 公网部署（托管 Postgres，例 Neon；不启动内置 db）：
+#   PROD_DATABASE_URL='postgres://<user>:<pass>@<host>/<db>?sslmode=require' \
+#   SEED_ADMIN_PASSWORD='<强口令>' \
+#   docker compose -f docker-compose.prod.yml up -d --build --no-deps app
+#
+# 为什么变量叫 PROD_DATABASE_URL 而不是 DATABASE_URL：仓根 .env 为本机 dev 库
+# （localhost:5433），compose 默认会读同目录 .env —— 直接 ${DATABASE_URL} 会被它
+# 覆盖成容器内不可达的地址。PROD_DATABASE_URL 不存在于 .env ⇒ 默认值（db 服务）恒定生效。
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-music_drift}
+      # 本地默认口令仅服务本机彩排；公网部署请在 .env 或 shell 里覆盖（不入库）
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-music_drift_prod}
+      POSTGRES_DB: ${POSTGRES_DB:-music_drift}
+      TZ: UTC
+      PGTZ: UTC
+    volumes:
+      - music-drift-prod-pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U ${POSTGRES_USER:-music_drift} -d ${POSTGRES_DB:-music_drift}']
+      interval: 3s
+      timeout: 3s
+      retries: 20
+      start_period: 5s
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: music-drift-app
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - '${APP_PORT:-8080}:8080'
+    environment:
+      NODE_ENV: production
+      GATEWAY_PORT: '8080'
+      PORT: '8788'          # Fastify 容器内端口；对外只有网关 8080
+      HOST: '0.0.0.0'
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      # 见文件头：默认指向内置 db；公网部署用 PROD_DATABASE_URL 覆盖
+      DATABASE_URL: ${PROD_DATABASE_URL:-postgres://music_drift:music_drift_prod@db:5432/music_drift}
+      # admin 口令只经环境注入（仓根 .env 已被 compose 自动读取；空值 ⇒ seed 跳过 admin 并告警）
+      SEED_ADMIN_PASSWORD: ${SEED_ADMIN_PASSWORD:-}
+    healthcheck:
+      # node 自带 fetch（镜像内无 curl/wget）；/healthz 由网关反代到 Fastify
+      test: ['CMD', 'node', '-e', "fetch('http://127.0.0.1:8080/healthz').then((r) => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
+
+volumes:
+  music-drift-prod-pgdata:
+    name: music-drift-prod-pgdata

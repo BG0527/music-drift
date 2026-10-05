@@ -139,6 +139,87 @@ describe('useSegmentPlayer：播放控制', () => {
 
     expect(view.result.current.isPlaying).toBe(false);
   });
+
+  /* ── t15 残余（真机探针 F1/F2 实测）：play() 被拒绝时不许静默、不许「假装在播」 ── */
+
+  it('play() 被拒绝（音频 404/被拦）→ 暴露 playFailure 并复位假「在播」，不许静默', async () => {
+    const element = new FakeAudio();
+    // 浏览器真实形态（t15 真机探针 F1 实测）：play() 先把 paused 置 false 并触发 play 事件
+    // （UI 瞬间变「暂停」），随后以 NotSupportedError 拒绝 —— 不复位就是"假装在播"的僵尸，
+    // 不暴露就是静默失败：用户看到 1/4 + 暂停却毫无声音，只能反复多点。
+    element.play = vi.fn(async () => {
+      element.paused = false;
+      element.emit('play');
+      throw new DOMException('segment audio unavailable', 'NotSupportedError');
+    });
+    const view = renderHook(() =>
+      useSegmentPlayer({
+        src: '/api/segments/x/audio',
+        durationMs: 20_000,
+        createElement: () => element,
+      }),
+    );
+
+    await act(async () => {
+      view.result.current.toggle();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(view.result.current.playFailure, '失败必须暴露成可见状态').toBe('NotSupportedError');
+    expect(element.paused, '拒绝后元素不许停在假 playing').toBe(true);
+    expect(view.result.current.isPlaying).toBe(false);
+  });
+
+  it('AbortError（元素重建竞态的内部中断）不算播放失败：playFailure 保持 null', async () => {
+    const element = new FakeAudio();
+    element.play = vi.fn(async () => {
+      throw new DOMException('interrupted by pause', 'AbortError');
+    });
+    const view = renderHook(() =>
+      useSegmentPlayer({
+        src: '/api/segments/x/audio',
+        durationMs: 20_000,
+        createElement: () => element,
+      }),
+    );
+
+    await act(async () => {
+      view.result.current.toggle();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(view.result.current.playFailure, '内部 Abort 不该惊动用户').toBeNull();
+    expect(view.result.current.isPlaying).toBe(false);
+  });
+
+  it('同段重按：autoPlayToken +1 而 src 不变（元素不重建）→ 仍要起播（令牌不许被吞）', async () => {
+    const element = new FakeAudio();
+    const view = renderHook(
+      ({ token }: { token: number }) =>
+        useSegmentPlayer({
+          src: '/api/segments/x/audio',
+          durationMs: 20_000,
+          createElement: () => element,
+          autoPlayToken: token,
+        }),
+      { initialProps: { token: 0 } },
+    );
+    expect(element.play, '令牌为 0 时挂载不许擅自出声').not.toHaveBeenCalled();
+
+    view.rerender({ token: 1 });
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(
+      element.play,
+      'key 不变 ⇒ 元素 effect 不重跑；令牌消费必须另有落点，否则点「听」/「听全部」毫无反应',
+    ).toHaveBeenCalledTimes(1);
+    expect(view.result.current.isPlaying).toBe(true);
+  });
 });
 
 describe('useSegmentPlayer：已播放时长与覆盖率', () => {

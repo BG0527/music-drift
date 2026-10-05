@@ -553,3 +553,123 @@ describe('选歌页：照稿差值收尾', () => {
     expect(code).toContain('data-device="sp-glint"');
   });
 });
+
+/**
+ * t17 现状核验（并发会话 1cc4dde 之后，五档真机截图 vs `site/new.html` 逐块对照）。
+ *
+ * 用户截图所指的「内容被裁 / 底部提示看不见」已由 1cc4dde 修掉（根框 overflow-y-auto +
+ * 页脚先登录负外边距，上面两组测试钉住）。对照唯一基准仍剩下的**结构 / 比例**级差距：
+ *  R1 检索牌 `.plate` 与状态区 `.states` 照稿 width:844px ⇒ 844/1440 = 58.611vw 比例宽
+ *     （md+ 生效，窄屏仍满幅；此前牌一路拉满内容宽，与稿的左半比例不符）；
+ *  R2 检索框照稿 width:320px ⇒ 320/1440 = 22.222vw；计数控件照稿 `.count { margin-left:auto }`
+ *     贴牌右缘（此前 input 拉通、计数只是跟在 input 后面 —— 牌一收窄计数必须自己靠右）；
+ *  R3 `.platter` 照稿**两层**背景：密环 + 右下角 radial 光晕（稿 `rgba(127,209,217,.05)` ⇒
+ *     token 化 `color-mix … var(--color-glass) 5%`，本页守卫禁 rgba/hex）；
+ *  R4 干盆按钮照稿：disabled 行是**纯文字**「暂不可发起」（稿 `.act[disabled]` 无 svg）。
+ */
+describe('选歌页：site/new.html 逐块对照（t17 残余差距，先红后绿）', () => {
+  const raw = readFileSync(
+    resolve(process.cwd(), 'src', 'pages', 'song-picker-page.tsx'),
+    'utf8',
+  );
+  const code = raw
+    .replace(/\/\*[\s\S]*?\*\//g, '')
+    .split('\n')
+    .filter((line) => {
+      const trimmed = line.trim();
+      return !trimmed.startsWith('//') && !trimmed.startsWith('*');
+    })
+    .join('\n');
+
+  function setup(catalog: unknown[] = [song()]) {
+    return renderWithProviders(<SongPickerPage />, {
+      handlers: [{ path: '/api/songs', respond: () => ({ body: catalog }) }],
+    });
+  }
+
+  it('R1 检索牌与状态区照稿 844 比例宽（md:max-w-[58.611vw]，两处状态区都要）', async () => {
+    const plate = code.match(/data-anchor="new-catalog"\s*className="([^"]+)"/);
+    expect(plate, '找不到检索牌容器（data-anchor=new-catalog）').not.toBeNull();
+    expect(plate?.[1] ?? '', '检索牌缺 844/1440 = 58.611vw 比例宽').toContain(
+      'md:max-w-[58.611vw]',
+    );
+
+    const states = [...code.matchAll(/data-device="sp-states"\s*className="([^"]+)"/g)];
+    expect(states, '状态区应有「空 态」与「无匹配」两处').toHaveLength(2);
+    for (const match of states) {
+      expect(match[1] ?? '', '状态区缺 844/1440 = 58.611vw 比例宽').toContain(
+        'md:max-w-[58.611vw]',
+      );
+    }
+    // 真机口径：牌在渲染结果里（不是只写在注释里）
+    setup();
+    await screen.findByText('深海鲸落');
+    expect(screen.getByText('找 歌')).toBeInTheDocument();
+  });
+
+  it('R2 检索框照稿 320 比例宽、计数 margin-left:auto 贴牌右缘', async () => {
+    setup();
+    await screen.findByText('深海鲸落');
+    const input = screen.getByRole('searchbox', { name: '按曲名过滤曲库' });
+    expect(input.className, '检索框缺 320/1440 = 22.222vw 比例宽').toContain(
+      'md:max-w-[22.222vw]',
+    );
+    const count = code.match(/<span className="([^"]+)">\s*\{matched\.length/);
+    expect(count, '找不到计数控件（曲库共 N 首）').not.toBeNull();
+    expect(count?.[1] ?? '', '计数缺 margin-left:auto（稿 .count）').toContain('ml-auto');
+  });
+
+  it('R3 platter 照稿两层背景：密环 + 右下 5% glass 光晕（token 化，无 rgba）', () => {
+    const platter = code.match(/data-device="sp-platter"\s*className="([^"]+)"/);
+    expect(platter, '找不到 platter 背景层').not.toBeNull();
+    const className = platter?.[1] ?? '';
+    expect(className, '缺密环层').toContain('repeating-radial-gradient');
+    expect(className, '缺 radial 光晕层（稿 .platter 第二层）').toMatch(/\),radial-gradient\(/);
+    expect(className, '光晕必须走 token（5% glass ≈ 稿 rgba(127,209,217,.05)）').toContain(
+      'color-mix(in_srgb,var(--color-glass)_5%',
+    );
+  });
+
+  it('R4 干盆按钮照稿：disabled 纯文字无图标；可发起按钮带话筒', async () => {
+    const RAW_ID = '44444444-4444-4444-8444-444444444444';
+    setup([
+      song(),
+      song({
+        id: RAW_ID,
+        title: '别人写的歌',
+        totalSegments: 4,
+        licensedSource: 'user-provided',
+        segments: [],
+      }),
+    ]);
+    await screen.findByText('别人写的歌');
+    const dryRow = screen.getByText('别人写的歌').closest('li') as HTMLElement;
+    const disabled = within(dryRow).getByRole('button');
+    expect(disabled).toBeDisabled();
+    expect(disabled.querySelector('svg'), '稿的 disabled 按钮是纯文字（无话筒图标）').toBeNull();
+    const wetRow = screen.getByText('深海鲸落').closest('li') as HTMLElement;
+    const enabled = within(wetRow).getByRole('button');
+    expect(enabled.querySelector('svg'), '可发起按钮应保留话筒图标').not.toBeNull();
+  });
+
+  it('R5 关键区块清单齐（对照 site/new.html 块清单）且根框可滚不静默裁切', () => {
+    for (const marker of [
+      'data-device="sp-platter"',
+      'data-device="sp-deep"',
+      'data-device="sp-glint"',
+      'SIDE A · 未刻',
+      '选一首歌，投出第一棒',
+      'data-anchor="new-catalog"',
+      '找 歌',
+      'data-device="sp-states"',
+      'EDGE_TILT',
+      'BASIN_TILT',
+      'data-testid="basin-graphic"',
+      'md:mt-auto',
+      'md:overflow-y-auto',
+    ]) {
+      expect(code, `缺块（对照 site/new.html 清单）：${marker}`).toContain(marker);
+    }
+    expect(code, '根框仍在静默裁切（超一屏就看不见且滚不动）').not.toMatch(/md:overflow-hidden/);
+  });
+});

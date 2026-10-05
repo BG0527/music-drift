@@ -421,6 +421,44 @@ async function buildRiverBottle(demo, song, log, fixture) {
   return created.bottleId;
 }
 
+/**
+ * 公海「等待接力」瓶（t32 验收面③·三种状态瓶之一）：
+ * 演示账号建瓶 + 录第 1 段 + 入海（未完成 ⇒ SEA/INCOMPLETE），停在公海等下一位接棒。
+ * 与 buildCompletedSeaBottle 的中段路径同源（同为 chooseResolution 'SEA'），只是**停在第一步**。
+ */
+async function buildWaitingSeaBottle(demo, song, log, fixture) {
+  const created = await openBottleWithFirstSegment(demo, song, fixture);
+  await chooseResolution(demo, created.bottleId, 'SEA');
+  log(`  演示账号建瓶 ${created.bottleId.slice(0, 8)}…（《${String(song.title)}》）第 1 段入海（公海等待接力）`);
+  return created.bottleId;
+}
+
+/**
+ * 公开评论种子（t32 验收面⑤）：完成品上至少一条评论，评委打开评论区即可见。
+ * 幂等：已有任意评论就不重复发。内容为合成演示文案（零真实 PII）。
+ */
+async function ensureSeedComment(demo, bottleId, log) {
+  const list = await call(
+    demo,
+    'GET',
+    `/api/bottles/${encodeURIComponent(bottleId)}/comments?limit=20`,
+    {},
+    [200],
+    '读公开评论',
+  );
+  if ((list.items ?? []).length > 0) return 0;
+  await call(
+    demo,
+    'POST',
+    `/api/bottles/${encodeURIComponent(bottleId)}/comments`,
+    { json: { content: '演示公开评论：第三棒的转音接得太顺了，像同一个人唱的。' } },
+    [201],
+    '发公开评论',
+  );
+  log('  在完整作品上补了一条公开评论（演示）');
+  return 1;
+}
+
 function countUnread(notifications) {
   return notifications.filter((row) => row.readAt === null).length;
 }
@@ -511,12 +549,47 @@ export async function ensureDemoData(options = {}) {
     state = await snapshot();
   }
 
+  // ⑤ 至少一支「公海等待接力」（SEA/INCOMPLETE）—— 三种状态瓶齐全（t32 验收面）
+  const hasWaitingSea = state.items.some(
+    (item) => item.status === 'SEA' && item.seaZone === 'INCOMPLETE',
+  );
+  if (!hasWaitingSea) {
+    await buildWaitingSeaBottle(demo, songs[2] ?? songs[0], log, fixture);
+    actions.push('造了一支公海等待接力的瓶子（第 1 段入海等接棒）');
+    state = await snapshot();
+  }
+
+  // ⑥ 完成品上至少一条公开评论（评委打开评论区即可见，t32 验收面）
+  const commentTarget = completedSea()?.id ?? seaBottleId;
+  if (commentTarget !== null) {
+    const created = await ensureSeedComment(demo, commentTarget, log);
+    if (created > 0) actions.push('补了一条种子公开评论');
+  }
+
   const unread = countUnread(state.notifications);
+  const seaIncomplete = state.items.filter(
+    (item) => item.status === 'SEA' && item.seaZone === 'INCOMPLETE',
+  ).length;
+  const comments =
+    commentTarget === null
+      ? 0
+      : ((
+          await call(
+            demo,
+            'GET',
+            `/api/bottles/${encodeURIComponent(commentTarget)}/comments?limit=20`,
+            {},
+            [200],
+            '读公开评论（校验）',
+          )
+        ).items ?? []).length;
   const result = {
     account: DEMO,
     participated: state.items.length,
     completedSea: state.items.filter((item) => item.status === 'SEA' && item.seaZone === 'COMPLETED').length,
     inRiver: state.items.filter((item) => item.status === 'IN_RIVER' || item.status === 'HELD').length,
+    seaIncomplete,
+    comments,
     collections: state.collections.length,
     notifications: state.notifications.length,
     unread,
@@ -526,6 +599,13 @@ export async function ensureDemoData(options = {}) {
 
   if (result.completedSea < 1 || result.inRiver < 1 || result.collections < 1) {
     throw new Error(`施种后仍未满足「我的」页非空：${JSON.stringify(result)}`);
+  }
+  // t32 验收面：三种状态瓶齐全（河道等待 / 公海等待接力 / 公海完成品含评论+收藏）
+  if (result.seaIncomplete < 1) {
+    throw new Error(`施种后没有「公海等待接力」（SEA/INCOMPLETE）瓶子：${JSON.stringify(result)}`);
+  }
+  if (result.comments < 1) {
+    throw new Error(`施种后完成品上没有公开评论：${JSON.stringify(result)}`);
   }
   if (unread < 1) {
     throw new Error('施种后仍没有未读通知：通知的未读态无法从公开 API 造出来（见文件头说明）');
@@ -566,7 +646,9 @@ if (isMain) {
     console.log(
       `  「我的」页内容：参与过 ${String(result.participated)} 支` +
         `（完整入海 ${String(result.completedSea)} · 河道/持有中 ${String(result.inRiver)}）` +
+        ` · 公海等待接力 ${String(result.seaIncomplete)}` +
         ` · 收藏 ${String(result.collections)}` +
+        ` · 公开评论 ${String(result.comments)}` +
         ` · 通知 ${String(result.notifications)}（未读 ${String(result.unread)}）`,
     );
     console.log(

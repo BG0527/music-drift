@@ -24,10 +24,11 @@ async function insertBottle(db: Db, totalSegments = 4): Promise<string> {
     `insert into songs (id, title, total_segments, licensed_source) values ($1, $2, $3, $4)`,
     [songId, `song-${songId.slice(0, 8)}`, totalSegments, 'test'],
   );
-  await db.query(`insert into users (id, handle, email, password_hash) values ($1, $2, $3, $4)`, [
+  // 0009 已删 users.email（W21 账号契约退役）：列形状照抄已绿夹具 test-helpers.insertUser ——
+  // `insert into users (id, handle, password_hash)`，不带 email、不发明新姿势。
+  await db.query(`insert into users (id, handle, password_hash) values ($1, $2, $3)`, [
     userId,
     `owner-${userId.slice(0, 8)}`,
-    `${userId.slice(0, 8)}@test.local`,
     'x',
   ]);
   await db.query(
@@ -40,10 +41,10 @@ async function insertBottle(db: Db, totalSegments = 4): Promise<string> {
 
 async function insertUser(db: Db): Promise<string> {
   const userId = randomUUID();
-  await db.query(`insert into users (id, handle, email, password_hash) values ($1, $2, $3, $4)`, [
+  // 同上：列形状与 test-helpers.insertUser 逐字一致（0009 删 email 后的现行 schema）
+  await db.query(`insert into users (id, handle, password_hash) values ($1, $2, $3)`, [
     userId,
     `u-${userId.slice(0, 8)}`,
-    `${userId.slice(0, 8)}@test.local`,
     'x',
   ]);
   return userId;

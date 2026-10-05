@@ -144,7 +144,8 @@ export function Modal({
       aria-hidden={open ? undefined : 'true'}
       inert={open ? undefined : true}
       className={cn(
-        'z-overlay fixed inset-0 flex items-center justify-center p-6',
+        // t21：遮罩留白 p-4（原 p-6）—— 面板高度上限随之放宽到 100dvh-2rem（各档多 16px 可用高）
+        'z-overlay fixed inset-0 flex items-center justify-center p-4',
         open ? 'enter-fade' : 'exit-fade',
       )}
     >
@@ -163,11 +164,14 @@ export function Modal({
         aria-labelledby={titleId}
         tabIndex={-1}
         className={cn(
-          'z-modal enter-rise relative max-h-[calc(100dvh-3rem)] w-full max-w-[47.5rem] overflow-y-auto rounded-2xl border border-hairline bg-ink p-8 shadow-floating',
+          // t21 紧凑排版（四档桌面一屏）：内边距上界 p-6（原 p-8）；
+          // max-h + overflow-y-auto **保留** —— 桌面靠内容排版装下（不出现滚动条），
+          // 窄屏（375 等）仍可在面板内滚动（移动端例外），不许用 overflow-hidden 裁切兜底。
+          'z-modal enter-rise relative max-h-[calc(100dvh-2rem)] w-full max-w-[47.5rem] overflow-y-auto rounded-2xl border border-hairline bg-ink p-6 shadow-floating',
           className,
         )}
       >
-        <header className="mb-6 flex items-start justify-between gap-4">
+        <header className="mb-4 flex items-start justify-between gap-4">
           <h2 id={titleId} className="text-[1.375rem] font-semibold text-paper">
             {title}
           </h2>
@@ -181,9 +185,9 @@ export function Modal({
             <Icon name="X" size={20} />
           </button>
         </header>
-        <div className="flex flex-col gap-6">{children}</div>
+        <div className="flex flex-col gap-4">{children}</div>
         {footer === undefined ? null : (
-          <footer className="mt-6 flex items-center gap-4">{footer}</footer>
+          <footer className="mt-4 flex items-center gap-4">{footer}</footer>
         )}
       </div>
     </div>,

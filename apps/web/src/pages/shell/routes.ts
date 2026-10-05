@@ -91,7 +91,8 @@ export function buildPath(name: RouteName, params: Record<string, string> = {}):
 }
 
 export interface AppNavItem {
-  key: 'intro' | 'river' | 'sea' | 'mine' | 'settings' | 'admin';
+  // t28 用户裁决：landing 独立出导航栏 ⇒ 介绍入口的键随其导航项一并清出 key 联合
+  key: 'river' | 'sea' | 'mine' | 'settings' | 'admin';
   label: string;
   href: string;
 }
@@ -104,12 +105,8 @@ export interface AppNavItem {
 /** 审核台入口：只在 `session.isAdmin` 时追加（**权限判定在服务端**，这里只是别露错入口）。 */
 export const ADMIN_NAV_ITEM: AppNavItem = { key: 'admin', label: '审核台', href: '/admin' };
 
-/**
- * 项目介绍 landing 入口（**t12 新裁决**：landing 收编进根路由 `/`，顶栏「介绍」指向 `/`）。
- * **不进 `NAV_ITEMS`** —— 那张表是产品四入口（routes.test 钉住顺序），
- * 介绍页是站内元入口，由外壳单独追加在最前。
- */
-export const INTRO_NAV_ITEM: AppNavItem = { key: 'intro', label: '介绍', href: '/' };
+// t28 用户裁决：原顶栏最前的「介绍」站内元入口（指向 `/`）已整块删除 ——
+// landing 独立于导航栏：访问 `/` 依然进 landing，但顶栏不再出现「介绍」。
 
 export const NAV_ITEMS: readonly AppNavItem[] = [
   { key: 'river', label: '河道', href: '/river' },
@@ -118,11 +115,9 @@ export const NAV_ITEMS: readonly AppNavItem[] = [
   { key: 'settings', label: '设置', href: '/settings' },
 ];
 
-/** 侧栏高亮归属：landing（`/`）归「介绍」入口；漂流瓶页与日志属于「河道」。 */
+/** 侧栏高亮归属：landing（`/`）不映射任何导航项（t28：介绍入口已移出导航）；漂流瓶页与日志属于「河道」。 */
 export function activeNavKey(name: RouteName): AppNavItem['key'] | null {
   switch (name) {
-    case 'home':
-      return 'intro';
     case 'river':
     case 'bottle':
     case 'bottleLog':

@@ -877,8 +877,10 @@
   }
 
   /* 「听全部」：与赞/踩同行同高（继承上面的 .votes button），但用 coral 描边+字色
-     区分它是"放声音"的传输键，不是投票。图标（播放/暂停）随状态换。 */
+     区分它是"放声音"的传输键，不是投票。图标（播放/暂停）随状态换。
+     margin-left:auto = 用户裁决布局①：推到 .votes 行右端（赞/踩居左、主键右对齐）。*/
   .bottle-page .votes button.listenAllBtn {
+    margin-left: auto;
     border-color: var(--coral);
     color: var(--coral);
   }
@@ -1068,14 +1070,9 @@
 }
 
 .bottle-page .bf-full-preview { margin-top: 12px; min-width: 0; }
-.bottle-page .sequential-player audio { width: min(100%, 260px); height: 40px; }
-.bottle-page .listenCol .sequential-player { gap: 8px; }
-.bottle-page .listenCol .sequential-status { display: none; }
-.bottle-page .listenCol .sequential-status[role='alert'] { display: block; }
 .bottle-page .transport .bar { flex: 1 1 auto; min-width: 0; width: auto; }
 @media (min-width: 1024px) {
   .bottle-page .listenCol .bf-full-preview { margin-top: 8px; }
-  .bottle-page .listenCol .sequential-player audio { flex: 1; min-width: 120px; }
   .bottle-page .votes button::after { inset: -3px 0; }
   .bottle-page .bp-status-item { pointer-events: none; }
   .bottle-page .bp-status-item a, .bottle-page .bp-status-item button { pointer-events: auto; }

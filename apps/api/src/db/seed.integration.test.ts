@@ -6,6 +6,7 @@
  * 直插 users 绕开注册弱口令黑名单（admin123 ∈ COMMON_WEAK_PASSWORDS），登录只验哈希不受影响。
  */
 import { randomUUID } from 'node:crypto';
+import { readFileSync } from 'node:fs';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createManualClock } from '@music-drift/shared/domain';
 import { buildApp } from '../app.js';
@@ -172,5 +173,16 @@ describe('seed：admin 管理员账号（admin/admin123）', () => {
       handle,
     ]);
     expect(rows[0]?.role).toBe('USER');
+  });
+});
+
+// ── t32（用户裁决·脱敏）：管理员口令只来自 .env/环境变量，源码零明文 ────────────
+describe('seed：admin 口令来源（t32 脱敏）', () => {
+  it('seed.ts 不再内嵌管理员口令明文，改读 SEED_ADMIN_PASSWORD（.env）', () => {
+    const source = readFileSync(new URL('./seed.ts', import.meta.url), 'utf8');
+    expect(source, '源码不得再出现旧的明文口令字面').not.toContain('admin123');
+    expect(source, '口令必须来自环境/.env 读取').toContain('SEED_ADMIN_PASSWORD');
+    // 上面的口令幂等/登录/弱口令三条既有用例即为「.env 兜底生效」的行为证明：
+    // 它们不经环境变量、只经 .env 兜底读到口令后照常绿（改动后复跑为准）。
   });
 });

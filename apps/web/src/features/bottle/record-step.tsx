@@ -195,7 +195,15 @@ export function RecordStep({
   );
 
   return (
-    <div className={cn('flex flex-col gap-4', className)}>
+    /*
+     * t21（四档桌面一屏）：**桌面两栏** —— 伴奏/状态占左、录音面板占右，纵向高度取两者
+     * 的 max 而不是和（真机实测单列复核态 scrollHeight=1034px，720 视口装不下）。
+     * 非等宽 1fr/1.3fr：面板侧文案（时长告警/静音告警/复核四键）更吃宽度，等宽列会多折 2-3 行
+     * （真机最坏复核态等宽列 825px，非等宽后实测见探针）。
+     * 只带断点前缀（md:）：768 以下仍单列堆叠，窄屏靠弹窗面板内滚动（移动端例外）。
+     * 不加 overflow-hidden —— 桌面靠排版装下，不许裁切兜底。
+     */
+    <div className={cn('grid gap-4 md:grid-cols-[1fr_1.3fr]', className)}>
       {library.isError ? (
         <p role="status" className="text-[0.875rem] text-muted">
           本段伴奏与歌词暂时无法读取，不影响继续录音。
@@ -279,7 +287,8 @@ export function RecordStep({
       </AsyncBoundary>
 
       {failure === null ? null : (
-        <div className="flex flex-col gap-3 rounded-base border border-warning-border bg-warning-tint px-4 py-4 text-warning">
+        // t21：失败区横跨两列（否则被网格挤进半栏、文案折行又把高度顶回去）
+        <div className="flex flex-col gap-3 rounded-base border border-warning-border bg-warning-tint px-4 py-4 text-warning md:col-span-2">
           <p role="status" className="flex items-start gap-2 text-[0.875rem] leading-[1.6]">
             <Icon name="AlertTriangle" size={16} />
             <span>{failure.message}</span>

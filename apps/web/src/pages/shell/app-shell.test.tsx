@@ -1,4 +1,6 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, describe, expect, it } from 'vitest';
 import { installFetchMock, renderWithProviders } from '../../test/harness';
 import { USER_A } from '../../test/fixtures';
@@ -71,10 +73,11 @@ describe('外壳与导航', () => {
               path: '/api/auth/me',
               respond: () => ({
                 body: {
+                  // W21 账号契约：AuthUserSchema strict —— 正名 account 必填、无 email 字段
                   user: {
                     id: '11111111-1111-4111-8111-111111111111',
                     handle: 'boss',
-                    email: null,
+                    account: 'boss',
                     role: 'ADMIN',
                   },
                   expiresAt: '2030-01-01T00:00:00.000Z',
@@ -92,6 +95,36 @@ describe('外壳与导航', () => {
       for (const label of ['河道', '公海', '我的', '设置']) {
         expect(screen.getByRole('link', { name: label })).toBeInTheDocument();
       }
+    } finally {
+      mock.restore();
+    }
+  });
+
+  /**
+   * t28（用户裁决）：landing 独立于导航栏 —— 顶栏零「介绍」入口，
+   * 普通会话导航恰为 河道/公海/我的/设置（admin 会话 +审核台，见上一个用例）。
+   * 源码与渲染双证：源码不得再出现 INTRO_NAV_ITEM / label '介绍'。
+   */
+  it('t28：顶栏零「介绍」入口（渲染产物恰四链接 + 源码零 INTRO_NAV_ITEM）', () => {
+    const mock = installFetchMock([]);
+    try {
+      renderWithProviders(
+        <AppShell current="river">
+          <h1>暖流河道</h1>
+        </AppShell>,
+      );
+      expect(screen.queryByRole('link', { name: '介绍' }), '顶栏不得有「介绍」入口').toBeNull();
+      const nav = screen.getByRole('navigation', { name: '站内导航' });
+      expect(
+        within(nav).getAllByRole('link').map((link) => (link.textContent ?? '').trim()),
+        '普通会话导航恰为四入口、顺序不乱',
+      ).toEqual(['河道', '公海', '我的', '设置']);
+
+      const source =
+        readFileSync(resolve(process.cwd(), 'src', 'pages', 'shell', 'app-shell.tsx'), 'utf8') +
+        readFileSync(resolve(process.cwd(), 'src', 'pages', 'shell', 'routes.ts'), 'utf8');
+      expect(source, '源码零 INTRO_NAV_ITEM').not.toMatch(/INTRO_NAV_ITEM/);
+      expect(source, "源码零 label '介绍'").not.toMatch(/label:\s*'介绍'/);
     } finally {
       mock.restore();
     }
@@ -268,7 +301,8 @@ describe('requireLogin 自动跳转（用户本轮裁决，覆盖旧「不静默
             path: '/api/auth/me',
             respond: () => ({
               body: {
-                user: { id: USER_A, handle: '午夜歌手', email: 'a@example.com', role: 'USER' },
+                // W21 账号契约：strict schema 无 email、account 必填
+                user: { id: USER_A, handle: '午夜歌手', account: '午夜歌手', role: 'USER' },
                 expiresAt: '2030-01-01T00:00:00.000Z',
               },
             }),
@@ -301,8 +335,9 @@ describe('requireLogin 自动跳转（用户本轮裁决，覆盖旧「不静默
           path: '/api/auth/login',
           respond: () => ({
             status: 200,
+            // W21 账号契约：strict schema 无 email、account 必填
             body: {
-              user: { id: USER_A, handle: '午夜歌手', email: 'a@example.com', role: 'USER' },
+              user: { id: USER_A, handle: '午夜歌手', account: '午夜歌手', role: 'USER' },
               expiresAt: '2030-01-01T00:00:00.000Z',
             },
           }),

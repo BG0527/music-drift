@@ -1,4 +1,4 @@
-﻿/**
+/**
  * 录制面板：录音页的**全部状态**（DESIGN.md 明确要求自建状态，不得以"Figma 没有状态帧"为由跳过）。
  *
  * 状态清单与对应语义：
@@ -237,7 +237,8 @@ export function RecorderPanel({
       aria-labelledby={headingId}
       className={cn(
         // record-v1（DESIGN.md §Components）：录制 / 波形区 = `water-void` 底 + 1px 细线（不用阴影造层次）
-        'flex flex-col gap-4 rounded-base border border-line/20 bg-water-void p-6 text-paper',
+        // t21 紧凑排版（四档桌面一屏）：内边距上界 p-5、子区间距上界 gap-2（原 p-6/gap-4）
+        'flex flex-col gap-2 rounded-base border border-line/20 bg-water-void p-5 text-paper',
         className,
       )}
     >
@@ -262,20 +263,27 @@ export function RecorderPanel({
         {statusText}
       </p>
 
-      {/* 波形是装饰性反馈：进度另有文字表达（DESIGN.md 无障碍媒体条款） */}
-      <div
-        data-testid="waveform"
-        aria-hidden="true"
-        className="flex h-16 items-end gap-1 rounded-md border border-line/10 bg-water-bed px-3 py-2"
-      >
-        {levels.map((level, index) => (
-          <span
-            key={`bar-${String(index)}`}
-            className="w-1 flex-1 rounded-sm bg-glass"
-            style={{ height: `${Math.max(4, Math.round(level * 100))}%` }}
-          />
-        ))}
-      </div>
+      {/*
+        波形是装饰性反馈：进度另有文字表达（DESIGN.md 无障碍媒体条款）。
+        t21：复核态不渲染 —— 电平条只在录前/录制中“在干活”，复核态让出 48px 给一屏预算
+        （最坏复核态 = 时长告警 + 静音告警同屏，真机实测 703px > 720 视口的 688px 上限）。
+      */}
+      {status === 'reviewing_local' ? null : (
+        <div
+          data-testid="waveform"
+          aria-hidden="true"
+          // t21：h-10（原 h-16）—— 录制中仍是可读的电平条，纵向让出 24px 给“一屏装下”
+          className="flex h-10 items-end gap-1 rounded-md border border-line/10 bg-water-bed px-3 py-2"
+        >
+          {levels.map((level, index) => (
+            <span
+              key={`bar-${String(index)}`}
+              className="w-1 flex-1 rounded-sm bg-glass"
+              style={{ height: `${Math.max(4, Math.round(level * 100))}%` }}
+            />
+          ))}
+        </div>
+      )}
 
       {/*
         已录进度（record-v1 的沟槽语法：底槽 `rgba(line,.1)`、已录段 `water-deep`）。
@@ -303,7 +311,7 @@ export function RecorderPanel({
       {!support.ok && support.guidance !== null ? (
         <div
           role="alert"
-          className="flex items-start gap-2 rounded-base border border-danger-border bg-danger-tint px-4 py-3 text-[0.875rem] leading-[1.6] text-danger"
+          className="flex items-start gap-2 rounded-base border border-danger-border bg-danger-tint px-4 py-2 text-[0.875rem] leading-[1.6] text-danger"
         >
           <Icon name="MicOff" size={18} />
           <span>{support.guidance}</span>
@@ -313,7 +321,7 @@ export function RecorderPanel({
       {error !== null ? (
         <div
           role="alert"
-          className="flex items-start gap-2 rounded-base border border-danger-border bg-danger-tint px-4 py-3 text-[0.875rem] leading-[1.6] text-danger"
+          className="flex items-start gap-2 rounded-base border border-danger-border bg-danger-tint px-4 py-2 text-[0.875rem] leading-[1.6] text-danger"
         >
           <Icon name="AlertCircle" size={18} />
           <span>
@@ -356,7 +364,7 @@ export function RecorderPanel({
             id={clipNoticeId}
             data-testid="clip-silent"
             role="status"
-            className="flex items-start gap-2 rounded-base border border-warning-border bg-warning-tint px-4 py-3 text-[0.875rem] leading-[1.6] text-warning"
+            className="flex items-start gap-2 rounded-base border border-warning-border bg-warning-tint px-4 py-2 text-[0.875rem] leading-[1.6] text-warning"
           >
             <Icon name="MicOff" size={16} />
             <span>
@@ -391,18 +399,23 @@ export function RecorderPanel({
         <p
           id={presetNoticeId}
           data-testid="preset-missing"
-          className="flex items-start gap-2 rounded-base border border-warning-border bg-warning-tint px-4 py-3 text-[0.875rem] leading-[1.6] text-warning"
+          className="flex items-start gap-2 rounded-base border border-warning-border bg-warning-tint px-4 py-2 text-[0.875rem] leading-[1.6] text-warning"
         >
           <Icon name="AlertTriangle" size={16} />
           <span>{recorder.blockedReason}</span>
         </p>
       ) : null}
 
-      <div className="flex flex-wrap items-center gap-3">
+      {/* t21 紧凑：按钮行 gap-2（原 gap-3）—— 复核态四颗按钮换行时少占一行高 */}
+      <div className="flex flex-wrap items-center gap-2">
         {status === 'recording' ? (
           <Button variant="primary" onClick={recorder.stop} icon={<Icon name="Square" size={18} />}>
             停止录制
           </Button>
+        ) : status === 'reviewing_local' ? (
+          // t21：复核态不再摆「开始录制」—— 与用这一段/试听本段/重录/取消抢一行高度；
+          // 要重来走「重录」（它回到开录态，开始录制自会回来）。
+          null
         ) : (
           <Button
             variant="primary"
@@ -491,7 +504,7 @@ export function RecorderPanel({
         <div
           role="status"
           className={cn(
-            'flex flex-wrap items-center gap-3 rounded-base border px-4 py-3 text-[0.875rem]',
+            'flex flex-wrap items-center gap-3 rounded-base border px-4 py-2 text-[0.875rem]',
             uploadTone === 'success'
               ? 'border-success-border bg-success-tint text-success'
               : uploadTone === 'warning'
@@ -519,7 +532,7 @@ function poiStatus(message: string | null, status: string) {
     <p
       role="status"
       data-testid="duration-violation"
-      className="flex items-start gap-2 rounded-base border border-warning-border bg-warning-tint px-4 py-3 text-[0.875rem] leading-[1.6] text-warning"
+      className="flex items-start gap-2 rounded-base border border-warning-border bg-warning-tint px-4 py-2 text-[0.875rem] leading-[1.6] text-warning"
     >
       <Icon name="AlertTriangle" size={16} />
       <span>{message}</span>

@@ -1,4 +1,4 @@
-﻿/**
+/**
  * 分段播放条（试听 + 已听进度 + 点踩）。
  *
  * - 音频来自 `GET /api/segments/:id/audio`（带 HTTP Range，拖动进度条只取需要的字节）；
@@ -328,6 +328,23 @@ export function SegmentPlayer({
           {PLAYBACK_UI[player.playbackState].state}
         </p>
       </div>
+
+      {/*
+        起播失败出口（用户实测缺陷：「听全部」要点好几次才响）。
+        根因是 `play()` 被 autoplay 策略/404 拒绝后**异常被吞掉** —— 页面既不报错也不给提示，
+        用户只能盲目重复点击。现在把原因摆出来，并**不自动消失**（自动消失的提示会被错过，
+        等于没有）；一旦成功重播就自动退场（不留下永久红字）。
+        role=status + aria-live=polite：动效与颜色不是唯一反馈通道。
+      */}
+      {player.playFailure === null ? null : (
+        <p
+          role="status"
+          aria-live="polite"
+          className="rounded-base border border-danger/45 bg-danger/10 px-[10px] py-[6px] text-[0.875rem] leading-[1.6] text-danger"
+        >
+          {`播放没有开始（${player.playFailure}）。再点一次播放；如果一直这样，这一段的音频可能还不可用。`}
+        </p>
+      )}
 
       <div
         role="progressbar"

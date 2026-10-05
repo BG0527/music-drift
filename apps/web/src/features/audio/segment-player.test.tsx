@@ -439,3 +439,41 @@ describe('SegmentPlayer：状态反馈是"看得见 + 听得见"的（不靠颜�
     expect(element.paused).toBe(false);
   });
 });
+
+/* ── t15 残余（真机探针 F1/F2）：play() 被拒绝必须变成**可见出口**，不许静默、不许假装在播 ── */
+describe('SegmentPlayer：播放失败可见', () => {
+  it('play() 拒绝 → 出现 danger Toast 文案且假「在播」被复位；下次成功播放自动清除', async () => {
+    const element = new FakeAudio();
+    // 浏览器真实形态：play() 先 paused=false + play 事件（UI 瞬间「暂停」），随后 NotSupportedError 拒绝
+    element.play = vi.fn(async () => {
+      element.paused = false;
+      element.emit('play');
+      throw new DOMException('injected 404', 'NotSupportedError');
+    });
+    setup({ createElement: () => element });
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: '播放' }));
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    const message = await screen.findByText(/播放没有开始/);
+    const toast = message.closest('[role="status"]');
+    expect(toast, '失败提示必须是可播报的状态出口').not.toBeNull();
+    expect(toast?.className, '失败 tone 用 danger（且不自动离场）').toMatch(/danger/);
+    expect(element.paused, '拒绝后元素不许停在假 playing').toBe(true);
+    expect(screen.getByTestId('playback-state').textContent).toMatch(/已暂停/);
+
+    // 修复后重试成功 → 失败提示自动退场（不留永久红字）
+    element.play = vi.fn(async () => {
+      element.paused = false;
+      element.emit('play');
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: /继续播放|播放/ }));
+      await Promise.resolve();
+    });
+    expect(screen.queryByText(/播放没有开始/)).toBeNull();
+  });
+});

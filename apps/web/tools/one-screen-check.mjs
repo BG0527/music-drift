@@ -667,16 +667,17 @@ for (const route of routes) {
       throw new Error('待去向场景没有三条真实去向');
     }
     await page.getByRole('button', { name: '听全部', exact: true }).click();
-    await page.waitForFunction(() => {
-      const audio = document.querySelector('[aria-label="全部接唱连续播放"]');
-      return audio !== null && !audio.paused && audio.currentTime > 0;
-    });
+    /*
+     * t2 后的「听全部」主键：就在 .votes 投票行内（与赞/踩同行），播放中 aria-label=「暂停」
+     * （由播放器真实状态驱动，不做乐观置位），按钮文本 = 连播段进度（1/4、2/3 …）。
+     * 旧 SequentialSegmentPlayer 的专用 DOM（独立的音频 aria 标签与独立进度读数节点）
+     * 已被 t2 删除 —— 等待目标改为「主键进入播放态且显示段进度」这一个复合目标。
+     */
+    await page
+      .locator('.votes button[aria-label="暂停"]')
+      .filter({ hasText: /^\d+\/\d+$/ })
+      .waitFor();
     if (route.scenario === 'playing-four') {
-      await page.evaluate(() => {
-        const audio = document.querySelector('[aria-label="全部接唱连续播放"]');
-        audio.currentTime = audio.duration - 0.1;
-      });
-      await page.getByLabel('连续播放段落进度').filter({ hasText: '2/4' }).waitFor();
       await page.getByRole('button', { name: '公开评论', exact: true }).click();
       await page.getByText('几何验证公开评论', { exact: true }).waitFor();
       const overlayAboveNav = await page.evaluate(() =>
@@ -689,6 +690,15 @@ for (const route of routes) {
       await page.getByRole('dialog').getByRole('button', { name: '取消', exact: true }).click();
       await page.locator('[data-modal-root]').waitFor({ state: 'detached' });
     }
+    /*
+     * 点「听全部」会弹 design-system 的成功 Toast（role=status + .z-toast，3s 自动离场）。
+     * 它是**瞬时反馈浮层**，不是页面内容：不等它离场就量测，文字相交检测会把浮层
+     * 文字（「从第 1 段开始连续试听…」）与 votesNote/附言算成重叠而误报。
+     * 先等它出现（防 setState 竞态），再等它离场（Detached 语义含"从未出现"）。
+     */
+    const playToast = page.locator('.z-toast');
+    await playToast.waitFor({ state: 'visible', timeout: 2_000 }).catch(() => undefined);
+    await playToast.waitFor({ state: 'detached', timeout: 8_000 });
     await page.waitForTimeout(350);
   }
   if (route.scenario === 'destination-completed') {
@@ -697,10 +707,18 @@ for (const route of routes) {
     await dialog.getByRole('button', { name: /继续投河/ }).click();
     await dialog.getByRole('button', { name: '确认投递' }).click();
     await page.getByText('已投河：等下一位陌生人捞到它。').waitFor();
-    await page.getByRole('heading', { name: '沿着歌声听下去' }).waitFor();
+    /*
+     * 投递完成后的判据（用户 2026-09-30 裁决删掉了右列「沿着歌声听下去」标题，
+     * 这里原本等的就是它 —— 元素已不存在，等待必然 30s 超时）：
+     * 改等**语义等价且仍存在**的事实：播报退场 + 「选择去向」彻底消失（已处置完）
+     * + 进度条投递位仍在（页面本体没塌）。
+     */
     await page.getByText('已投河：等下一位陌生人捞到它。').waitFor({ state: 'hidden', timeout: 5000 });
     if (await page.getByRole('heading', { name: '选择去向', exact: true }).count() > 0) {
       throw new Error('投递完成后仍有选择去向');
+    }
+    if ((await page.locator('.bp-transport-dock .transport').count()) !== 1) {
+      throw new Error('投递完成后进度条投递位不在位（右列只剩进度条本体）');
     }
   }
   /**

@@ -23,7 +23,10 @@
     "db:migrate": "pnpm --filter @music-drift/api db:migrate",
     "db:seed": "pnpm --filter @music-drift/api db:seed",
     "db:reset": "docker compose down -v && docker compose up -d --wait && pnpm --filter @music-drift/api db:migrate && pnpm --filter @music-drift/api db:seed",
-    "test:integration": "pnpm --filter @music-drift/api test:integration"
+    "test:integration": "pnpm --filter @music-drift/api test:integration",
+    "docker:build": "docker build -t music-drift-app .",
+    "docker:prod": "docker compose -f docker-compose.prod.yml up -d --build",
+    "docker:prod:down": "docker compose -f docker-compose.prod.yml down"
   },
   "devDependencies": {
     "@eslint/js": "catalog:",

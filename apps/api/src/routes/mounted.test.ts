@@ -87,7 +87,7 @@ const KNOWN_FAMILIES: readonly Family[] = [
   },
   { family: 'reports', method: 'POST', path: '/api/reports' },
   { family: 'notifications', method: 'GET', path: '/api/notifications' },
-  { family: 'badges', method: 'GET', path: '/api/me/badges' },
+  // badges 族已登记为「退役」（见下方专测）：a19a4ea 删除 GET /api/me/badges 路由 ⇒ 不再进挂载表
   { family: 'collections', method: 'GET', path: '/api/me/collections' },
   {
     family: 'collections-create',
@@ -123,6 +123,14 @@ describe('路由注册守卫：所有已知路由族必须同时挂载（防静�
     );
     // 用文本判定（204 无 body 时 .json() 会抛）；未匹配唯一特征就是 notFound 处理器写的 unmatched 标记。
     expect(response.body, `${path} 未被路由匹配（疑似注册被覆盖）`).not.toContain('unmatched');
+  });
+
+  // 徽章族已退役（a19a4ea 删除 GET /api/me/badges 路由）：把「退役」本身钉住 ——
+  // 与 interactions.integration.test.ts 的同步口径逐字一致（合法 404 ≠ 静默丢失；
+  // 若路由被重新挂载，未登录会回 401 而非 404，本断言立刻红，提醒同步改两处）。
+  it('badges 已退役：GET /api/me/badges 必须 404（与 interactions 集成口径一致）', async () => {
+    const response = await app.inject({ method: 'GET', url: '/api/me/badges' });
+    expect(response.statusCode).toBe(404);
   });
 
   it('负向对照：未注册路径必须被判定为 unmatched（证明本守卫有牙齿）', async () => {

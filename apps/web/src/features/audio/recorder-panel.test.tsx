@@ -761,3 +761,114 @@ describe('RecorderPanel：录到静音时必须明说（t40 用户实测「试�
     vi.useRealTimers();
   });
 });
+
+/* ───────── t16 用户裁决：录前只有一个「开始录制」，点它 = 伴奏与录音同启 ───────── */
+describe('RecorderPanel：「开始录制」一键同启伴奏（t16）', () => {
+  it('onRecordButtonClick 在同一次点击栈内同步触发（不等异步开录 —— 伴奏先起的机械前提），随后进入录制态', async () => {
+    const { environment } = makeRecorderEnvironment();
+    const onRecordButtonClick = vi.fn();
+    render(
+      <RecorderPanel
+        segmentIndex={1}
+        totalSegments={4}
+        environment={environment}
+        presetDurationMs={ANY_PRESET_MS}
+        onRecordButtonClick={onRecordButtonClick}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: /开始录制/ }));
+    // 关键断言：点击返回后**立刻**（未 await、未 flush）回调已发生 —— 与 recorder.start()
+    // 同处 onClick 同步段，处于同一个用户手势任务里（自动播放策略放行的窗口）。
+    expect(onRecordButtonClick, '伴奏起播回调必须同步于点击栈').toHaveBeenCalledTimes(1);
+
+    // 回调之后录音照常推进（同步回调不能阻塞开录）
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(screen.getByRole('button', { name: /停止录制/ })).toBeInTheDocument();
+  });
+});
+
+/* ── t21：录制弹窗四档桌面一屏 —— 面板级紧凑排版（高度上界，先红后绿） ── */
+describe('RecorderPanel：t21 紧凑排版（一屏无滚动的结构前提）', () => {
+  it('面板容器收紧到 p-5/gap-2（原 p-6/gap-4），波形降到 h-10（原 h-16）', () => {
+    const { environment } = makeRecorderEnvironment();
+    render(
+      <RecorderPanel
+        segmentIndex={1}
+        totalSegments={4}
+        environment={environment}
+        presetDurationMs={ANY_PRESET_MS}
+      />,
+    );
+
+    const section = screen.getByRole('heading', { name: /第 1 段/ }).closest('section');
+    expect(section, 'RecorderPanel 必须渲染 <section>').not.toBeNull();
+    const className = section?.className ?? '';
+    expect(className, '内边距上界 p-5').toContain('p-5');
+    expect(className, '不得回到 p-6').not.toContain('p-6');
+    expect(className, '子区间距上界 gap-2（真机复核态 825px→需再省 gap）').toContain('gap-2');
+    expect(className, '不得回到 gap-3').not.toContain('gap-3');
+    expect(className, '不得回到 gap-4').not.toContain('gap-4');
+
+    const waveform = screen.getByTestId('waveform');
+    expect(waveform.className, '波形高度上界 h-10').toContain('h-10');
+    expect(waveform.className, '不得回到 h-12').not.toContain('h-12');
+    expect(waveform.className, '不得回到 h-16').not.toContain('h-16');
+  });
+
+  it('复核态不渲染「开始录制」（复核四键唯一：用这一段/试听本段/重录/取消录制）——省一行按钮高度', async () => {
+    const { environment } = makeRecorderEnvironment();
+    render(
+      <RecorderPanel
+        segmentIndex={1}
+        totalSegments={4}
+        environment={environment}
+        presetDurationMs={ANY_PRESET_MS}
+      />,
+    );
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: /开始录制/ }));
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: /停止录制/ }));
+    });
+
+    expect(screen.getByRole('button', { name: /用这一段/ })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /重录/ })).toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: /开始录制/ }),
+      '复核态不该同时摆「开始录制」（与四键抢一行；要重来走「重录」）',
+    ).not.toBeInTheDocument();
+  });
+
+  it('复核态不渲染波形条（电平条只为录制中服务；省 48px 让最坏复核态也进一屏），录前/录制中仍在', async () => {
+    const { environment } = makeRecorderEnvironment();
+    render(
+      <RecorderPanel
+        segmentIndex={1}
+        totalSegments={4}
+        environment={environment}
+        presetDurationMs={ANY_PRESET_MS}
+      />,
+    );
+
+    // 录前在（既有「波形是装饰性的」用例钉住 aria-hidden，语义不动）
+    expect(screen.getByTestId('waveform')).toBeInTheDocument();
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: /开始录制/ }));
+    });
+    // 录制中在（电平条唯一的“在干活”状态）
+    expect(screen.getByTestId('waveform')).toBeInTheDocument();
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: /停止录制/ }));
+    });
+    expect(
+      screen.queryByTestId('waveform'),
+      '复核态该让位：最坏复核态（时长告警+静音告警）实测 703px，720 视口预算只有 688px',
+    ).not.toBeInTheDocument();
+  });
+});

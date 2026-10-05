@@ -297,7 +297,7 @@ export function SongPickerPage() {
       <span
         aria-hidden="true"
         data-device="sp-platter"
-        className="pointer-events-none absolute inset-0 bg-[repeating-radial-gradient(circle_at_98.6%_106.7%,color-mix(in_srgb,var(--color-line)_5.5%,transparent)_0_1.2px,transparent_1.2px_6.5px)]"
+        className="pointer-events-none absolute inset-0 bg-[repeating-radial-gradient(circle_at_98.6%_106.7%,color-mix(in_srgb,var(--color-line)_5.5%,transparent)_0_1.2px,transparent_1.2px_6.5px),radial-gradient(circle_at_98.6%_106.7%,color-mix(in_srgb,var(--color-glass)_5%,transparent)_0_30%,transparent_68%)]"
       />
       <span
         aria-hidden="true"
@@ -370,7 +370,7 @@ export function SongPickerPage() {
           // 稿 §4 状态区（空态行）：dashed 框 + cat 标签「空 态」，逐字照稿
           <div
             data-device="sp-states"
-            className="enter-fade rounded-base border border-dashed border-paper/[0.16] px-[14px] py-[9px]"
+            className="enter-fade rounded-base border border-dashed border-paper/[0.16] px-[14px] py-[9px] md:max-w-[58.611vw]"
           >
             <p className="flex gap-[14px] text-[0.78125rem] leading-[1.6] text-muted">
               <span className="shrink-0 font-latin text-[11px] tracking-[0.24em] text-paper/50">
@@ -398,7 +398,7 @@ export function SongPickerPage() {
               */}
               <div
                 data-anchor="new-catalog"
-                className="relative flex flex-col gap-3 rounded-base border border-line/20 bg-paper/[0.035] p-3 sm:flex-row sm:items-center sm:gap-4"
+                className="relative flex flex-col gap-3 rounded-base border border-line/20 bg-paper/[0.035] p-3 sm:flex-row sm:items-center sm:gap-4 md:max-w-[58.611vw]"
               >
                 <label
                   htmlFor={filterId}
@@ -415,9 +415,9 @@ export function SongPickerPage() {
                   onChange={(event) => {
                     setKeyword(event.target.value);
                   }}
-                  className="min-h-11 w-full min-w-0 flex-1 border-b border-paper/24 bg-transparent px-3 text-[0.9375rem] text-paper placeholder:text-muted focus:outline-none focus:border-glass focus-visible:ring-2 focus-visible:ring-coral focus-visible:ring-offset-2 focus-visible:ring-offset-ink"
+                  className="min-h-11 w-full min-w-0 flex-1 border-b border-paper/24 bg-transparent px-3 text-[0.9375rem] text-paper placeholder:text-muted focus:outline-none focus:border-glass focus-visible:ring-2 focus-visible:ring-coral focus-visible:ring-offset-2 focus-visible:ring-offset-ink md:max-w-[22.222vw]"
                 />
-                <span className="shrink-0 font-latin text-[0.75rem] text-muted">
+                <span className="ml-auto shrink-0 font-latin text-[0.75rem] text-muted">
                   {matched.length === items.length
                     ? `曲库共 ${String(items.length)} 首`
                     : `匹配 ${String(matched.length)} / ${String(items.length)} 首`}
@@ -428,7 +428,7 @@ export function SongPickerPage() {
                 /* 稿 §4 状态区（无匹配行）：dashed 框 + cat 标签，正文带真 query */
                 <div
                   data-device="sp-states"
-                  className="enter-fade rounded-base border border-dashed border-paper/[0.16] px-[14px] py-[9px]"
+                  className="enter-fade rounded-base border border-dashed border-paper/[0.16] px-[14px] py-[9px] md:max-w-[58.611vw]"
                 >
                   <p className="flex gap-[14px] text-[0.78125rem] leading-[1.6] text-muted">
                     <span className="shrink-0 font-latin text-[11px] tracking-[0.24em] text-paper/50">
@@ -496,7 +496,8 @@ export function SongPickerPage() {
                             className="min-h-11 justify-center border border-paper/25 bg-paper/[0.03] px-3 text-[0.78125rem] leading-tight text-paper hover:border-glass hover:text-glass disabled:border-dashed disabled:border-paper/[0.14] disabled:text-muted"
                             loading={create.isPending}
                             disabled={!startable}
-                            icon={<Icon name="Mic" size={16} />}
+                            // 稿 .act[disabled]：干盆行是纯文字「暂不可发起」，不带话筒图标
+                            icon={startable ? <Icon name="Mic" size={16} /> : undefined}
                             onClick={() => {
                               // 「我参与过的漂流瓶」由服务端 `GET /api/me/bottles` 提供（t19），
                               // 页面不再写任何本机书签 —— 少一处"第二真相"。

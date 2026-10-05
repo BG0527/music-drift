@@ -762,3 +762,32 @@ describe('公海大厅 · one-screen 锚点 sea-list', () => {
     expect(anchor?.querySelector('.zones'), '分区必须在锚点容器内').not.toBeNull();
   });
 });
+
+/* ─────────────── t22 批次：键盘焦点与按压反馈（DESIGN §Interaction States） ─────────────── */
+describe('公海大厅 · 键盘焦点与按压反馈（t22）', () => {
+  it('zones 与分页按钮都有 2px coral ring（:focus/:focus-visible 都覆盖）；分页按钮有 active 位移', async () => {
+    const { container } = renderWithProviders(<SeaPage />, {
+      handlers: [
+        {
+          path: '/api/sea?zone=COMPLETED&limit=6',
+          respond: () => ({
+            body: { items: [bottleSummary()], nextCursor: '游标一', total: 24 },
+          }),
+        },
+      ],
+    });
+    await screen.findByRole('button', { name: '第 1 页' });
+    const css = styleOf(container);
+    // 分区 tab（li role=tab，由 ref 程序化 focus）——DESIGN：焦点永远可见，2px coral ring + offset 2
+    expect(css, 'zones 缺 :focus/:focus-visible 焦点环').toMatch(
+      /\.sea-hall \.zones li:focus,\.sea-hall \.zones li:focus-visible\{outline:2px solid var\(--color-coral\);outline-offset:2px\}/,
+    );
+    expect(css, '分页按钮缺 :focus/:focus-visible 焦点环').toMatch(
+      /\.sea-hall \.pages button:focus,\.sea-hall \.pages button:focus-visible\{outline:2px solid var\(--color-coral\);outline-offset:2px\}/,
+    );
+    // 分区已有 :active，分页按钮补齐同款按压反馈（DESIGN active = translateY(-1px)，立即、无过渡）
+    expect(css, '分页按钮缺 :active 按压位移').toMatch(
+      /\.sea-hall \.pages button:active\{transform:translateY\(-1px\)\}/,
+    );
+  });
+});

@@ -122,6 +122,8 @@ const SEA_HALL_CSS = `
    按下给 translateY(-1px)。关进 @media (hover: hover) 避免触屏粘滞；不改 :116 的默认几何。 */
 @media (hover: hover){.sea-hall .zones li:hover{color:rgba(243,249,250,.78);border-bottom-color:rgba(216,243,246,.28)}.sea-hall .zones li:hover .n{color:rgba(203,238,246,.6)}}
 .sea-hall .zones li:active{transform:translateY(-1px)}
+/* 键盘/程序化焦点（li role=tab 由 ref 调 focus()）：DESIGN §Interaction States —— 2px coral ring + offset 2，:focus 与 :focus-visible 都覆盖；焦点环立即出现（不参与过渡）。 */
+.sea-hall .zones li:focus,.sea-hall .zones li:focus-visible{outline:2px solid var(--color-coral);outline-offset:2px}
 /* t6 分区切换的确认动效（guidance：现在看的是哪个分区）。一次性「起-落」，
    幅度取契约 hoverScale、时长/缓动取 --motion-* token；只动 transform，静止态 = 基态。 */
 @keyframes sea-tab-pick{0%{transform:scale(1)}50%{transform:scale(var(--motion-hover-scale))}100%{transform:scale(1)}}
@@ -166,6 +168,9 @@ const SEA_HALL_CSS = `
 /* t3 微交互：分页按钮 hover 缩放（feedback —— 可点目标有回应；参数只引 --motion-* token，
    只动 transform；reduced-motion 下由 motion.css 全局重置为瞬时状态变化） */
 .sea-hall .pages button:hover{transform:scale(var(--motion-hover-scale))}
+/* t22：分页按钮补按压与焦点反馈（active 立即位移、focus 2px coral ring，均按 DESIGN 契约）。 */
+.sea-hall .pages button:active{transform:translateY(-1px)}
+.sea-hall .pages button:focus,.sea-hall .pages button:focus-visible{outline:2px solid var(--color-coral);outline-offset:2px}
 .sea-hall .pages button[aria-current='page']{position:relative;border-color:rgba(212,85,58,.62);background:rgba(212,85,58,.16);color:var(--color-paper)}
 
 /* ── 稿：空态 潮位退到最低，水线上空着 ── */

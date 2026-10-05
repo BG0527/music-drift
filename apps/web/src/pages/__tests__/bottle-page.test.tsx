@@ -79,8 +79,152 @@ describe('漂流瓶接唱页', () => {
     ] });
     // 用户裁决：公海等待接力的瓶子统一成「录第 N 段」（与河道捞起来同形同义），
     // 不再是「我来接这一段」。
-    expect(await screen.findByRole('button', { name: /录第 \d+ 段/ })).toBeInTheDocument();
+    const seaCta = await screen.findByRole('button', { name: /录第 \d+ 段/ });
+    expect(seaCta).toBeInTheDocument();
+    // 形态与河道 gapAction 的 cta 按钮一致（cta 共用外观 + Mic 图标）
+    expect(seaCta.classList.contains('cta'), '公海接唱 CTA 必须带 cta 共用类').toBe(true);
+    expect(seaCta.classList.contains('bp-record-cta')).toBe(true);
+    expect(seaCta.querySelector('svg.lucide-mic'), 'Mic 图标与河道一致').not.toBeNull();
+    expect(screen.queryByText(/我来接这一段/), '页面上不得再出现旧措辞').toBeNull();
   });
+
+  it('公海接唱：点「录第 N 段」走 POST 接管，成功后不跳页、直接开本页录制弹层', async () => {
+    renderWithProviders(<BottlePage id={BOTTLE_ID} />, {
+      route: `/bottles/${BOTTLE_ID}`,
+      handlers: [
+        { path: '/api/auth/me', respond: () => ({ body: SESSION_B }) },
+        { path: '/api/me/collections', respond: () => ({ body: [] }) },
+        {
+          method: 'POST',
+          path: `/api/sea/${BOTTLE_ID}/targeted-segment`,
+          respond: () => ({
+            body: bottleDetail({
+              status: 'HELD',
+              isHolder: true,
+              availableResolutions: [],
+              missingSegmentIndexes: [2],
+            }),
+          }),
+        },
+        {
+          path: `/api/bottles/${BOTTLE_ID}`,
+          respond: () => ({
+            body: bottleDetail({
+              status: 'SEA',
+              seaZone: 'INCOMPLETE',
+              isHolder: false,
+              availableResolutions: [],
+            }),
+          }),
+        },
+      ],
+    });
+
+    fireEvent.click(await screen.findByRole('button', { name: /录第 \d+ 段/ }));
+    // 直接打开本页第 N 段录制弹层（recorderPhase=open 的 Modal 标题 = 录第 N 段）
+    expect(await screen.findByRole('dialog', { name: /录第 \d+ 段/ })).toBeInTheDocument();
+    // 不跳页：接管成功后仍在瓶详情路由上
+    expect(window.location.pathname).toBe(`/bottles/${BOTTLE_ID}`);
+  });
+
+  /* ───── t13：用户场景复现 + 旧文案分支考古 ─────
+     用户引用的两段被否文案：「第 N 段还空着」（relay-timeline gapHead 的 else 分支）
+     与「这一段只有发起者（尚未投河时）或当前持有者能录…录不了它。」（bottle-page gapNote 的
+     最后一支）。两支都只在 gapAction 为空时出现 —— 逐分支考古见下面各用例的注释。 */
+  it('复现用户路径：已登录 + 公海未完成 + 本人未唱过 + 有缺口 ⇒ 缺口格就是 cta「录第 N 段」，全页无旧文案', async () => {
+    renderWithProviders(<BottlePage id={BOTTLE_ID} />, {
+      route: `/bottles/${BOTTLE_ID}`,
+      handlers: [
+        { path: '/api/auth/me', respond: () => ({ body: SESSION_B }) },
+        { path: '/api/me/collections', respond: () => ({ body: [] }) },
+        {
+          path: `/api/bottles/${BOTTLE_ID}`,
+          respond: () => ({
+            body: bottleDetail({
+              status: 'SEA',
+              seaZone: 'INCOMPLETE',
+              isHolder: false,
+              availableResolutions: [],
+            }),
+          }),
+        },
+      ],
+    });
+
+    // 缺口格（RelayTimeline gapBox / data-anchor=bottle-record）内的 cta 按钮
+    const gapBox = await screen.findByRole('button', { name: /录第 \d+ 段/ });
+    const box = gapBox.closest('[data-anchor="bottle-record"]');
+    expect(box, '录段按钮必须长在缺口格里（与河道捞起瓶同一容器）').not.toBeNull();
+    expect(gapBox.classList.contains('cta')).toBe(true);
+    expect(gapBox.classList.contains('bp-record-cta')).toBe(true);
+    // gapHead 随 gapAction 自动切到「由你开第一句」（relay 内 canRecord = gapAction 存在）
+    expect(screen.getByText(/第 \d+ 段由你开第一句/)).toBeInTheDocument();
+    // 全页无被否旧文案
+    const pageText = document.querySelector('main')?.textContent ?? '';
+    expect(pageText, '旧文案①：还空着').not.toContain('还空着');
+    expect(pageText, '旧文案②：只有发起者能录').not.toContain('只有发起者（尚未投河时）或当前持有者能录');
+    // 位置统一：全页只有一个录段按钮，destCol（右列）不摆第二入口
+    expect(screen.getAllByRole('button', { name: /录第 \d+ 段/ })).toHaveLength(1);
+    const destCol = document.querySelector('.destCol');
+    expect(destCol?.querySelectorAll('button').length ?? 0).toBeGreaterThanOrEqual(0);
+    expect(
+      [...(destCol?.querySelectorAll('button') ?? [])].filter((b) => /录第 \d+ 段/.test(b.textContent ?? '')),
+      'destCol 不得残留录段入口',
+    ).toHaveLength(0);
+  });
+
+  it('考古分支 A（已唱过 · 服务端禁录态）：不摆会 422 的假按钮（旧文案分支，替换文案待 captain 裁决）', async () => {
+    const sangSegment = { ...bottleDetail().segments[0]!, isMine: true };
+    renderWithProviders(<BottlePage id={BOTTLE_ID} />, {
+      route: `/bottles/${BOTTLE_ID}`,
+      handlers: [
+        { path: '/api/auth/me', respond: () => ({ body: SESSION_B }) },
+        { path: '/api/me/collections', respond: () => ({ body: [] }) },
+        {
+          path: `/api/bottles/${BOTTLE_ID}`,
+          respond: () => ({
+            body: bottleDetail({
+              status: 'SEA',
+              seaZone: 'INCOMPLETE',
+              isHolder: false,
+              availableResolutions: [],
+              segments: [sangSegment],
+            }),
+          }),
+        },
+      ],
+    });
+    await screen.findByRole('heading', { level: 1 });
+    // canTakeFromSea 因 mySegmentRecorded=false→… 为假 ⇒ 无按钮（点了一定 422 ALREADY_SANG_IN_BOTTLE）
+    expect(screen.queryByRole('button', { name: /录第 \d+ 段/ })).not.toBeInTheDocument();
+    // 旧文案此时可见（gapNote 末支 + gapHead else）——即用户可能看到旧文案的触发条件之一
+    expect(document.body.textContent).toContain('只有发起者（尚未投河时）或当前持有者能录');
+    expect(document.body.textContent).toContain('还空着');
+  });
+
+  it('考古分支 B（未登录）：不摆会 401/422 的假按钮（旧文案分支同上）', async () => {
+    renderWithProviders(<BottlePage id={BOTTLE_ID} />, {
+      route: `/bottles/${BOTTLE_ID}`,
+      handlers: [
+        {
+          path: `/api/bottles/${BOTTLE_ID}`,
+          respond: () => ({
+            body: bottleDetail({
+              status: 'SEA',
+              seaZone: 'INCOMPLETE',
+              isHolder: false,
+              availableResolutions: [],
+            }),
+          }),
+        },
+      ],
+    });
+    await screen.findByRole('heading', { level: 1 });
+    // canTakeFromSea 需要 session==='authed' ⇒ 未登录不摆假按钮
+    expect(screen.queryByRole('button', { name: /录第 \d+ 段/ })).not.toBeInTheDocument();
+    expect(document.body.textContent).toContain('还空着');
+  });
+
   it('左上「回河道」是唯一放回入口：持有者先 put-back 成功再导航', async () => {
     renderWithProviders(<BottlePage id={BOTTLE_ID} />, {
       route: `/bottles/${BOTTLE_ID}`,
@@ -1469,6 +1613,52 @@ describe('听全部主键 + 分段直播 + 布局对齐（t2）', () => {
     expect(fake.element.paused, '第 2 段应自动续播，不能停在暂停').toBe(false);
   });
 
+  /**
+   * 「听全部」点一下就要响（用户反馈"需要多点几次才开始播放"）。
+   *
+   * 真正的根因不是按钮状态，而是**竞态**：换段时 `key` 变 ⇒ 元素创建 effect 重跑
+   * （cleanup 里 `element.pause()`）；若起播放在**外层** effect，它会先 `play()`
+   * 紧接着被这次 cleanup 的 `pause()` 打断（`AbortError: play() interrupted by
+   * pause()`）—— 表现就是"点了没声，再点一次"。所以起播必须发生在元素 effect **内部**。
+   *
+   * 本测试用"pause 之后仍要求处于播放态"锁住这个顺序：若起播被后到的 pause 打断，
+   * `paused` 会回到 true，断言即红。
+   */
+  it('起播不会被元素重建的 cleanup pause 打断（AbortError 回归）', async () => {
+    const fake = fakeAudioHarness();
+    renderWithProviders(
+      <BottlePage id={BOTTLE_ID} seams={{ segmentElementFactory: fake.factory as never }} />,
+      {
+        route: `/bottles/${BOTTLE_ID}`,
+        handlers: [
+          {
+            path: `/api/bottles/${BOTTLE_ID}`,
+            respond: () => ({
+              body: bottleDetail({
+                status: 'SEA',
+                seaZone: 'COMPLETED',
+                isComplete: true,
+                isHolder: false,
+                availableResolutions: [],
+                missingSegmentIndexes: [],
+                segments: fourSegments,
+              }),
+            }),
+          },
+        ],
+      },
+    );
+
+    const listenAll = await screen.findByRole('button', { name: '听全部' });
+    fireEvent.click(listenAll);
+    await waitFor(() => {
+      expect(fake.element.paused, '点一次「听全部」后必须真的在播').toBe(false);
+    });
+    // 若有"先 play 后被 pause 打断"，播放态会被清掉；这里等一拍再确认它仍在播。
+    await new Promise((resolve) => setTimeout(resolve, 60));
+    expect(fake.element.paused, '起播不应被随后的 pause 打断（AbortError 回归）').toBe(false);
+  });
+
   it('没有已录段：听全部键禁用且不出假进度', async () => {
     renderWithProviders(<BottlePage id={BOTTLE_ID} />, {
       route: `/bottles/${BOTTLE_ID}`,
@@ -1643,5 +1833,113 @@ describe('听全部主键 + 分段直播 + 布局对齐（t2）', () => {
       css,
       '赞/踩/听全部的上距回到 14px（原先为对齐右列文字用的 53px 已随该文字删除而撤销）',
     ).not.toMatch(/\.bottle-page \.votes \{\s*margin-top:\s*53px/);
+  });
+});
+
+/* ───────── t14：进度条挪右列（5ec5ac1 portal 保一个播放器）+「试听与投票」标题归位 ───────── */
+
+describe('t14 进度条右列投递与标题归位', () => {
+  async function renderDefaultBottle() {
+    const view = renderWithProviders(<BottlePage id={BOTTLE_ID} />, {
+      route: `/bottles/${BOTTLE_ID}`,
+      handlers: [
+        { path: '/api/auth/me', respond: () => ({ body: SESSION_B }) },
+        { path: `/api/bottles/${BOTTLE_ID}`, respond: () => ({ body: bottleDetail() }) },
+      ],
+    });
+    await screen.findByRole('heading', { level: 1 });
+    return view;
+  }
+
+  it('进度条组（.bar+.timecode）经 portal 落在右列 destCol 的投递位内，且全页只有一份 transport', async () => {
+    await renderDefaultBottle();
+
+    const transports = [...document.querySelectorAll('.transport')];
+    expect(transports, 'transport 必须只有一份：portal 只搬 DOM，不拆播放器、不复制实例').toHaveLength(1);
+    const transport = transports[0]!;
+    expect(transport.querySelector('.bar'), '水道进度 .bar 随行').not.toBeNull();
+    expect(transport.querySelector('.timecode'), '时长 .timecode 随行').not.toBeNull();
+
+    const dock = transport.closest('.bp-transport-dock');
+    expect(dock, '进度条必须落在右列投递位里').not.toBeNull();
+    const destCol = dock!.closest('.destCol');
+    expect(destCol, '投递位归属右列 destCol').not.toBeNull();
+
+    /*
+     * 右列现在**只有进度条**（用户 2026-09-30 裁决删掉「沿着歌声听下去」+那段说明）：
+     * 那段解释性文案已被并发 19173db 删除，瓶子本身（段格里的「听」）已经把这套操作演示一遍。
+     * 所以这里不再断言「在标题/副标题之下」，改为钉住删除后的形态：
+     * ① 那两段文字确已不存在（防复活）；② 投递位仍是右列 transport 的唯一归属。
+     */
+    const destColText = destCol!.textContent ?? '';
+    expect(destColText, '右列解释文案「沿着歌声听下去」已删，不得复活').not.toContain('沿着歌声听下去');
+    expect(
+      destColText,
+      '右列解释文案「按段号顺序连着听」已删，不得复活',
+    ).not.toContain('按段号顺序连着听');
+    expect(destColText, '右列解释文案「只听那一段」已删，不得复活').not.toContain('只听那一段');
+
+    // 左列（进度条原在位置）不再残留 transport
+    expect(document.querySelector('.listenCol .transport')).toBeNull();
+  });
+
+  it('「试听与投票」标题在 listenCol 原槽位（进度条让位后的顶部），含第 N 段副标题且 aria 链不断', async () => {
+    await renderDefaultBottle();
+
+    const section = document.querySelector('.listenCol');
+    expect(section, '左列在场').not.toBeNull();
+    expect(section!.getAttribute('aria-labelledby'), 'aria-labelledby 引用链').toBe('playback-heading');
+    const h2 = document.getElementById('playback-heading');
+    expect(h2, 'playback-heading 锚点').not.toBeNull();
+    expect(h2!.tagName).toBe('H2');
+    expect(h2!.textContent).toContain('试听与投票');
+    expect(h2!.querySelector('span'), '第 N 段副标题 span 随标题一起').not.toBeNull();
+
+    // 位置 = 进度条原在的左列槽位：listenCol 内、且在 votes 行之前（transport 已让位）
+    expect(section!.compareDocumentPosition(h2!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    const votes = document.querySelector('.listenCol .votes');
+    expect(votes, '投票行仍在左列').not.toBeNull();
+    expect(
+      Boolean(h2!.compareDocumentPosition(votes!) & Node.DOCUMENT_POSITION_FOLLOWING),
+      '标题在投票行之前（原进度条槽位让给内容流）',
+    ).toBe(true);
+
+    // 播放器唯一性 + t2 主键不回退
+    expect(document.querySelectorAll('.transport')).toHaveLength(1);
+    expect(screen.getAllByRole('button', { name: /听全部/ })).toHaveLength(1);
+  });
+
+  it('几何对齐（桌面）：同轴改由「标题下移 32px + 投递位 48px」实现，.votes 回到 14px', () => {
+    /*
+     * 机制已变更（并发 19173db，用户 2026-09-30 裁决「删掉右列解释文案」）：
+     * 那段文字原本是「进度条要对齐」的参照物 —— 它的正文比左列标题高，把右列进度条顶到了下面，
+     * 上一提交才被迫给 .votes 加 39px 去凑同轴。参照物删掉后 39px 失去意义、已撤销；
+     * 同轴改由 `.listenCol > h2 { margin-top: 32px }` + `.bp-transport-dock { margin-top: 48px }`
+     * 这对留白实现（真机实测：标题 630→662、votes 699–737、transportMid 718 == votesMid 718）。
+     *
+     * 本用例钉住**新机制**且防回退：① .votes 不得再出现被撤销的 53px；
+     * ② 基准断仍是 14px；③ 对齐靠 32/48 这对留白而不是重新加 39px。
+     * （同 describe 里另一条用例已钉结构与 DOM 归属，此处只管几何机制。）
+     */
+    const css = readFileSync(join(process.cwd(), 'src', 'pages', 'bottle-page.css'), 'utf8');
+    // ① 被撤销的 53px 不许复活（它依赖已删除的右列参照文字）
+    expect(
+      css,
+      '.votes 不得回到 53px（对齐参照物已随右列文案删除而撤销）',
+    ).not.toMatch(/\.bottle-page \.votes \{\s*margin-top: 53px/);
+    // ② 基准断保持 14px（窄屏/单列不位移）
+    expect(css).toMatch(/\.bottle-page \.votes \{\s*margin-top: 14px;/);
+    // ③ 新机制的两个留白必须在位（缺一个就重新错位）
+    expect(
+      css,
+      '同轴靠「标题下移 32px」实现，缺它标题会贴住瓶身剖面下沿',
+    ).toMatch(/\.listenCol > h2[^{]*\{[^}]*margin-top: 32px/);
+    expect(
+      css,
+      '同轴靠「投递位 48px」实现，缺它进度条与赞/踩/听全部不同轴',
+    ).toMatch(/\.bp-transport-dock[^{]*\{[^}]*margin-top: 48px/);
+    // ④ 投递位仍在（结构由上一用例钉，此处防误删）
+    const source = readFileSync(join(process.cwd(), 'src', 'pages', 'bottle-page.tsx'), 'utf8');
+    expect(source, '投递位 DOM 仍在').toContain('bp-transport-dock');
   });
 });

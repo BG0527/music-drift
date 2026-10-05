@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { NAV_ITEMS, activeNavKey, buildPath, matchRoute, safeNextPath } from './routes';
 
@@ -76,5 +78,20 @@ describe('路由表', () => {
     expect(safeNextPath('//evil.example/x')).toBe('/');
     expect(safeNextPath(undefined)).toBe('/');
     expect(safeNextPath('bottles/abc')).toBe('/');
+  });
+
+  /**
+   * t28（用户裁决）：landing 独立出导航栏 —— 顶栏不再有「介绍」入口，
+   * `/` 依旧渲染 landing，但 activeNavKey 不再把 `/` 映射到任何导航项
+   * （INTRO_NAV_ITEM 导出与 intro 归属一并清理）。
+   */
+  it('t28：`/` 不再映射任何导航高亮，INTRO_NAV_ITEM 与 key 联合里的 intro 已清理', () => {
+    expect(activeNavKey('home'), 'landing 不属于任何导航项').toBeNull();
+    const source = readFileSync(resolve(process.cwd(), 'src', 'pages', 'shell', 'routes.ts'), 'utf8');
+    expect(source, 'routes.ts 不得再导出/引用 INTRO_NAV_ITEM').not.toMatch(/INTRO_NAV_ITEM/);
+    expect(source, "key 联合类型与分支里的 'intro' 已清").not.toMatch(/'intro'/);
+    // 四入口顺序断言不放松（原样保留在此文件头部用例里）
+    expect(NAV_ITEMS.map((item) => item.key)).toEqual(['river', 'sea', 'mine', 'settings']);
+    expect(NAV_ITEMS.map((item) => item.label)).toEqual(['河道', '公海', '我的', '设置']);
   });
 });

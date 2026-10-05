@@ -88,6 +88,14 @@ export interface UseSegmentPlayerResult {
   toggle: () => void;
   seekTo: (positionMs: number) => void;
   replay: () => void;
+  /**
+   * 起播失败原因（`null` = 无失败）。
+   *
+   * 存在的理由：用户实测「听全部」要点好几次才响 —— 根因之一是 `play()` 被 autoplay 策略
+   * 拒绝后**异常被吞掉**，页面既不报错也不给出口，用户只能盲目重复点击。这里把原因暴露出来，
+   * 由调用方渲染可见提示。`AbortError`（元素重建竞态的内部中断）不算失败，恒为 null。
+   */
+  playFailure: string | null;
 }
 
 /**
@@ -163,6 +171,17 @@ export function useSegmentPlayer(options: UseSegmentPlayerOptions): UseSegmentPl
   const elementRef = useRef<AudioElementLike | null>(null);
   const trackerRef = useRef<ListenTracker | null>(null);
   /**
+   * 起播失败的原因（`null` = 没失败/已恢复）。
+   *
+   * 为什么用 ref 而不是直接进 `ProgressState`：它**不参与进度语义**（不该被覆盖率/唱针看见），
+   * 但必须能被 UI 读到 —— 走 `publish()` 触发一次重渲染，由 `playFailureRef` 派生。
+   * 竞态用 `playRequestRef` 判废：元素重建后旧 promise 的 reject 不该再改新元素的状态。
+   */
+  const playFailureRef = useRef<string | null>(null);
+  const playRequestRef = useRef(0);
+  /** 已消费的 autoPlayToken（换段起播与同段重按共享去重，避免双播）。 */
+  const rememberedTokenRef = useRef(0);
+  /**
    * 是否**曾经播放过**（用于区分"显式暂停在 0"与"从未播放"）。
    * 只在本段元素的事件处理器里写、在元素创建 effect 里重置 —— 不在 render 期读写。
    */
@@ -215,6 +234,53 @@ export function useSegmentPlayer(options: UseSegmentPlayerOptions): UseSegmentPl
     });
   }, [key]);
 
+  /**
+   * 请求起播的**唯一**落点：手动 toggle、换段自动起播、同段重按都走它。
+   *
+   * 三件事在此收口：① 竞态判废（元素重建后旧 promise 的结果不再改状态）；
+   * ② 失败暴露（`playFailure`，不再静默吞掉 —— 用户报的「要点好几次才响」就是被吞掉的
+   *    autoplay 拒绝造成的：页面既不报错也不给出口，只能盲目重复点击）；
+   * ③ 失败时把元素从「假在播」的僵尸态复位。
+   */
+  const requestPlay = useCallback((): void => {
+    const element = elementRef.current;
+    if (element === null) return;
+    playbackStore?.claimAudio(element);
+    playRequestRef.current += 1;
+    const request = playRequestRef.current;
+    playFailureRef.current = null; // 新一次尝试：清掉上一轮的失败，别让旧错留在屏幕上
+    void Promise.resolve(element.play()).then(
+      () => {
+        if (playRequestRef.current === request) publish();
+      },
+      (thrown: unknown) => {
+        if (playRequestRef.current !== request) return;
+        // `name` 取自 DOMException / Error 两者共有的一等公民属性 ——
+        // **不能用 `instanceof Error`**：浏览器抛的 DOMException 不是 Error 子类
+        // （jsdom 与真机皆然），那样会把 NotSupportedError/AbortError 误判成未知故障。
+        const name =
+          typeof thrown === 'object' && thrown !== null && 'name' in thrown
+            ? String((thrown as { name: unknown }).name)
+            : 'PlaybackError';
+        if (name === 'AbortError') {
+          // 元素重建竞态的内部中断，不是用户可见故障；但状态必须复位，别停在假 playing
+          playFailureRef.current = null;
+          publish();
+          return;
+        }
+        playFailureRef.current = name;
+        // 浏览器真实形态：play() 先把 paused 置 false 并触发 play 事件（UI 瞬间变「暂停」），
+        // 随后拒绝 —— 元素就此停在「假在播」的僵尸态。必须复位，否则用户看到「暂停」
+        // 却毫无声音，只能反复多点（这正是他们报的缺陷）。
+        element.pause();
+        // `hasPlayedRef` 保持 true：用户**确实按过播放**（浏览器也已触发 play 事件），
+        // 复位后如实显示「已暂停」而不是「还没播放」—— 重试入口就在播放键上。
+        atEndRef.current = false;
+        publish();
+      },
+    );
+  }, [publish, playbackStore]);
+
   useEffect(() => {
     const element = createElement(src);
     elementRef.current = element;
@@ -254,13 +320,13 @@ export function useSegmentPlayer(options: UseSegmentPlayerOptions): UseSegmentPl
     element.addEventListener('play', onPlay);
     element.addEventListener('pause', onPlayStateChange);
 
-    // 自动起播：放在监听挂好之后、return 之前 —— 这是本元素生命周期的**最后一个动作**。
-    // 「听全部」换段后由它接上（不会再被外层 cleanup 的 pause 打断）。
+    // **换段**时的自动起播：放在监听挂好之后、return 之前 —— 这是本元素生命周期的最后一个动作，
+    // 不会再被外层 cleanup 的 pause 打断（src 变 ⇒ key 变 ⇒ 本 effect 重跑）。
+    // 令牌在这里**标记为已消费**（rememberedTokenRef），免得下面那个「同段重按」的 effect
+    // 在同一次重跑里再起播一次（双播）。
     if ((autoPlayTokenRef.current ?? 0) > 0) {
-      playbackStore?.claimAudio(element);
-      void Promise.resolve(element.play()).catch(() => {
-        publish();
-      });
+      rememberedTokenRef.current = autoPlayTokenRef.current;
+      requestPlay();
     }
 
     return () => {
@@ -274,7 +340,20 @@ export function useSegmentPlayer(options: UseSegmentPlayerOptions): UseSegmentPl
       elementRef.current = null;
       trackerRef.current = null;
     };
-  }, [createElement, duration, publish, src, playbackStore]);
+  }, [createElement, duration, publish, src, playbackStore, requestPlay]);
+
+  /**
+   * **同段重按**的自动起播：用户点段「听」/「听全部」时令牌 +1，但 src 不变 ⇒ 上面的元素 effect
+   * 不会重跑，令牌会被吞掉 —— 表现正是「要点好几次才响」。这里补上这个落点。
+   *
+   * 用「已消费令牌」比对去重：只有真正变化的令牌才起播，元素重建那次的起播不会被这里重复触发。
+   */
+  useEffect(() => {
+    const token = options.autoPlayToken ?? 0;
+    if (token === 0 || token === rememberedTokenRef.current) return;
+    rememberedTokenRef.current = token;
+    requestPlay();
+  }, [options.autoPlayToken, requestPlay]);
 
   /**
    * 智能切换（用户在"播放按钮"上的直觉）：
@@ -294,12 +373,8 @@ export function useSegmentPlayer(options: UseSegmentPlayerOptions): UseSegmentPl
       element.currentTime = 0;
       trackerRef.current?.markSeek();
     }
-    playbackStore?.claimAudio(element);
-    // 自动播放策略可能拒绝 play()：吞掉异常并保持"未播放"，不冒未捕获错误
-    void Promise.resolve(element.play()).catch(() => {
-      publish();
-    });
-  }, [publish, playbackStore]);
+    requestPlay();
+  }, [requestPlay]);
 
   const seekTo = useCallback(
     (positionMs: number): void => {
@@ -344,5 +419,7 @@ export function useSegmentPlayer(options: UseSegmentPlayerOptions): UseSegmentPl
     toggle,
     seekTo,
     replay,
+    // 「点了没声」必须看得见：play() 被拒时这里是原因（AbortError 内部竞态已滤成 null）
+    playFailure: playFailureRef.current,
   };
 }

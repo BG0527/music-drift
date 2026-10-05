@@ -127,11 +127,13 @@ describe('根路由直达（t12 用户新裁决，覆盖 `/`→`/river` 旧裁�
     expect(matchRoute('/').name).toBe('home');
   });
 
-  it('顶栏「介绍」指向 `/` 且在本页高亮', async () => {
+  // t28 用户裁决（captain 授权外科改写，仅此一条）：landing 独立出导航栏 ——
+  // 顶栏不再有「介绍」入口；`/` 依旧直接渲染 landing（原「介绍指向 / 且高亮」断言随之作废）。
+  it('t28：顶栏零「介绍」入口，`/` 仍是独立 landing（h1 钩子在、不跳走）', async () => {
     renderLanding();
-    const link = await screen.findByRole('link', { name: '介绍' });
-    expect(link).toHaveAttribute('href', '/');
-    expect(link).toHaveAttribute('aria-current', 'page');
+    expect(await screen.findByRole('heading', { level: 1, name: HOOK })).toBeInTheDocument();
+    expect(window.location.pathname).toBe('/');
+    expect(screen.queryByRole('link', { name: '介绍' })).toBeNull();
   });
 });
 

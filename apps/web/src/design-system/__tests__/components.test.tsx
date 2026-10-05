@@ -406,7 +406,8 @@ describe('Modal（去向三选一）', () => {
   it('720px 矮屏下面板有视口高度上限，长内容在面板内滚动', () => {
     render(<Modal open title="长内容" onClose={() => {}}><div>内容</div></Modal>);
     const dialog = screen.getByRole('dialog', { name: '长内容' });
-    expect(dialog.className).toContain('max-h-[calc(100dvh-3rem)]');
+    // t21：上限口径改为 100dvh-2rem（遮罩留白 p-4，四档桌面各多出 16px 可用高）；语义不变
+    expect(dialog.className).toContain('max-h-[calc(100dvh-2rem)]');
     expect(dialog.className).toContain('overflow-y-auto');
   });
 
@@ -636,5 +637,35 @@ describe('Tabs（公海三入口）', () => {
     expect(first?.className).toMatch(/border-coral/);
     expect(first?.className, 'record-v1 不用胶囊药丸表示选中').not.toMatch(/rounded-pill/);
     expect(second?.className).toMatch(/text-muted/);
+  });
+});
+
+describe('Modal：t21 紧凑排版（录制弹窗四档桌面一屏）', () => {
+  it('面板内边距/标题间距/子区间距收紧为上界，且窄屏内滚通道保留（桌面靠排版装下，不靠裁切）', () => {
+    render(
+      <Modal open title="紧凑排版" onClose={() => {}}>
+        <p>内容</p>
+      </Modal>,
+    );
+    const dialog = screen.getByRole('dialog', { name: '紧凑排版' });
+    expect(dialog.className, '内边距上界 p-6（原 p-8）').toContain('p-6');
+    expect(dialog.className, '不得回到 p-8').not.toContain('p-8');
+    expect(dialog.className, '高度上限收到 100dvh-2rem（配合遮罩留白 p-4）').toContain(
+      'max-h-[calc(100dvh-2rem)]',
+    );
+    expect(dialog.className, '窄屏可内滚：通道必须保留').toContain('overflow-y-auto');
+    expect(dialog.className, '不许用 overflow-hidden 裁切兜底').not.toContain('overflow-hidden');
+
+    const overlay = dialog.parentElement;
+    expect(overlay?.className ?? '', '遮罩留白 p-4（原 p-6）—— 四档桌面各多 16px 可用高').toContain('p-4');
+    expect(overlay?.className ?? '', '不得回到 p-6').not.toContain('p-6');
+
+    const header = dialog.querySelector('header');
+    expect(header?.className ?? '', '标题间距上界 mb-4（原 mb-6）').toContain('mb-4');
+    expect(header?.className ?? '', '不得回到 mb-6').not.toContain('mb-6');
+
+    const body = [...dialog.children].find((child) => child.tagName === 'DIV');
+    expect(body?.className ?? '', '子区间距上界 gap-4（原 gap-6）').toContain('gap-4');
+    expect(body?.className ?? '', '不得回到 gap-6').not.toContain('gap-6');
   });
 });
