@@ -1,0 +1,26 @@
+# 构建上下文减负：Dockerfile 只 COPY 白名单（package.json/pnpm-*/tsconfig.base.json/packages/apps），
+# 下面这些放进上下文只会白占传输体积，服务器侧（Zeabur/Render 从 git 克隆构建）尤其吃亏。
+.git
+node_modules
+**/node_modules
+dist
+**/dist
+
+# Agent 会话与技能资产（72MB+，与应用无关）
+.agents
+.agent-teams
+.tmp*
+_tmp*
+
+# 本机/凭据类（服务端克隆本就没有，双保险）
+.env
+.env.*
+!.env.example
+.neon
+.codex
+.mcp.json
+
+# 只读参考站与文档（应用不消费）
+site
+docs
+screenshots
