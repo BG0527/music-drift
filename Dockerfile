@@ -111,6 +111,28 @@ GATEWAY_EOF
 ENV GATEWAY_PORT=8080
 EXPOSE 8080
 
-# 启动序列（fail-fast）：迁移 → 种子（admin 口令只来自环境，缺失则跳过并告警）→ Fastify(后台) + 网关(前台)。
+# 启动序列（fail-fast）：迁移 → 种子（admin 口令只来自环境，缺失则跳过并告警）→ Fastify(后台) + 网关(前台）。
 # 任一前置步骤失败 ⇒ 容器退出（compose restart 策略会把它暴露成 CrashLoop，而不是带病运行）。
-CMD ["sh", "-c", "pnpm --filter @music-drift/api db:migrate && pnpm --filter @music-drift/api db:seed && { pnpm --filter @music-drift/api start & node /app/gateway.mjs; }"]
+#
+# DATABASE_URL_B64 解码（CloudBase 部署层适配，业务代码零感知）：
+# 腾讯云旧版 CLI `tcb run deploy --envParams "k=v&k2=v2"` 的解析器先按 & 再按第一个 = 切值，
+# 真实连接串同时含 & 与多个 = 会被截断 → 平台侧改传 url-safe 无填充 base64（只含 [A-Za-z0-9_-]），
+# 容器启动时在此还原成普通 DATABASE_URL 再进入迁移/种子/服务。两种传法等价，见 docs/deploy-runbook.md。
+RUN cat > /app/decode-db-url.sh <<'DECODE_EOF'
+#!/bin/sh
+# 被 . 引入（sourced）：用 return 不用 exit，且必须保持退出码 0。
+[ -n "${DATABASE_URL_B64:-}" ] || return 0
+b64=$(printf '%s' "$DATABASE_URL_B64" | tr -- '-_' '+/')
+case $((${#b64} % 4)) in
+  2) b64="${b64}==" ;;
+  3) b64="${b64}=" ;;
+  1) echo '[decode] DATABASE_URL_B64 非法 base64 长度' >&2; return 1 ;;
+esac
+decoded=$(printf '%s' "$b64" | base64 -d) || { echo '[decode] DATABASE_URL_B64 解码失败' >&2; return 1; }
+DATABASE_URL="$decoded"
+export DATABASE_URL
+echo "[decode] DATABASE_URL_B64 restored (${#decoded} chars)"
+DECODE_EOF
+RUN chmod +x /app/decode-db-url.sh
+
+CMD ["sh", "-c", ". /app/decode-db-url.sh && pnpm --filter @music-drift/api db:migrate && pnpm --filter @music-drift/api db:seed && { pnpm --filter @music-drift/api start & node /app/gateway.mjs; }"]
