@@ -30,6 +30,8 @@
   },
   "devDependencies": {
     "@eslint/js": "catalog:",
+    "@neon/config": "^1.8.3",
+    "@neon/env": "^1.5.0",
     "eslint": "catalog:",
     "eslint-config-prettier": "catalog:",
     "eslint-plugin-react-hooks": "catalog:",

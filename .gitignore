@@ -51,3 +51,7 @@ docs/ui-review/fit/
 
 # 一次性会话归档解压产物（t8 恢复 landing 页用；会话内容不进仓）
 .agents/landing-revert/
+# Neon：链接指针与本机代理凭据（连接串走 .env*，上面已覆盖）
+.neon
+.codex/
+.mcp.json
