@@ -240,7 +240,7 @@ docker compose -f docker-compose.prod.yml down
   `MDB_API_BASE=<对外地址> node tools/seed-demo.mjs`（自检：完整入海≥1 / 河道≥1 / 公海等待≥1 / 评论≥1）。
 - admin 口令机制与重置序列见 §2/§3（`pnpm db:reset` 仅用于**本地 dev 库**）。
 
-### 5.6 公网发布（两条路；平台侧命令**未实测**——本机无 CLI/凭据，以官方文档为准，先标注再复制）
+### 5.6 公网发布（两条路；平台侧命令**未实测**——本机无 CLI/凭据，以官方文档为准，先标注再复制。**实际落地用的是 5.9 的 CloudBase 路径，已实测**）
 
 **路 A（推荐，平台连仓库构建）**：完成 5.1 注册 → push 代码到托管（**推远端需 captain/用户确认**）→
 平台新建服务选本仓库 → 构建命令 `docker build -t music-drift-app .`（或平台 Dockerfile 识别）→
@@ -282,7 +282,36 @@ pg_dump "$PROD_DATABASE_URL" -f backup-$(date +%F).sql          # 变更前必�
 # 平台侧（未实测，以官方文档为准）：fly deployments rollback / Render Rollback / Koyeb 上一 revision 重新部署
 ```
 
-## 6. 文案可改一条龙（t33 合同必含 + 实测记录）
+### 5.9 腾讯云 CloudBase 云托管 —— **实际落地路径（2026-10-05 全链实测，取代 5.6 的未实测命令）**
+
+**平台为什么是它**（用户裁决链：绑卡即弃）：Render 要绑卡 → Koyeb 官网定价页实测**新账号无免费档**（最低 Pro $29/mo，且被 Mistral 收购后 Starter 免费档关闭）→ Zeabur 文档写「无需绑卡」但注册实测**要付款** → HF/Replit/Claw/CF 快隧道在本机网络**直连不通**（评委同样不通）→ 最终选定腾讯云 CloudBase：**实名≠绑卡**（微信扫码实名即可），环境 `bg0527-d6gltfs0j67f8b9b9` 为**体验版，有效期至 2027-04-05（6 个月）**。
+
+**已上线交付物**：
+- 公网 URL：`https://music-drift-323731-8-1500762505.sh.run.tcloudbase.com`（每个服务自带 HTTPS 公网域名，**免备案、免证书**；录音 `getUserMedia` 的 secure-context 要求因此天然满足）
+- 服务：`music-drift`（container 型，识别根 Dockerfile，端口 8080，MinNum=1 常驻 1 实例，PUBLIC 访问，cpu1/mem2）
+- 数据库：Neon production 分支（连接串在本机 `.env.neon-production`，**gitignore**）；容器启动自动 `db:migrate` → `db:seed`
+- 管理员：`admin` / `.env` 里 `SEED_ADMIN_PASSWORD`（口令真机登录 200）
+- 演示数据：`node tools/seed-demo.mjs --base=<公网URL>` → 3 种状态瓶 + 接力链 + 收藏 + 公开评论 + 通知，音频自检真 WebM/Opus
+
+**一键重部署（改文案后就跑它）**：
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File tools\deploy-cloudbase.ps1
+```
+脚本内建三个实测坑的对策（详见脚本头注释）：① 环境变量走 `DATABASE_URL_B64`（旧版 CLI `--envParams` 解析器按 `&`/`=` 截断真实连接串；脚本给本机 npx 缓存的 CLI 打幂等补丁注入 `EnvParams`，带锚点唯一性断言，**只改本机缓存、不碰仓库**，CLI 版本钉死 3.8.5）；② 全局隐藏旗标 `-y`（服务已存在时的「是否灰度」提示会卡死 detached 进程）；③ staging 用 robocopy 构建（Windows tar 解 git archive 会损坏中文曲目文件名）。
+
+**首次部署时的实测时间线（供排障对照）**：
+- 首版本 `music-drift-001` **失败**（`创建版本失败：任务失败`，424s）——根因：新命令未携带环境变量，容器起动即 `DATABASE_URL` 为空崩掉（探活失败）
+- `music-drift-002`（补丁注入 EnvParams + `-y`）→ `CreateVersion finished (336s)` → `ReleaseVersion finished` → `Deployment successful EXIT=0`
+
+**验收记录（公网，一次全绿）**：`/healthz` 200（contract 0.2.0-s1）→ `/` 200 → `POST /api/auth/login admin` 200 ADMIN → `GET /api/bottles/<SEA瓶>/comments` 200 items=1 → seed-demo exit 0。
+
+**日志**：部署输出（已脱敏）在 `%TEMP%\tcb-deploy-manual.log`；控制台图形化详情 `https://tcb.cloud.tencent.com/dev?envId=bg0527-d6gltfs0j67f8b9b9#/platform-run/service/detail?serverName=music-drift`。
+
+**注意**：体验版到期 2027-04-05；到期前若需迁移，镜像/代码/数据库全在自己手里（GitHub + Neon），换平台只需新平台重跑 5.6 的路 A。
+
+## 6. 文案可改一条龙（t33 合同必含 + 实测记录；公网落地见 5.9）
+
+
 
 改任何前端文案 = 三步：
 
@@ -290,9 +319,12 @@ pg_dump "$PROD_DATABASE_URL" -f backup-$(date +%F).sql          # 变更前必�
 # 1) 改 apps/web/src 下的文案（例：pages/not-found-page.tsx 的「找不到这一页」）
 # 2) 构建
 pnpm --filter @music-drift/web build
-# 3) 重新发布（本地彩排）：
+# 3) 重新发布：
+#    公网（腾讯云 CloudBase，实测）：
+powershell -NoProfile -ExecutionPolicy Bypass -File tools\deploy-cloudbase.ps1
+#    本地彩排：
 docker compose -f docker-compose.prod.yml up -d --build        # 镜像内重新 vite build
-#    （公网：fly deploy / 平台 Rebuild —— 见 5.6，未实测）
+#    （其他平台见 5.6，未实测）
 ```
 
 **产物可见性证明方式**：`Select-String apps\web\dist\assets\*.js -Pattern '<新文案>'`。
